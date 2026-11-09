@@ -36,7 +36,7 @@ before-arrival evidence counts are unaffected.
 
 The original study and archive remain frozen. The correction ledger supersedes
 their `reason` and post-departure `abandoned_tick` fields; consumers must not use
-the original reasons as causal labels. The [archived audit and replays](data/capture-visit-endings-v1.json)
+the original reasons as causal labels. The archived audit and replays (`docs/data/capture-visit-endings-v1.json`, in git history)
 retain every checked visit, the original report hashes and the corrections.
 
 ## Failure chronology

@@ -352,7 +352,7 @@ copied inputs**, all native traces, failures, target/scheduler checks, feedback,
 analyses, source/runtime, tests and logs. All **62 earlier manifests** and copied
 input origins remain unchanged. The original frozen specification is retained
 separately from this completed report. No confirmation use, model promotion or
-navigation qualification. See [results](data/flight-motor-command-balance-v1-results.json)
+navigation qualification. See results (`docs/data/flight-motor-command-balance-v1-results.json`, in git history)
 and [archive receipt](data/flight-motor-command-balance-v1-archive.json).
 
 ## Interpretation and next decision

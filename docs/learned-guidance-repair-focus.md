@@ -184,8 +184,8 @@ The package is
 It retains the frozen plan, source patch, executable, checkpoints, traces,
 analysis scripts and archive. Production controls remain unchanged.
 
-[Open the final synchronized replay](data/learned-guidance-repair-focus-v1-replay.html)
-to compare the four fixed models on all 15 declared replay cases.
+The final synchronized replay (`docs/data/learned-guidance-repair-focus-v1-replay.html`, in git history)
+compares the four fixed models on all 15 declared replay cases.
 
 ## Evidence checks
 
@@ -204,7 +204,7 @@ evaluation. Source states remain unchanged.
 The replay passes playback, case switching, all 60 terminal-state checks,
 precision dwell checks and narrow-screen overflow checks. All four plots and
 desktop, precision and mobile replay captures were inspected at 1× scale.
-The [machine-readable results](data/learned-guidance-repair-focus-v1-results.json)
+The machine-readable results (`docs/data/learned-guidance-repair-focus-v1-results.json`, in git history)
 include model identities, per-case gains and losses, snapshot behavior, the
 unselected near miss, timing and integrity receipts.
 

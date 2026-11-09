@@ -91,7 +91,7 @@ Runtime, runner and plan froze at
 The complete raw summary is
 `target/capture-flag-survey/neutral-join-v1-profiled/summary.json`, SHA-256
 `4bd0e1232f81e720c537415aa51f005b8b2c207fe5a84bd7d8cb7ab5e2488285`.
-The [tracked projection](data/neutral-timing-join-v1.json) retains commands,
+The tracked projection (`docs/data/neutral-timing-join-v1.json`, in git history) retains commands,
 source records, compositions, publication/termination states, budgets, full
 parity digests and all raw file hashes; repeated candidates and motor trajectories
 are omitted from later snapshots, rather than duplicated.

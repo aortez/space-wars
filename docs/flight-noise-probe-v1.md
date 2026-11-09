@@ -131,7 +131,7 @@ Nineteen focused Python tests passed. Production Python/native sources and nativ
 
 Used **972,617 action ticks** in **1,344 episodes**, plus 1,536 neutral setups. Worker times 296.16–626.49 seconds; independent verification 13.54 seconds. All seven subprocesses exited zero within budget. Zero training ticks, optimizer steps, new checkpoints or exports. No confirmation use, model promotion or general navigation claim.
 
-Archive `data/training-experiments/learned-flight-noise-probe-v1-20261024` retains 1,556 sources, unchanged runtime, 105 copied parent inputs, all traces, shared noise streams, compact policy evidence, parity, reconstructed metrics and logs. All 32 previous manifests and copied inputs remain unchanged. See [results](data/flight-noise-probe-v1-results.json) and [receipt](data/flight-noise-probe-v1-archive.json).
+Archive `data/training-experiments/learned-flight-noise-probe-v1-20261024` retains 1,556 sources, unchanged runtime, 105 copied parent inputs, all traces, shared noise streams, compact policy evidence, parity, reconstructed metrics and logs. All 32 previous manifests and copied inputs remain unchanged. See results (`docs/data/flight-noise-probe-v1-results.json`, in git history) and [receipt](data/flight-noise-probe-v1-archive.json).
 
 ## Next decision
 

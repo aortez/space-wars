@@ -99,7 +99,7 @@ audits and per-tick shared-budget reconciliations passed. The largest remote
 allocation was 127 queries in a tick, below the 384-query ceiling. All forty
 held-out matches finished: thirty by pilot death and ten by the deadline.
 
-The [compact result](data/capture-value-promotion-v1.json) retains every plan
+The compact result (`docs/data/capture-value-promotion-v1.json`, in git history) retains every plan
 row, command, outcome, visit, frozen prediction attempt, accepted switch's
 source report, unknown count, raw hash, work audit and timing measurement. Its
 projection manifest lists the omitted repeated fields and unchosen comparison

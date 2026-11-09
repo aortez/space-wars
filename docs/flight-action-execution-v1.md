@@ -100,7 +100,7 @@ are excluded. No commit or clean checkout is implied.
 
 All **240 episodes** completed, using **410,538 physics ticks**, plus the separately
 recorded **128 preflight ticks**. Workers took 333.3–347.4 concurrent seconds each.
-No model weights changed and no optimizer steps occurred. See [compact results](data/flight-action-execution-v1-results.json)
+No model weights changed and no optimizer steps occurred. See compact results (`docs/data/flight-action-execution-v1-results.json`, in git history)
 and [archive receipt](data/flight-action-execution-v1-archive.json).
 
 | Frozen model | Deterministic successes | Sampled successes | Sampled rate | Successes by sampled repeat |

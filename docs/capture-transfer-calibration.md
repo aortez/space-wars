@@ -95,7 +95,7 @@ commands, source/binary/raw-log hashes and every audited result.
 
 ## Results: 26 September 2026
 
-The complete record is [capture-transfer-calibration-v1.json](data/capture-transfer-calibration-v1.json).
+The complete record is `docs/data/capture-transfer-calibration-v1.json` (in git history).
 Raw reports, compressed controller traces and probe logs remain under
 `target/capture-flag-survey/transfer-calibration-v1`. Physics ran from clean
 `43c03cc`, binary SHA-256

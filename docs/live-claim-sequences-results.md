@@ -186,8 +186,8 @@ integration regression identified by the broader evaluation.
   `target/live-claim-sequences/v1/archives/`. Their hashes and every member's
   size/hash are bound in the manifest; the earlier archive is retained too.
 
-The committed [manifest](data/live-claim-sequences-v1.json) links the
-[compressed portable review bundle](data/live-claim-sequences-v1.json.gz).
+The committed manifest (`docs/data/live-claim-sequences-v1.json`, in git history) links the
+compressed portable review bundle (`docs/data/live-claim-sequences-v1.json.gz`, in git history).
 It includes the frozen plan, qualified source summary, original and replay
 reports, full derived sequence diagnostics, selected recovery observations,
 commands, source text, validation logs, audit interruption/resume receipts,

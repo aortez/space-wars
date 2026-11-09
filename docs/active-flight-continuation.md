@@ -147,7 +147,7 @@ supports the specific interruption fix, not a general win-rate improvement.
 
 [The result manifest](data/active-flight-continuation-v1.json) summarizes every
 run, including losses and unchanged outcomes.
-[The compressed evidence archive](data/active-flight-continuation-v1.json.gz)
+The compressed evidence archive (`docs/data/active-flight-continuation-v1.json.gz`, in git history)
 contains 68 exact documents: frozen summaries, diagnostic patch/log/replay,
 raw-file hashes, first changed controls, all continuation responses, physical
 milestones, sensor timings and validation logs. All embedded text hashes and

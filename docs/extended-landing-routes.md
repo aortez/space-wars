@@ -147,7 +147,7 @@ experiment changes no search deadline, probe count, equipment check or default.
 
 The [result manifest](data/extended-landing-routes-v1.json) records every game,
 unchanged outcome, physical visit and work total. The
-[compressed evidence](data/extended-landing-routes-v1.json.gz) contains 47 exact
+compressed evidence (`docs/data/extended-landing-routes-v1.json.gz`, in git history) contains 47 exact
 documents, including both study summaries, hashes for all 261 raw study files,
 physical and cover witnesses, two diagnostic replays, the diagnostic patch,
 the archive script and validation logs.

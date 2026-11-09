@@ -84,7 +84,7 @@ Clippy still fails with the same 16 existing message/file diagnostic identities;
 its log is byte-identical to the preceding baseline.
 
 The [manifest](data/rebuild-precise-arrival-v1.json) and
-[portable bundle](data/rebuild-precise-arrival-v1.json.gz) contain outcomes,
+portable bundle (`docs/data/rebuild-precise-arrival-v1.json.gz`, in git history) contain outcomes,
 arrival and placement audits, per-tick timelines, first-difference witnesses,
 explicit settling and scuttle witnesses, frozen source, validation and exporter.
 Verified raw archives remain in `target/rebuild-precise-arrival/v1/archives/`.

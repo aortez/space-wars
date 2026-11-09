@@ -222,7 +222,7 @@ checks passed. The production learner and Rust code were unchanged; the original
 source/runtime contracts were used for loading. Retained worker tensors contain
 reconstructed data and gradients, not newly trained models.
 
-The [results](data/flight-learning-signal-audit-v1-results.json) include all stages,
+The results (`docs/data/flight-learning-signal-audit-v1-results.json`, in git history) include all stages,
 gradient cases and boundary predictions. The
 [archive receipt](data/flight-learning-signal-audit-v1-archive.json) identifies
 the frozen source/specification, 36 rollout/gradient/row datasets, 48 continuation

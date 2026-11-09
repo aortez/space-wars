@@ -159,7 +159,7 @@ with the same 16 message/file diagnostics** as the preceding refinement. Its
 failed log and the baseline comparison are retained.
 
 The [manifest](data/rebuild-staging-v1.json) and
-[portable bundle](data/rebuild-staging-v1.json.gz) retain all reports/audits,
+portable bundle (`docs/data/rebuild-staging-v1.json.gz`, in git history) retain all reports/audits,
 control comparisons, all 129 staging rows, derived movement diagnostics,
 recorded witnesses, the 11 frozen changed files, validation logs, exporter and
 source/command/binary provenance. Complete raw traces remain in verified

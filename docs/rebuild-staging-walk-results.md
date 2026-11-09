@@ -136,7 +136,7 @@ unchanged. The original failure, corrected auditor, frozen originals and audit
 resume are retained.
 
 The [manifest](data/rebuild-staging-walk-v1.json) and
-[portable bundle](data/rebuild-staging-walk-v1.json.gz) include all reports and
+portable bundle (`docs/data/rebuild-staging-walk-v1.json.gz`, in git history) include all reports and
 audits, dense staging rows, onward movement timelines, impact/placement/boarding
 witnesses, first differences, validation logs, frozen source, exporter and
 source/command/binary provenance. Full raw traces remain in verified lossless

@@ -218,7 +218,7 @@ training remains separate implementation verification.
 Retain 1,597 frozen sources, 104 copied inputs, the task matrix, runtime/dependencies,
 96 scored traces, three continuation traces, every parity/probe result, tests,
 commands and timings. All 49 prior manifest hashes and copied input sources remain
-unchanged. See [results](data/flight-motor-retention-v1-results.json) and
+unchanged. See results (`docs/data/flight-motor-retention-v1-results.json`, in git history) and
 [archive receipt](data/flight-motor-retention-v1-archive.json). No reserved
 confirmation use, model promotion or navigation qualification. Local retention
 is not off-machine backup.

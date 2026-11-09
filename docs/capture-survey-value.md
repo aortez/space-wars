@@ -111,7 +111,7 @@ owned-base v13 replays retained the frozen predecessor's exact evaluator bytes,
 mission telemetry and recorded physical outcomes. All action/range/ownership
 prefix checks before the first switch passed.
 
-The [compact record](data/capture-survey-value-v1.json) retains every declared
+The compact record (`docs/data/capture-survey-value-v1.json`, in git history) retains every declared
 case, command, outcome, visit, frozen prediction attempt, accepted switch source
 report, coverage count, work audit, timing and artifact hash. Its projection
 manifest identifies omitted repeated counters, unchosen comparison examples and

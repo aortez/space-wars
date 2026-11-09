@@ -172,9 +172,9 @@ maximum publication age of **120 ticks**. The gate itself adds no queries.
 Aggregate graph/query work falls because the trajectories and several match
 durations change; this is not an efficiency result or a Pi performance claim.
 
-[The result manifest](data/pursuit-health-gate-v1.json) retains every outcome,
+The result manifest (`docs/data/pursuit-health-gate-v1.json`, in git history) retains every outcome,
 physical visit, pursuit entry, vehicle transition and comparison.
-[The compressed evidence archive](data/pursuit-health-gate-v1.json.gz) contains
+The compressed evidence archive (`docs/data/pursuit-health-gate-v1.json.gz`, in git history) contains
 73 exact documents: the original plan, all gate checks, physical/route/flight
 witnesses, first changed controls, pursuit and damage records, validation logs,
 and hashes for 407 raw files. Embedded text and raw-file hashes were verified;

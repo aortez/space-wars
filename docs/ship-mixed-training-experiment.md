@@ -160,7 +160,7 @@ deadline extension, or model-specific assistance was introduced.
 All three [genomes and provenance](../crates/engine-agent/fixtures/ship-arrival-mixed-v1/README.md)
 are retained. The repository also contains the
 [pretraining plan](data/ship-arrival-mixed-v1-plan.json) and
-[complete compact results](data/ship-arrival-mixed-v1-results.json), including
+complete compact results (`docs/data/ship-arrival-mixed-v1-results.json`, in git history), including
 every reported outcome, per-generation winners, and trace diagnostics.
 
 Local evidence is in `target/ship-curriculum/mixed-v1-pxqc6156/`, with a durable

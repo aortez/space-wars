@@ -182,8 +182,8 @@ The frozen profiled binary is
 `f4b173e5ed918f2a0724eba22eec81fbf32597270ddaeb0c5a341a340f287bed`.
 The complete summary at `target/transfer-approach/v1/summary.json` has SHA-256
 `074b66abbaa7e280cdcd9e7438cd5a5106d565f3ea6bf0bba762a0f4a114d9b3`.
-[The manifest](data/transfer-approach-v1.json) records summary/archive hashes,
-complete outcomes and checks. [The archive](data/transfer-approach-v1.json.gz)
+The manifest (`docs/data/transfer-approach-v1.json`, in git history) records summary/archive hashes,
+complete outcomes and checks. The archive (`docs/data/transfer-approach-v1.json.gz`, in git history)
 preserves the frozen plan, exact consumed observations and entry decisions,
 prior native witnesses, first changed controls, complete mission/vehicle/damage
 history, arrival geometry, validation logs, analysis scripts and raw-file hashes.

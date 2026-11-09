@@ -230,7 +230,7 @@ Preserve 1,581 frozen sources, 918 copied inputs, unchanged runtime, sixty new n
 traces, 540 compressed Python traces and policy records, 240 streams, all summaries,
 likelihoods, commands, tests and timings. All 45 previous manifests and copied input
 sources remain unchanged. Sealing verifies frozen source/input/runtime hashes.
-See [results](data/flight-propulsion-probe-v1-results.json) and
+See results (`docs/data/flight-propulsion-probe-v1-results.json`, in git history) and
 [archive receipt](data/flight-propulsion-probe-v1-archive.json). Local retention is
 not off-machine backup. No confirmation use, model promotion or general-navigation
 claim follows this probe.

@@ -104,7 +104,7 @@ default-feature library check. The 117 include 20 physical mission tests and
 the combat recovery test. The four-arm comparison and four automatic/control
 comparisons pass their terrain conservation and physical-speed audits.
 
-The [component audit](data/terrain-recovery-components-v1.json) verifies 2,352
+The component audit (`docs/data/terrain-recovery-components-v1.json`, in git history) verifies 2,352
 frozen inputs, 12 retained control files and 87 evidence files. The
 [automatic audit](data/terrain-recovery-reconsideration-v1.json) verifies 2,358
 frozen inputs, all four retained control streams and 120 evidence files.

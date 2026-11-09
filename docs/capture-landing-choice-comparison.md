@@ -103,7 +103,7 @@ The raw main summary is
 `3af41999d1a280bef54838ace5be018cd505ef5607adf414428c548e06a73e60`.
 The ordinary summary is in its `ordinary/` subdirectory, SHA-256
 `3d8eefb818859405daa23ab31daccb87c266c4bebe761cd0629ab6de514d6a9b`.
-[The tracked record](data/capture-landing-choice-v1.json) retains the full plan,
+The tracked record (`docs/data/capture-landing-choice-v1.json`, in git history) retains the full plan,
 audited comparisons, selected/reference assessments and raw hashes; full
 per-direction ledgers remain in the hashed raw reports.
 

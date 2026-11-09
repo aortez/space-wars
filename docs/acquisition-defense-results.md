@@ -136,9 +136,9 @@ strength sampling and the stale-recovery correctness fix remain separate work.
   the explicitly recorded runner/test correction. Runtime, matrix and decision
   rules are unchanged.
 
-The [manifest](data/acquisition-defense-v1.json) binds the commands, binary,
+The manifest (`docs/data/acquisition-defense-v1.json`, in git history) binds the commands, binary,
 checks, comparisons, reviews and every raw archive. The
-[review bundle](data/acquisition-defense-v1.json.gz) includes exact plans,
+review bundle (`docs/data/acquisition-defense-v1.json.gz`, in git history) includes exact plans,
 auditors, changed runtime sources, physical audits, defense witnesses, snapshots,
 logs and the preserved failed audit. All **340 archived files** are verified
 losslessly before removing generated raw copies: **21,241,249,994 raw bytes**

@@ -81,7 +81,7 @@ to these outcomes. Failures and unchanged matches are retained.
 
 ## Results at `b6e74f3`
 
-The [machine-readable results](data/capture-mission-value-v1.json) retain the
+The machine-readable results (`docs/data/capture-mission-value-v1.json`, in git history) retain the
 plan, commands, binary/report hashes, both players, unknown evidence, outcomes
 and timings. All **43 matches finished**, representing 269.99 simulated
 minutes: 38 ended by pilot death and five by the match deadline. All physical

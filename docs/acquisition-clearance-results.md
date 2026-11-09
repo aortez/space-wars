@@ -117,8 +117,8 @@ budget, defense, laser and clearance audits. The six qualification games with
 inherited partial impact observers retain **275,268 native impact rows**, with
 zero overrides. No audit corrections or game retries are needed.
 
-The [manifest](data/acquisition-clearance-v1.json) and
-[portable review bundle](data/acquisition-clearance-v1.json.gz) bind the frozen
+The manifest (`docs/data/acquisition-clearance-v1.json`, in git history) and
+portable review bundle (`docs/data/acquisition-clearance-v1.json.gz`, in git history) bind the frozen
 inputs, commands, binary, comparisons, audits, selected native witnesses and logs.
 Raw archives remain under `target/acquisition-clearance/v1/archives`: **471 files,
 32,368,892,683 raw bytes in 4,474,915,241 compressed bytes**. Every member is

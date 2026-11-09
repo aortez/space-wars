@@ -112,8 +112,8 @@ Final before-export device temperatures stayed at or below 76°C and firmware th
 
 ## Reusable evidence and remaining work
 
-- [Summary JSON](data/pizza-cascade-20261018-summary.json): 65 headless runs, 24 GPU runs, timing windows, lifecycle counts and repeat comparisons.
-- [Raw archive](data/pizza-cascade-20261018-raw.tar.gz) and [checksum/build manifest](data/pizza-cascade-20261018-manifest.json): per-update simulation samples, CPU counters, complete KMS/status captures, exact launch commands, binary/build identities, calibration and focused validation logs. No binaries or saved user settings are included.
+- Summary JSON (`docs/data/pizza-cascade-20261018-summary.json`, in git history): 65 headless runs, 24 GPU runs, timing windows, lifecycle counts and repeat comparisons.
+- Raw archive (`docs/data/pizza-cascade-20261018-raw.tar.gz`, in git history) and [checksum/build manifest](data/pizza-cascade-20261018-manifest.json): per-update simulation samples, CPU counters, complete KMS/status captures, exact launch commands, binary/build identities, calibration and focused validation logs. No binaries or saved user settings are included.
 - [Screenshot manifest](screenshots/pizza-capacity/validation.json): refreshed local physical exports and actual Pi 4 GPU capture, with source, dimensions and hashes. Screenshots occur after timing and cannot establish performance or an exact pictured population from an earlier status sample.
 
 Unfinished: Pi 5/HyperPixel validation (device is offline); ordinary gravity-cascade physics/frame stalls; isolated single-explosion and non-explosion production controls; exact per-update/per-frame joining; cold GPU-cache measurements. The existing raw stage evidence supports the next focused physics investigation, not a speculative renderer/allocator rewrite or a reduction in fragments/physics quality. #354 and #359 remain open. Passing functional tests and the measured dense lookup improvement do not override the failed ordinary performance check.

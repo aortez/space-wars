@@ -19,8 +19,7 @@ there is no private repository for it.
   code reads it. When a change seems to need another committed data file, raise
   it with the owner first.
 - `docs/data` keeps the files code already reads and small summaries of the
-  last few experiments. Delete old results rather than adding to them.
-  `.github/ci/docs-data-grandfathered.txt` lists the oversized files that
-  predate this rule, and it only shrinks.
+  last few experiments. Delete old results rather than adding to them; a
+  deleted file stays in git history, and the document that cited it says so.
 - OTA run records (`ota-<subject>-<date>.json`) live outside the repository.
   The OTA documents name them so the owner can find them locally.

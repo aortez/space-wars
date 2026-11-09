@@ -197,7 +197,7 @@ written checkpoints and 20 exports, complete traces, endpoint response outputs a
 process statuses. All 24 previous manifests and referenced inputs remain unchanged.
 No network-size, reward, actuator, task-distribution or physics change. Default scaling
 remains `schema-v1`; the task arm is an explicit experiment option. No reserved
-confirmation or general-flight claim. See [results](data/flight-input-scaling-v1-results.json)
+confirmation or general-flight claim. See results (`docs/data/flight-input-scaling-v1-results.json`, in git history)
 and [archive receipt](data/flight-input-scaling-v1-archive.json).
 
 ## Next decision

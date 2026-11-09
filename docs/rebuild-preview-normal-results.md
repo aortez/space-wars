@@ -134,7 +134,7 @@ provenance; affected harness/tooling checks and the release build are rerun.
 Controls retain **46 handoff / 41 coarse** historical files outside the two
 selector timing logs, including prior audits with their original timing
 provenance. The [manifest](data/rebuild-preview-normal-v2.json) and
-[portable evidence bundle](data/rebuild-preview-normal-v2.json.gz) include full
+portable evidence bundle (`docs/data/rebuild-preview-normal-v2.json.gz`, in git history) include full
 audits, selector forecasts, actual-contact witnesses, both batch histories,
 validation, frozen and repaired source, exporter and verified archive receipts.
 Full archives remain under `target/rebuild-preview-normal/v1/archives/` and

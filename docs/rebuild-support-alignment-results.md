@@ -88,7 +88,7 @@ about a trailing zero in a test literal was fixed before freezing; runtime
 behavior was not retuned after observing these replays.
 
 The [manifest](data/rebuild-support-alignment-v1.json) and
-[portable bundle](data/rebuild-support-alignment-v1.json.gz) contain frozen
+portable bundle (`docs/data/rebuild-support-alignment-v1.json.gz`, in git history) contain frozen
 source, validation, all audits, timelines, first differences, the successful
 settling counterexample and the exporter. Verified raw archives remain in
 `target/rebuild-support-alignment/v1/archives/`.

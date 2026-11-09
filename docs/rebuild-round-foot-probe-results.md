@@ -81,7 +81,7 @@ geometry, filtering, sensors, exclusions, initial overlap, invalid inputs and
 unchanged physics.
 
 The [manifest](data/rebuild-round-foot-probe-v1.json) and
-[portable bundle](data/rebuild-round-foot-probe-v1.json.gz) contain the frozen
+portable bundle (`docs/data/rebuild-round-foot-probe-v1.json.gz`, in git history) contain the frozen
 sources, probes, audits, native contact traces, predictions, validation logs and
 exporter. Verified full raw archives remain under
 `target/rebuild-round-foot-probe/v1/archives/`.

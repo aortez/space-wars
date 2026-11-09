@@ -208,7 +208,7 @@ passed. Rust code was unchanged; the captured executable was rebuilt after sourc
 freeze. All **96 trained Rust/PyTorch parity fixtures** passed with identical
 discrete controls and maximum absolute output error **1.43×10⁻⁶**.
 
-The [machine-readable results](data/flight-persistent-exploration-v1-results.json)
+The machine-readable results (`docs/data/flight-persistent-exploration-v1-results.json`, in git history)
 include per-seed physical outcomes, control statistics, parity and trace inspection.
 The [archive receipt](data/flight-persistent-exploration-v1-archive.json) identifies
 the local immutable archive with all **774 checkpoints**, twelve exports, all

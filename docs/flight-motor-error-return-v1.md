@@ -265,7 +265,7 @@ Analysis includes **14,400 alternative-versus-baseline paired horizon rows /3,20
 cells**, plus 7,200 direct plus-versus-minus rows /1,600 cells. All observed returns,
 critic terms, failures and draws remain available. Full LF-069/LF-070 archives
 and all 66 previous manifests verify unchanged. See
-[results](data/flight-motor-error-return-v1-results.json),
+results (`docs/data/flight-motor-error-return-v1-results.json`, in git history),
 [findings](data/flight-motor-error-return-v1-findings.json) and
 [archive receipt](data/flight-motor-error-return-v1-archive.json).
 

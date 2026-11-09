@@ -40,11 +40,11 @@ shapes, where all models and native control take damage, and world 750008 player
 on the latter pair after 70 ticks. The separate world-710003 host diagnostics
 remain unresolved; these results do not establish that recovery is impossible.
 
-[Open the synchronized replay](data/learned-guidance-priority-v1-replay.html)
-to inspect all five models on all 226 match starts. It includes case groups,
+The synchronized replay (`docs/data/learned-guidance-priority-v1-replay.html`, in git history)
+covers all five models on all 226 match starts. It includes case groups,
 playback, speed, scrubbing, controls and exact identities. It shows recorded
 flight paths relative to the target; terrain and other world geometry are not
-rendered. The [complete results](data/learned-guidance-priority-v1-results.json)
+rendered. The complete results (`docs/data/learned-guidance-priority-v1-results.json`, in git history)
 include case-level gains, losses and verification counts.
 
 ## Training and checkpoint choice

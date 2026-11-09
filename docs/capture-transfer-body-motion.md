@@ -141,14 +141,14 @@ The corpus covers **55,718 physical ticks**, **111,452 controller rows and the
 same number of sensor rows**, **1,052,460,654 decompressed trace bytes**, 88 raw
 files and eight logs. There were no failures in the eight-run experiment and no
 dropped cases.
-The [tracked projection](data/capture-transfer-body-motion-v1.json) preserves
+The tracked projection (`docs/data/capture-transfer-body-motion-v1.json`, in git history) preserves
 commands, forecasts, shared-time differences, endpoint clocks, historical audits
 and hashes. Raw summary:
 `target/capture-flag-survey/transfer-body-motion-v1/summary.json`, SHA-256
 `19bc11c14a5515f5fedf765ddc19852e2394cffdc28b766dfe5d52e6b5397703`.
 
 The independent evidence audit is recorded separately in
-[the audit report](data/capture-transfer-body-motion-audit-v1.json). Its script
+the audit report (`docs/data/capture-transfer-body-motion-audit-v1.json`, in git history). Its script
 is `target/capture-flag-survey/transfer-body-motion-post-audit.py`; it does not
 import the new paired-comparison runner. The report pins its own code and any
 older helpers, verifies raw evidence and the tracked projection, and reconstructs

@@ -162,7 +162,7 @@ powered infeasibility or permission to raise the allowance.
 ## Evidence and validation
 
 The [result manifest](data/cover-walk-bounds-v1.json) records every case and
-comparison. Its [compressed evidence](data/cover-walk-bounds-v1.json.gz) contains
+comparison. Its compressed evidence (`docs/data/cover-walk-bounds-v1.json.gz`, in git history) contains
 47 exact documents: frozen summaries, hashes for 261 raw files, physical and
 scheduling witnesses, powered stage measurements and patch, and validation logs.
 

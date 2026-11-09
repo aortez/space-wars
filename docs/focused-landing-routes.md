@@ -163,7 +163,7 @@ acceptance threshold changed in this study.
 
 The [result manifest](data/focused-landing-routes-v1.json) records each original
 comparison, physical visit outcome, combat counter, delivery age and charged
-work. Its [compressed evidence](data/focused-landing-routes-v1.json.gz) includes
+work. Its compressed evidence (`docs/data/focused-landing-routes-v1.json.gz`, in git history) includes
 the exact current/prior summaries, raw file manifest, physical milestones,
 route-delivery witnesses and the failed cover-search handoff. Full per-tick
 streams remain at the hashed local paths.

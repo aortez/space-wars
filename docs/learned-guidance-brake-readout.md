@@ -66,7 +66,7 @@ outputs; closed-loop effects still require physical evaluation.
 
 ![Baseline brake outputs across all precision cases and training approaches](data/learned-guidance-brake-readout-v1-outputs.png)
 
-The [machine-readable report](data/learned-guidance-brake-readout-v1-results.json)
+The machine-readable report (`docs/data/learned-guidance-brake-readout-v1-results.json`, in git history)
 retains per-case gains and losses, output distributions, population history,
 settling measurements and verification counts. The useful next diagnosis is the
 new sun-avoidance regression alongside the five remaining no-brake training

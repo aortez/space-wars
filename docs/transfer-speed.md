@@ -196,8 +196,8 @@ The frozen profiled binary is
 `f4cc149d6591e58a192aa3570bbc2b1f759277acfa14b5fbe549cedb7df1fa2a`.
 The completed summary is `target/transfer-speed/v1/summary.json`, SHA-256
 `0f6d1217d577f14ba590781ac00987a4ee595db99bab04c8264b9d1f742d865b`.
-[The manifest](data/transfer-speed-v1.json) records complete outcomes, checks and
-summary/archive hashes. [The archive](data/transfer-speed-v1.json.gz) preserves
+The manifest (`docs/data/transfer-speed-v1.json`, in git history) records complete outcomes, checks and
+summary/archive hashes. The archive (`docs/data/transfer-speed-v1.json.gz`, in git history) preserves
 the frozen plan, exact consumed observations and velocity decisions, native
 route/physical witnesses, first changed controls, mission/vehicle/damage history,
 approach geometry, baseline diagnosis, validation logs, reproduction scripts and

@@ -50,7 +50,7 @@ precision traces. Native-source reconstruction and the separate preflight bring
 the completed execution phases to **75.6 seconds**. Compilation, the rejected
 first preflight, analysis and packaging are outside that timing.
 
-The [machine-readable results](data/learned-guidance-brake-bias-v1-results.json)
+The machine-readable results (`docs/data/learned-guidance-brake-bias-v1-results.json`, in git history)
 retain every variant and per-case outcome. This finite grid establishes that
 none of the tested uniform shifts meets retention; it does not rule out every
 intermediate bias or a different state-dependent brake policy.

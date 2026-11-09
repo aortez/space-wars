@@ -158,7 +158,7 @@ zero-step v1 preflight failures. No fresh random games or tuning were performed.
 
 The [manifest](data/rebuild-replay-v2.json) records the commands, hashes,
 validation results, continuation outcomes, survey counts and archive members.
-The [portable review bundle](data/rebuild-replay-v2.json.gz) contains both plans,
+The portable review bundle (`docs/data/rebuild-replay-v2.json.gz`, in git history) contains both plans,
 reports and audits, the complete 782-row corrected live continuation, selected
 dense reference and recorded-control windows, the decisive paired survey,
 frozen source changes, audit repair, build/test logs and reproducible exporter.

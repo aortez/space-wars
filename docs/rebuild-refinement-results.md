@@ -153,7 +153,7 @@ remains an outstanding repository lint limitation.
 The [manifest](data/rebuild-refinement-v1.json) records the commands, hashes,
 work counts, direct control comparisons, route and landing receipts, validation
 outcomes and archive inventories. The
-[portable bundle](data/rebuild-refinement-v1.json.gz) includes all reports and
+portable bundle (`docs/data/rebuild-refinement-v1.json.gz`, in git history) includes all reports and
 audits, the 13 frozen changed sources, validation logs, complete precise-route
 output and utility sources, landing timeline, dense witnesses and reproducible
 exporter. Its provenance links the prior coverage and original replay bundles.

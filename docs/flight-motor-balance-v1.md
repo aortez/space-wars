@@ -280,7 +280,7 @@ runtime, original/corrected metadata and both verifier results. All **61 prior
 manifests**, copied input origins and LF-065's full sealed archive remain
 unchanged. Actual new physics/training/optimizer steps are all **zero**; there
 are no new checkpoints, policy exports, confirmation use or promotion. See
-[results](data/flight-motor-balance-v1-results.json) and
+results (`docs/data/flight-motor-balance-v1-results.json`, in git history) and
 [archive receipt](data/flight-motor-balance-v1-archive.json).
 
 ## Interpretation and next decision

@@ -113,7 +113,7 @@ check. The supplied controls, combined controls, and four three-arm candidate
 comparisons each pass their explicit diagnostic and material/physical audits.
 This is not full workspace CI or Pi performance qualification.
 
-The [machine-readable audit](data/terrain-recovery-integration-v1.json) contains
+The machine-readable audit (`docs/data/terrain-recovery-integration-v1.json`, in git history) contains
 the runtime identity, comparisons, native completion receipt, actual feature
 events and SHA-256 receipts for **496 generated evidence files**. The
 [auditor](../tools/audit-terrain-recovery-integration.py) checks frozen inputs,

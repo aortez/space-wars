@@ -237,7 +237,7 @@ cannot estimate a general win rate. Keep powered capture opt-in.
 
 The [result manifest](data/powered-mission-integration-v1.json) contains every
 run's physical visit results, combat counters, delivery counts, allocation
-totals and paired differences. The [compressed evidence](data/powered-mission-integration-v1.json.gz)
+totals and paired differences. The compressed evidence (`docs/data/powered-mission-integration-v1.json.gz`, in git history)
 preserves the exact original rejected summary, both re-audit summaries, the
 369-file raw manifest, milestone/flight witnesses and the budget diagnosis.
 The full per-tick streams remain in their hashed local paths.

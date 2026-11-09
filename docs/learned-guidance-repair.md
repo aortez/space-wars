@@ -99,8 +99,8 @@ approach behavior. It does not test a new speed or elapsed-time reward.
 
 ![Focal approach behavior](data/learned-guidance-repair-v1-behavior.png)
 
-[Open the synchronized replay](data/learned-guidance-repair-v1-replay.html) to
-compare all saved models on the five precision tasks and both approach shapes.
+The synchronized replay (`docs/data/learned-guidance-repair-v1-replay.html`, in git history)
+compares all saved models on the five precision tasks and both approach shapes.
 It shows target distance, target-relative speed, dwell, controls and terminal
 outcome. The precision target circle has radius 2. Match arrival uses the native
 handoff conditions, not distance to that plotted point alone. The player shows
@@ -135,7 +135,7 @@ Physical source records remain unchanged after every model evaluation.
 The replay passes playback, case switching, all 58 terminal-state checks,
 precision dwell display checks and narrow-screen overflow checks. Plots and
 desktop/mobile captures were inspected at 1× scale. The
-[machine-readable results](data/learned-guidance-repair-v1-results.json) retain
+machine-readable results (`docs/data/learned-guidance-repair-v1-results.json`, in git history) retain
 model identities, lost/gained case lists, scores, timing and trajectory metrics.
 
 The retained package is

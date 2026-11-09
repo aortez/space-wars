@@ -200,9 +200,9 @@ of **4 graph operations / 384 queries**, with published route age at most 120
 ticks. Different trajectories have different total work; this is not a device
 performance claim.
 
-[The manifest](data/initial-cover-admission-v1.json) records complete per-case
+The manifest (`docs/data/initial-cover-admission-v1.json`, in git history) records complete per-case
 comparisons and initial event timelines.
-[The compressed archive](data/initial-cover-admission-v1.json.gz) retains ninety
+The compressed archive (`docs/data/initial-cover-admission-v1.json.gz`, in git history) retains ninety
 exact documents: frozen summaries/plan, current-observation event witnesses,
 physical/route/flight/health witnesses, first changed controls, phase and damage
 histories, validation logs and hashes for 500 raw files. Embedded documents, raw

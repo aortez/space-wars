@@ -195,7 +195,7 @@ Compilation and whitespace checks passed.
 The sealed archive retains 1,528 selected source files, 405 copied parent inputs,
 all new checkpoints and physics/probability evidence, logs, commands, frozen criteria
 and analysis. Eighteen earlier manifests and referenced parent files remain unchanged.
-See [compact results](data/flight-mixed-duration-v1-results.json) and
+See compact results (`docs/data/flight-mixed-duration-v1-results.json`, in git history) and
 [archive receipt](data/flight-mixed-duration-v1-archive.json). Local retention is not
 off-machine backup.
 

@@ -278,10 +278,10 @@ The frozen binary is
 The completed summary is `target/ordinary-transfer-response/v1/summary.json`,
 SHA-256 `fbb2f4d04d39e16ba19b3162d3237178694fdf62617f87b54ae707626bb122aa`.
 
-The [manifest](data/ordinary-transfer-response-v1.json) records all 47 outcomes,
+The manifest (`docs/data/ordinary-transfer-response-v1.json`, in git history) records all 47 outcomes,
 separate cohort totals, paired changes, exact survey comparisons, legacy and
 retained-response parity, input/tool/binary hashes and **752 raw-file hashes**.
-The [compressed archive](data/ordinary-transfer-response-v1.json.gz) preserves
+The compressed archive (`docs/data/ordinary-transfer-response-v1.json.gz`, in git history) preserves
 the original runner summary, physical visit audits, response witnesses,
 triggering-projectile tracks, report checkpoints and final reports excluding
 their large samples/events arrays. Contact, loss and recovery evidence remains

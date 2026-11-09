@@ -148,7 +148,7 @@ Archive `data/training-experiments/learned-flight-early-hold-v1-20261024` retain
 new checkpoints and twenty exports, admissions, training/evaluation traces, parity
 and process logs. All 27 prior manifests and copied parent inputs remain unchanged.
 No model promotion, confirmation use or approach/navigation claim. See
-[results](data/flight-early-hold-v1-results.json) and
+results (`docs/data/flight-early-hold-v1-results.json`, in git history) and
 [archive receipt](data/flight-early-hold-v1-archive.json).
 
 ## Next decision

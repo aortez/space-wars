@@ -83,7 +83,7 @@ geometric tolerances never relax bit-exact source identity or control parity.
 
 ## Results: 26 September 2026
 
-The complete record is [capture-transfer-forecast-v1.json](data/capture-transfer-forecast-v1.json).
+The complete record is `docs/data/capture-transfer-forecast-v1.json` (in git history).
 Raw data remains under `target/capture-flag-survey/transfer-forecast-v1`.
 The model, runner and fixed plan were committed as clean `f99717e` before
 examining physical forecast errors. The release example SHA-256 is

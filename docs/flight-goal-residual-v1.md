@@ -184,7 +184,7 @@ Preserve 1,575 frozen sources, 172 copied inputs, six configs, the rebuilt runti
 108 checkpoints, 24 pilot/resume exports, six preflight exports and every trace and
 response output. All 42 previous manifests and copied input sources remain
 unchanged. Source/runtime/config/archive hashes are verified. See
-[results](data/flight-goal-residual-v1-results.json) and
+results (`docs/data/flight-goal-residual-v1-results.json`, in git history) and
 [archive receipt](data/flight-goal-residual-v1-archive.json). Local retention is not
 off-machine backup. No confirmation use, promotion or commit is implied.
 

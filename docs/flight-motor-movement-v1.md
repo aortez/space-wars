@@ -262,7 +262,7 @@ Retain **816 checkpoints, 804 rollouts, 48 exports, 1,623 frozen sources and 204
 copied inputs**, all traces/diagnostics, runtime, source archive, tests, commands
 and logs. Verify all **58 previous manifests** and original input hashes unchanged.
 The frozen source/specification and all results are retained separately from this
-completed report. See [results](data/flight-motor-movement-v1-results.json) and
+completed report. See results (`docs/data/flight-motor-movement-v1-results.json`, in git history) and
 [archive receipt](data/flight-motor-movement-v1-archive.json).
 
 ## Interpretation and next decision

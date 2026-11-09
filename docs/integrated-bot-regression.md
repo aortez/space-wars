@@ -154,7 +154,7 @@ result. Original and replay input hashes were verified after execution.
 
 The [manifest](data/integrated-bot-regression-v1.json) records the replay parity,
 mode counts, loss provenance and v16 report checks. The
-[evidence archive](data/integrated-bot-regression-v1.json.gz) preserves the exact
+evidence archive (`docs/data/integrated-bot-regression-v1.json.gz`, in git history) preserves the exact
 summaries, frozen plan, audits, derived per-tick diagnostics, selected full source
 rows and logs. Full raw streams remain under `target/integrated-bot/regression-v1`
 and the original `comparison-v1`, with hashes retained in the summaries.

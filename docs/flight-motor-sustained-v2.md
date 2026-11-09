@@ -311,7 +311,7 @@ No confirmation set, model promotion, native assistance or navigation qualificat
 Retain **816 checkpoints, 804 rollouts, 48 exports**, every trace/log, **1,617
 sources** and **176 copied inputs**, with lossless gzip and verified original-byte
 hashes. All **56 previous manifests** remain unchanged. The failed LF-060 archive
-is preserved with its original gate and result. See [results](data/flight-motor-sustained-v2-results.json)
+is preserved with its original gate and result. See results (`docs/data/flight-motor-sustained-v2-results.json`, in git history)
 and [archive receipt](data/flight-motor-sustained-v2-archive.json).
 
 ## Next decision

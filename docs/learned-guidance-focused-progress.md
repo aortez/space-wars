@@ -47,7 +47,7 @@ middle-50% bands include candidates that fail retention. Both runs contain a
 candidate that completes all eight remaining starts while losing precision.
 The best fully retained candidates reach zero additional starts in the control
 and two in the focused run. The
-[machine-readable results](data/learned-guidance-focused-progress-v1-results.json)
+machine-readable results (`docs/data/learned-guidance-focused-progress-v1-results.json`, in git history)
 retain every generation's population summaries and per-case comparisons.
 
 Training takes **4m37s** for the control and **4m39s** for the focused run,

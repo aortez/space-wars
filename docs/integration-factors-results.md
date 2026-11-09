@@ -157,8 +157,8 @@ An interruption after the first eight raw games required an explicit audit
 resume: their original hashes and logs were verified and reused, and the
 pre-interruption summary and both runner logs are retained.
 
-The [manifest](data/integration-factors-v1.json) and
-[review bundle](data/integration-factors-v1.json.gz) contain the frozen plan and
+The manifest (`docs/data/integration-factors-v1.json`, in git history) and
+review bundle (`docs/data/integration-factors-v1.json.gz`, in git history) contain the frozen plan and
 inputs, exact commands, all results and contrasts, physical/planning audits,
 both actors' chronology, full first-action witnesses and verification logs.
 Full streams remain in **32 archives / 552 files**, with 29,024,613,661 raw

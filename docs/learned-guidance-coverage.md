@@ -35,10 +35,10 @@ generation 135 completes 24, the old final model 22, and the broader model 23.
 On the 26 native-completing final-evaluation starts, those counts are 24, 18 and
 20. Each learned model also completes four of the six native final-evaluation
 nonarrivals. The complete case-level comparisons are in the
-[results](data/learned-guidance-coverage-v1-results.json).
+results (`docs/data/learned-guidance-coverage-v1-results.json`, in git history).
 
-[Open the synchronized replay](data/learned-guidance-coverage-v1-replay.html)
-to compare all three models on any of the 226 match starts. It includes grouped
+The synchronized replay (`docs/data/learned-guidance-coverage-v1-replay.html`, in git history)
+compares all three models on any of the 226 match starts. It includes grouped
 case selection, play/pause, speed, scrubbing, recorded controls, outcomes and
 model identities. It is a schematic flight trace, without terrain or other
 world geometry.

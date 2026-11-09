@@ -131,7 +131,7 @@ desktop/Pi scene-hash matches. Quarry/curved comparisons also match the physical
 motion hashes. The repeated spike runs retain their hashes and the profiled
 runs pass replay with profiling disabled on the replay side.
 
-[Raw measurements, source/binary hashes and deployment](data/dirt-collapse-cost-20261008.json) ·
+Raw measurements, source/binary hashes and deployment (`docs/data/dirt-collapse-cost-20261008.json`, in git history) ·
 [per-second traces](data/dirt-collapse-cost-traces-20261008.jsonl.gz) ·
 [before/after stage profiles](data/dirt-collapse-cost-profiles-20261008.jsonl.gz) ·
 [local runtime verification](data/dirt-collapse-cost-local-live-20261008.txt) ·

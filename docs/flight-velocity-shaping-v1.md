@@ -179,7 +179,7 @@ differ because source and explicit reward configuration changed; old checkpoints
 are not silently accepted for resume. All **96 trained Rust/PyTorch parity
 fixtures** passed with matching actions and maximum output error **1.43×10⁻⁶**.
 
-The [results](data/flight-velocity-shaping-v1-results.json) contain per-seed gates,
+The results (`docs/data/flight-velocity-shaping-v1-results.json`, in git history) contain per-seed gates,
 trajectories, action statistics and approach diagnostics. The
 [archive receipt](data/flight-velocity-shaping-v1-archive.json) identifies all
 **774 checkpoints**, twelve exports, training/development traces, frozen selected

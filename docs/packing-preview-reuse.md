@@ -131,9 +131,9 @@ material duel with Weak/Angular dirt and heavy asteroid arrivals every second.
 Its live smoke test ran at about 60 updates per second. No commit or PR has been
 created for this pass.
 
-[Measurements and build identities](data/dirt-packing-reuse-20261008.json) ·
+Measurements and build identities (`docs/data/dirt-packing-reuse-20261008.json`, in git history) ·
 [per-second diagnostics](data/dirt-packing-reuse-traces-20261008.jsonl.gz) ·
-[profiles](data/dirt-packing-reuse-profiles-20261008.jsonl.gz) ·
-[frozen inspection reports](data/dirt-packing-reuse-inspections-20261008.jsonl.gz).
+profiles (`docs/data/dirt-packing-reuse-profiles-20261008.jsonl.gz`, in git history) ·
+frozen inspection reports (`docs/data/dirt-packing-reuse-inspections-20261008.jsonl.gz`, in git history).
 Local source snapshots, executables, raw output and reproduction scripts are in
 `target/dirt-cave-packing-review/`.

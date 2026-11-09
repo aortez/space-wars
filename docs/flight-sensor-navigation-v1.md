@@ -154,7 +154,7 @@ The retained experiment is `learned-flight-sensor-navigation-v1-20261022`.
 Source was captured before the final run, including uncommitted and untracked
 workspace files. Plans, full reports, the viewer, snapshots, matching executable,
 source hashes and validation artifacts are retained under `data/training-experiments/`.
-The [compact results](data/flight-sensor-navigation-v1-results.json) omit raw
+The compact results (`docs/data/flight-sensor-navigation-v1-results.json`, in git history) omit raw
 route samples, which remain in the archived full report. The
 [archive receipt](data/flight-sensor-navigation-v1-archive.json) identifies the
 retained files and verification. Earlier C0 and mechanics archives are unchanged.

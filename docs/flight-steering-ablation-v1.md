@@ -95,7 +95,7 @@ clean checkout is implied.
 All **192 new episodes** completed in **177,917 physics ticks**, plus **128 preflight
 ticks**. The **324,138** fully sampled baseline ticks were reused from the sealed
 parent archive, not rerun. Workers took 128.6–153.8 concurrent seconds. There were
-no optimizer steps or model changes. See [compact results](data/flight-steering-ablation-v1-results.json)
+no optimizer steps or model changes. See compact results (`docs/data/flight-steering-ablation-v1-results.json`, in git history)
 and [archive receipt](data/flight-steering-ablation-v1-archive.json).
 
 | Frozen model | Fully sampled | Mean steering, sampled buttons | Success-rate gain | New successes by repeat |

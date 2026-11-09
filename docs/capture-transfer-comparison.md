@@ -94,7 +94,7 @@ No deployment is part of this slice.
 Runtime, runner, budgets and this plan were frozen at `9f51d33`; the entire matrix
 passed on its first attempt, with no tuning or source replacement. Release binary
 SHA-256: `ebf4d8d974bac8116effd4839ebf8c4bdfda4ec4b96a549a433cc472ac9b0e43`.
-The full record is [capture-transfer-comparison-v1.json](data/capture-transfer-comparison-v1.json),
+The full record is `docs/data/capture-transfer-comparison-v1.json` (in git history),
 with raw artifacts in `target/capture-flag-survey/transfer-comparison-v1`.
 
 All **39 runs** complete: 13 frozen ordinary baselines and 26 comparison runs.

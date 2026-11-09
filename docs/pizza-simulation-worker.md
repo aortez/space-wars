@@ -169,11 +169,11 @@ python3 tools/pizza-worker-summary.py /path/to/present-runs --pair every fresh \
 The summary rejects any pair whose fingerprints differ, any run whose recorded
 mode the client's own status does not confirm, any `direct` or `worker` run
 in the other mode and, with `--desktop`, any run that does not replay the
-desktop seed-7 extracts. The [archive](data/pizza-worker-20261018-raw.tar.gz)
+desktop seed-7 extracts. The archive (`docs/data/pizza-worker-20261018-raw.tar.gz`, in git history)
 retains the first comparison under `pi/`, the second under `pi-present/` and
 the desktop end-to-end reports under `desktop/`. With `--desktop` on the
 `extracts` directory of the
-[bounded-gravity archive](data/pizza-gravity-20261018-raw.tar.gz), the two
+bounded-gravity archive (`docs/data/pizza-gravity-20261018-raw.tar.gz`, in git history), the two
 commands reproduce the [worker summary](data/pizza-worker-20261018-summary.json)
 and the [presentation summary](data/pizza-worker-20261018-present-summary.json)
 byte for byte. The [manifest](data/pizza-worker-20261018-manifest.json) records

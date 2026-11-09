@@ -145,7 +145,7 @@ No frozen process was retried, no gate changed after execution, and no longer ru
 Retain 1,562 sources, six configs, 128 copied inputs, 108 new checkpoints and 24 exports,
 all training/evaluation traces, admissions, likelihood diagnostics, parity and process
 records. All 35 prior manifests and copied inputs remain unchanged. No confirmation or
-model promotion. See [results](data/flight-rate-training-v1-results.json) and
+model promotion. See results (`docs/data/flight-rate-training-v1-results.json`, in git history) and
 [archive receipt](data/flight-rate-training-v1-archive.json).
 
 ### Next decision

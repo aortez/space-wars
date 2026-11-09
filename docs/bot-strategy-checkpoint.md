@@ -68,7 +68,7 @@ reuses that binary byte for byte; it does not rebuild or rerun the Rust checks.
 The comparison runner adds ten tests, bringing the passing Python suite to 889.
 All 72 games and 120 paired comparisons pass, covering 2,947,354 dense actor
 rows. All 18 observed late-rebuild boarding opportunities complete. The results
-report and [manifest](data/recovery-strategies-v1.json) bind complete counts,
+report and manifest (`docs/data/recovery-strategies-v1.json`, in git history) bind complete counts,
 audits and verified archives.
 Other Rust integration suites and the full interactive client are outside this
 last validation step.

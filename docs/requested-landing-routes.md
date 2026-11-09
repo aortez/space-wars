@@ -149,7 +149,7 @@ These runs leave the quota, lifetime, search deadline and defaults unchanged.
 
 The [result manifest](data/requested-landing-routes-v1.json) records every game,
 comparison, physical visit, delivery clock and work total. Its
-[compressed evidence](data/requested-landing-routes-v1.json.gz) contains 39 exact
+compressed evidence (`docs/data/requested-landing-routes-v1.json.gz`, in git history) contains 39 exact
 documents: current/prior summaries, hashes for all 261 raw files, physical and
 cover witnesses, delivery histories and validation logs.
 

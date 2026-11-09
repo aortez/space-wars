@@ -181,8 +181,8 @@ The frozen profiled binary is
 The complete summary at `target/capture-escape/v1/summary.json` has SHA-256
 `b9caf00030385f1cce0602bdaff4f7412d9699ada60f5dda7862d661398e700f`.
 
-[The manifest](data/capture-escape-v1.json) records all outcomes and checks.
-[The archive](data/capture-escape-v1.json.gz) retains the frozen plan, summaries,
+The manifest (`docs/data/capture-escape-v1.json`, in git history) records all outcomes and checks.
+The archive (`docs/data/capture-escape-v1.json.gz`, in git history) retains the frozen plan, summaries,
 all consumed escape observations, prior native receipt/abort and physical/route
 witnesses, first changed controls, complete mission transitions and damage
 evidence, validation logs, correction/reproduction scripts and raw-file hashes.

@@ -163,7 +163,7 @@ game rerun, audit correction, policy modification or threshold tuning.
 
 The [manifest](data/pursuit-climb-laser-loss-v1.json) binds the replay summary,
 original evidence, binary, validation and archives. Its
-[review archive](data/pursuit-climb-laser-loss-v1.json.gz) includes the exact
+review archive (`docs/data/pursuit-climb-laser-loss-v1.json.gz`, in git history) includes the exact
 summary, audits, runner/tests/plan, post-review script, selected actor snapshots,
 all recorded damage/contact transitions and the acquisition interval. Full
 reports, raw streams and complete derived points remain in two lossless local archives

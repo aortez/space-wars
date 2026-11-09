@@ -210,7 +210,7 @@ Archive `data/training-experiments/learned-flight-hold-update-audit-v1-20261024`
 1,543 source files, all 34 copied parent inputs, exact runtime, frozen budgets/spec,
 twelve reconstructed rollouts/collectors/targets, RNG, gradients, row data and all 48
 branch states with probes. All 26 previous manifests and referenced inputs remain
-unchanged. See [results](data/flight-hold-update-audit-v1-results.json) and
+unchanged. See results (`docs/data/flight-hold-update-audit-v1-results.json`, in git history) and
 [archive receipt](data/flight-hold-update-audit-v1-archive.json).
 
 ## Next decision

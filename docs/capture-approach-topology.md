@@ -125,7 +125,7 @@ The final summary hash is
 `46a1384a7cbf2ad954c935ff505be0c76b0ded62555a4d8dd590d4ad8e1a6918`.
 
 The [manifest](data/capture-approach-topology-v1.json) records counts, provenance,
-checks and the decision. The linked [compressed inputs](data/capture-approach-topology-v1.json.gz)
+checks and the decision. The linked compressed inputs (`docs/data/capture-approach-topology-v1.json.gz`, in git history)
 preserve the exact final summary and diagnostic JSON documents, plus the two
 prior audit summaries. Native trace and work files remain under the recorded
 local run paths, with hashes and replay commands retained in the summary.

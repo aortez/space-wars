@@ -5,7 +5,7 @@ PR #144 merged at `2e5a2c0`; existing bot defaults remain unchanged.
 
 ## Recorded gap
 
-The [arrival audit](data/current-neutral-baseline-v1.json) joins every evaluation
+The arrival audit (`docs/data/current-neutral-baseline-v1.json`, in git history) joins every evaluation
 to its exact seat, planet and selection tick in all 64 recorded cases. It uses
 the evaluator's completion tick for availability, excludes observations after
 departure/abandonment, and retains visits with no usable evidence or arrival.
@@ -103,7 +103,7 @@ regressions; any device-default change also needs a Pi performance check.
 Implementation, runner and plan were frozen at `8832a5c`. The preserved release
 binary is `target/current-neutral-costs/surface_mission_soak-8832a5c`, SHA-256
 `5c9d6e4b5cd0a1d82e0bf24f8f63d14186655faa2fd14cde20c4a1ba3a55b2e4`.
-The [complete evidence](data/current-neutral-costs-v1.json) retains all runs,
+The complete evidence (`docs/data/current-neutral-costs-v1.json`, in git history) retains all runs,
 predictions, milestones, failures, timing joins, work audits and raw hashes.
 The [visit-ending correction](capture-visit-endings.md) supersedes that archive's
 failure reasons and post-departure abandonment markers. The original raw files

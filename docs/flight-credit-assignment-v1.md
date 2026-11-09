@@ -200,7 +200,7 @@ Source contracts differ and incompatible resume remains rejected. All **96 train
 Rust/PyTorch parity fixtures** passed with matching actions and maximum absolute
 output error **1.43×10⁻⁶**.
 
-The [results](data/flight-credit-assignment-v1-results.json) retain per-seed physical
+The results (`docs/data/flight-credit-assignment-v1-results.json`, in git history) retain per-seed physical
 gates, trajectory diagnostics and optimizer statistics. The
 [archive receipt](data/flight-credit-assignment-v1-archive.json) identifies all
 **774 checkpoints**, twelve exports, traces, frozen source/runtime/configurations,

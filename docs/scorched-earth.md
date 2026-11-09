@@ -223,7 +223,7 @@ bot difficulty tuning remain separate follow-ups.
 ### Relocation comparison, 2026-10-11
 
 [Source identities and comparison results](data/tank-relocation-20261011.json)
-and the [complete source patch, commands and traces](data/tank-relocation-traces-20261011.json.gz)
+and the complete source patch, commands and traces (`docs/data/tank-relocation-traces-20261011.json.gz`, in git history)
 retain 98 replay-checked commands: 36 bounded opportunity searches, 36 existing
 driving/destruction benchmarks, 18 ordinary Reactive duels and eight stationary
 calibration checks. All 36 retained observation hashes and all eight stationary
@@ -254,8 +254,8 @@ in this destination pass. No new Pi timing qualification is claimed.
 
 ### Correction priority review, 2026-10-12
 
-[Source identities and results](data/tank-shot-priority-20261012.json), with the
-[complete source patch, commands and traces](data/tank-shot-priority-traces-20261012.json.gz),
+Source identities and results (`docs/data/tank-shot-priority-20261012.json`, in git history), with the
+complete source patch, commands and traces (`docs/data/tank-shot-priority-traces-20261012.json.gz`, in git history),
 retain 134 replay-checked commands: 60 opportunity searches, 36 existing
 driving/destruction benchmarks, 30 ordinary Reactive duels and eight stationary
 calibration runs. All material audits pass. All 36 retained physics observation
@@ -420,7 +420,7 @@ live-fire runs; motor response under load matters too. Enlarging the wheels
 without corresponding gearing reduced the available ground force and did not
 solve the stall. The shared Rover Lab and Spacewars rover defaults are unaffected.
 
-The [manual hill comparisons](data/tank-duel-climb-20261011.json) retain quiet and
+The manual hill comparisons (`docs/data/tank-duel-climb-20261011.json`, in git history) retain quiet and
 live-fire runs, with continuous drive and with two-second releases at X=-10,
 -6 and -2. All eight candidate runs reach X=8 alive and supported; all eight
 old-setting controls fail to reach it within 40 seconds. Times below start when
@@ -508,7 +508,7 @@ target/ci/examples/scorched_benchmark --shape round --seed 314 --seconds 30 \
 ```
 
 The [review receipt](data/tank-cpu-footing-20261011.json) and
-[full traces](data/tank-cpu-footing-traces-20261011.json.gz) retain the captures,
+full traces (`docs/data/tank-cpu-footing-traces-20261011.json.gz`, in git history) retain the captures,
 commands, source identities and validation. Two naturally occurring opportunities
 complete a move and hold for a shot:
 
@@ -552,7 +552,7 @@ the client, shared physics/terrain, Scorched Earth, Rover Lab and Spacewars,
 plus the Scorched UI lifecycle test on both vector and raster renderers.
 Formatting and strict scenario-only Clippy pass.
 
-The [integration receipt](data/tank-driving-integration-20261011.json) records
+The integration receipt (`docs/data/tank-driving-integration-20261011.json`, in git history) records
 all commands, binary identities and results. All 36 desktop benchmark cases
 retain their accepted observation hashes. All 36 Picade runs pass replay and
 material audits with exactly the same final hashes as the desktop. The two
@@ -626,7 +626,7 @@ snapshot, starting observation/controller state, and full report. Reproduction
 uses the recorded source, arguments and capture tick; the native snapshot alone
 does not contain all scenario state.
 
-The original baseline's [results and source/binary identities](data/tank-driving-course-20261011.json)
+The original baseline's results and source/binary identities (`docs/data/tank-driving-course-20261011.json`, in git history)
 and [per-second traces](data/tank-driving-course-traces-20261011.json.gz) retain
 32 cases before the profile change: both gears and dirt shapes on five courses, four blocked duels, and
 eight rubble strength controls. All three continuations and their initialization
@@ -673,7 +673,7 @@ check is isolated in `driving_lab::reference` for reproduction; gameplay uses
 the new check. Support contacts, drive/brake response, suspension settings,
 range selection, firing readiness and retry cooldowns retain their behavior.
 
-The [profile comparison](data/tank-cpu-ground-20261011.json) records 24 course
+The profile comparison (`docs/data/tank-cpu-ground-20261011.json`, in git history) records 24 course
 and frozen-duel cases, each with four continuations and complete replay;
 [full traces](data/tank-cpu-ground-traces-20261011.json.gz) retain the samples.
 Every starting observation and native snapshot matches the original course
@@ -752,8 +752,8 @@ arms change with their geometry. Each report records the settings. CPU,
 reference, neutral, held and goal trials share the same complete starting
 state within each setting. Different radii require different physical starts.
 
-The pre-repair [results](data/tank-goal-driving-20261011.json) and
-[full traces](data/tank-goal-driving-traces-20261011.json.gz) cover 48 cases,
+The pre-repair results (`docs/data/tank-goal-driving-20261011.json`, in git history) and
+full traces (`docs/data/tank-goal-driving-traces-20261011.json.gz`, in git history) cover 48 cases,
 both dirt shapes and both running gears, using the original support gate and
 torque-90 baseline. Goal driving arrives and stays stopped
 on flat and step courses: the wheels take 8.87 and 10.52 seconds from the settled
@@ -805,8 +805,8 @@ The CPU still refuses the trench. These finish times measure simulated travel,
 not processor performance. Rubble largely redeposits during the settling prefix,
 so this remains a rough-ground test rather than sustained loose-grain traction.
 
-The [receipt](data/tank-wheel-support-20261011.json) and
-[full traces](data/tank-wheel-support-traces-20261011.json.gz) retain 20 course
+The receipt (`docs/data/tank-wheel-support-20261011.json`, in git history) and
+full traces (`docs/data/tank-wheel-support-traces-20261011.json.gz`, in git history) retain 20 course
 comparisons and 12 frozen failure comparisons. The new `scorched_support_lab`
 captures the first old-gate support refusal, then clones the entire native world
 and the already-running goal controller into old/new support pairs with goal,
@@ -866,7 +866,7 @@ monotonically, allowing time to cover the deliberate run-up. Rocking and terrain
 edits cannot replenish the allowance. Arrival requires live support.
 
 The [receipt](data/tank-goal-climb-20261011.json) and
-[full traces](data/tank-goal-climb-traces-20261011.json.gz) cover 20 fresh course
+full traces (`docs/data/tank-goal-climb-traces-20261011.json.gz`, in git history) cover 20 fresh course
 comparisons and eight frozen failures, all with replay and material checks.
 Both shapes and both running gears reach and stop at flat, step, slope and
 returned-rubble goals; both refuse the trench. With wheels, arrival from the
@@ -1128,7 +1128,7 @@ hashes). Hillside seeds 7 and 91 add repeatability/conservation checks; changing
 the hill or grain shape can leave a bank holding after the same three shots.
 Strict core/Scorched Clippy passes; Spacewars retains the same 17 existing warnings.
 
-[Raw measurements, source/binary hashes and validation](data/dirt-overhang-20261008.json) ·
+Raw measurements, source/binary hashes and validation (`docs/data/dirt-overhang-20261008.json`, in git history) ·
 [per-second traces](data/dirt-overhang-traces-20261008.jsonl.gz) ·
 [local runtime commands and status](data/dirt-overhang-local-live-20261008.txt).
 
@@ -1163,7 +1163,7 @@ The installed kiosk was also exercised through its ordinary menus and controller
 input: Spacewars Weak/Angular, combat Weak/Round, hillside demo in both shapes,
 a manual shot, and Strong holding the ledge. Live hillside samples were roughly
 25–31 submitted FPS and 60 UPS at raster scale 2; these are separate from the
-headless simulation timings above. [Live command log](data/dirt-gameplay-picade-live-20261006.txt).
+headless simulation timings above. Live command log (`docs/data/dirt-gameplay-picade-live-20261006.txt`, in git history).
 The prior Spacewars dirt selection was restored. The device is left paused in
 Weak/Angular hillside before the first demo shot; Resume starts the encounter.
 
@@ -1370,7 +1370,7 @@ It increases Spacewars match cost and also costs more on the second seeded
 Angular Scorched terrain. Capacity stays configurable for experiments; automatic
 eviction or deposition through actors is not part of the policy.
 
-[Full measurements](data/dirt-capacity-20261006.json) and
+Full measurements (`docs/data/dirt-capacity-20261006.json`, in git history) and
 [per-second traces](data/dirt-capacity-traces-20261006.jsonl.gz) retain all
 56 executions (26 desktop, 30 Picade), source/binary identities and audits.
 All 40 Scorched runs pass a complete replay outside timing. Corresponding
@@ -1455,7 +1455,7 @@ individual queries for every excluded subset, including rotated/offset colliders
 collision groups, sensors, disabled shapes, unflushed movement and replacements.
 Unknown blockers and invalid query geometry stay conservative.
 
-[Full record](data/dirt-packing-cost-20261006.json),
+Full record (`docs/data/dirt-packing-cost-20261006.json`, in git history),
 [workload traces](data/dirt-packing-cost-traces-20261006.jsonl.gz), and
 [stage summaries with worst ticks](data/dirt-packing-cost-profiles-20261006.jsonl.gz)
 record the immediately preceding deployed runtime and this pass's source/binary
@@ -1540,9 +1540,9 @@ tests pass, including actor movement, repeated blasts, conservation and replay.
 Strict Clippy passes for terrain, Rapier and Scorched with `--all-targets
 --no-deps -- -D warnings`; format and diff checks pass.
 
-[Full record](data/dirt-performance-20261006.json),
+Full record (`docs/data/dirt-performance-20261006.json`, in git history),
 [per-second workload traces](data/dirt-performance-traces-20261006.jsonl.gz), and
-[per-second stage summaries with worst ticks](data/dirt-performance-profiles-20261006.jsonl.gz)
+per-second stage summaries with worst ticks (`docs/data/dirt-performance-profiles-20261006.jsonl.gz`, in git history)
 retain source/executable identities, commands and telemetry. There are 40 final
 runner executions: 20 desktop and 20 Picade. Timings below have profiling off.
 Both Scorched shapes have three paired Picade repetitions, with build/shape

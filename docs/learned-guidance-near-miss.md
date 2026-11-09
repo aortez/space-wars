@@ -12,7 +12,7 @@ The original reference misses the world-750008 player-2 pair. The focused final 
 
 That precision case requires distance at most 2 and relative speed at most 1 for 30 consecutive ticks. The near-miss reaches a maximum of 24 consecutive ticks, then loses the condition and continues oscillating around the target. At the 1,200-tick limit its distance is 2.62516 and relative speed 1.67989. The focused final arrives at tick 519; the original reference at 528. This is a settling failure, not a terrain collision or host takeover.
 
-[Precision measurements](data/learned-guidance-near-miss-v1-precision.png) · [World-42 approach](data/learned-guidance-near-miss-v1-behavior.png) · [Interactive recorded replay](data/learned-guidance-near-miss-v1-replay.html) · [Results](data/learned-guidance-near-miss-v1-results.json) · [Frozen plan](data/learned-guidance-near-miss-v1-plan.json)
+[Precision measurements](data/learned-guidance-near-miss-v1-precision.png) · [World-42 approach](data/learned-guidance-near-miss-v1-behavior.png) · Interactive recorded replay (`docs/data/learned-guidance-near-miss-v1-replay.html`, in git history) · Results (`docs/data/learned-guidance-near-miss-v1-results.json`, in git history) · [Frozen plan](data/learned-guidance-near-miss-v1-plan.json)
 
 ## Reconstruction and evidence
 

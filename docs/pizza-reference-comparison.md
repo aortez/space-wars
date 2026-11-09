@@ -199,8 +199,8 @@ cargo +1.89.0 run --locked --release -p scenario-pizza --example capacity_lab \
 The feature is off by default. Each report labels its scope; the regular
 profiling samples now expose existing CCD, update and island timers as well.
 
-Retained [raw reports](data/pizza-reference-20261018-raw.tar.gz),
-[summary](data/pizza-reference-20261018-summary.json), and
+Retained raw reports (`docs/data/pizza-reference-20261018-raw.tar.gz`, in git history),
+summary (`docs/data/pizza-reference-20261018-summary.json`, in git history), and
 [manifest/checksums](data/pizza-reference-20261018-manifest.json) identify both
 headless executables and the production GPU pair. No binaries, credentials or
 user settings are included. The summary's paired groups are reproducible with:

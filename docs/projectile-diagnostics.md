@@ -154,7 +154,7 @@ The profiled binary is
 `6d8d406b06813c78b68650fedebd437c2b4788fc41006b524c8c3a0bf780b8d8`.
 The [manifest](data/projectile-diagnostics-v1.json) records all five parity
 results, four track summaries, input/binary/tool hashes, and **69 raw-file
-hashes**. The [compressed evidence](data/projectile-diagnostics-v1.json.gz)
+hashes**. The compressed evidence (`docs/data/projectile-diagnostics-v1.json.gz`, in git history)
 preserves complete observed tracks, native controls/flight limits during
 transfer, and report samples around each loss. Full streams remain at their
 hashed local paths.

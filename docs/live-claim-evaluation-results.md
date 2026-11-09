@@ -202,8 +202,8 @@ removing its generated raw copy. The export rechecked all archive hashes,
 original stream hashes, game logs, witness files, input identity and the
 computed screen, then verified the review bundle's JSON/gzip round trip.
 
-The [manifest](data/live-claim-evaluation-v1.json) and
-[review bundle](data/live-claim-evaluation-v1.json.gz) retain all commands,
+The manifest (`docs/data/live-claim-evaluation-v1.json`, in git history) and
+review bundle (`docs/data/live-claim-evaluation-v1.json.gz`, in git history) retain all commands,
 both players' records, all comparisons and decision reasons, complete
 first-action witnesses, actor chronologies, source snapshots and validation
 logs. Local complete evidence is under `target/live-claim-evaluation/v1`:

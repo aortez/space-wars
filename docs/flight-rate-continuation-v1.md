@@ -145,7 +145,7 @@ in **384 episodes**. No frozen process was retried. No update-64 run, confirmati
 promotion occurred. Preserve 1,564 sources, 455 input copies including 229 historical
 completed traces, 102 new checkpoints and 24 exports. The historical trace copies are
 explicitly identified; they do not count as new samples. All 36 previous manifests and
-copied inputs remain unchanged. See [results](data/flight-rate-continuation-v1-results.json)
+copied inputs remain unchanged. See results (`docs/data/flight-rate-continuation-v1-results.json`, in git history)
 and [archive receipt](data/flight-rate-continuation-v1-archive.json).
 
 ### Next decision
