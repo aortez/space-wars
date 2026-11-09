@@ -30,6 +30,8 @@ class CrossingArrivalTests(unittest.TestCase):
 
     def test_native_fixture_provenance_and_all_four_arrival_distances(self):
         f=json.loads((A.ROOT/A.NEW[1]).read_text());bundle=A.ROOT/f['source_bundle']
+        # The samples are checked against their source bundle, which therefore stays in docs/data.
+        self.assertEqual(f['source_bundle'],'docs/data/live-claim-sequences-v1.json.gz')
         self.assertEqual(A.P.digest(bundle),f['source_sha256'])
         with gzip.open(bundle,'rt') as stream:b=json.load(stream)
         rows=b['derived_diagnosis']['runs'][f['source_run']]['recovery_trace_witnesses']
