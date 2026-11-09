@@ -145,7 +145,7 @@ impl Duel {
                 point: None,
                 normal: None,
             });
-            if x.abs() > 46.0 {
+            if x.abs() > self.placement.drive_limit() + 2.0 {
                 result.reason = Some("world edge");
                 return result;
             }

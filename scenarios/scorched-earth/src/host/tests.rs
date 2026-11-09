@@ -48,6 +48,18 @@ fn wider_hills_reserve_their_chunks_and_support_custom_landings() {
         duel.tanks(&world).map(|tank| tank.motion.position.x),
         [-80.0, 80.0]
     );
+    duel.set_firing(false);
+    for _ in 0..600 {
+        step(&mut duel, &mut world);
+    }
+    assert!(
+        duel.duel
+            .driving_diagnostics()
+            .iter()
+            .all(|drive| drive.powered_ticks > 0),
+        "both tanks must drive from the wider landing positions"
+    );
+    duel.set_firing(true);
     for _ in 0..1200 {
         step(&mut duel, &mut world);
     }

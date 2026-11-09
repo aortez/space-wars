@@ -229,6 +229,32 @@ fn start_fighting(state: &mut ClockState) {
 }
 
 #[test]
+fn portrait_tanks_drive_inward_from_outer_entry_lanes() {
+    let mut state = ready(0.6, 42, ClockTimeFormat::TwentyFourHour);
+    ClockScenario::step(
+        &mut state,
+        &[ClockAction::set_reading(
+            ClockReading::new(8, 8, 0).unwrap(),
+        )],
+        Duration::ZERO,
+    );
+    start_fighting(&mut state);
+    // Isolate driving from displacement caused by shell impacts.
+    event(&mut state).duel.set_firing(false);
+    let initial = state.tanks_state().unwrap().positions_milli;
+    for _ in 0..10 * u64::from(FIXED_HZ) {
+        tick(&mut state);
+    }
+    let positions = state.tanks_state().unwrap().positions_milli;
+    for (before, after) in initial.into_iter().zip(positions) {
+        assert!(
+            after[0].abs() + 1000 < before[0].abs(),
+            "tank must approach from its outer lane: {before:?} -> {after:?}"
+        );
+    }
+}
+
+#[test]
 fn visitors_and_player_ducks_are_excluded_in_both_directions() {
     for visitor in [
         ClockEventKind::Duck,
