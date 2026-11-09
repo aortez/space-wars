@@ -7,7 +7,10 @@ generation number. It is the full-image counterpart of
 [fast application updates](pi-kiosk.md#fast-application-updates), and the
 intended loop for OS-level development on the Nightly test unit.
 
-Status: implemented, and not yet installed on a unit. See [Rollout](#rollout).
+Status: implemented (#566) and present in the images `sw-picade-2` has run
+since its generation 24 install on 2026-11-07. Development installs are not
+enabled on any unit, and the two supervised runs have not been made. See
+[Rollout](#rollout).
 
 ## Why a separate path
 

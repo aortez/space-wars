@@ -4,39 +4,33 @@ Run records named like `ota-<subject>-<date>` are private files kept outside
 the repository, on the owner's workstation; this document keeps their
 summaries.
 
-**Status reviewed 2026-10-18:** both primary Pis have passed supervised signed
-installation, application-health rollback/quarantine and subsequent normal boot
-([physical trials](#physical-signed-trials-2026-10-17)). Interrupted promotion,
-physical power loss and the broader failure matrix remain outstanding. See the
-[active OTA plan](ota-updates.md#current-implementation) for current images,
-device-specific coverage and rollout order. The
-second-Picade follow-up (`ota-picade2-profile-image-20261018`) adds its
-successful signed trial/normal boot and installed radio/time/OTA qualification;
-it includes an explicitly reviewed additive settings migration, not a new
-deliberate-failure or power-loss trial.
-The second-Picade kiosk-hang record (`ota-picade2-kiosk-hang-20261024`)
-adds an offline generation-13 hang, automatic return to generation 12, quarantine
-and a subsequent normal boot on 2026-10-24. Its original host observer failed;
-an explicitly authorized read-only diagnostic established the return. The
-[case details](#second-picade-kiosk-hang-2026-10-24) retain that observation gap and
-the corrected host assertions. Owner review and the remaining physical matrix
-are still required; no installation approval was created.
-Its explicit repeated-failure record (`ota-picade2-repeated-failure-20261024`)
-adds the second failed attempt, return within 191.705 seconds, preserved history
-through another normal boot and refusal of a third attempt. The trial observer
-completed; a close-out probe initially returned `Busy` and was repeated only after
-the updater became idle. Both results are retained.
-The software-reset record (`ota-picade2-trial-reset-20261025`) and
-kiosk-crash record (`ota-picade2-kiosk-crash-20261025`) add both offline
-generation-14 attempts on 2026-10-25. The crash series observed five distinct
-process exits and automatic return to generation 12 within 189.919 seconds.
-Both generations 13 and 14 are now exhausted. Six of eleven physical cases have
-observations; the remaining five cases and owner review still precede approval.
-The review-fix image record (`ota-picade2-review-fixes-20261018`) adds
-its subsequent generation-7 trial, default boot and installed service/network
-checks. Exact pre-update settings bytes were retained before installation;
-selected durable stores remained unchanged. Its deliberate-failure matrix is
-still outstanding.
+**Status reviewed 2026-11-08:** the recovery approval bundle of 2026-10-27
+(`ota-recovery-approval-bundle-20261027`) holds one reviewed report per
+required case. Seven are observed passes: `healthy-trial`, `normal-boot`,
+`kiosk-hang` (2026-10-24), `repeated-failure` (2026-10-24), `trial-reset`
+(2026-10-25), `kiosk-crash` (2026-10-25) and `recovery-service-failure`
+(2026-10-25, `ota-picade2-recovery-service-failure-20261025`: the observer was
+killed 23.8 s into a generation-16 trial, the unit returned to the good image
+230.3 s after the fault, and the quarantine survived a normal boot). Two are
+reviewed from earlier observations under the owner's run-once rule of
+2026-10-26: `root-startup-failure` (the missing-root tryboots and a bootstrap
+trial that fell back through the watchdog) and `watchdog-handoff` (the
+2026-10-17 expiry tests and the recovery-service-failure return). `power-loss`
+is a partial observation (`ota-picade2-power-loss-20261027`: wall-power cuts
+during the inactive-root write and during the observing trial of generation 17
+both returned to the good image with replayed journals and preserved data), and
+`interrupted-promotion` was not run; on 2026-10-27 the owner accepted both
+promotion-boundary cuts as risk so that the units could be approved. Per-unit
+approvals followed (`ota-pi5-approval-20261027`,
+`ota-picade2-approval-20261027`, `ota-picade-approval-20261028`) and were
+renewed after each medium or kernel change (`ota-picade2-sd-approval-20261103`,
+`ota-picade2-kernel612-approval-20261106`, and the 2026-11-07 SD bootstraps of
+the Pi 5 and the primary Picade). Each approval binds one unit's board, medium,
+layout, boot set, profile and kernel, and a change to any of them invalidates
+it. No deliberate-failure case has run on an SD card or a 6.12 boot set. The
+[active OTA plan](ota-updates.md#current-implementation) owns current images
+and next steps; the case sections below retain their dated observations and
+limitations.
 
 The missing-root commands immediately below are an **earlier generation-zero
 diagnostic**, not the next test for today's signed-update devices. Their
