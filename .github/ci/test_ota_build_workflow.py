@@ -10,8 +10,8 @@ class BuildWorkflowTests(unittest.TestCase):
         path = Path(__file__).resolve().parents[1] / 'workflows/ota-build.yml'
         raw = path.read_text()
         workflow = yaml.load(raw, Loader=yaml.BaseLoader)
-        self.assertEqual(set(workflow['on']), {'schedule', 'workflow_dispatch'})
-        self.assertEqual(len(workflow['on']['schedule']), 1)
+        # Candidates are built on demand only; the schedule was dropped after it never finished a build.
+        self.assertEqual(set(workflow['on']), {'workflow_dispatch'})
         self.assertEqual(workflow['permissions'], {'contents': 'read'})
         self.assertEqual(set(workflow['jobs']), {'candidate'})
         job = workflow['jobs']['candidate']

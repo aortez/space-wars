@@ -163,8 +163,9 @@ Examples include recovery qualification/replay tools, drain-splash profiling,
 retained packing/geometry inspection, visual fixture exports and durability
 measurement. Feature-gated diagnostic assertions continue in their normal jobs.
 This workflow does not perform physical Pi or hardware GPU acceptance. The
-separate scheduled `OTA image candidate` workflow builds and qualifies an unsigned
-Yocto image; it is not part of the Windows nightly publication gate.
+separate `OTA image candidate` workflow, run by manual dispatch only, builds and
+qualifies an unsigned Yocto image; it is not part of the Windows nightly
+publication gate.
 
 ```sh
 # Full validation of a pushed branch, without publishing a nightly release:

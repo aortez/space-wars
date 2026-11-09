@@ -109,7 +109,7 @@ def from_checkout(repo, reviewed_commit):
     clean_repository(repo, reviewed_commit)
     result = Policy(
         build=workflow(read(repo / '.github/workflows/ota-build.yml', 128 * 1024),
-            '.github/workflows/ota-build.yml', ('schedule', 'workflow_dispatch'), BUILD_JOBS),
+            '.github/workflows/ota-build.yml', ('workflow_dispatch',), BUILD_JOBS),
         ci=workflow(read(repo / '.github/workflows/ci.yml', 128 * 1024),
             '.github/workflows/ci.yml', ('push', 'workflow_dispatch'), CI_JOBS),
         producer_job=BUILD_JOBS[0][0], files=tuple(ARTIFACT_FILES.items()))

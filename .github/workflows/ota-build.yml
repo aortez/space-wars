@@ -1,8 +1,6 @@
 name: OTA image candidate
 
 on:
-  schedule:
-    - cron: '23 2 * * *'
   workflow_dispatch:
 
 permissions:
@@ -17,7 +15,7 @@ jobs:
     name: Build and qualify Pi rootfs candidate
     if: >-
       github.repository == 'aortez/space-wars' && github.ref == 'refs/heads/main' &&
-      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     env:
@@ -43,7 +41,7 @@ jobs:
         with:
           tool: nextest@0.9.144
       - name: Run complete OTA recovery suite
-        # Nightly and manual candidates require all sweeps at this exact source.
+        # Dispatched candidates require all sweeps at this exact source.
         # A PR smoke selection is never accepted as publication evidence.
         run: python3 .github/ci/ota_test_selection.py run --full
       - name: Build selected source in isolated container

@@ -38,8 +38,8 @@ from the selected `main` commit in the pinned kas container, qualified against
 that commit's passing CI run, prepared, reviewed and signed with pinned drivers,
 and published by the owner. A Release promotion signs the same payload under
 the Release role against a local qualification record. The feed's timestamp is
-renewed weekly by the owner. The scheduled image workflow has never completed a
-hosted build; see [Publication](#publication) below.
+renewed weekly by the owner. The hosted image workflow runs on manual dispatch
+only and has never completed a build; see [Publication](#publication) below.
 
 ### Fleet and feed state
 
@@ -91,13 +91,16 @@ publish is the owner's command. The workstation build reuses its warm Yocto
 state and takes about ten minutes.
 
 The hosted [image workflow](../.github/workflows/ota-build.yml) builds the
-same unsigned candidate on a standard runner at 02:23 UTC. It has not completed
-a build in any of its runs since 2026-10-18: a cold Yocto build on four cores
-with 12 GiB either exceeds its 330-minute limit or fails compiling
-`engine-client` after four and a half hours. No published generation came from
-it, and its artifacts were never needed because signing is an owner action
-either way. The open question is whether to drop the schedule or give it a
-runner that can finish.
+same unsigned candidate on a standard runner, on manual dispatch only. Its
+nightly schedule was removed on 2026-11-08 after it failed every run since
+2026-10-18: a cold Yocto build on four cores with 12 GiB either exceeds its
+330-minute limit or fails compiling `engine-client` after four and a half
+hours. No published generation came from it, and its artifacts were never
+needed because signing is an owner action either way. A dispatch is expected to
+fail the same way until the build fits the runner or reuses a cache; the
+working path after a merge is the workstation build. The publisher policy pins
+the workflow's trigger set, so a trigger change and the policy change land in
+one commit.
 
 ### Review corrections and next network gate
 
@@ -172,7 +175,7 @@ test unit and a fresh candidate are available.
 | #256 | Corrected installed time service verified after signed update and normal boot on both primary Pis; broader provider and RTC retention qualification remain |
 | #258–#260 | Native off/time-wake/automatic-OTA/off cycle and SSH controls passed on Pi 5 and the selected second Picade; expected setup profile changes and remaining per-device rollout remain |
 | #261 | Shared metadata/image contract and verification fixtures in use by every publication and install; retain those checks through further service integration |
-| #262 | Owner-local publication in use: 26 Nightly generations and four Release promotions prepared, reviewed and signed with pinned drivers and published by the owner; the weekly timestamp renewal is the owner's command; the hosted candidate workflow has never completed a build, and automatic signing is not pursued while signing stays an owner action |
+| #262 | Owner-local publication in use: 26 Nightly generations and four Release promotions prepared, reviewed and signed with pinned drivers and published by the owner; the weekly timestamp renewal is the owner's command; the hosted candidate workflow runs on manual dispatch only and has never completed a build, and automatic signing is not pursued while signing stays an owner action |
 | #263 | The 2026-10-27 approval bundle holds all eleven case reports: seven observed passes, two reviewed from earlier observations, interrupted promotion as owner-accepted risk and power loss as a partial observation plus accepted risk; the confirming normal reboot (#600) was observed on 2026-11-08 |
 | #264 | Native writer connected and in routine use from the Updates panel on all three units; development installs (#566) implemented but not yet enabled on `sw-picade-2`; cancellation, worker failure, lost CLI replies, rollback of a panel install and service or app restart during an install remain untested on hardware |
 | #265 | Daily checks and downloads run unattended on all three units and delivered Release generation 20 by themselves on 2026-10-29; download impact on gameplay and resumed downloads remain unmeasured |
@@ -194,10 +197,11 @@ test unit and a fresh candidate are available.
    window, the idle wait, the countdown and postponement, reusing the manual
    flow's writer, locks, recovery and app handoff. Pilot it on `sw-picade-2`'s
    Nightly channel; the household units stay on Release and Ask.
-4. Publication (#262): decide the hosted image workflow, which has never
-   completed a build, by dropping its schedule or giving it a runner that can
-   finish. Signing and publishing stay owner actions, and the weekly renewal
-   stays the owner's command.
+4. Publication (#262): the hosted image workflow keeps manual dispatch only;
+   a dispatch succeeds only once the cold build fits the runner or reuses a
+   cache, which nobody needs while the workstation builds in minutes. Signing
+   and publishing stay owner actions, and the weekly renewal stays the owner's
+   command.
 5. Deferred qualification (#263, #267): interrupted promotion and the
    promotion-boundary power cuts are accepted risk until a test unit and a
    fresh candidate are set aside for them. Kernel, firmware and boot-asset
@@ -1964,11 +1968,12 @@ That workstation result did not validate GitHub runner capacity.
 
 ## Standard-runner candidate build
 
-The [candidate workflow](../.github/workflows/ota-build.yml) selects the standard
-`ubuntu-24.04` GitHub-hosted runner, once daily at 02:23 UTC or by manual dispatch
-on `main`. It checks out the exact event SHA with persisted credentials disabled.
-Actions and the kas container are pinned to immutable revisions. The job has
-only Contents read permission, with no signing keys or release-writing access.
+The [candidate workflow](../.github/workflows/ota-build.yml) selects the
+standard `ubuntu-24.04` GitHub-hosted runner, by manual dispatch (its daily
+02:23 UTC schedule was removed on 2026-11-08) on `main`. It checks out the exact
+event SHA with persisted credentials disabled. Actions and the kas container are
+pinned to immutable revisions. The job has only Contents read permission, with
+no signing keys or release-writing access.
 It produces an unsigned candidate; it does not publish an update.
 
 The first build preparation step is
