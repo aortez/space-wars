@@ -66,8 +66,10 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
             &mut events,
         )?)
     };
-    let mut pending_support =
-        saved.is_some_and(|c| matches!(&c.status, Status::Falling(a) if a.pending_support));
+    let mut pending_support = saved.is_some_and(
+        |c| matches!(&c.status, Status::Falling(a) | Status::ChangingLoad(a) if a.pending_support),
+    );
+    let impact_arrivals = history.incoming.is_some();
     let mut current = scene;
     let mut intervals = Vec::with_capacity(count);
     for i in 0..count {
@@ -127,14 +129,14 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
                     crossing()
                 },
                 middle.max(0.0),
-                if revision == 3 {
+                if impact_arrivals {
                     EpisodeTransition::Impact
                 } else {
                     EpisodeTransition::Support
                 },
                 &mut events,
             )?);
-            pending_support = revision == 3;
+            pending_support = impact_arrivals;
         }
         let interval = history.finish(&current, after.plates.x, next, h, at, owner)?;
         if after.plates.x < history.summary.plastic_indentation
@@ -181,6 +183,12 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
             Status::Active(Box::new(Active {
                 scene: current,
                 owner: owner.ok_or(R::Numerical)?,
+            }))
+        } else if revision == 4 {
+            Status::ChangingLoad(Box::new(FallingActive {
+                scene: current,
+                owner,
+                pending_support,
             }))
         } else if revision == 3 {
             Status::Falling(Box::new(FallingActive {
