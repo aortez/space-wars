@@ -38,7 +38,8 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
     };
     let (count, h) = history.subdivision(dt)?;
     let loading = world.loading.as_ref().unwrap();
-    if count + usize::from(saved.is_none() && scene.plates.x >= 0.0)
+    let records = count * if history.paired.is_some() { 2 } else { 1 };
+    if records + usize::from(saved.is_none() && scene.plates.x >= 0.0)
         > loading.config.max_records_per_step
     {
         return Err(R::Limit);
@@ -54,7 +55,7 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
     pair.sort();
     let mut owner = if let Some(c) = saved {
         c.active().unwrap().1
-    } else if revision == 3 || revision == 5 {
+    } else if revision == 3 || revision >= 5 {
         None
     } else {
         Some(enter(
@@ -67,7 +68,7 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
         )?)
     };
     let mut pending_support = saved.is_some_and(
-        |c| matches!(&c.status, Status::Falling(a) | Status::ChangingLoad(a) | Status::MovingSupport(a) if a.pending_support),
+        |c| matches!(&c.status, Status::Falling(a) | Status::ChangingLoad(a) | Status::MovingSupport(a) | Status::PairedMaterials(a) if a.pending_support),
     );
     let impact_arrivals = history.incoming.is_some() || history.moving.is_some();
     let mut current = scene;
@@ -125,13 +126,7 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
         if after != expected || (revision == 1 && dx > 0.0 && after.plates.x <= current.plates.x) {
             return Err(R::Numerical);
         }
-        let curve = MaterialCurve::new(&current.plates.material);
-        let q = curve.segment(
-            current.plates.x,
-            history.summary.plastic_indentation,
-            after.plates.x,
-            f64::from(h),
-        );
+        let q = history.segment(after.plates.x, f64::from(h))?;
         let next = history.moving.as_ref().map_or_else(
             || {
                 [
@@ -196,7 +191,7 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
             staged.loading.as_mut().unwrap().episodes.remove(&pair);
             pending_support = false;
         }
-        if count + events.len() > staged.loading.as_ref().unwrap().config.max_records_per_step {
+        if records + events.len() > staged.loading.as_ref().unwrap().config.max_records_per_step {
             return Err(R::Limit);
         }
         staged.raw.bodies[handle].set_linvel(normal * next[0], true);
@@ -217,6 +212,17 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
                 after.plates.sources[1].region,
                 after.plates.material.clone(),
             );
+        if let Some(p) = &history.paired {
+            staged
+                .loading
+                .as_mut()
+                .unwrap()
+                .response
+                .as_mut()
+                .unwrap()
+                .materials
+                .insert(after.plates.sources[0].region, p.material(0));
+        }
         intervals.push(interval);
         current = after;
     }
@@ -228,6 +234,12 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
             Status::Active(Box::new(Active {
                 scene: current,
                 owner: owner.ok_or(R::Numerical)?,
+            }))
+        } else if revision == 6 {
+            Status::PairedMaterials(Box::new(FallingActive {
+                scene: current,
+                owner,
+                pending_support,
             }))
         } else if revision == 5 {
             Status::MovingSupport(Box::new(FallingActive {

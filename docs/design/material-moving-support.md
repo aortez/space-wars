@@ -87,7 +87,9 @@ totals. Restore repeats native bytes and events, including the pending same-owne
 Impact-to-Support observation. Corruption and boundary tests cover independent
 body balances, external edits, capacity failure and exhausted numerical budgets.
 
-This is another bounded #327 path. Two finite materials, externally driven moving
-supports, angular/oblique contacts, connection loads and transfers between older
+The [paired-material extension](material-paired-compression.md) admits finite
+layers on both free bodies with separate deformation and damage histories.
+This remains a bounded #327 path. Externally driven moving supports,
+angular/oblique contacts, connection loads and transfers between older
 loading modes remain. Material Lab still demonstrates the fixed-support cases;
 gameplay integration and persistent failure consequences are later slices.

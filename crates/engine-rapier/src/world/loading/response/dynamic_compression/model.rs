@@ -16,6 +16,8 @@ pub(super) struct History {
     // Required fixed-size v19 extension. Earlier history layouts are unchanged.
     #[serde(skip)]
     pub(super) moving: Option<moving::MovingHistory>,
+    #[serde(skip)]
+    pub(super) paired: Option<paired::PairedHistory>,
     pub(super) summary: DynamicCompressionSummary,
 }
 
@@ -58,7 +60,7 @@ impl MaterialCurve {
             depth,
         }
     }
-    fn energy(&self, x: f64, p: f64) -> f64 {
+    pub(super) fn energy(&self, x: f64, p: f64) -> f64 {
         let e = (x - p).max(0.0);
         0.5 * self.k * e * e
     }
@@ -105,6 +107,7 @@ impl History {
                 }),
             loads: None,
             moving,
+            paired: paired::PairedHistory::new(world, scene)?,
             summary: DynamicCompressionSummary::default(),
         };
         h.summary = h.initial_summary();
@@ -116,6 +119,9 @@ impl History {
     // Only an explicit load change upgrades an enrolled history. Otherwise old
     // overload and exact safe-equilibrium histories retain revision 1/v15 bytes.
     pub(super) fn revision(&self) -> u32 {
+        if self.paired.is_some() {
+            return 6;
+        }
         if self.moving.is_some() {
             return 5;
         }
@@ -125,7 +131,7 @@ impl History {
         if self.incoming.is_some() {
             return 3;
         }
-        let c = MaterialCurve::new(&self.initial);
+        let c = self.curve();
         if (self.initial_x == 0.0 && self.weight() > c.y)
             || (self.initial_x > 0.0 && self.weight() == c.k * self.initial_x)
         {
@@ -150,8 +156,30 @@ impl History {
             .as_ref()
             .map_or(f64::from(self.mass), |m| m.effective_mass())
     }
+    pub(super) fn curve(&self) -> MaterialCurve {
+        self.paired
+            .as_ref()
+            .map_or_else(|| MaterialCurve::new(&self.initial), |p| p.curve())
+    }
+    pub(super) fn plastic_work(&self) -> f64 {
+        self.paired.as_ref().map_or_else(
+            || self.curve().y * self.summary.plastic_indentation,
+            |p| p.plastic_work(),
+        )
+    }
+    pub(super) fn segment(&self, x: f64, h: f64) -> Result<Segment, R> {
+        if let Some(p) = &self.paired {
+            return p.segment(x, h);
+        }
+        Ok(self.curve().segment(
+            self.summary.indentation,
+            self.summary.plastic_indentation,
+            x,
+            h,
+        ))
+    }
     fn initial_summary(&self) -> DynamicCompressionSummary {
-        let c = MaterialCurve::new(&self.initial);
+        let c = self.curve();
         DynamicCompressionSummary {
             indentation: self.initial_x,
             velocity: self.initial_velocity(),
@@ -169,12 +197,15 @@ impl History {
         }
     }
     pub(super) fn current_material(&self) -> StoredRegion {
+        if let Some(p) = &self.paired {
+            return p.material(1);
+        }
         let mut m = self.initial.clone();
         m.remaining -= self.summary.damage_work;
         m
     }
     pub(super) fn valid(&self) -> bool {
-        let c = MaterialCurve::new(&self.initial);
+        let c = self.curve();
         let s = &self.summary;
         let start = self.initial_summary();
         let weight = f64::from(self.mass) * f64::from(self.acceleration);
@@ -195,8 +226,9 @@ impl History {
             && c.y.is_finite()
             && c.y > 0.0
             && c.ey > 0.0
-            && c.ey < c.depth / 4.0
+            && (self.paired.is_some() || c.ey < c.depth / 4.0)
             && self.valid_loads()
+            && self.paired.as_ref().is_none_or(|p| p.valid(self))
             && self.moving.as_ref().is_none_or(|m| m.valid(self))
             && (if falling {
                 (-c.depth / 4.0..=0.0).contains(&self.initial_x)
@@ -240,10 +272,14 @@ impl History {
             && s.indentation <= c.depth / 4.0
             && (if rebound { -64.0 } else { 0.0 }..=64.0).contains(&s.velocity)
             && (self.moving.is_some() || f64::from(s.velocity as f32) == s.velocity)
-            && (0.0..=c.depth / 4.0 - c.ey).contains(&s.plastic_indentation)
-            && s.indentation - s.plastic_indentation <= c.ey + 1e-14 * c.depth
+            && (if self.paired.is_some() {
+                (0.0..=c.depth / 4.0).contains(&s.plastic_indentation)
+            } else {
+                (0.0..=c.depth / 4.0 - c.ey).contains(&s.plastic_indentation)
+                    && s.indentation - s.plastic_indentation <= c.ey + 1e-14 * c.depth
+            })
             && s.damage_work >= 0.0
-            && s.damage_work < self.initial.remaining
+            && (self.paired.is_some() || s.damage_work < self.initial.remaining)
             && s.viscous_loss >= 0.0
             && s.reaction_impulse >= 0.0
             && s.scales == start.scales
@@ -253,11 +289,12 @@ impl History {
                 0.5 * self.effective_mass() * s.velocity * s.velocity,
                 s.scales[0],
             )
-            && near(
-                s.elastic_energy,
-                c.energy(s.indentation, s.plastic_indentation),
-                s.scales[0],
-            )
+            && (self.paired.is_some()
+                || near(
+                    s.elastic_energy,
+                    c.energy(s.indentation, s.plastic_indentation),
+                    s.scales[0],
+                ))
             && near(
                 s.gravity_work,
                 self.gravity_totals(s.indentation, s.elapsed)[0],
@@ -265,7 +302,7 @@ impl History {
             )
             && near(
                 s.charge_error,
-                c.y * s.plastic_indentation - s.damage_work,
+                self.plastic_work() - s.damage_work,
                 s.scales[0],
             )
             && (0.0..=1e-5 * s.scales[0]).contains(&s.absolute_charge_error)
@@ -294,7 +331,7 @@ impl History {
                 s.gravity_work + start.elastic_energy + start.kinetic_energy
                     - s.kinetic_energy
                     - s.elastic_energy
-                    - c.y * s.plastic_indentation
+                    - self.plastic_work()
                     - s.viscous_loss,
                 s.scales[0],
             )
@@ -320,7 +357,7 @@ impl History {
                     && s.plastic_indentation == 0.0))
     }
     pub(super) fn subdivision(&self, dt: f32) -> Result<(usize, f32), R> {
-        let c = MaterialCurve::new(&self.initial);
+        let c = self.curve();
         let bound = (1.0_f64 / 4096.0)
             .min(1.0 / (32.0 * libm::sqrt(c.k / self.effective_mass())))
             .min(self.effective_mass() / (32.0 * c.eta));
@@ -339,7 +376,7 @@ impl History {
     }
     pub(super) fn displacement(&self, h: f64) -> Result<f64, R> {
         let s = &self.summary;
-        let c = MaterialCurve::new(&self.initial);
+        let c = self.curve();
         if self.revision() >= 2 {
             return self.signed_displacement(h);
         }
@@ -372,27 +409,27 @@ impl History {
     }
     fn signed_displacement(&self, h: f64) -> Result<f64, R> {
         let s = &self.summary;
-        let c = MaterialCurve::new(&self.initial);
+        let c = self.curve();
         let residual = |dx: f64| {
-            let reaction = c
-                .segment(s.indentation, s.plastic_indentation, s.indentation + dx, h)
-                .mean;
-            2.0 * self.effective_mass() * (dx / h - s.velocity) / h - self.weight() + reaction
+            let reaction = self.segment(s.indentation + dx, h)?.mean;
+            Ok::<_, R>(
+                2.0 * self.effective_mass() * (dx / h - s.velocity) / h - self.weight() + reaction,
+            )
         };
-        if residual(0.0) == 0.0 {
+        if residual(0.0)? == 0.0 {
             return Ok(0.0);
         }
         let (mut lo, mut hi) = (-c.depth, c.depth);
-        if !residual(lo).is_finite()
-            || !residual(hi).is_finite()
-            || residual(lo) >= 0.0
-            || residual(hi) <= 0.0
+        if !residual(lo)?.is_finite()
+            || !residual(hi)?.is_finite()
+            || residual(lo)? >= 0.0
+            || residual(hi)? <= 0.0
         {
             return Err(R::Numerical);
         }
         for _ in 0..64 {
             let dx = 0.5 * (lo + hi);
-            if residual(dx) > 0.0 {
+            if residual(dx)? > 0.0 {
                 hi = dx;
             } else {
                 lo = dx;
@@ -415,7 +452,7 @@ impl History {
         owner: Option<EpisodeId>,
     ) -> Result<DynamicCompressionInterval, R> {
         let old = self.summary.clone();
-        let c = MaterialCurve::new(&self.initial);
+        let c = self.curve();
         let dt = f64::from(h);
         let dx = x - old.indentation;
         if !x.is_finite() || x.abs() > c.depth / 4.0 {
@@ -427,37 +464,24 @@ impl History {
         {
             return Err(R::Numerical);
         }
-        let q = c.segment(old.indentation, old.plastic_indentation, x, dt);
-        let mut region = scene
-            .plates
-            .material
-            .region()
-            .map_err(|_| R::UnsupportedScene)?;
-        let outcome = sustained(
-            &region,
-            SustainedLoad {
-                force: q.force as f32,
-                width: 2.0,
-                section: self.initial.section(),
-                duration: h,
-                measured_plastic_displacement: Some(q.dp as f32),
-            },
-        )
-        .map_err(|_| R::Numerical)?;
-        if outcome.failed[0]
-            || outcome.ledger.excess != 0.0
-            || region.absorb(outcome.consumed[0]) != Ok(0.0)
-            || region.failed()
-        {
-            return Err(R::FailedRegion);
-        }
-        let charge = scene.plates.material.remaining - region.remaining_precise();
-        let charge_error = c.y * q.dp - charge;
-        if (q.dp > 0.0 && (charge <= 0.0 || charge_error.abs() > 1e-5 * c.y * q.dp))
-            || (q.dp == 0.0 && charge != 0.0)
-        {
-            return Err(R::Numerical);
-        }
+        let (q, loads) = if let Some(paired) = &mut self.paired {
+            let (loads, q) = paired.finish(scene, x, h, owner)?;
+            (q, Some(loads))
+        } else {
+            (
+                c.segment(old.indentation, old.plastic_indentation, x, dt),
+                None,
+            )
+        };
+        let (remaining, charge, charge_error) = if let Some(loads) = &loads {
+            (
+                0.0,
+                loads[0].damage_work + loads[1].damage_work,
+                loads[0].charge_error + loads[1].charge_error,
+            )
+        } else {
+            charge(&scene.plates.material, &q, h)?
+        };
         let kinetic = 0.5 * self.effective_mass() * v * v;
         let kinetic_change = kinetic - old.kinetic_energy;
         let impulse = q.mean * dt;
@@ -475,10 +499,19 @@ impl History {
         next.kinetic_energy = kinetic;
         next.elastic_energy = q.elastic;
         next.gravity_work = self.gravity_totals(x, old.elapsed)[0];
-        next.damage_work = self.initial.remaining - region.remaining_precise();
+        next.damage_work = if let Some(p) = &self.paired {
+            p.summaries().iter().map(|s| s.damage_work).sum()
+        } else {
+            self.initial.remaining - remaining
+        };
         next.viscous_loss = add(old.viscous_loss, q.loss)?;
-        next.charge_error = c.y * q.p - next.damage_work;
-        next.absolute_charge_error = add(old.absolute_charge_error, charge_error.abs())?;
+        next.charge_error =
+            self.paired.as_ref().map_or(c.y * q.p, |p| p.plastic_work()) - next.damage_work;
+        next.absolute_charge_error = if let Some(p) = &self.paired {
+            p.summaries().iter().map(|s| s.absolute_charge_error).sum()
+        } else {
+            add(old.absolute_charge_error, charge_error.abs())?
+        };
         next.reaction_impulse = add(old.reaction_impulse, impulse)?;
         next.integrated_velocity = add(old.integrated_velocity, integrated)?;
         for (i, error) in errors.into_iter().enumerate() {
@@ -491,35 +524,80 @@ impl History {
         if !self.valid() {
             return Err(R::Numerical);
         }
+        let (other_load, load) = if let Some([other, load]) = loads {
+            (Some(other), load)
+        } else {
+            (
+                None,
+                CompressionLoad {
+                    law: engine_material::LAW_VERSION,
+                    material_id: scene
+                        .plates
+                        .material
+                        .region()
+                        .map_err(|_| R::UnsupportedScene)?
+                        .material()
+                        .identity(),
+                    episode: owner,
+                    sources: scene.plates.sources,
+                    normal: Vec2::new(scene.plates.normal[0], scene.plates.normal[1]),
+                    duration: h,
+                    width: 2.0,
+                    section: self.initial.section(),
+                    displacement: dx,
+                    plastic_displacement: q.dp,
+                    force: q.force,
+                    impulse,
+                    elastic_before: old.elastic_energy,
+                    elastic_after: q.elastic,
+                    driver_work: q.work,
+                    damage_work: charge,
+                    viscous_loss: q.loss,
+                    charge_error,
+                },
+            )
+        };
         Ok(DynamicCompressionInterval {
+            other_load,
             at,
             gravity_work,
             kinetic_change,
             incoming: old.velocity as f32,
             outgoing: v as f32,
             errors,
-            load: CompressionLoad {
-                law: engine_material::LAW_VERSION,
-                material_id: region.material().identity(),
-                episode: owner,
-                sources: scene.plates.sources,
-                normal: Vec2::new(scene.plates.normal[0], scene.plates.normal[1]),
-                duration: h,
-                width: 2.0,
-                section: self.initial.section(),
-                displacement: dx,
-                plastic_displacement: q.dp,
-                force: q.force,
-                impulse,
-                elastic_before: old.elastic_energy,
-                elastic_after: q.elastic,
-                driver_work: q.work,
-                damage_work: charge,
-                viscous_loss: q.loss,
-                charge_error,
-            },
+            load,
         })
     }
+}
+pub(super) fn charge(material: &StoredRegion, q: &Segment, h: f32) -> Result<(f64, f64, f64), R> {
+    let c = MaterialCurve::new(material);
+    let mut region = material.region().map_err(|_| R::UnsupportedScene)?;
+    let outcome = sustained(
+        &region,
+        SustainedLoad {
+            force: q.force as f32,
+            width: 2.0,
+            section: material.section(),
+            duration: h,
+            measured_plastic_displacement: Some(q.dp as f32),
+        },
+    )
+    .map_err(|_| R::Numerical)?;
+    if outcome.failed[0]
+        || outcome.ledger.excess != 0.0
+        || region.absorb(outcome.consumed[0]) != Ok(0.0)
+        || region.failed()
+    {
+        return Err(R::FailedRegion);
+    }
+    let charge = material.remaining - region.remaining_precise();
+    let error = c.y * q.dp - charge;
+    if (q.dp > 0.0 && (charge <= 0.0 || error.abs() > 1e-5 * c.y * q.dp))
+        || (q.dp == 0.0 && charge != 0.0)
+    {
+        return Err(R::Numerical);
+    }
+    Ok((region.remaining_precise(), charge, error))
 }
 pub(super) fn add(old: f64, change: f64) -> Result<f64, R> {
     let next = old + change;

@@ -330,6 +330,8 @@ one compliant work law. The [changing-load extension](material-changing-load.md)
 adds bounded piecewise normal gravity without resetting work, damage or numerical
 allowances. The [moving-support extension](material-moving-support.md) adds free
 two-body recoil with reduced-mass material work and separate motion balances.
+The [paired-material extension](material-paired-compression.md) gives both free
+bodies finite layers, separate retained capacities and one shared work reaction.
 Transfer between older loading modes, general connection
 loads and broader geometry remain future work.
 

@@ -200,3 +200,72 @@ fn moving_enrollment_refuses_external_force_and_non_normal_motion() {
         refused(&mut w, DT, R::UnsupportedScene);
     }
 }
+
+#[test]
+fn paired_extension_preserves_frozen_v19_histories() {
+    let mut original = pair(4.0);
+    original
+        .step_material_dynamic_compression(1.0 / 128.0)
+        .unwrap();
+    for terminal in [false, true] {
+        let mut w = original.clone();
+        if terminal {
+            w.loading
+                .as_mut()
+                .unwrap()
+                .invalidate_gravity(gravity::Invalidation::ExternalEdit);
+        }
+        let c = continuation(&mut w);
+        let mut frozen = bincode::serialize(&5_u32).unwrap();
+        frozen.extend(model::frozen_v15_history(&c.history));
+        match &c.status {
+            Status::MovingSupport(a) => {
+                bincode::serialize_into(&mut frozen, &5_u32).unwrap();
+                frozen.extend(compression::scene::frozen_v14_scene(&a.scene.plates));
+                bincode::serialize_into(
+                    &mut frozen,
+                    &(
+                        a.scene.mass,
+                        a.scene.acceleration,
+                        a.owner,
+                        a.pending_support,
+                    ),
+                )
+                .unwrap();
+            }
+            Status::Invalidated(_) => {
+                bincode::serialize_into(&mut frozen, &(1_u32, 0_u32)).unwrap();
+            }
+            _ => panic!("v19 lifecycle changed"),
+        }
+        assert_eq!(bincode::serialize(&c).unwrap(), frozen);
+        let m = c.history.moving.as_ref().unwrap();
+        bincode::serialize_into(
+            &mut frozen,
+            &(
+                m.masses,
+                m.initial.positions,
+                m.initial.velocities,
+                m.current.positions,
+                m.current.velocities,
+                m.integrated_velocity,
+                m.errors,
+                m.absolute_errors,
+            ),
+        )
+        .unwrap();
+        let bytes = w.snapshot_bytes().unwrap();
+        assert_eq!(&bytes[..4], &19_u32.to_le_bytes());
+        assert!(bytes.ends_with(&frozen));
+        let mut restored = PhysicsWorld::from_snapshot_bytes(&bytes).unwrap();
+        assert_eq!(restored.snapshot_bytes().unwrap(), bytes);
+        assert_eq!(
+            restored.step_material_dynamic_compression(DT),
+            w.step_material_dynamic_compression(DT)
+        );
+        assert_eq!(
+            restored.snapshot_bytes().unwrap(),
+            w.snapshot_bytes().unwrap()
+        );
+    }
+}
