@@ -328,7 +328,9 @@ and compatible saved lifecycles. The [falling-platen handoff](material-impact-su
 adds incoming kinetic energy and same-owner Impact/Support continuation through
 one compliant work law. The [changing-load extension](material-changing-load.md)
 adds bounded piecewise normal gravity without resetting work, damage or numerical
-allowances. Transfer between older loading modes, general connection
+allowances. The [moving-support extension](material-moving-support.md) adds free
+two-body recoil with reduced-mass material work and separate motion balances.
+Transfer between older loading modes, general connection
 loads and broader geometry remain future work.
 
 ## Evidence

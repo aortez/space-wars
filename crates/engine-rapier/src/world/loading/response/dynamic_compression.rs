@@ -5,8 +5,10 @@ use engine_material::{CRUSH_TIME_CONSTANT, SustainedLoad, sustained};
 
 mod loads;
 mod model;
+mod moving;
 mod step;
 use model::{History, MaterialCurve};
+pub use moving::MovingSupportSummary;
 
 /// Largest number of internal midpoint reaction solves per public call.
 pub const MAX_DYNAMIC_COMPRESSION_STEPS: usize = 1024;
@@ -19,6 +21,7 @@ pub struct DynamicCompressionSummary {
     pub indentation: f64,
     pub velocity: f64,
     pub plastic_indentation: f64,
+    /// Relative kinetic energy; reduced mass is used for a moving support.
     pub kinetic_energy: f64,
     pub elastic_energy: f64,
     pub gravity_work: f64,
@@ -32,8 +35,9 @@ pub struct DynamicCompressionSummary {
     /// Energy, impulse and position defects, respectively. Never material damage.
     pub errors: [f64; 3],
     /// Sums of absolute defects, bounded by 1e-5 times the initial scales.
+    /// A moving pair admits two position allowances; each body is also checked.
     pub absolute_errors: [f64; 3],
-    /// Y*depth, sqrt(2*mass*Y*depth), depth. Frozen at enrollment.
+    /// Y*depth, sqrt(2*effective_mass*Y*depth), depth. Frozen at enrollment.
     pub scales: [f64; 3],
     pub elapsed: f64,
     pub solves: u64,
@@ -47,8 +51,11 @@ pub struct DynamicCompressionInterval {
     pub at: f64,
     pub load: CompressionLoad,
     pub gravity_work: f64,
+    /// Relative kinetic-energy change (reduced mass for a moving support).
     pub kinetic_change: f64,
+    /// Relative endpoint speed, rounded to f32 for a moving pair.
     pub incoming: f32,
+    /// Relative endpoint speed, rounded to f32 for a moving pair.
     pub outgoing: f32,
     pub errors: [f64; 3],
 }
@@ -74,6 +81,7 @@ enum Status {
     Rebound(Box<ReboundActive>),
     Falling(Box<FallingActive>),
     ChangingLoad(Box<FallingActive>),
+    MovingSupport(Box<FallingActive>),
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct FallingActive {
@@ -101,18 +109,36 @@ struct Scene {
 }
 impl Scene {
     fn read(world: &PhysicsWorld) -> Result<Self, R> {
-        let plates = compression::scene::Scene::read_dynamic(world)?;
+        let moving = world.raw.bodies.iter().all(|(_, b)| b.is_dynamic());
+        let plates = if moving {
+            compression::scene::Scene::read_moving(world)?
+        } else {
+            compression::scene::Scene::read_dynamic(world)?
+        };
         let n = Vector::new(plates.normal[0], plates.normal[1]);
         let acceleration = world.raw.gravity.dot(n);
-        let body = &world.raw.bodies[world
-            .body_handle(plates.bodies[0])
-            .ok_or(R::UnsupportedScene)?];
-        let mut refreshed = body.clone();
-        refreshed.recompute_mass_properties_from_colliders(&world.raw.colliders);
+        let mass = Self::mass(world, plates.bodies[0])?;
+        if moving {
+            Self::mass(world, plates.bodies[1])?;
+        }
         if !acceleration.is_finite()
             || !(0.0..=1e6).contains(&acceleration)
             || world.raw.gravity != n * acceleration
-            || !(5.0..=80.0).contains(&body.mass())
+        {
+            return Err(R::UnsupportedScene);
+        }
+        Ok(Self {
+            plates,
+            mass,
+            acceleration,
+        })
+    }
+
+    fn mass(world: &PhysicsWorld, id: BodyId) -> Result<f32, R> {
+        let body = &world.raw.bodies[world.body_handle(id).ok_or(R::UnsupportedScene)?];
+        let mut refreshed = body.clone();
+        refreshed.recompute_mass_properties_from_colliders(&world.raw.colliders);
+        if !(5.0..=80.0).contains(&body.mass())
             || body.mass() != refreshed.mass()
             || body.local_center_of_mass() != refreshed.local_center_of_mass()
             || !body.local_center_of_mass().is_finite()
@@ -124,11 +150,7 @@ impl Scene {
         {
             return Err(R::UnsupportedScene);
         }
-        Ok(Self {
-            plates,
-            mass: body.mass(),
-            acceleration,
-        })
+        Ok(body.mass())
     }
 }
 impl Continuation {
@@ -144,8 +166,10 @@ impl Continuation {
             REBOUND_SNAPSHOT_VERSION
         } else if self.revision == 3 {
             FALLING_SUPPORT_SNAPSHOT_VERSION
-        } else {
+        } else if self.revision == 4 {
             CHANGING_LOAD_SNAPSHOT_VERSION
+        } else {
+            MOVING_SUPPORT_SNAPSHOT_VERSION
         }
     }
     pub(in crate::world) fn snapshot_tag(&self) -> u64 {
@@ -155,8 +179,10 @@ impl Continuation {
             REBOUND_SNAPSHOT_TAG
         } else if self.revision == 3 {
             FALLING_SUPPORT_SNAPSHOT_TAG
-        } else {
+        } else if self.revision == 4 {
             CHANGING_LOAD_SNAPSHOT_TAG
+        } else {
+            MOVING_SUPPORT_SNAPSHOT_TAG
         }
     }
     pub(in crate::world) fn serialize_extensions(
@@ -173,6 +199,13 @@ impl Continuation {
                 .map_err(|e| PhysicsWorldError(e.to_string()))?;
         } else if self.revision == 4 {
             self.history.serialize_loads(bytes)?;
+        } else if self.revision == 5 {
+            let moving = self
+                .history
+                .moving
+                .as_ref()
+                .ok_or_else(|| PhysicsWorldError("missing moving-support history".into()))?;
+            bincode::serialize_into(bytes, moving).map_err(|e| PhysicsWorldError(e.to_string()))?;
         }
         Ok(())
     }
@@ -186,6 +219,10 @@ impl Continuation {
             );
         } else if self.revision == 4 {
             self.history.deserialize_loads(reader)?;
+        } else if self.revision == 5 {
+            self.history.moving = Some(
+                bincode::deserialize_from(reader).map_err(|e| PhysicsWorldError(e.to_string()))?,
+            );
         }
         Ok(())
     }
@@ -202,6 +239,11 @@ impl Continuation {
                 if self.revision == 4
                     && (!a.pending_support
                         || (a.owner.is_some() && self.history.incoming.is_some())) =>
+            {
+                Some((&a.scene, a.owner))
+            }
+            Status::MovingSupport(a)
+                if self.revision == 5 && (!a.pending_support || a.owner.is_some()) =>
             {
                 Some((&a.scene, a.owner))
             }
@@ -228,7 +270,12 @@ impl Continuation {
             && scene.mass == self.history.mass
             && scene.acceleration == self.history.current_acceleration()
             && scene.plates.x == self.history.summary.indentation
-            && f64::from(scene.plates.speed) == self.history.summary.velocity
+            && if let Some(moving) = &self.history.moving {
+                moving.live(world, &scene)
+            } else {
+                world.body_kind(scene.plates.bodies[1]) == Some(BodyKind::Fixed)
+                    && f64::from(scene.plates.speed) == self.history.summary.velocity
+            }
             && scene.plates.material == self.history.current_material()
             && owner.is_some() == (scene.plates.x >= self.history.summary.plastic_indentation)
             && loading.episodes.len() == usize::from(owner.is_some())
@@ -256,6 +303,12 @@ impl PhysicsWorld {
     /// and weight <= 2Y. A detached start needs positive speed or gravity;
     /// touching arrival needs positive speed. Initial kinetic energy/momentum
     /// are retained explicitly. Imported histories and plastic preload refuse.
+    /// Revision 5 also admits a dynamic support of refreshed mass `[5,80]`,
+    /// with both bodies rotation-locked and moving only along the normal.
+    /// External gravity is zero, initial relative speed is `(0,64]`, and each
+    /// body's speed stays in `[-64,64]`. Only the support carries material.
+    /// The same law uses reduced mass and equal/opposite impulses; the companion
+    /// `material_moving_support_summary` retains both laboratory-frame balances.
     ///
     /// Signed material work covers loading, unloading, separation and return.
     /// Falling contact emits Impact, then Support with the same owner on the
@@ -268,8 +321,9 @@ impl PhysicsWorld {
     /// elastic/viscous timescales. Actual intervals sum exactly to dt. Physical
     /// and numerical limits refuse atomically. Pause clears ephemeral output
     /// without enrollment. Public edits/other stepping permanently invalidate
-    /// retained history, except the explicit acceleration API. Snapshot v18
-    /// supports changing loads; unchanged histories retain their v1-v17 layouts.
+    /// retained history, except the explicit acceleration API for fixed supports.
+    /// Snapshot v19 retains moving-support motion and numerical allowances;
+    /// fixed-support histories keep their v1-v18 layouts and stepping behavior.
     pub fn step_material_dynamic_compression(
         &mut self,
         dt: f32,

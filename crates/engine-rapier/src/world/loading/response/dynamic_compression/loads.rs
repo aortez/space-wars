@@ -67,6 +67,7 @@ impl History {
 
     fn accepts_acceleration(&self, acceleration: f32) -> bool {
         acceleration.is_finite()
+            && (self.moving.is_none() || acceleration == 0.0)
             && (0.0..=1e6).contains(&acceleration)
             && f64::from(self.mass) * f64::from(acceleration)
                 <= 2.0 * MaterialCurve::new(&self.initial).y
@@ -125,6 +126,7 @@ impl PhysicsWorld {
     /// An accepted change selects snapshot v18. Invalid/stale/over-limit commands
     /// leave all state and outputs unchanged. Ordinary `set_gravity` still
     /// invalidates continuation; this API cannot enroll or revive a history.
+    /// Moving-support histories only admit the existing zero acceleration.
     pub fn set_material_dynamic_compression_acceleration(
         &mut self,
         acceleration: f32,

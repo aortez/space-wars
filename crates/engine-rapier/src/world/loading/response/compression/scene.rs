@@ -10,7 +10,7 @@ pub(in crate::world::loading::response) struct Scene {
     slices: [usize; 2],
     copies: [usize; 2],
     pub(in crate::world::loading::response) normal: [f32; 2],
-    origin: [f32; 2],
+    pub(in crate::world::loading::response) origin: [f32; 2],
     pub(in crate::world::loading::response) x: f64,
     pub(in crate::world::loading::response) speed: f32,
     pub(in crate::world::loading::response) material: StoredRegion,
@@ -19,21 +19,27 @@ pub(in crate::world::loading::response) struct Scene {
 }
 impl Scene {
     pub(in crate::world::loading::response) fn read(world: &PhysicsWorld) -> Result<Self, R> {
-        Self::read_mode(world, false)
+        Self::read_mode(world, false, false)
     }
 
     pub(in crate::world::loading::response) fn read_dynamic(
         world: &PhysicsWorld,
     ) -> Result<Self, R> {
-        Self::read_mode(world, true)
+        Self::read_mode(world, true, false)
     }
 
-    fn read_mode(world: &PhysicsWorld, dynamic: bool) -> Result<Self, R> {
+    pub(in crate::world::loading::response) fn read_moving(
+        world: &PhysicsWorld,
+    ) -> Result<Self, R> {
+        Self::read_mode(world, true, true)
+    }
+
+    fn read_mode(world: &PhysicsWorld, dynamic: bool, moving: bool) -> Result<Self, R> {
         let loading = world.loading.as_ref().ok_or(R::ResponseDisabled)?;
         let response = loading.response.as_ref().ok_or(R::ResponseDisabled)?;
         if world.raw.bodies.len() != 2
             || world.raw.colliders.len() > 16
-            || (!dynamic && world.raw.gravity != Vector::ZERO)
+            || ((!dynamic || moving) && world.raw.gravity != Vector::ZERO)
             || (!dynamic && loading.dynamic_compression.is_some())
             || (dynamic && loading.compression.is_some())
             || !world.raw.impulse_joints.is_empty()
@@ -47,29 +53,41 @@ impl Scene {
         {
             return Err(R::UnsupportedScene);
         }
-        let driver = world
+        let support = world
             .raw
             .bodies
             .iter()
             .find(|(_, b)| {
-                b.body_type()
-                    == if dynamic {
-                        RigidBodyType::Dynamic
-                    } else {
-                        RigidBodyType::KinematicVelocityBased
-                    }
+                if moving {
+                    b.is_dynamic()
+                        && b.colliders().iter().any(|h| {
+                            decode_collider(world.raw.colliders[*h].user_data)
+                                .and_then(|id| loading.bindings.get(&id))
+                                .is_some_and(|s| response.materials.contains_key(&s.region))
+                        })
+                } else {
+                    b.is_fixed()
+                }
             })
             .map(|(h, _)| h)
             .ok_or(R::UnsupportedScene)?;
-        let fixed = world
+        let driver = world
             .raw
             .bodies
             .iter()
-            .find(|(_, b)| b.is_fixed())
+            .find(|(h, b)| {
+                *h != support
+                    && b.body_type()
+                        == if dynamic {
+                            RigidBodyType::Dynamic
+                        } else {
+                            RigidBodyType::KinematicVelocityBased
+                        }
+            })
             .map(|(h, _)| h)
             .ok_or(R::UnsupportedScene)?;
-        let handles = [driver, fixed];
-        let base = &world.raw.bodies[fixed];
+        let handles = [driver, support];
+        let base = &world.raw.bodies[support];
         let turn = QuarterTurn::from_angle(base.rotation().angle()).ok_or(R::UnsupportedScene)?;
         if *base.rotation() != turn.rotation() {
             return Err(R::UnsupportedScene);
@@ -78,7 +96,8 @@ impl Scene {
         let origin = [base.translation().x - n.x, base.translation().y - n.y];
         for axis in 0..2 {
             let center = [base.translation().x, base.translation().y][axis];
-            if f64::from(origin[axis]) != f64::from(center) - f64::from([n.x, n.y][axis])
+            if (!moving
+                && f64::from(origin[axis]) != f64::from(center) - f64::from([n.x, n.y][axis]))
                 || !(-16.0..=16.0).contains(&origin[axis])
             {
                 return Err(R::UnsupportedScene);
@@ -123,7 +142,7 @@ impl Scene {
                         || b.activation().angular_threshold >= 0.0))
                 || !(1..=8).contains(&b.colliders().len())
                 || -n.y * b.linvel().x + n.x * b.linvel().y != 0.0
-                || (role == 1 && b.linvel() != Vector::ZERO)
+                || (role == 1 && !moving && b.linvel() != Vector::ZERO)
             {
                 return Err(R::UnsupportedScene);
             }
@@ -196,8 +215,16 @@ impl Scene {
             return Err(R::UnsupportedScene);
         }
         let b = &world.raw.bodies[driver];
-        let x = f64::from(n.x) * (f64::from(b.translation().x) - f64::from(origin[0]))
-            + f64::from(n.y) * (f64::from(b.translation().y) - f64::from(origin[1]));
+        let x = if moving {
+            // Subtract the two actual centers before adding the unit face gap;
+            // rounding the moving surface to f32 would lose relative motion.
+            f64::from(n.x) * (f64::from(b.translation().x) - f64::from(base.translation().x))
+                + f64::from(n.y) * (f64::from(b.translation().y) - f64::from(base.translation().y))
+                + 1.0
+        } else {
+            f64::from(n.x) * (f64::from(b.translation().x) - f64::from(origin[0]))
+                + f64::from(n.y) * (f64::from(b.translation().y) - f64::from(origin[1]))
+        };
         let mut integration = world.raw.integration_parameters;
         integration.dt = 0.0;
         Ok(Self {
@@ -209,7 +236,11 @@ impl Scene {
             normal: [n.x, n.y],
             origin,
             x,
-            speed: n.x * b.linvel().x + n.y * b.linvel().y,
+            speed: if moving {
+                n.x * (b.linvel().x - base.linvel().x) + n.y * (b.linvel().y - base.linvel().y)
+            } else {
+                n.x * b.linvel().x + n.y * b.linvel().y
+            },
             material: response.materials[&sources[1].region].clone(),
             capture: loading.config,
             integration,
