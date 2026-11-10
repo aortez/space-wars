@@ -150,16 +150,12 @@ impl MovingHistory {
             && Motion::read(world, scene) == Ok(self.current.clone())
     }
     pub fn valid(&self, history: &History) -> bool {
-        let c = MaterialCurve::new(&history.initial);
+        let c = history.curve();
         let s = &history.summary;
         let initial_energy: f64 = self.energy(&self.initial).iter().sum();
         let energy: f64 = self.energy(&self.current).iter().sum();
         let expected = [
-            initial_energy
-                - energy
-                - s.elastic_energy
-                - c.y * s.plastic_indentation
-                - s.viscous_loss,
+            initial_energy - energy - s.elastic_energy - history.plastic_work() - s.viscous_loss,
             -s.reaction_impulse
                 - f64::from(self.masses[0])
                     * (f64::from(self.current.velocities[0])
@@ -224,7 +220,7 @@ impl PhysicsWorld {
     /// history. Retained after invalidation, like the relative-motion summary.
     pub fn material_moving_support_summary(&self) -> Option<MovingSupportSummary> {
         let h = &self.loading.as_ref()?.dynamic_compression.as_ref()?.history;
-        Some(h.moving.as_ref()?.summary(&MaterialCurve::new(&h.initial)))
+        Some(h.moving.as_ref()?.summary(&h.curve()))
     }
 }
 

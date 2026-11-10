@@ -6,9 +6,11 @@ use engine_material::{CRUSH_TIME_CONSTANT, SustainedLoad, sustained};
 mod loads;
 mod model;
 mod moving;
+mod paired;
 mod step;
 use model::{History, MaterialCurve};
 pub use moving::MovingSupportSummary;
+pub use paired::MaterialCompressionSummary;
 
 /// Largest number of internal midpoint reaction solves per public call.
 pub const MAX_DYNAMIC_COMPRESSION_STEPS: usize = 1024;
@@ -46,10 +48,15 @@ pub struct DynamicCompressionSummary {
 /// One internal interval, in execution order. The reaction is the mean
 /// constitutive force in the work-preserving discrete solve, not a rigid
 /// penetration-correction impulse. `load.force` is its endpoint reaction.
+/// For paired materials, the two forces are individual endpoint law diagnostics;
+/// both load records carry the same common reaction impulse, counted once.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DynamicCompressionInterval {
     pub at: f64,
     pub load: CompressionLoad,
+    /// The incoming body's material load, when both bodies carry material.
+    /// `load` remains the support load; their work sums to the pair's work.
+    pub other_load: Option<CompressionLoad>,
     pub gravity_work: f64,
     /// Relative kinetic-energy change (reduced mass for a moving support).
     pub kinetic_change: f64,
@@ -82,6 +89,7 @@ enum Status {
     Falling(Box<FallingActive>),
     ChangingLoad(Box<FallingActive>),
     MovingSupport(Box<FallingActive>),
+    PairedMaterials(Box<FallingActive>),
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct FallingActive {
@@ -168,8 +176,10 @@ impl Continuation {
             FALLING_SUPPORT_SNAPSHOT_VERSION
         } else if self.revision == 4 {
             CHANGING_LOAD_SNAPSHOT_VERSION
-        } else {
+        } else if self.revision == 5 {
             MOVING_SUPPORT_SNAPSHOT_VERSION
+        } else {
+            PAIRED_COMPRESSION_SNAPSHOT_VERSION
         }
     }
     pub(in crate::world) fn snapshot_tag(&self) -> u64 {
@@ -181,8 +191,10 @@ impl Continuation {
             FALLING_SUPPORT_SNAPSHOT_TAG
         } else if self.revision == 4 {
             CHANGING_LOAD_SNAPSHOT_TAG
-        } else {
+        } else if self.revision == 5 {
             MOVING_SUPPORT_SNAPSHOT_TAG
+        } else {
+            PAIRED_COMPRESSION_SNAPSHOT_TAG
         }
     }
     pub(in crate::world) fn serialize_extensions(
@@ -195,17 +207,26 @@ impl Continuation {
                 .incoming
                 .as_ref()
                 .ok_or_else(|| PhysicsWorldError("missing falling initial motion".into()))?;
-            bincode::serialize_into(bytes, incoming)
+            bincode::serialize_into(&mut *bytes, incoming)
                 .map_err(|e| PhysicsWorldError(e.to_string()))?;
         } else if self.revision == 4 {
             self.history.serialize_loads(bytes)?;
-        } else if self.revision == 5 {
+        } else if self.revision >= 5 {
             let moving = self
                 .history
                 .moving
                 .as_ref()
                 .ok_or_else(|| PhysicsWorldError("missing moving-support history".into()))?;
-            bincode::serialize_into(bytes, moving).map_err(|e| PhysicsWorldError(e.to_string()))?;
+            bincode::serialize_into(&mut *bytes, moving)
+                .map_err(|e| PhysicsWorldError(e.to_string()))?;
+        }
+        if self.revision == 6 {
+            let paired = self
+                .history
+                .paired
+                .as_ref()
+                .ok_or_else(|| PhysicsWorldError("missing paired material history".into()))?;
+            bincode::serialize_into(bytes, paired).map_err(|e| PhysicsWorldError(e.to_string()))?;
         }
         Ok(())
     }
@@ -215,12 +236,19 @@ impl Continuation {
     ) -> Result<(), PhysicsWorldError> {
         if self.revision == 3 {
             self.history.incoming = Some(
-                bincode::deserialize_from(reader).map_err(|e| PhysicsWorldError(e.to_string()))?,
+                bincode::deserialize_from(&mut *reader)
+                    .map_err(|e| PhysicsWorldError(e.to_string()))?,
             );
         } else if self.revision == 4 {
             self.history.deserialize_loads(reader)?;
-        } else if self.revision == 5 {
+        } else if self.revision >= 5 {
             self.history.moving = Some(
+                bincode::deserialize_from(&mut *reader)
+                    .map_err(|e| PhysicsWorldError(e.to_string()))?,
+            );
+        }
+        if self.revision == 6 {
+            self.history.paired = Some(
                 bincode::deserialize_from(reader).map_err(|e| PhysicsWorldError(e.to_string()))?,
             );
         }
@@ -244,6 +272,11 @@ impl Continuation {
             }
             Status::MovingSupport(a)
                 if self.revision == 5 && (!a.pending_support || a.owner.is_some()) =>
+            {
+                Some((&a.scene, a.owner))
+            }
+            Status::PairedMaterials(a)
+                if self.revision == 6 && (!a.pending_support || a.owner.is_some()) =>
             {
                 Some((&a.scene, a.owner))
             }
@@ -277,6 +310,18 @@ impl Continuation {
                     && f64::from(scene.plates.speed) == self.history.summary.velocity
             }
             && scene.plates.material == self.history.current_material()
+            && self.history.paired.as_ref().is_none_or(|p| {
+                world
+                    .loading
+                    .as_ref()
+                    .unwrap()
+                    .response
+                    .as_ref()
+                    .unwrap()
+                    .materials
+                    .get(&scene.plates.sources[0].region)
+                    == Some(&p.material(0))
+            })
             && owner.is_some() == (scene.plates.x >= self.history.summary.plastic_indentation)
             && loading.episodes.len() == usize::from(owner.is_some())
             && match owner {
@@ -290,7 +335,7 @@ impl Continuation {
 }
 
 impl PhysicsWorld {
-    /// Advance a finite-mass ideal rigid platen against a unilateral material layer.
+    /// Advance finite-mass normal compression against unilateral material layers.
     ///
     /// Uses the driven-compression rectangle/source/section/frame restrictions,
     /// with one dynamic, rotation-locked, nonsleeping body of refreshed mass
@@ -309,6 +354,12 @@ impl PhysicsWorld {
     /// body's speed stays in `[-64,64]`. Only the support carries material.
     /// The same law uses reduced mass and equal/opposite impulses; the companion
     /// `material_moving_support_summary` retains both laboratory-frame balances.
+    /// Revision 6 admits finite material on both free bodies, with separate
+    /// deformation, capacity and charge accounting under a common work reaction.
+    /// Both materials use the same thickness/depth and elastic-limit bounds.
+    /// The smaller depth bounds total indentation; the smaller yield force and
+    /// depth set the fixed pair scales. `material_paired_compression_summary`
+    /// returns the two histories, in incoming-body/support geometric order.
     ///
     /// Signed material work covers loading, unloading, separation and return.
     /// Falling contact emits Impact, then Support with the same owner on the
@@ -322,8 +373,8 @@ impl PhysicsWorld {
     /// and numerical limits refuse atomically. Pause clears ephemeral output
     /// without enrollment. Public edits/other stepping permanently invalidate
     /// retained history, except the explicit acceleration API for fixed supports.
-    /// Snapshot v19 retains moving-support motion and numerical allowances;
-    /// fixed-support histories keep their v1-v18 layouts and stepping behavior.
+    /// Snapshot v20 retains paired materials and both motion histories;
+    /// earlier modes keep their v1-v19 layouts and stepping behavior.
     pub fn step_material_dynamic_compression(
         &mut self,
         dt: f32,

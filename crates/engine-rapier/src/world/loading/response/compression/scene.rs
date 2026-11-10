@@ -45,7 +45,7 @@ impl Scene {
             || !world.raw.impulse_joints.is_empty()
             || world.raw.multibody_joints.iter().next().is_some()
             || loading.regions.len() != 2
-            || response.materials.len() != 1
+            || !(response.materials.len() == 1 || (moving && response.materials.len() == 2))
             || loading.bindings.len() != world.raw.colliders.len()
             || loading.gravity.is_some()
             || loading.arrival_departures.is_some()
@@ -53,12 +53,23 @@ impl Scene {
         {
             return Err(R::UnsupportedScene);
         }
+        let paired = moving && response.materials.len() == 2;
         let support = world
             .raw
             .bodies
             .iter()
             .find(|(_, b)| {
-                if moving {
+                if paired {
+                    // The normal follows the common quarter turn; the body
+                    // further along it is the support, independent of IDs.
+                    QuarterTurn::from_angle(b.rotation().angle()).is_some_and(|turn| {
+                        let n = turn.rotate(Vec2::X);
+                        world.raw.bodies.iter().all(|(_, other)| {
+                            n.x * b.translation().x + n.y * b.translation().y
+                                >= n.x * other.translation().x + n.y * other.translation().y
+                        })
+                    })
+                } else if moving {
                     b.is_dynamic()
                         && b.colliders().iter().any(|h| {
                             decode_collider(world.raw.colliders[*h].user_data)
@@ -177,7 +188,7 @@ impl Scene {
                     || source.is_some_and(|other| other != s)
                     || !loading.live(s.region)
                     || loading.regions[&s.region.id].body != id
-                    || response.materials.contains_key(&s.region) != (role == 1)
+                    || response.materials.contains_key(&s.region) != (role == 1 || paired)
                 {
                     return Err(R::UnsupportedScene);
                 }
