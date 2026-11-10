@@ -1,5 +1,61 @@
 use super::*;
 #[test]
+fn collapsed_support_keeps_its_failure_and_damage_while_the_platen_falls() {
+    let mut s = MaterialLabState::new(Case::SupportFailure);
+    s.paused = false;
+    assert_eq!(s.capacity(), 120.0);
+    assert_eq!(s.remaining(), s.capacity());
+    let mut first = None;
+    while s.stopped.is_none() {
+        s.advance();
+        if let Some(failure) = s.failure() {
+            if first.is_none() {
+                assert!(s.paused);
+                first = Some((failure.clone(), s.summary()));
+                let before = s.snapshot_bytes().unwrap();
+                assert!(s.set_load(Load::Light).is_err());
+                assert_eq!(s.snapshot_bytes().unwrap(), before);
+                assert_eq!(&before[..8], FAILURE_SAVE_MAGIC);
+                s = restored(&s);
+            }
+            assert_eq!(s.failure(), first.as_ref().map(|(e, _)| e.clone()));
+            assert_eq!(s.remaining(), 0.0);
+            assert_eq!(s.summary().damage_work, 120.0);
+            assert_eq!(s.summary().elastic_energy, 0.0);
+            assert_eq!(s.phase(), Phase::Collapsed);
+            let a = s.summary();
+            assert!(
+                (a.gravity_work
+                    - a.kinetic_energy
+                    - a.damage_work
+                    - a.charge_error
+                    - a.viscous_loss
+                    - failure.dissipated()
+                    - a.errors[0])
+                    .abs()
+                    < 1e-8
+            );
+        }
+    }
+    assert!(
+        s.stopped.as_ref().unwrap().starts_with("Run complete"),
+        "{}",
+        s.diagnostics()
+    );
+    let (event, before) = first.unwrap();
+    assert!(s.summary().velocity > before.velocity + 1.0);
+    assert!(s.summary().indentation > before.indentation + 0.01);
+    assert_eq!(s.events.iter().filter(|e| e.label == "Collapse").count(), 1);
+    assert_eq!(s.separations, 0);
+    assert_eq!(restored(&s).failure(), Some(event));
+    let bytes = s.snapshot_bytes().unwrap();
+    for magic in [SAVE_MAGIC, LOAD_SAVE_MAGIC, PAIR_SAVE_MAGIC] {
+        let mut bad = bytes.clone();
+        bad[..8].copy_from_slice(magic);
+        assert!(MaterialLabState::from_snapshot_bytes(&bad).is_err());
+    }
+}
+#[test]
 fn qualified_cases_finish_with_expected_material_behavior() {
     for case in Case::ALL
         .into_iter()

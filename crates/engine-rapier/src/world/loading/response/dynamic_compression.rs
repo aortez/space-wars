@@ -3,11 +3,13 @@ use super::*;
 use compression::{CompressionEvent, CompressionLoad, CompressionRejection as R};
 use engine_material::{CRUSH_TIME_CONSTANT, SustainedLoad, sustained};
 
+mod failure;
 mod loads;
 mod model;
 mod moving;
 mod paired;
 mod step;
+pub use failure::CompressionFailure;
 use model::{History, MaterialCurve};
 pub use moving::MovingSupportSummary;
 pub use paired::MaterialCompressionSummary;
@@ -65,6 +67,9 @@ pub struct DynamicCompressionInterval {
     /// Relative endpoint speed, rounded to f32 for a moving pair.
     pub outgoing: f32,
     pub errors: [f64; 3],
+    /// Elastic release and excess plastic work dissipated at a collapse boundary.
+    /// Add this to the load's storage change, damage, viscosity and charge error.
+    pub failure_dissipated: f64,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -72,6 +77,7 @@ pub struct DynamicCompressionStep {
     pub events: Vec<CompressionEvent>,
     pub intervals: Vec<DynamicCompressionInterval>,
     pub summary: Option<DynamicCompressionSummary>,
+    pub failures: Vec<CompressionFailure>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -90,6 +96,7 @@ enum Status {
     ChangingLoad(Box<FallingActive>),
     MovingSupport(Box<FallingActive>),
     PairedMaterials(Box<FallingActive>),
+    CollapsingSupport(Box<FallingActive>),
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct FallingActive {
@@ -178,8 +185,10 @@ impl Continuation {
             CHANGING_LOAD_SNAPSHOT_VERSION
         } else if self.revision == 5 {
             MOVING_SUPPORT_SNAPSHOT_VERSION
-        } else {
+        } else if self.revision == 6 {
             PAIRED_COMPRESSION_SNAPSHOT_VERSION
+        } else {
+            COLLAPSING_SUPPORT_SNAPSHOT_VERSION
         }
     }
     pub(in crate::world) fn snapshot_tag(&self) -> u64 {
@@ -193,8 +202,10 @@ impl Continuation {
             CHANGING_LOAD_SNAPSHOT_TAG
         } else if self.revision == 5 {
             MOVING_SUPPORT_SNAPSHOT_TAG
-        } else {
+        } else if self.revision == 6 {
             PAIRED_COMPRESSION_SNAPSHOT_TAG
+        } else {
+            COLLAPSING_SUPPORT_SNAPSHOT_TAG
         }
     }
     pub(in crate::world) fn serialize_extensions(
@@ -211,7 +222,7 @@ impl Continuation {
                 .map_err(|e| PhysicsWorldError(e.to_string()))?;
         } else if self.revision == 4 {
             self.history.serialize_loads(bytes)?;
-        } else if self.revision >= 5 {
+        } else if self.revision == 5 || self.revision == 6 {
             let moving = self
                 .history
                 .moving
@@ -226,7 +237,17 @@ impl Continuation {
                 .paired
                 .as_ref()
                 .ok_or_else(|| PhysicsWorldError("missing paired material history".into()))?;
-            bincode::serialize_into(bytes, paired).map_err(|e| PhysicsWorldError(e.to_string()))?;
+            bincode::serialize_into(&mut *bytes, paired)
+                .map_err(|e| PhysicsWorldError(e.to_string()))?;
+        }
+        if self.revision == 7 {
+            let failure = self
+                .history
+                .failure
+                .as_ref()
+                .ok_or_else(|| PhysicsWorldError("missing collapse history".into()))?;
+            bincode::serialize_into(bytes, &(&self.history.incoming, failure))
+                .map_err(|e| PhysicsWorldError(e.to_string()))?;
         }
         Ok(())
     }
@@ -241,7 +262,7 @@ impl Continuation {
             );
         } else if self.revision == 4 {
             self.history.deserialize_loads(reader)?;
-        } else if self.revision >= 5 {
+        } else if self.revision == 5 || self.revision == 6 {
             self.history.moving = Some(
                 bincode::deserialize_from(&mut *reader)
                     .map_err(|e| PhysicsWorldError(e.to_string()))?,
@@ -249,8 +270,15 @@ impl Continuation {
         }
         if self.revision == 6 {
             self.history.paired = Some(
-                bincode::deserialize_from(reader).map_err(|e| PhysicsWorldError(e.to_string()))?,
+                bincode::deserialize_from(&mut *reader)
+                    .map_err(|e| PhysicsWorldError(e.to_string()))?,
             );
+        }
+        if self.revision == 7 {
+            let (incoming, failure) =
+                bincode::deserialize_from(reader).map_err(|e| PhysicsWorldError(e.to_string()))?;
+            self.history.incoming = incoming;
+            self.history.failure = Some(failure);
         }
         Ok(())
     }
@@ -280,12 +308,31 @@ impl Continuation {
             {
                 Some((&a.scene, a.owner))
             }
+            Status::CollapsingSupport(a)
+                if self.revision == 7
+                    && (!a.pending_support
+                        || (a.owner.is_some() && self.history.incoming.is_some())) =>
+            {
+                Some((&a.scene, a.owner))
+            }
             _ => None,
         }
     }
     pub(in crate::world) fn valid_for(&self, world: &PhysicsWorld) -> bool {
         if self.revision != self.history.revision() || !self.history.valid() {
             return false;
+        }
+        if let Some(f) = &self.history.failure {
+            let Some(loading) = &world.loading else {
+                return false;
+            };
+            if f.source.region.incarnation >= loading.next_region
+                || f.event
+                    .as_ref()
+                    .is_some_and(|e| e.episode.0 >= loading.next_episode)
+            {
+                return false;
+            }
         }
         if matches!(self.status, Status::Invalidated(_)) {
             return true;
@@ -310,6 +357,11 @@ impl Continuation {
                     && f64::from(scene.plates.speed) == self.history.summary.velocity
             }
             && scene.plates.material == self.history.current_material()
+            && self
+                .history
+                .failure
+                .as_ref()
+                .is_none_or(|f| f.source == scene.plates.sources[1])
             && self.history.paired.as_ref().is_none_or(|p| {
                 world
                     .loading
@@ -322,7 +374,9 @@ impl Continuation {
                     .get(&scene.plates.sources[0].region)
                     == Some(&p.material(0))
             })
-            && owner.is_some() == (scene.plates.x >= self.history.summary.plastic_indentation)
+            && owner.is_some()
+                == (!self.history.collapsed()
+                    && scene.plates.x >= self.history.summary.plastic_indentation)
             && loading.episodes.len() == usize::from(owner.is_some())
             && match owner {
                 Some(id) => loading
@@ -379,7 +433,7 @@ impl PhysicsWorld {
         &mut self,
         dt: f32,
     ) -> Result<DynamicCompressionStep, compression::CompressionRejection> {
-        step::advance(self, dt)
+        step::advance(self, dt, false)
     }
     pub fn material_dynamic_compression_summary(&self) -> Option<DynamicCompressionSummary> {
         Some(

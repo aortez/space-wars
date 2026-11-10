@@ -332,6 +332,10 @@ allowances. The [moving-support extension](material-moving-support.md) adds free
 two-body recoil with reduced-mass material work and separate motion balances.
 The [paired-material extension](material-paired-compression.md) gives both free
 bodies finite layers, separate retained capacities and one shared work reaction.
+The opt-in [collapsing support](material-support-failure.md) commits exhaustion
+of one fixed layer, dissipates its elastic store and continues the platen's
+motion with a persistent failure observation. Other paths retain their current
+failure refusals.
 Transfer between older loading modes, general connection
 loads and broader geometry remain future work.
 

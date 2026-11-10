@@ -84,7 +84,7 @@ The PR selection covers:
 
 The **33 full-only cases** retain all their original assertions. They cover the
 long Garden Lab physiology sequence and its moss surface workflow, the Material Lab
-free-pair collisions, repeated marquee recipes, complete tank
+free-pair collisions and support collapse, repeated marquee recipes, complete tank
 fixture/player-choice matrices, autostart repetition/relaunch, complete rain/duck/
 Demo/match lifecycles, and additional variants of shared scenario lifecycle tests.
 The two full-only Clock ceiling workflows retain the 300-second sunlight hold,

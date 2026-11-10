@@ -6,7 +6,11 @@ impl PhysicsHooks for CompliantPair {
         context.solver_contacts.clear();
     }
 }
-pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompressionStep, R> {
+pub(super) fn advance(
+    world: &mut PhysicsWorld,
+    dt: f32,
+    collapse: bool,
+) -> Result<DynamicCompressionStep, R> {
     if !dt.is_finite() || !(0.0..=1.0 / 30.0).contains(&dt) {
         return Err(R::InvalidCommand);
     }
@@ -21,11 +25,13 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
         .loading
         .as_ref()
         .and_then(|l| l.dynamic_compression.as_ref());
-    if saved.is_some_and(|c| c.active().is_none() || !c.valid_for(world)) {
+    if saved.is_some_and(|c| {
+        c.active().is_none() || !c.valid_for(world) || c.history.failure.is_some() != collapse
+    }) {
         return Err(R::StaleContinuation);
     }
     let scene = Scene::read(world)?;
-    if scene.plates.material.remaining <= 0.0 {
+    if scene.plates.material.remaining <= 0.0 && !saved.is_some_and(|c| c.history.collapsed()) {
         return Err(R::FailedRegion);
     }
     if saved.is_none() && !world.loading.as_ref().unwrap().episodes.is_empty() {
@@ -36,6 +42,18 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
     } else {
         History::new(&scene, world)?
     };
+    if saved.is_none() && collapse {
+        if history.moving.is_some() || history.paired.is_some() {
+            return Err(R::UnsupportedScene);
+        }
+        history.failure = Some(failure::FailureHistory {
+            source: scene.plates.sources[1],
+            event: None,
+        });
+        if !history.valid() {
+            return Err(R::UnsupportedScene);
+        }
+    }
     let (count, h) = history.subdivision(dt)?;
     let loading = world.loading.as_ref().unwrap();
     let records = count * if history.paired.is_some() { 2 } else { 1 };
@@ -50,12 +68,17 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
     let loading = staged.loading.as_mut().unwrap();
     loading.begin_step();
     let mut events = Vec::new();
+    let mut failures = Vec::new();
     let revision = history.revision();
     let mut pair = scene.plates.sources;
     pair.sort();
     let mut owner = if let Some(c) = saved {
         c.active().unwrap().1
-    } else if revision == 3 || revision >= 5 {
+    } else if revision == 3
+        || revision == 5
+        || revision == 6
+        || (revision == 7 && history.incoming.is_some())
+    {
         None
     } else {
         Some(enter(
@@ -68,7 +91,7 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
         )?)
     };
     let mut pending_support = saved.is_some_and(
-        |c| matches!(&c.status, Status::Falling(a) | Status::ChangingLoad(a) | Status::MovingSupport(a) | Status::PairedMaterials(a) if a.pending_support),
+        |c| matches!(&c.status, Status::Falling(a) | Status::ChangingLoad(a) | Status::MovingSupport(a) | Status::PairedMaterials(a) | Status::CollapsingSupport(a) if a.pending_support),
     );
     let impact_arrivals = history.incoming.is_some() || history.moving.is_some();
     let mut current = scene;
@@ -144,7 +167,7 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
         let old_p = history.summary.plastic_indentation;
         let crossing =
             || at + f64::from(h) * (old_p - current.plates.x) / (after.plates.x - current.plates.x);
-        if owner.is_none() && after.plates.x >= old_p {
+        if !history.collapsed() && owner.is_none() && after.plates.x >= old_p {
             owner = Some(enter(
                 staged.loading.as_mut().unwrap(),
                 pair,
@@ -168,6 +191,7 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
             motion.velocities = next;
             moving.finish(motion, q.work, q.mean * f64::from(h), f64::from(h))?;
         }
+        let was_collapsed = history.collapsed();
         let interval = history.finish(
             &current,
             after.plates.x,
@@ -176,11 +200,28 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
             at,
             owner,
         )?;
-        if after.plates.x < history.summary.plastic_indentation
+        let just_collapsed = !was_collapsed && history.collapsed();
+        if just_collapsed {
+            failures.push(
+                history
+                    .failure
+                    .as_ref()
+                    .unwrap()
+                    .event
+                    .as_ref()
+                    .unwrap()
+                    .clone(),
+            );
+        }
+        if (just_collapsed || after.plates.x < history.summary.plastic_indentation)
             && let Some(id) = owner.take()
         {
             events.push(CompressionEvent {
-                at: crossing(),
+                at: if just_collapsed {
+                    at + f64::from(h)
+                } else {
+                    crossing()
+                },
                 event: EpisodeEvent {
                     id,
                     sources: pair,
@@ -191,7 +232,9 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
             staged.loading.as_mut().unwrap().episodes.remove(&pair);
             pending_support = false;
         }
-        if records + events.len() > staged.loading.as_ref().unwrap().config.max_records_per_step {
+        if records + events.len() + failures.len()
+            > staged.loading.as_ref().unwrap().config.max_records_per_step
+        {
             return Err(R::Limit);
         }
         staged.raw.bodies[handle].set_linvel(normal * next[0], true);
@@ -235,6 +278,12 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
                 scene: current,
                 owner: owner.ok_or(R::Numerical)?,
             }))
+        } else if revision == 7 {
+            Status::CollapsingSupport(Box::new(FallingActive {
+                scene: current,
+                owner,
+                pending_support,
+            }))
         } else if revision == 6 {
             Status::PairedMaterials(Box::new(FallingActive {
                 scene: current,
@@ -274,6 +323,7 @@ pub(super) fn advance(world: &mut PhysicsWorld, dt: f32) -> Result<DynamicCompre
         events,
         intervals,
         summary: Some(summary),
+        failures,
     })
 }
 

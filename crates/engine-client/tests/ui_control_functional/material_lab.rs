@@ -48,7 +48,7 @@ fn snapshot(h: &mut FunctionalHarness, predicate: impl Fn(&Value) -> bool) -> Va
     }
 }
 fn physics(v: &Value) -> Value {
-    json!({"case":v["case"],"steps":v["steps"],"summary":v["summary"],"remaining":v["remaining"],"events":v["events"],"impacts":v["impacts"],"separations":v["separations"],"weight":v["weight"],"gravity_impulse":v["gravity_impulse"],"load_changes":v["load_changes"],"pair":v["pair"]})
+    json!({"case":v["case"],"steps":v["steps"],"summary":v["summary"],"remaining":v["remaining"],"events":v["events"],"impacts":v["impacts"],"separations":v["separations"],"weight":v["weight"],"gravity_impulse":v["gravity_impulse"],"load_changes":v["load_changes"],"pair":v["pair"],"capacity":v["capacity"],"failure":v["failure"]})
 }
 fn launch(h: &mut FunctionalHarness, mut s: UiState, renderer: &str) -> UiState {
     s = h.activate_until_scenario("material-lab", s);
@@ -210,7 +210,7 @@ fn body(v: &Value, index: usize, field: &str) -> f64 {
 }
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
-fn material_lab_free_pairs_step_save_load_and_both_renderers() {
+fn material_lab_pairs_and_collapse_step_save_load_and_both_renderers() {
     run_functional_test_with_seed("material-lab-pairs", "winit-femtovg", 42, |h| {
         let ready = h.wait_until_ready();
         let mut s = launch(h, ready, "vector");
@@ -309,5 +309,56 @@ fn material_lab_free_pairs_step_save_load_and_both_renderers() {
         assert_eq!(body(&end, 1, "damage_work"), 0.0);
         assert_eq!(body(&end, 1, "remaining"), body(&end, 1, "capacity"));
         h.capture_screenshot("pair-wood-armor-complete-raster.png");
+        choose(h, &mut s, &mut control, 3);
+        let fresh = snapshot(h, |v| v["case"] == "Support gives way" && v["steps"] == 0);
+        assert_eq!(fresh["remaining"], fresh["capacity"]);
+        assert!(fresh["failure"].is_null());
+        choose(h, &mut s, &mut control, 0);
+        let collapsed = snapshot(h, |v| v["phase"] == "Collapsed" && v["paused"] == true);
+        assert!(collapsed["stopped"].is_null());
+        assert_eq!(collapsed["remaining"], 0.0);
+        assert_eq!(collapsed["summary"]["damage_work"], 120.0);
+        h.capture_screenshot("support-collapsed-raster.png");
+        choose(h, &mut s, &mut control, 4);
+        let saved = snapshot(h, |v| {
+            v["storage_status"].as_str().unwrap().starts_with("Saved")
+        });
+        assert_eq!(physics(&saved), physics(&collapsed));
+        choose(h, &mut s, &mut control, 1);
+        let next = snapshot(h, |v| {
+            v["steps"].as_u64() == Some(saved["steps"].as_u64().unwrap() + 1)
+        });
+        choose(h, &mut s, &mut control, 5);
+        let loaded = snapshot(h, |v| {
+            v["storage_status"].as_str().unwrap().starts_with("Loaded")
+        });
+        assert_eq!(physics(&loaded), physics(&saved));
+        choose(h, &mut s, &mut control, 1);
+        assert_eq!(
+            physics(&snapshot(h, |v| v["steps"] == next["steps"])),
+            physics(&next)
+        );
+        choose(h, &mut s, &mut control, 0);
+        let end = snapshot(h, |v| v["stopped"].is_string());
+        assert!(end["stopped"].as_str().unwrap().starts_with("Run complete"));
+        assert_eq!(end["failure"], collapsed["failure"]);
+        assert_eq!(
+            end["summary"]["damage_work"],
+            collapsed["summary"]["damage_work"]
+        );
+        assert!(
+            end["summary"]["velocity"].as_f64().unwrap()
+                > collapsed["summary"]["velocity"].as_f64().unwrap() + 1.0
+        );
+        assert_eq!(
+            end["events"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|e| e["label"] == "Collapse")
+                .count(),
+            1
+        );
+        h.capture_screenshot("support-fallen-raster.png");
     });
 }

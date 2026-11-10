@@ -1,4 +1,4 @@
-use crate::MaterialLabState;
+use crate::{Case, MaterialLabState};
 use engine_common::{
     Camera2, RenderColor as C, RenderFrame, RenderLine, RenderPoint as P, RenderPolygon,
     RenderPrimitive as R, RenderText, Stroke,
@@ -48,6 +48,8 @@ pub fn frame(s: &MaterialLabState) -> RenderFrame {
         10.3,
         if pair.is_some() {
             "MATERIAL LAB  /  PAIRED COLLISION"
+        } else if s.case == Case::SupportFailure {
+            "MATERIAL LAB  /  SUPPORT FAILURE"
         } else {
             "MATERIAL LAB  /  LOAD & RECOVERY"
         },
@@ -79,17 +81,24 @@ pub fn frame(s: &MaterialLabState) -> RenderFrame {
 fn platen(f: &mut RenderFrame, s: &MaterialLabState, a: &DynamicCompressionSummary) {
     let platen = 1.0 - a.indentation as f32 * 20.0;
     let permanent = 1.0 - a.plastic_indentation as f32 * 20.0;
-    let surface = permanent.min(platen);
+    let failure = s.failure();
+    let surface = failure
+        .as_ref()
+        .map_or(permanent.min(platen), |e| 1.0 - e.indentation as f32 * 20.0);
     text(
         f,
         -14.0,
         5.2,
-        format!(
-            "Load: {:.0}  |  changes: {}/{}",
-            s.weight(),
-            s.load_changes.len(),
-            crate::MAX_DYNAMIC_COMPRESSION_LOAD_CHANGES
-        ),
+        if s.case == Case::SupportFailure {
+            format!("Fixed load: {:.0}", s.weight())
+        } else {
+            format!(
+                "Load: {:.0}  |  changes: {}/{}",
+                s.weight(),
+                s.load_changes.len(),
+                crate::MAX_DYNAMIC_COMPRESSION_LOAD_CHANGES
+            )
+        },
         14.0,
         if s.weight() == 0.0 { AMBER } else { CYAN },
     );
@@ -105,7 +114,11 @@ fn platen(f: &mut RenderFrame, s: &MaterialLabState, a: &DynamicCompressionSumma
         -4.2,
         11.0,
         surface + 4.2,
-        C::rgb(0.36, 0.24, 0.13),
+        if failure.is_some() {
+            C::rgb(0.19, 0.17, 0.15)
+        } else {
+            C::rgb(0.36, 0.24, 0.13)
+        },
     );
     for i in 0..8 {
         let x = -13.7 + i as f32 * 1.4;
@@ -116,7 +129,18 @@ fn platen(f: &mut RenderFrame, s: &MaterialLabState, a: &DynamicCompressionSumma
     rect(f, -14.0, platen, 11.0, 1.3, C::rgb(0.16, 0.55, 0.69));
     line(f, -14.0, platen, -3.0, platen, CYAN);
     text(f, -13.6, platen + 0.9, "20 mass units", 14.0, C::WHITE);
-    text(f, -14.0, -5.2, "Wood layer / fixed support", 14.0, INK);
+    text(
+        f,
+        -14.0,
+        -5.2,
+        if failure.is_some() {
+            "Collapsed wood / no support"
+        } else {
+            "Wood layer / fixed support"
+        },
+        14.0,
+        INK,
+    );
     text(f, -14.0, -6.1, "Displacement x20 · schematic", 13.0, INK);
     text(
         f,
@@ -126,11 +150,11 @@ fn platen(f: &mut RenderFrame, s: &MaterialLabState, a: &DynamicCompressionSumma
         12.0,
         AMBER,
     );
-    let lines = [
+    let mut lines = vec![
         format!("Normal speed    {:.3}", a.velocity),
         format!("Compression     {:.5}", a.indentation.max(0.0)),
         format!("Permanent set   {:.5}", a.plastic_indentation),
-        format!("Capacity left   {:.2} / 1200", s.remaining()),
+        format!("Capacity left   {:.2} / {:.0}", s.remaining(), s.capacity()),
         format!("Damage work     {:.3}", a.damage_work),
         format!("Elastic energy  {:.3}", a.elastic_energy),
         format!("Motion energy   {:.3}", a.kinetic_energy),
@@ -138,19 +162,23 @@ fn platen(f: &mut RenderFrame, s: &MaterialLabState, a: &DynamicCompressionSumma
         format!("Gravity work    {:.3}", a.gravity_work),
         format!("Gravity impulse  {:.3}", s.gravity_impulse()),
     ];
+    if let Some(e) = &failure {
+        lines.push(format!("Collapse loss   {:.3}", e.dissipated()));
+    }
     for (i, l) in lines.into_iter().enumerate() {
         text(f, 0.5, 5.8 - i as f32 * 0.75, l, 14.0, INK);
     }
-    rect(f, 0.5, -2.1, 14.5, 0.25, C::rgb(0.2, 0.23, 0.27));
+    let bar_y = if failure.is_some() { -2.9 } else { -2.1 };
+    rect(f, 0.5, bar_y, 14.5, 0.25, C::rgb(0.2, 0.23, 0.27));
     rect(
         f,
         0.5,
-        -2.1,
-        14.5 * (s.remaining() / 1200.0) as f32,
+        bar_y,
+        14.5 * (s.remaining() / s.capacity()) as f32,
         0.25,
         CYAN,
     );
-    history(f, s, 0.5, -2.8);
+    history(f, s, 0.5, bar_y - 0.7);
 }
 /// The latest contact observations, and why a finished run stopped.
 fn history(f: &mut RenderFrame, s: &MaterialLabState, x: f32, y: f32) {

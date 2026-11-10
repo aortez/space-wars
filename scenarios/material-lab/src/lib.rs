@@ -1,5 +1,5 @@
 //! A bounded, slow-motion application of native material loading, unloading and
-//! paired collisions.
+//! paired collisions and support collapse.
 use bincode::Options;
 use engine_common::{Action, Observation, RenderFrame, Scenario, StepResult, TickModel};
 use engine_material::{ARMOR, Material, WOOD};
@@ -7,7 +7,7 @@ use engine_rapier::world::{
     PhysicsWorld,
     loading::response::compression::CompressionRejection,
     loading::response::dynamic_compression::{
-        DynamicCompressionSummary, MAX_DYNAMIC_COMPRESSION_LOAD_CHANGES,
+        CompressionFailure, DynamicCompressionSummary, MAX_DYNAMIC_COMPRESSION_LOAD_CHANGES,
     },
     loading::{EpisodeTransition, RegionToken},
 };
@@ -29,6 +29,7 @@ pub const MAX_SAVE_BYTES: u64 = 1_048_576;
 const SAVE_MAGIC: &[u8; 8] = b"MATLAB01";
 const LOAD_SAVE_MAGIC: &[u8; 8] = b"MATLAB02";
 const PAIR_SAVE_MAGIC: &[u8; 8] = b"MATLAB03";
+const FAILURE_SAVE_MAGIC: &[u8; 8] = b"MATLAB04";
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Case {
@@ -41,6 +42,7 @@ pub enum Case {
     // Appended: saved case tags of the platen cases stay fixed.
     WoodWood,
     WoodArmor,
+    SupportFailure,
 }
 /// Initial condition of one free body along the +x contact normal.
 #[derive(Clone, Copy)]
@@ -51,7 +53,7 @@ pub(crate) struct BodySetup {
     pub velocity: f32,
 }
 impl Case {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::Elastic,
         Self::PlasticReturn,
         Self::Support,
@@ -59,6 +61,7 @@ impl Case {
         Self::LoadRelease,
         Self::WoodWood,
         Self::WoodArmor,
+        Self::SupportFailure,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -69,6 +72,7 @@ impl Case {
             Self::LoadRelease => "Load, release & return",
             Self::WoodWood => "Wood strikes wood",
             Self::WoodArmor => "Wood meets armor",
+            Self::SupportFailure => "Support gives way",
         }
     }
     /// The two free bodies of a paired collision, incoming body first. Both
@@ -105,6 +109,7 @@ impl Case {
             Self::LoadRelease => (8000.0, 1.0 / 64.0, 768),
             Self::WoodWood => (0.0, 1.0 / 16.0, 352),
             Self::WoodArmor => (0.0, 1.0 / 16.0, 512),
+            Self::SupportFailure => (8000.0, 1.0 / 64.0, 144),
         }
     }
     pub fn next(self) -> Self {
@@ -144,6 +149,7 @@ pub enum Phase {
     Approach,
     /// A free pair in contact and still closing.
     Compression,
+    Collapsed,
 }
 impl Phase {
     pub fn label(self) -> &'static str {
@@ -155,6 +161,7 @@ impl Phase {
             Self::Separated => "Separated",
             Self::Approach => "Approach",
             Self::Compression => "Compression",
+            Self::Collapsed => "Collapsed",
         }
     }
 }
@@ -208,6 +215,16 @@ impl MaterialLabState {
             .loading_material_remaining(self.materials[1].unwrap())
             .unwrap()
     }
+    pub fn capacity(&self) -> f64 {
+        let region = self.case.free_pair().map_or_else(
+            || scene::support_region(self.case),
+            |pair| scene::region(pair[1].material),
+        );
+        f64::from(region.capacity())
+    }
+    pub fn failure(&self) -> Option<CompressionFailure> {
+        self.world.material_compression_failure()
+    }
     pub fn weight(&self) -> f32 {
         -self.world.gravity().y * 20.0
     }
@@ -218,6 +235,9 @@ impl MaterialLabState {
     }
     /// A load command owns no tick and never resets an existing physical history.
     pub fn set_load(&mut self, load: Load) -> Result<(), String> {
+        if self.case == Case::SupportFailure {
+            return Err("This collapse case uses a fixed load. Choose another platen case.".into());
+        }
         if self.case.free_pair().is_some() {
             return Err("A free pair takes no external load. Choose a platen case.".into());
         }
@@ -246,6 +266,13 @@ impl MaterialLabState {
         Ok(())
     }
     pub fn guidance(&self) -> Option<&'static str> {
+        if self.case == Case::SupportFailure && self.stopped.is_none() {
+            return Some(if self.failure().is_some() {
+                "Support has collapsed. Run to watch the platen fall."
+            } else {
+                "Run until the support fails; the lab will pause."
+            });
+        }
         if self.case != Case::LoadRelease || self.stopped.is_some() {
             return None;
         }
@@ -264,6 +291,9 @@ impl MaterialLabState {
         )
     }
     pub fn phase(&self) -> Phase {
+        if self.failure().is_some() {
+            return Phase::Collapsed;
+        }
         let s = self.summary();
         let pair = self.case.free_pair().is_some();
         if s.indentation < s.plastic_indentation {
@@ -289,10 +319,19 @@ impl MaterialLabState {
             return;
         }
         let at = self.summary().elapsed;
-        match self.world.step_material_dynamic_compression(PHYSICS_DT) {
+        let result = if self.case == Case::SupportFailure {
+            self.world.step_material_collapsing_support(PHYSICS_DT)
+        } else {
+            self.world.step_material_dynamic_compression(PHYSICS_DT)
+        };
+        match result {
             Ok(result) => {
                 self.steps += 1;
                 let mut separated = false;
+                let collapsed_episode = result.failures.first().map(|f| f.episode);
+                if collapsed_episode.is_some() {
+                    self.paused = true;
+                }
                 for e in result.events {
                     let label = match e.event.transition {
                         EpisodeTransition::Impact => {
@@ -300,6 +339,9 @@ impl MaterialLabState {
                             "Impact"
                         }
                         EpisodeTransition::Support => "Support",
+                        EpisodeTransition::End if Some(e.event.id) == collapsed_episode => {
+                            "Contact ended"
+                        }
                         EpisodeTransition::End => {
                             self.separations += 1;
                             separated = true;
@@ -312,6 +354,16 @@ impl MaterialLabState {
                     self.events.push(Event {
                         time: at + e.at,
                         label: label.into(),
+                        episode: self.impacts,
+                    });
+                }
+                for failure in result.failures {
+                    if self.events.len() == 8 {
+                        self.events.remove(0);
+                    }
+                    self.events.push(Event {
+                        time: failure.elapsed,
+                        label: "Collapse".into(),
                         episode: self.impacts,
                     });
                 }
@@ -328,7 +380,8 @@ impl MaterialLabState {
                 }
             }
             Err(reason) => {
-                let reason = if self.case.free_pair().is_some()
+                let reason = if (self.case.free_pair().is_some()
+                    || self.case == Case::SupportFailure)
                     && reason == CompressionRejection::Numerical
                 {
                     "Numerical accuracy limit reached".to_string()
@@ -346,7 +399,8 @@ impl MaterialLabState {
             "summary": self.summary(), "remaining": self.remaining(), "events": self.events,
             "stopped": self.stopped, "weight": self.weight(),
             "gravity_impulse": self.gravity_impulse(), "load_changes": self.load_changes,
-            "guidance": self.guidance(), "pair": self.pair() })
+            "guidance": self.guidance(), "pair": self.pair(),
+            "capacity": self.capacity(), "failure": self.failure() })
     }
     pub fn snapshot_bytes(&self) -> Result<Vec<u8>, String> {
         let save = Save {
@@ -358,9 +412,11 @@ impl MaterialLabState {
             stopped: self.stopped.clone(),
             world: self.world.snapshot_bytes().map_err(|e| e.to_string())?,
         };
-        // A free pair accepts no load command, so its envelope has no command list.
+        // Fixed-load cases have no command list in their save envelope.
         let plain = self.load_changes.is_empty() && self.case != Case::LoadRelease;
-        let mut bytes = if self.case.free_pair().is_some() {
+        let mut bytes = if self.case == Case::SupportFailure {
+            FAILURE_SAVE_MAGIC
+        } else if self.case.free_pair().is_some() {
             PAIR_SAVE_MAGIC
         } else if plain {
             SAVE_MAGIC
@@ -384,22 +440,24 @@ impl MaterialLabState {
         if bytes.len() as u64 > MAX_SAVE_BYTES {
             return Err("Not a supported Material Lab save".into());
         }
-        let (save, changes): (Save, Vec<LoadChange>) =
-            if bytes.starts_with(SAVE_MAGIC) || bytes.starts_with(PAIR_SAVE_MAGIC) {
-                let save: Save = codec()
-                    .deserialize(&bytes[8..])
-                    .map_err(|e| e.to_string())?;
-                if save.case == Case::LoadRelease {
-                    return Err("Load/release case requires a newer lab save".into());
-                }
-                (save, Vec::new())
-            } else if bytes.starts_with(LOAD_SAVE_MAGIC) {
-                codec()
-                    .deserialize(&bytes[8..])
-                    .map_err(|e| e.to_string())?
-            } else {
-                return Err("Not a supported Material Lab save".into());
-            };
+        let (save, changes): (Save, Vec<LoadChange>) = if bytes.starts_with(SAVE_MAGIC)
+            || bytes.starts_with(PAIR_SAVE_MAGIC)
+            || bytes.starts_with(FAILURE_SAVE_MAGIC)
+        {
+            let save: Save = codec()
+                .deserialize(&bytes[8..])
+                .map_err(|e| e.to_string())?;
+            if save.case == Case::LoadRelease {
+                return Err("Load/release case requires a newer lab save".into());
+            }
+            (save, Vec::new())
+        } else if bytes.starts_with(LOAD_SAVE_MAGIC) {
+            codec()
+                .deserialize(&bytes[8..])
+                .map_err(|e| e.to_string())?
+        } else {
+            return Err("Not a supported Material Lab save".into());
+        };
         if save.steps > save.case.parameters().2
             || save.events.len() > 8
             || changes.len() > MAX_DYNAMIC_COMPRESSION_LOAD_CHANGES
