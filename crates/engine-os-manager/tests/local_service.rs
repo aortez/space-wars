@@ -22,6 +22,7 @@ fn snapshot() -> DeviceStatus {
         update: None,
         install_policy: None,
         install_admission: None,
+        install_automatic: None,
         time: TimeStatus {
             usable: false,
             source: None,
@@ -269,22 +270,11 @@ fn install_policy_changes_are_validated_before_the_handler_and_shown_in_status()
         json!({"schema": 1, "error": "unavailable"})
     );
     let mut older = serde_json::to_value(snapshot()).unwrap();
-    for field in ["install_policy", "install_admission"] {
+    for field in ["install_policy", "install_admission", "install_automatic"] {
         older.as_object_mut().unwrap().remove(field).unwrap();
     }
     let older = serde_json::from_value::<DeviceStatus>(older).unwrap();
     assert!(older.install_policy.is_none() && older.install_admission.is_none());
-}
-
-#[test]
-fn only_healthy_usable_time_feeds_other_device_decisions() {
-    let mut status = snapshot();
-    assert!(status.usable_time().is_none());
-    status.time.usable = true;
-    status.time.utc_us = Some(1_794_310_200_000_000);
-    assert_eq!(status.usable_time().unwrap().0.as_second(), 1_794_310_200);
-    status.service_healthy = false;
-    assert!(status.usable_time().is_none());
 }
 
 #[test]

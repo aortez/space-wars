@@ -1,10 +1,12 @@
-//! Manual consent and app acknowledgement, independent of disk installation.
+//! Consent and app acknowledgement, independent of disk installation. Consent
+//! is a person's confirmation, or the saved Automatic preference acting for an
+//! idle app (`automatic`); both take the same path from here on.
 //! The native service adapter is intentionally not enabled by this module.
 //! Consuming authorization does not construct a RecoveryCapability, acquire
 //! locks, grant maintenance ownership or replace final payload verification.
 use spacewars_control::install::{
     Aborted, Acknowledgement, Candidate, Channel, Consent, Error, HostInstance, Id, Message, Offer,
-    PREPARE_MS, Prepare, SCHEMA, Ticket,
+    PREPARE_MS, Prepare, SCHEMA, Ticket, wire::Scene,
 };
 use std::io::Read;
 
@@ -14,6 +16,8 @@ pub mod service;
 #[path = "install_journal.rs"]
 pub mod journal;
 
+#[path = "install_automatic.rs"]
+pub mod automatic;
 #[path = "install_hold.rs"]
 mod hold;
 #[path = "install_native.rs"]
@@ -67,6 +71,33 @@ pub struct HostObservation {
     pub game: bool,
     pub fenced: bool,
     pub observed_ms: u64,
+    /// What the app says it shows. Only an automatic attempt reads it, and
+    /// reads absence as a game.
+    pub scene: Option<Scene>,
+    /// How long the app says it has gone without a person. Only an automatic
+    /// attempt reads it, and absence is never idle.
+    pub idle_ms: Option<u64>,
+}
+
+impl HostObservation {
+    /// The service's reading of one reply from `instance`, which the caller
+    /// authenticated, taken at `observed_ms`.
+    pub(crate) fn of(
+        view: &spacewars_control::install::wire::HostView,
+        instance: HostInstance,
+        observed_ms: u64,
+    ) -> Self {
+        Self {
+            instance,
+            revision: view.revision,
+            settings_revision: view.settings_revision,
+            game: view.game,
+            fenced: view.fenced,
+            observed_ms,
+            scene: view.scene,
+            idle_ms: view.idle_ms,
+        }
+    }
 }
 
 /// Owner-sampled inputs, not a wire request. The adapter serializes these with
@@ -107,14 +138,16 @@ pub struct Coordinator {
     written: Option<spacewars_control::install::wire::Written>,
 }
 
-/// One-use local value for the installer adapter; deliberately neither
-/// Clone nor serializable. Only the durable recovery journal authorizes writes.
-pub struct ManualAuthorization {
+/// Consumed consent, whether a person confirmed or the saved Automatic
+/// preference did. One-use local value for the installer adapter; deliberately
+/// neither Clone nor serializable. Only the durable recovery journal authorizes
+/// writes.
+pub struct Authorization {
     ticket: Ticket,
     selection_generation: u64,
 }
 
-impl ManualAuthorization {
+impl Authorization {
     pub fn ticket(&self) -> &Ticket {
         &self.ticket
     }
@@ -323,7 +356,7 @@ impl Coordinator {
         peer: &HostInstance,
         context: &Context,
         now_ms: u64,
-    ) -> Result<ManualAuthorization, Error> {
+    ) -> Result<Authorization, Error> {
         ack.validate()?;
         let (selected, pending) = self.selected(&ack.ticket)?;
         let pending = pending.ok_or(Error::NotReady)?;
@@ -336,7 +369,7 @@ impl Coordinator {
             return Err(Error::Stale);
         }
         self.state = State::Consumed(ack.ticket.clone());
-        Ok(ManualAuthorization {
+        Ok(Authorization {
             ticket: ack.ticket.clone(),
             selection_generation: selected.ready.selection_generation,
         })

@@ -1,19 +1,27 @@
 //! Live bounded service endpoint. The native worker owns disk/host I/O while
 //! the coordinator remains available for status and pre-admission cancellation.
 use super::*;
+use crate::install_admission::Gatekeeper;
 use spacewars_control::install::{transport, wire::*};
 use std::{
     path::Path,
     sync::atomic::{AtomicBool, Ordering},
     sync::{Arc, Mutex, mpsc},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 // Kept private: an adapter cannot enable production installation without also
 // implementing the final serialized native gates here.
 pub(super) trait Backend: Send + Sync + 'static {
     fn context(&self) -> Result<Context, Failure>;
+    /// The app alone, without the locks and journals a context needs.
+    fn observe(&self) -> Result<HostObservation, Failure>;
+    /// `observe`, telling the app that this generation installs at `ends_ms`
+    /// unless somebody uses it first.
+    fn countdown(&self, generation: u64, ends_ms: u64) -> Result<HostObservation, Failure>;
+    /// The image an offer would name now.
+    fn ready(&self) -> Option<automatic::Image>;
     fn prepare(&self, request: &Prepare) -> Result<(Acknowledgement, HostInstance), Failure>;
     fn abort(&self, aborted: &Aborted);
     fn accept(
@@ -35,6 +43,8 @@ pub(super) struct Admission {
     state: Arc<Mutex<Coordinator>>,
     ticket: Ticket,
     stop: Arc<AtomicBool>,
+    /// For an attempt nobody confirmed: the image to remember with its rule.
+    unattended: Option<(Arc<Gatekeeper>, String)>,
 }
 impl Admission {
     pub fn consume(
@@ -42,20 +52,27 @@ impl Admission {
         ack: &Acknowledgement,
         peer: &HostInstance,
         context: &Context,
-    ) -> Result<ManualAuthorization, Failure> {
+    ) -> Result<Authorization, Failure> {
         if self.stopped() {
             return Err(Failure::NotReady);
         }
-        self.state
+        let now = transport::boot_ms().map_err(|_| Failure::NotReady)?;
+        let authorization = self
+            .state
             .lock()
             .unwrap()
-            .consume(
-                ack,
-                peer,
-                context,
-                transport::boot_ms().map_err(|_| Failure::NotReady)?,
-            )
-            .map_err(Failure::from)
+            .consume(ack, peer, context, now)
+            .map_err(Failure::from)?;
+        if let Some((gate, image)) = &self.unattended {
+            // Durable before the first write, and saved without the
+            // coordinator's lock. Whatever follows, this image never installs
+            // by itself again; if that cannot be saved, nothing is written.
+            gate.tried(image).map_err(|error| {
+                tracing::warn!(%error, "automatic installation could not record its image.");
+                Failure::Unavailable
+            })?;
+        }
+        Ok(authorization)
     }
     pub fn pending(&self) -> Result<(), Failure> {
         let state = self.state.lock().unwrap();
@@ -105,9 +122,25 @@ pub(super) fn host_exchange(
     Ok((reply, before))
 }
 
-enum Work {
+pub(super) enum Work {
     Request(ServiceRequest, mpsc::SyncSender<ServiceReply>),
     Reconcile,
+    Automatic(automatic::Ask),
+}
+
+/// A consumed handoff is over once both journals are settled and the app has
+/// released its fence.
+fn settle(state: &mut Coordinator, context: &Result<Context, Failure>, backend: &dyn Backend) {
+    if matches!(state.state, State::Consumed(_))
+        && context
+            .as_ref()
+            .is_ok_and(|c| c.host.as_ref().is_some_and(|h| !h.fenced))
+        && backend.settled()
+    {
+        state.state = State::Idle;
+        state.progress = None;
+        state.written = None;
+    }
 }
 
 pub struct Runtime {
@@ -116,6 +149,8 @@ pub struct Runtime {
     epoch: Id,
     // Drop listener before closing the worker queue.
     server: Option<transport::Server>,
+    // Holds a sender of its own, so it stops before the worker queue closes.
+    automatic: Option<automatic::Handle>,
     sender: Option<mpsc::SyncSender<Work>>,
     worker: Option<thread::JoinHandle<()>>,
 }
@@ -124,6 +159,7 @@ impl Runtime {
     pub fn bind_native(
         boot_id: String,
         updates: crate::update_runtime::Handle,
+        gate: Arc<Gatekeeper>,
     ) -> crate::Result<Self> {
         use std::os::unix::fs::{FileTypeExt, MetadataExt};
         let path = Path::new(SERVICE_SOCKET);
@@ -139,11 +175,17 @@ impl Runtime {
             1000,
             Arc::new(super::native::Native::new(boot_id.clone(), updates)),
             true,
+            Some((gate, automatic::Pace::NATIVE)),
         )?;
         runtime.recovery = Some(super::reconciliation::Runtime::bind_native(
             runtime.epoch.clone(),
         )?);
         Ok(runtime)
+    }
+
+    /// What the automatic watcher last did, if this service runs one.
+    pub fn automatic(&self) -> Option<automatic::Watch> {
+        self.automatic.as_ref().map(automatic::Handle::watch)
     }
 
     fn bind(
@@ -152,6 +194,7 @@ impl Runtime {
         uid: u32,
         backend: Arc<dyn Backend>,
         enabled: bool,
+        automatic: Option<(Arc<Gatekeeper>, automatic::Pace)>,
     ) -> crate::Result<Self> {
         let coordinator = Arc::new(Mutex::new(Coordinator::new(boot_id)?));
         let epoch = coordinator.lock().unwrap().epoch.clone();
@@ -193,22 +236,66 @@ impl Runtime {
         )?;
         let stop = Arc::new(AtomicBool::new(false));
         let stopping = stop.clone();
+        let automatic = automatic.filter(|_| enabled);
+        let gate = automatic.as_ref().map(|(gate, _)| gate.clone());
+        let watcher = automatic
+            .map(|(gate, pace)| automatic::spawn(backend.clone(), gate, pace, sender.clone()));
         let worker = thread::spawn(move || {
+            // The refusal last logged for the watcher, which asks again every
+            // time it looks.
+            let mut refusal = None;
             while let Ok(work) = receiver.recv() {
                 let mut prepare = None;
-                if let Work::Request(request, response) = work {
+                // The image of an attempt nobody confirmed.
+                let mut unattended = None;
+                // Whether this work can have left an abort the app has not
+                // heard. The watcher's questions alone never do.
+                let mut settles = true;
+                if let Work::Automatic(ask) = work {
+                    let result = (|| {
+                        let gate = gate.as_ref().ok_or(automatic::Hold::Refused)?;
+                        if Instant::now() >= ask.until {
+                            return Err(automatic::Hold::Refused);
+                        }
+                        let context = backend.context();
+                        let mut state = coordinator.lock().unwrap();
+                        settle(&mut state, &context, &*backend);
+                        let context =
+                            context.map_err(|failure| automatic::refused(&mut refusal, failure))?;
+                        refusal = None;
+                        match ask.step {
+                            automatic::Step::Admit => {
+                                automatic::admit(&state, &context, &ask.image)?;
+                                drop(state);
+                                automatic::begin(gate, &ask.image)
+                            }
+                            automatic::Step::Install => {
+                                if !gate.automatic() {
+                                    return Err(automatic::Hold::NotAutomatic);
+                                }
+                                let now =
+                                    transport::boot_ms().map_err(|_| automatic::Hold::Refused)?;
+                                prepare = Some(automatic::confirm(
+                                    &mut state, &context, &ask.image, now,
+                                )?);
+                                unattended = Some((gate.clone(), ask.image.clone()));
+                                Ok(())
+                            }
+                        }
+                    })();
+                    settles = prepare.is_some();
+                    if ask.reply.send(result).is_err()
+                        && let Some(prepare) = prepare.take()
+                    {
+                        // The watcher stopped waiting and reported no
+                        // installation, so none starts.
+                        let _ = coordinator.lock().unwrap().cancel(&prepare.ticket);
+                    }
+                } else if let Work::Request(request, response) = work {
                     // Confirmation is idempotent; retries never refresh deadlines.
                     let context = backend.context();
-                    let settled = context
-                        .as_ref()
-                        .is_ok_and(|c| c.host.as_ref().is_some_and(|h| !h.fenced))
-                        && backend.settled();
                     let mut state = coordinator.lock().unwrap();
-                    if settled && matches!(state.state, State::Consumed(_)) {
-                        state.state = State::Idle;
-                        state.progress = None;
-                        state.written = None;
-                    }
+                    settle(&mut state, &context, &*backend);
                     let mut offer = None;
                     if context.is_err() {
                         // Failed observation cannot leave an old offer revivable
@@ -249,6 +336,7 @@ impl Runtime {
                         state: coordinator.clone(),
                         ticket: prepare.ticket.clone(),
                         stop: stopping.clone(),
+                        unattended,
                     };
                     if backend.execute(&prepare, &admission).is_err() {
                         let mut state = coordinator.lock().unwrap();
@@ -261,7 +349,7 @@ impl Runtime {
                     }
                 }
                 let aborted = reply(&coordinator.lock().unwrap(), None, true).aborted;
-                if let Some(aborted) = aborted {
+                if let Some(aborted) = aborted.filter(|_| settles) {
                     backend.abort(&aborted);
                 }
             }
@@ -271,6 +359,7 @@ impl Runtime {
             recovery: None,
             epoch,
             server: Some(server),
+            automatic: watcher,
             sender: Some(sender),
             worker: Some(worker),
         })
@@ -283,6 +372,7 @@ impl Drop for Runtime {
         self.recovery.take();
         self.stop.store(true, Ordering::Relaxed);
         self.server.take();
+        self.automatic.take();
         self.sender.take();
         if let Some(worker) = self.worker.take() {
             let _ = worker.join();

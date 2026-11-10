@@ -27,6 +27,18 @@ struct Pending {
     frame: u64,
     acknowledged: bool,
 }
+/// A countdown stays on screen this long after the service last announced it.
+const NOTICE_QUIET_MS: u64 = 2_500;
+/// How long the app says that a person postponed an installation.
+const POSTPONED_MS: u64 = 4_000;
+
+/// The automatic installation the device service is counting down to.
+struct Notice {
+    generation: u64,
+    ends_ms: u64,
+    /// When the service last announced it.
+    heard_ms: u64,
+}
 struct Host {
     identity: HostInstance,
     gate: HostGate,
@@ -37,6 +49,14 @@ struct Host {
     scene: String,
     failure: Option<Failure>,
     startup_blocked: bool,
+    /// When a person last used the app, in milliseconds since boot. The app's
+    /// start counts as use. `None` when that time could not be read.
+    input_ms: Option<u64>,
+    notice: Option<Notice>,
+    /// The end of the countdown a person stopped here, and until when the app
+    /// says so. The service may announce that countdown once more before it
+    /// has looked again.
+    postponed: Option<(u64, u64)>,
 }
 impl Host {
     fn new(identity: HostInstance) -> Self {
@@ -50,7 +70,97 @@ impl Host {
             scene: String::new(),
             failure: None,
             startup_blocked: false,
+            input_ms: transport::boot_ms().ok(),
+            notice: None,
+            postponed: None,
         }
+    }
+    /// A person used the app: restarts the idle time the device service reads.
+    fn touched(&mut self) {
+        self.used(transport::boot_ms().ok());
+    }
+    /// Use of the app at `now` also ends a countdown, which the service
+    /// learns from the idle time at its next look.
+    fn used(&mut self, now: Option<u64>) {
+        self.input_ms = now;
+        if let Some(notice) = self.notice.take() {
+            let until = now.map_or(0, |now| now.saturating_add(POSTPONED_MS));
+            self.postponed = Some((notice.ends_ms, until));
+        }
+    }
+    /// The line an automatic installation puts over the app: its countdown,
+    /// or briefly that somebody postponed it. Empty when there is none.
+    fn notice(&mut self, window: &MainWindow, now: u64) -> String {
+        if now == u64::MAX || window.get_updates_visible() || window.get_install_fenced() {
+            // Updates takes over once the installation itself begins.
+            self.notice = None;
+            return String::new();
+        }
+        if let Some(notice) = &self.notice {
+            if now < notice.ends_ms && now.saturating_sub(notice.heard_ms) <= NOTICE_QUIET_MS {
+                return format!(
+                    "Generation {} installs in {} s · Press any button or touch here to postpone",
+                    notice.generation,
+                    (notice.ends_ms - now).div_ceil(1000)
+                );
+            }
+            self.notice = None;
+        }
+        match self.postponed {
+            Some((_, until)) if now < until => "Update postponed.".into(),
+            _ => String::new(),
+        }
+    }
+    fn view(
+        &mut self,
+        window: &MainWindow,
+        nonce: u64,
+        now: u64,
+        frames: Option<u64>,
+    ) -> HostReply {
+        let idle_ms = self.idle_ms(window, now);
+        HostReply {
+            schema: SCHEMA,
+            error: None,
+            acknowledgement: None,
+            view: Some(HostView {
+                nonce,
+                host: self.identity.clone(),
+                revision: self.revision,
+                settings_revision: self.settings_revision,
+                game: !window.get_launcher_visible(),
+                fenced: window.get_install_fenced(),
+                available: !self.startup_blocked && Self::available(window) && frames.is_some(),
+                scene: Some(Self::showing(window)),
+                idle_ms,
+            }),
+        }
+    }
+    /// What an installation would interrupt. Only the launcher and the Clock
+    /// are not games; a scenario that has not named itself yet is a game.
+    fn showing(window: &MainWindow) -> Scene {
+        if window.get_launcher_visible() {
+            Scene::Launcher
+        } else if window
+            .get_runtime_diagnostics()
+            .lines()
+            .any(|line| line == "scenario=clock")
+        {
+            Scene::Clock
+        } else {
+            Scene::Game
+        }
+    }
+    /// Milliseconds without a person, for the service's automatic
+    /// installation. A press or touch still held down is use now.
+    fn idle_ms(&mut self, window: &MainWindow, now: u64) -> Option<u64> {
+        // The caller passes `u64::MAX` when it could not read the clock.
+        let now = (now != u64::MAX).then_some(now)?;
+        let activity = window.global::<crate::UserActivity>();
+        if activity.get_pointer_held() || activity.get_gamepad_held() {
+            self.used(Some(now));
+        }
+        now.checked_sub(self.input_ms?)
     }
     fn scene(window: &MainWindow) -> String {
         format!(
@@ -125,22 +235,27 @@ impl Host {
         let mut retired = None;
         let result = match incoming.request {
             HostRequest::Observe { nonce, .. } => {
-                let _ = incoming.reply.try_send(HostReply {
-                    schema: SCHEMA,
-                    error: None,
-                    acknowledgement: None,
-                    view: Some(HostView {
-                        nonce,
-                        host: self.identity.clone(),
-                        revision: self.revision,
-                        settings_revision: self.settings_revision,
-                        game: !window.get_launcher_visible(),
-                        fenced: window.get_install_fenced(),
-                        available: !self.startup_blocked
-                            && Self::available(window)
-                            && frames.is_some(),
-                    }),
-                });
+                let _ = incoming
+                    .reply
+                    .try_send(self.view(window, nonce, now, frames));
+                return None;
+            }
+            HostRequest::Countdown {
+                nonce,
+                generation,
+                ends_ms,
+                ..
+            } => {
+                let reply = self.view(window, nonce, now, frames);
+                // A countdown that a person already stopped here stays stopped.
+                if now != u64::MAX && self.postponed.is_none_or(|(ended, _)| ended != ends_ms) {
+                    self.notice = Some(Notice {
+                        generation,
+                        ends_ms,
+                        heard_ms: now,
+                    });
+                }
+                let _ = incoming.reply.try_send(reply);
                 return None;
             }
             HostRequest::Abort { aborted, .. } => {
@@ -470,15 +585,18 @@ fn start(
     let activity_window = window.as_weak();
     window.on_updates_activity(move || {
         if let Some(w) = activity_window.upgrade()
-            && !w.get_updates_visible()
             && let Some(host) = activity_host.borrow_mut().as_mut()
         {
-            host.revision += 1;
+            host.touched();
+            if !w.get_updates_visible() {
+                host.revision += 1;
+            }
         }
     });
     let interruption_host = host.clone();
     window.on_updates_interrupted(move || {
         if let Some(host) = interruption_host.borrow_mut().as_mut() {
+            host.touched();
             host.revision += 1;
         }
     });
@@ -685,6 +803,12 @@ fn start(
         }
         if w.get_install_fenced() {
             input.borrow_mut().clear();
+        }
+        if let Some(host) = host.borrow_mut().as_mut() {
+            let notice = host.notice(&w, now);
+            if w.get_updates_notice() != notice.as_str() {
+                w.set_updates_notice(notice.into());
+            }
         }
         let mut p = panel.borrow_mut();
         while let Ok((generation, reply)) = results.try_recv() {

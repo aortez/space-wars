@@ -1658,3 +1658,307 @@ fn an_expired_offer_returns_the_cursor_to_back_and_keeps_it_there() {
     assert_eq!(h.window.get_updates_focus(), 1);
     assert_eq!(confirmations.load(Ordering::SeqCst), 0);
 }
+
+fn observed(host: &mut Host, window: &MainWindow, writer: &SettingsWriter, now: u64) -> HostView {
+    let (reply, receipt) = mpsc::sync_channel(1);
+    let _ = host.request(
+        window,
+        &Settings::default(),
+        writer,
+        Incoming {
+            request: HostRequest::Observe {
+                schema: SCHEMA,
+                nonce: 1,
+            },
+            reply,
+        },
+        now,
+        Some(1),
+    );
+    receipt.recv().unwrap().view.unwrap()
+}
+
+#[test]
+fn observation_names_the_scene_and_the_time_since_a_person_used_the_app() {
+    let h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let writer = SettingsWriter::new(dir.path().join("settings.toml")).unwrap();
+    let mut host = Host::new(host_identity());
+    // The app's start counts as use.
+    assert!(host.input_ms.is_some());
+    host.input_ms = Some(1_000);
+    // A scenario that has not named itself is a game, paused or not.
+    let view = observed(&mut host, &h.window, &writer, 601_000);
+    assert_eq!(
+        (view.scene, view.idle_ms),
+        (Some(Scene::Game), Some(600_000))
+    );
+    h.window
+        .set_runtime_diagnostics("scenario=spacewars\nscenario_revision=4\npaused=true".into());
+    assert_eq!(
+        observed(&mut host, &h.window, &writer, 601_000).scene,
+        Some(Scene::Game)
+    );
+    h.window
+        .set_runtime_diagnostics("scenario=clock\nscenario_revision=5\npaused=false".into());
+    let view = observed(&mut host, &h.window, &writer, 601_000);
+    // The Clock still ends when an installation starts, so it stays a game
+    // for a confirmation; only the scene tells the two apart.
+    assert_eq!((view.scene, view.game), (Some(Scene::Clock), true));
+    h.window.set_launcher_visible(true);
+    let view = observed(&mut host, &h.window, &writer, 601_000);
+    assert_eq!((view.scene, view.game), (Some(Scene::Launcher), false));
+
+    // A touch or a button still held down is use now.
+    let activity = h.window.global::<crate::UserActivity>();
+    activity.set_pointer_held(true);
+    assert_eq!(
+        observed(&mut host, &h.window, &writer, 700_000).idle_ms,
+        Some(0)
+    );
+    activity.set_pointer_held(false);
+    assert_eq!(
+        observed(&mut host, &h.window, &writer, 700_500).idle_ms,
+        Some(500)
+    );
+    activity.set_gamepad_held(true);
+    assert_eq!(
+        observed(&mut host, &h.window, &writer, 800_000).idle_ms,
+        Some(0)
+    );
+    activity.set_gamepad_held(false);
+
+    // An unreadable clock, in either direction, is never idle time.
+    assert_eq!(
+        observed(&mut host, &h.window, &writer, u64::MAX).idle_ms,
+        None
+    );
+    assert_eq!(
+        observed(&mut host, &h.window, &writer, 799_999).idle_ms,
+        None
+    );
+    host.input_ms = None;
+    assert_eq!(
+        observed(&mut host, &h.window, &writer, 900_000).idle_ms,
+        None
+    );
+}
+
+#[test]
+fn any_input_restarts_the_idle_time_even_inside_updates() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("host.sock");
+    let frames = h.frames.clone();
+    let _runtime = start(
+        &h.window,
+        Arc::new(RwLock::new(Settings::default())),
+        SettingsWriter::new(dir.path().join("settings.toml")).unwrap(),
+        h.input.clone(),
+        Some(Host::new(host_identity())),
+        socket.clone(),
+        Arc::new(|_| Err("the panel sends nothing here".into())),
+        Rc::new(move || Some(frames.get())),
+        uid(),
+        None,
+    );
+    let observe = |h: &mut Harness| {
+        pumping_exchange(
+            h,
+            &socket,
+            HostRequest::Observe {
+                schema: SCHEMA,
+                nonce: 1,
+            },
+        )
+        .view
+        .unwrap()
+    };
+    let rest = |h: &mut Harness| {
+        let end = Instant::now() + Duration::from_millis(120);
+        while Instant::now() < end {
+            h.pump(false);
+        }
+    };
+    rest(&mut h);
+    let idle = observe(&mut h);
+    assert!(idle.idle_ms.unwrap() >= 120, "{:?}", idle.idle_ms);
+
+    // Outside Updates, input also changes the revision an offer was made for.
+    h.window.invoke_updates_activity();
+    let used = observe(&mut h);
+    assert!(used.idle_ms.unwrap() < 120, "{:?}", used.idle_ms);
+    assert_eq!(used.revision, idle.revision + 1);
+
+    // Inside Updates it keeps the revision, so that moving the cursor does not
+    // withdraw an offer, but it is still a person using the app.
+    h.window.set_updates_visible(true);
+    let opened = observe(&mut h).revision;
+    rest(&mut h);
+    assert!(observe(&mut h).idle_ms.unwrap() >= 120);
+    h.window.invoke_updates_activity();
+    let used = observe(&mut h);
+    assert!(used.idle_ms.unwrap() < 120, "{:?}", used.idle_ms);
+    assert_eq!(used.revision, opened);
+
+    // Losing focus counts as well.
+    rest(&mut h);
+    h.window.invoke_updates_interrupted();
+    let used = observe(&mut h);
+    assert!(used.idle_ms.unwrap() < 120, "{:?}", used.idle_ms);
+    assert_eq!(used.revision, opened + 1);
+}
+
+fn counted(
+    host: &mut Host,
+    window: &MainWindow,
+    writer: &SettingsWriter,
+    now: u64,
+    ends_ms: u64,
+) -> HostView {
+    let (reply, receipt) = mpsc::sync_channel(1);
+    let _ = host.request(
+        window,
+        &Settings::default(),
+        writer,
+        Incoming {
+            request: HostRequest::Countdown {
+                schema: SCHEMA,
+                nonce: 1,
+                generation: 27,
+                ends_ms,
+            },
+            reply,
+        },
+        now,
+        Some(1),
+    );
+    receipt.recv().unwrap().view.unwrap()
+}
+fn counting(seconds: u64) -> String {
+    format!("Generation 27 installs in {seconds} s · Press any button or touch here to postpone")
+}
+
+#[test]
+fn a_countdown_shows_until_it_ends_goes_quiet_or_somebody_uses_the_app() {
+    let h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let writer = SettingsWriter::new(dir.path().join("settings.toml")).unwrap();
+    let mut host = Host::new(host_identity());
+    host.input_ms = Some(0);
+    assert_eq!(host.notice(&h.window, 9_000), "");
+
+    // The announcement answers like an observation and starts the notice.
+    let view = counted(&mut host, &h.window, &writer, 10_000, 70_000);
+    assert_eq!(
+        (view.scene, view.idle_ms),
+        (Some(Scene::Game), Some(10_000))
+    );
+    assert_eq!(host.notice(&h.window, 10_000), counting(60));
+    assert_eq!(host.notice(&h.window, 10_001), counting(60));
+    assert_eq!(host.notice(&h.window, 11_000), counting(59));
+    // The service announces it at every look. Once it goes quiet, the
+    // countdown is over for a reason the app cannot see.
+    assert_eq!(host.notice(&h.window, 12_500), counting(58));
+    assert_eq!(host.notice(&h.window, 12_501), "");
+    counted(&mut host, &h.window, &writer, 13_000, 70_000);
+    assert_eq!(host.notice(&h.window, 13_000), counting(57));
+    // It ends at its end, when Updates takes over.
+    counted(&mut host, &h.window, &writer, 69_500, 70_000);
+    assert_eq!(host.notice(&h.window, 69_999), counting(1));
+    assert_eq!(host.notice(&h.window, 70_000), "");
+
+    // Somebody uses the app during the next one.
+    counted(&mut host, &h.window, &writer, 80_000, 140_000);
+    assert_eq!(host.notice(&h.window, 80_500), counting(60));
+    host.used(Some(81_000));
+    assert_eq!(host.notice(&h.window, 81_000), "Update postponed.");
+    // The service has not looked yet and announces the same countdown again.
+    let view = counted(&mut host, &h.window, &writer, 81_500, 140_000);
+    assert_eq!(view.idle_ms, Some(500));
+    assert_eq!(host.notice(&h.window, 81_500), "Update postponed.");
+    assert_eq!(host.notice(&h.window, 84_999), "Update postponed.");
+    assert_eq!(host.notice(&h.window, 85_000), "");
+    // Another night's countdown shows again.
+    counted(&mut host, &h.window, &writer, 90_000, 150_000);
+    assert_eq!(host.notice(&h.window, 90_000), counting(60));
+
+    // A touch that is still held down when the service looks is use as well.
+    h.window
+        .global::<crate::UserActivity>()
+        .set_pointer_held(true);
+    counted(&mut host, &h.window, &writer, 91_000, 150_000);
+    assert_eq!(host.notice(&h.window, 91_000), "Update postponed.");
+    h.window
+        .global::<crate::UserActivity>()
+        .set_pointer_held(false);
+
+    // Updates replaces the notice once the installation itself begins, and an
+    // unreadable clock shows nothing.
+    counted(&mut host, &h.window, &writer, 100_000, 160_000);
+    assert_eq!(host.notice(&h.window, 100_000), counting(60));
+    assert_eq!(host.notice(&h.window, u64::MAX), "");
+    counted(&mut host, &h.window, &writer, 101_000, 160_000);
+    h.window.set_updates_visible(true);
+    assert_eq!(host.notice(&h.window, 101_000), "");
+    h.window.set_updates_visible(false);
+    assert_eq!(host.notice(&h.window, 101_000), "");
+}
+
+#[test]
+fn the_announced_countdown_is_drawn_and_any_input_postpones_it() {
+    let mut h = Harness::new();
+    h.window.set_ingame_menu_visible(false);
+    h.window.set_sound_visible(false);
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("host.sock");
+    let frames = h.frames.clone();
+    let _runtime = start(
+        &h.window,
+        Arc::new(RwLock::new(Settings::default())),
+        SettingsWriter::new(dir.path().join("settings.toml")).unwrap(),
+        h.input.clone(),
+        Some(Host::new(host_identity())),
+        socket.clone(),
+        Arc::new(|_| Err("the panel sends nothing here".into())),
+        Rc::new(move || Some(frames.get())),
+        uid(),
+        None,
+    );
+    h.pump(true);
+    assert_eq!(h.window.get_updates_notice(), "");
+    let announce = |h: &mut Harness, ends_ms: u64| {
+        pumping_exchange(
+            h,
+            &socket,
+            HostRequest::Countdown {
+                schema: SCHEMA,
+                nonce: 1,
+                generation: 27,
+                ends_ms,
+            },
+        )
+        .view
+        .unwrap()
+    };
+    let ends_ms = transport::boot_ms().unwrap() + 60_000;
+    let before = announce(&mut h, ends_ms);
+    h.until(true, |w| {
+        w.get_updates_notice()
+            .starts_with("Generation 27 installs in ")
+    });
+    // Showing it is not use of the app and does not change what an offer
+    // was made for.
+    let after = announce(&mut h, ends_ms);
+    assert_eq!(after.revision, before.revision);
+    assert!(after.idle_ms >= before.idle_ms);
+    assert!(!h.window.get_updates_visible());
+
+    h.window.invoke_updates_activity();
+    h.until(true, |w| w.get_updates_notice() == "Update postponed.");
+    // The service's next look reads the use and keeps the notice gone.
+    let used = announce(&mut h, ends_ms);
+    assert!(used.idle_ms.unwrap() < before.idle_ms.unwrap().max(1_000));
+    h.pump(true);
+    assert_eq!(h.window.get_updates_notice(), "Update postponed.");
+}

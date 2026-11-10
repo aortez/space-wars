@@ -112,6 +112,8 @@ impl Fixture {
                 game: true,
                 fenced: false,
                 observed_ms: 100,
+                scene: None,
+                idle_ms: None,
             }),
             maintenance_clear: true,
         };
@@ -190,7 +192,7 @@ impl Fixture {
             )
             .unwrap();
     }
-    fn acknowledge(&mut self) -> ManualAuthorization {
+    fn acknowledge(&mut self) -> Authorization {
         self.host
             .saved(&self.prepare.ticket, self.prepare.settings_revision, true)
             .unwrap();

@@ -1,7 +1,8 @@
 //! Saved installation preference: whether a ready update waits for an explicit
 //! confirmation or may also install by itself inside a nightly window.
-//! This record only remembers the choice. It never installs, schedules or
-//! authorizes an installation, and no admission reads it yet.
+//! This record only remembers the choice. `install_admission` decides when the
+//! Automatic mode may start an attempt, and `install_handoff::automatic` starts
+//! one.
 use crate::saved_state::{Revised, Saved};
 use crate::schedule_store::StateRecord;
 use crate::{Error, Result};

@@ -346,3 +346,72 @@ fn written_counts_round_trip_and_cannot_exceed_the_total_or_lack_a_ticket() {
     };
     assert_eq!(reply.validate(), Err(Error::Invalid));
 }
+
+#[test]
+fn host_view_reports_its_scene_and_idle_time_only_when_it_knows_them() {
+    let view = wire::HostView {
+        nonce: 7,
+        host: request().host,
+        revision: 3,
+        settings_revision: 2,
+        game: true,
+        fenced: false,
+        available: true,
+        scene: Some(wire::Scene::Clock),
+        idle_ms: Some(600_000),
+    };
+    let json = serde_json::to_string(&view).unwrap();
+    assert!(json.ends_with(",\"scene\":\"clock\",\"idle_ms\":600000}"));
+    let decoded: wire::HostView = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        (decoded.scene, decoded.idle_ms),
+        (Some(wire::Scene::Clock), Some(600_000))
+    );
+    for (scene, name) in [
+        (wire::Scene::Launcher, "\"launcher\""),
+        (wire::Scene::Clock, "\"clock\""),
+        (wire::Scene::Game, "\"game\""),
+    ] {
+        assert_eq!(serde_json::to_string(&scene).unwrap(), name);
+    }
+    // An app that reports neither still decodes, and neither is written back.
+    let plain: wire::HostView =
+        serde_json::from_str(&json.replace(",\"scene\":\"clock\",\"idle_ms\":600000", "")).unwrap();
+    assert_eq!((plain.scene, plain.idle_ms), (None, None));
+    let written = serde_json::to_string(&plain).unwrap();
+    assert!(!written.contains("scene") && !written.contains("idle_ms"));
+    // A scene this version does not know is refused, not read as idle.
+    assert!(
+        serde_json::from_str::<wire::HostView>(&json.replace("\"clock\"", "\"screensaver\""))
+            .is_err()
+    );
+}
+
+#[test]
+fn a_countdown_names_its_generation_and_its_end() {
+    let request = wire::HostRequest::Countdown {
+        schema: SCHEMA,
+        nonce: 7,
+        generation: 27,
+        ends_ms: 61_000,
+    };
+    let json = serde_json::to_string(&request).unwrap();
+    assert_eq!(
+        json,
+        r#"{"command":"countdown","schema":1,"nonce":7,"generation":27,"ends_ms":61000}"#
+    );
+    assert!(wire::HostRequest::from_json(json.as_bytes()).is_ok());
+    for invalid in [
+        json.replace("\"generation\":27", "\"generation\":0"),
+        json.replace("\"ends_ms\":61000", "\"ends_ms\":0"),
+        json.replace("\"schema\":1", "\"schema\":2"),
+        json.replace(",\"ends_ms\":61000", ""),
+        json.replace("}", ",\"build_id\":\"x\"}"),
+    ] {
+        assert_eq!(
+            wire::HostRequest::from_json(invalid.as_bytes()).err(),
+            Some(Error::Invalid),
+            "{invalid}"
+        );
+    }
+}

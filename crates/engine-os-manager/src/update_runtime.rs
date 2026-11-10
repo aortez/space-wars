@@ -200,7 +200,9 @@ impl Handle {
         })
     }
 
-    pub(crate) fn install_time(&self) -> engine_ota::Result<UsableTime> {
+    /// The usable time an installation trusts, from a live observation whose
+    /// time metadata is intact.
+    pub fn install_time(&self) -> engine_ota::Result<UsableTime> {
         self.inputs.time().ok_or(engine_ota::Error::WaitingForTime)
     }
 

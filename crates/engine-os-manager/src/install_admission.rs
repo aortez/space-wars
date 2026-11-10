@@ -1,8 +1,8 @@
 //! When a saved Automatic preference may start an installation attempt: inside
 //! the saved window of usable local time, at most once per window, and never
 //! twice for one image. Nothing here observes the app, counts down or
-//! installs; the coordinator that asks comes later.
-use crate::install_policy::{Mode, Status as Policy, Window};
+//! installs; `install_handoff::automatic` asks and does those.
+use crate::install_policy::{Mode, Preference, Status as Policy, Window};
 use crate::saved_state::{Revised, Saved};
 use crate::schedule_store::StateRecord;
 use crate::{Error, Result};
@@ -10,6 +10,7 @@ use jiff::civil::Date;
 use jiff::tz::TimeZone;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::Arc;
 
 pub const STATE_DIRECTORY: &str = "/data/spacewars-system/install-admission";
 /// The next attempt waits at least this long after the last one, whatever the
@@ -178,7 +179,7 @@ impl History {
         }
     }
 
-    /// For the coordinator, immediately before it shows a countdown.
+    /// For the install worker, immediately before a countdown starts.
     /// `Gate::Open` means this window's single attempt is spent, durably, so a
     /// crash or restart cannot count down twice in one window. An error means
     /// nothing may start.
@@ -213,6 +214,59 @@ impl History {
             })
         })?;
         Ok(())
+    }
+}
+
+/// Usable device time in local terms, or `None` while either is unknown.
+pub type Clock = Arc<dyn Fn() -> Option<Moment> + Send + Sync>;
+
+/// The gate as this device stands: the saved preference, usable local time and
+/// the attempt history read together, for the status and for the service that
+/// starts an attempt.
+pub struct Gatekeeper {
+    preference: Arc<Preference>,
+    history: History,
+    now: Clock,
+}
+
+impl Gatekeeper {
+    pub fn new(preference: Arc<Preference>, history: History, now: Clock) -> Self {
+        Self {
+            preference,
+            history,
+            now,
+        }
+    }
+
+    /// What `begin` would answer for this ready image. Saves nothing.
+    pub fn status(&self, image: Option<&str>) -> Status {
+        self.history.status(
+            self.preference.status().as_ref(),
+            (self.now)().as_ref(),
+            image,
+        )
+    }
+
+    /// Whether the saved mode is Automatic now. A countdown reads it again, so
+    /// that saving Ask stops one that already spent its window.
+    pub fn automatic(&self) -> bool {
+        self.preference
+            .status()
+            .is_some_and(|policy| policy.mode == Mode::Automatic)
+    }
+
+    /// See `History::begin`.
+    pub fn begin(&self, image: &str) -> Result<Gate> {
+        self.history.begin(
+            self.preference.status().as_ref(),
+            (self.now)().as_ref(),
+            Some(image),
+        )
+    }
+
+    /// See `History::tried`.
+    pub fn tried(&self, image: &str) -> Result<()> {
+        self.history.tried(image)
     }
 }
 
