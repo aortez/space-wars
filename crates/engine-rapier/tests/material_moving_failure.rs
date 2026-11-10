@@ -88,6 +88,9 @@ fn moving_failure_matches_continuous_capacity_crossing_then_both_bodies_coast() 
                     events.extend(step.events.iter().map(|e| e.event.transition));
                     for i in &step.intervals {
                         let l = &i.load;
+                        if i.failure_dissipated > 0.0 {
+                            assert_eq!(l.force, 0.0);
+                        }
                         near(
                             l.driver_work,
                             l.elastic_after - l.elastic_before

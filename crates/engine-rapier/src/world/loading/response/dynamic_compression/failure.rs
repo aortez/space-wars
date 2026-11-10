@@ -155,8 +155,11 @@ impl PhysicsWorld {
         step::advance(self, dt, Policy::Support)
     }
 
-    /// The committed failure, available after pause, restore or invalidation.
-    /// Step output emits it once; this accessor does not consume the observation.
+    /// The committed single-support collapse (fixed or moving), available after
+    /// pause, restore or invalidation. Step output emits it once; reading does
+    /// not consume it. For paired collapse this returns `None`; use
+    /// [`Self::material_paired_compression_failure()`] for the contact boundary
+    /// and both layers' dispositions.
     pub fn material_compression_failure(&self) -> Option<CompressionFailure> {
         self.loading
             .as_ref()?

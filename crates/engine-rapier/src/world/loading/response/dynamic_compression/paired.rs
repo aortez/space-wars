@@ -279,7 +279,6 @@ impl PairedHistory {
         {
             self.commit_failure(elapsed, owner.ok_or(R::Numerical)?, x, motion, excess);
             a.total.elastic = 0.0;
-            a.total.force = 0.0;
             for load in &mut loads {
                 load.elastic_after = 0.0;
                 load.force = 0.0;

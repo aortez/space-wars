@@ -57,8 +57,9 @@ the contact. `elapsed` is absolute physical time, while ordinary contact events
 retain their time within the current public call. The failure also retains the
 boundary displacement, velocity, permanent set and energy disposition.
 
-`material_compression_failure()` reads that retained observation without consuming
-it, including after pause, restore, invalidation or body removal. The failed
+`material_compression_failure()` reads the single-support observation without
+consuming it, including after pause, restore, invalidation or body removal.
+Paired collapse uses `material_paired_compression_failure()` instead. The failed
 region remains registered with zero capacity. Mass, body geometry and actor
 ownership remain intact. Hosts retain responsibility for actor retirement and
 debris; ordinary stepping or public edits invalidate this specialized continuation.
@@ -89,8 +90,8 @@ normal-only motion and material on the support alone. Both recoil before failure
 The relative material law uses reduced mass, and every reaction impulse acts
 equally and oppositely. Collapse adds no impulse to either body. Each then keeps
 its own velocity while moving through the failed envelope.
-Coasting ends at the quarter-depth window, or earlier when a light pair exhausts
-a position allowance. Any moving-collapse Lab case must fit inside that window.
+Coasting ends at the quarter-depth window, or earlier when a body's position
+allowance runs out. Any moving-collapse Lab case must fit inside that window.
 
 The ordinary failure record reports relative velocity and indentation.
 `material_moving_support_failure()` additionally retains both normal positions

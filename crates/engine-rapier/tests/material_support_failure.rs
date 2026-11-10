@@ -41,6 +41,9 @@ fn exhausted_support_dissipates_once_then_falls_without_reaction() {
                 let s = step.summary.unwrap();
                 for interval in &step.intervals {
                     let l = &interval.load;
+                    if interval.failure_dissipated > 0.0 {
+                        assert_eq!(l.force, 0.0);
+                    }
                     near(
                         l.driver_work,
                         l.elastic_after - l.elastic_before

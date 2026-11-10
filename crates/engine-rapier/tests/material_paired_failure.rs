@@ -103,6 +103,7 @@ fn either_layer_or_both_fail_at_the_continuous_capacity_crossing() {
                 let loads = [interval.other_load.unwrap(), interval.load];
                 for (i, load) in loads.iter().enumerate() {
                     let dissipated = if interval.failure_dissipated > 0.0 {
+                        assert_eq!(load.force, 0.0);
                         collapse.as_ref().unwrap().layers[i].dissipated()
                     } else {
                         0.0
@@ -179,6 +180,7 @@ fn either_layer_or_both_fail_at_the_continuous_capacity_crossing() {
         assert!(emitted.windows(2).all(|p| p[0].source < p[1].source));
         let layers = w.material_paired_compression_summary().unwrap();
         for i in 0..2 {
+            assert!(layers[i].charge_error.abs() <= layers[i].absolute_charge_error + 1e-9);
             assert!(failure.layers[i].released_elastic > 0.0);
             assert_eq!(layers[i].remaining == 0.0, failure.layers[i].failed);
             assert_eq!(layers[i].damage_work > 0.0, materials[i] == WOOD);

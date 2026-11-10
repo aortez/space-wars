@@ -235,7 +235,7 @@ fn paired_failure_output_and_later_coasting_limits_are_atomic() {
     for tick in 0..16 {
         let bytes = w.snapshot_bytes().unwrap();
         if let Err(reason) = w.step_material_collapsing_pair(1.0 / 30.0) {
-            assert!(matches!(reason, R::Limit | R::Numerical));
+            assert_eq!(reason, R::Limit);
             assert_eq!(w.snapshot_bytes().unwrap(), bytes);
             assert_eq!(w.material_paired_compression_failure(), failure);
             return;
