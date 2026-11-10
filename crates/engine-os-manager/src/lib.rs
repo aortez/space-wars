@@ -68,6 +68,8 @@ pub mod recovery_service;
 #[cfg(target_os = "linux")]
 pub mod recovery_status;
 #[cfg(target_os = "linux")]
+mod saved_state;
+#[cfg(target_os = "linux")]
 mod schedule_store;
 #[cfg(target_os = "linux")]
 pub mod service;
