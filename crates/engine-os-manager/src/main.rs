@@ -73,6 +73,17 @@ enum Command {
         #[arg(value_parser = ["release", "nightly"])]
         channel: String,
     },
+    /// Save how a ready update installs: after a confirmation, or also by itself
+    /// in a nightly window. Automatic installation is not implemented yet, so the
+    /// saved mode changes nothing until it is.
+    #[command(group(clap::ArgGroup::new("change").required(true).multiple(true)))]
+    InstallPolicy {
+        #[arg(long, group = "change", value_parser = ["ask", "automatic"])]
+        mode: Option<String>,
+        /// Daily window in local time as HH:MM-HH:MM; it may cross midnight.
+        #[arg(long, group = "change")]
+        window: Option<String>,
+    },
     /// Inspect the current time provider without changing clocks or state.
     Probe,
     /// Read NetworkManager radio/checkpoint state without changing connectivity.
@@ -214,6 +225,32 @@ fn main() -> ExitCode {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn install_policy_requires_a_setting_and_accepts_either_or_both() {
+        let parse = |settings: &[&str]| {
+            Args::try_parse_from(
+                ["engine-os-manager", "install-policy"]
+                    .iter()
+                    .chain(settings),
+            )
+            .map(|arguments| arguments.command)
+        };
+        assert!(parse(&[]).is_err());
+        assert!(parse(&["--mode", "always"]).is_err());
+        for settings in [
+            &["--mode", "automatic"][..],
+            &["--window", "03:00-05:00"],
+            &["--mode", "ask", "--window", "22:30-01:00"],
+        ] {
+            assert!(matches!(parse(settings), Ok(Command::InstallPolicy { .. })));
+        }
+    }
+}
+
 #[cfg(not(target_os = "linux"))]
 fn run(_args: Args) -> engine_os_manager::Result<()> {
     Err(engine_os_manager::Error::Invalid(
@@ -249,6 +286,28 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
                     SOCKET_PATH.as_ref(),
                     service::UpdateAction::Select(channel)
                 )?)?
+            );
+        }
+        Command::InstallPolicy { mode, window } => {
+            use engine_os_manager::install_policy::{Change, Mode};
+            let change = Change {
+                mode: match mode.as_deref() {
+                    None => None,
+                    Some("ask") => Some(Mode::Ask),
+                    Some("automatic") => Some(Mode::Automatic),
+                    Some(_) => {
+                        return Err(engine_os_manager::Error::Invalid(
+                            "unknown install mode".into(),
+                        ));
+                    }
+                },
+                window: window
+                    .map(|text| text.parse().map_err(engine_os_manager::Error::Invalid))
+                    .transpose()?,
+            };
+            println!(
+                "{}",
+                serde_json::to_string(&service::install_policy(SOCKET_PATH.as_ref(), change)?)?
             );
         }
         Command::SyncNow => println!(
@@ -612,6 +671,10 @@ mod daemon {
             ));
         }
         let store = TimeStore::open(STATE_DIRECTORY.as_ref())?;
+        // Opened after the time store's lock, which admits one service only.
+        let install_policy = Arc::new(engine_os_manager::install_policy::Preference::open(
+            engine_os_manager::install_policy::STATE_DIRECTORY.as_ref(),
+        ));
         let (record, reason) = store.load();
         let mut saved = record.clone();
         let boot_id = linux::boot_id()?;
@@ -667,6 +730,7 @@ mod daemon {
         let checks = time_checks.handle();
         let sync = checks.clone();
         let reader = shared.clone();
+        let saved_policy = install_policy.clone();
         let _server = StatusServer::bind_with_actions(
             SOCKET_PATH.as_ref(),
             1000,
@@ -677,6 +741,7 @@ mod daemon {
                     .status()?;
                 status.time_check = Some(checks.status()?);
                 status.update = Some(update_status.status()?);
+                status.install_policy = saved_policy.status();
                 Ok(status)
             }),
             Some(Arc::new(move || sync.sync_now())),
@@ -684,6 +749,7 @@ mod daemon {
                 service::UpdateAction::Check => update_action.check_now(),
                 service::UpdateAction::Select(channel) => update_action.select_channel(channel),
             })),
+            Some(Arc::new(move |change| install_policy.change(change))),
         )?;
         let mut rtc_worker: Option<RtcWorker> = None;
         let mut save_retry = Instant::now();

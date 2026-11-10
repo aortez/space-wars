@@ -20,6 +20,7 @@ fn snapshot() -> DeviceStatus {
         recovery: Default::default(),
         time_check: None,
         update: None,
+        install_policy: None,
         time: TimeStatus {
             usable: false,
             source: None,
@@ -112,6 +113,7 @@ fn update_commands_are_explicit_bounded_and_authenticate_the_service_before_send
                 coalesced: false,
             })
         })),
+        None,
     )
     .unwrap();
     for _ in 0..3 {
@@ -149,6 +151,130 @@ fn update_commands_are_explicit_bounded_and_authenticate_the_service_before_send
         assert!(update_request(&path, UpdateAction::Select(engine_ota::Channel::Release)).is_err());
         assert_eq!(*calls.lock().unwrap(), ["check", "nightly"]);
     }
+}
+
+#[test]
+fn install_policy_changes_are_validated_before_the_handler_and_shown_in_status() {
+    use engine_os_manager::install_policy::{Change, Mode, Status, Window};
+    use engine_os_manager::service::install_policy;
+    use serde_json::json;
+    use std::sync::Mutex;
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("policy.sock");
+    let uid = unsafe { libc::geteuid() };
+    let defaults = Status {
+        generation: 0,
+        mode: Mode::Ask,
+        window: Window::default(),
+    };
+    let saved = Arc::new(Mutex::new(defaults.clone()));
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let (shown, changed, received) = (saved.clone(), saved.clone(), calls.clone());
+    let _server = StatusServer::bind_with_actions(
+        &path,
+        uid,
+        Arc::new(move || {
+            let mut status = snapshot();
+            status.install_policy = Some(shown.lock().unwrap().clone());
+            Ok(status)
+        }),
+        None,
+        None,
+        Some(Arc::new(move |change: Change| {
+            received.lock().unwrap().push(change);
+            let mut status = changed.lock().unwrap();
+            status.generation += 1;
+            status.mode = change.mode.unwrap_or(status.mode);
+            status.window = change.window.unwrap_or(status.window);
+            Ok(status.clone())
+        })),
+    )
+    .unwrap();
+    let request = |socket: &std::path::Path, body: &str| {
+        let mut socket = UnixStream::connect(socket).unwrap();
+        socket
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        writeln!(socket, "{body}").unwrap();
+        let mut text = String::new();
+        BufReader::new(socket).read_line(&mut text).unwrap();
+        serde_json::from_str::<serde_json::Value>(&text).unwrap()
+    };
+    assert_eq!(read_status(&path).unwrap().install_policy, Some(defaults));
+    assert!(calls.lock().unwrap().is_empty());
+    assert_eq!(
+        request(
+            &path,
+            r#"{"schema":1,"command":"install-policy","mode":"automatic"}"#
+        ),
+        json!({"schema": 1, "install_policy": {
+            "generation": 1, "mode": "automatic",
+            "window": {"start_minute": 180, "end_minute": 300},
+        }})
+    );
+    assert_eq!(
+        request(
+            &path,
+            r#"{"schema":1,"command":"install-policy","window":{"start_minute":1350,"end_minute":60}}"#
+        )["install_policy"],
+        json!({
+            "generation": 2, "mode": "automatic",
+            "window": {"start_minute": 1350, "end_minute": 60},
+        })
+    );
+    assert_eq!(
+        read_status(&path).unwrap().install_policy,
+        Some(Status {
+            generation: 2,
+            mode: Mode::Automatic,
+            window: Window {
+                start_minute: 1350,
+                end_minute: 60,
+            },
+        })
+    );
+    for bad in [
+        r#"{"schema":1,"command":"install-policy"}"#,
+        r#"{"schema":1,"command":"install-policy","mode":null,"window":null}"#,
+        r#"{"schema":1,"command":"install-policy","mode":"always"}"#,
+        r#"{"schema":1,"command":"install-policy","window":{"start_minute":180,"end_minute":180}}"#,
+        r#"{"schema":1,"command":"install-policy","window":{"start_minute":180,"end_minute":1440}}"#,
+        r#"{"schema":1,"command":"install-policy","window":{"start_minute":180}}"#,
+        r#"{"schema":1,"command":"install-policy","mode":"automatic","generation":2}"#,
+        r#"{"schema":2,"command":"install-policy","mode":"automatic"}"#,
+    ] {
+        assert!(request(&path, bad)["error"].is_string(), "{bad}");
+    }
+    assert_eq!(calls.lock().unwrap().len(), 2);
+    if uid != 0 {
+        // The client refuses a service that is not root's before sending anything.
+        let ask = Change {
+            mode: Some(Mode::Ask),
+            window: None,
+        };
+        assert!(install_policy(&path, ask).is_err());
+        assert_eq!(calls.lock().unwrap().len(), 2);
+    }
+
+    // A service without the saved preference refuses the change, and a status
+    // from before the setting existed still reads.
+    let bare = temp.path().join("bare.sock");
+    let _bare = StatusServer::bind(&bare, uid, Arc::new(|| Ok(snapshot()))).unwrap();
+    assert_eq!(
+        request(
+            &bare,
+            r#"{"schema":1,"command":"install-policy","mode":"automatic"}"#
+        ),
+        json!({"schema": 1, "error": "unavailable"})
+    );
+    let mut older = serde_json::to_value(snapshot()).unwrap();
+    older.as_object_mut().unwrap().remove("install_policy");
+    assert!(
+        serde_json::from_value::<DeviceStatus>(older)
+            .unwrap()
+            .install_policy
+            .is_none()
+    );
 }
 
 #[test]

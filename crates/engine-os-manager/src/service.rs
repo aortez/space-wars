@@ -33,6 +33,10 @@ pub struct DeviceStatus {
     pub time_check: Option<crate::time_runtime::Status>,
     #[serde(default)]
     pub update: Option<crate::update_runtime::Status>,
+    /// Absent while the saved preference is unreadable; installs then wait
+    /// for confirmation.
+    #[serde(default)]
+    pub install_policy: Option<crate::install_policy::Status>,
 }
 
 pub struct ObservedState {
@@ -61,6 +65,7 @@ impl ObservedState {
             recovery: crate::recovery_status::read(&self.boot_id, now.boottime_us / 1000),
             time_check: None,
             update: None,
+            install_policy: None,
         })
     }
 }
@@ -75,6 +80,17 @@ pub enum UpdateAction {
 }
 pub type Update =
     Arc<dyn Fn(UpdateAction) -> Result<crate::update_runtime::Accepted> + Send + Sync>;
+pub type InstallPolicy = Arc<
+    dyn Fn(crate::install_policy::Change) -> Result<crate::install_policy::Status> + Send + Sync,
+>;
+
+/// The preference as saved, returned only after it is durable.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InstallPolicySaved {
+    pub schema: u32,
+    pub install_policy: crate::install_policy::Status,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "command", rename_all = "kebab-case", deny_unknown_fields)]
@@ -96,6 +112,14 @@ enum Request {
         schema: u32,
         channel: engine_ota::Channel,
     },
+    /// An absent setting keeps its saved value.
+    InstallPolicy {
+        schema: u32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        mode: Option<crate::install_policy::Mode>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        window: Option<crate::install_policy::Window>,
+    },
 }
 
 pub struct StatusServer {
@@ -116,7 +140,7 @@ impl StatusServer {
         read: StatusReader,
         sync: Option<SyncNow>,
     ) -> Result<Self> {
-        Self::bind_with_actions(path, kiosk_uid, read, sync, None)
+        Self::bind_with_actions(path, kiosk_uid, read, sync, None, None)
     }
 
     pub fn bind_with_actions(
@@ -125,6 +149,7 @@ impl StatusServer {
         read: StatusReader,
         sync: Option<SyncNow>,
         update: Option<Update>,
+        policy: Option<InstallPolicy>,
     ) -> Result<Self> {
         let listener = UnixListener::bind(path)?;
         fs::set_permissions(path, fs::Permissions::from_mode(0o660))?;
@@ -154,9 +179,17 @@ impl StatusServer {
                         let read = read.clone();
                         let sync = sync.clone();
                         let update = update.clone();
+                        let policy = policy.clone();
                         let stop = stopped.clone();
                         workers.push(thread::spawn(move || {
-                            let _ = handle(stream, &read, sync.as_ref(), update.as_ref(), &stop);
+                            let _ = handle(
+                                stream,
+                                &read,
+                                sync.as_ref(),
+                                update.as_ref(),
+                                policy.as_ref(),
+                                &stop,
+                            );
                         }));
                     }
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
@@ -217,6 +250,7 @@ fn handle(
     read: &StatusReader,
     sync: Option<&SyncNow>,
     update: Option<&Update>,
+    policy: Option<&InstallPolicy>,
     stop: &AtomicBool,
 ) -> Result<()> {
     stream.set_write_timeout(Some(Duration::from_secs(2)))?;
@@ -242,6 +276,35 @@ fn handle(
                 .and_then(|update| update(action).ok())
             {
                 Some(accepted) => write_json(&mut stream, &accepted),
+                None => write_json(
+                    &mut stream,
+                    &serde_json::json!({"schema":1,"error":"unavailable"}),
+                ),
+            };
+        }
+        Request::InstallPolicy {
+            schema: 1,
+            mode,
+            window,
+        } => {
+            let change = crate::install_policy::Change { mode, window };
+            if !change.valid() {
+                return write_json(
+                    &mut stream,
+                    &serde_json::json!({"schema":1,"error":"invalid-request"}),
+                );
+            }
+            return match policy
+                .filter(|_| !stop.load(Ordering::Relaxed))
+                .and_then(|policy| policy(change).ok())
+            {
+                Some(install_policy) => write_json(
+                    &mut stream,
+                    &InstallPolicySaved {
+                        schema: 1,
+                        install_policy,
+                    },
+                ),
                 None => write_json(
                     &mut stream,
                     &serde_json::json!({"schema":1,"error":"unavailable"}),
@@ -363,6 +426,34 @@ pub fn update_request(
     Ok(accepted)
 }
 
+/// Saves one or both settings through the root-owned service. A refusal or a
+/// lost reply leaves the outcome unconfirmed; read status before retrying.
+pub fn install_policy(
+    path: &Path,
+    change: crate::install_policy::Change,
+) -> Result<crate::install_policy::Status> {
+    let mut stream = connect(path)?;
+    if peer_credentials(&stream)?.uid != 0 {
+        return Err(Error::Invalid("unexpected device service owner".into()));
+    }
+    write_json(
+        &mut stream,
+        &Request::InstallPolicy {
+            schema: 1,
+            mode: change.mode,
+            window: change.window,
+        },
+    )?;
+    let response = read_frame(&mut stream, MAX_RESPONSE, REQUEST_DEADLINE)?;
+    let saved: InstallPolicySaved = serde_json::from_slice(&response).map_err(|_| {
+        Error::Invalid("install policy change was not confirmed; read status".into())
+    })?;
+    if saved.schema != 1 {
+        return Err(Error::Invalid("unsupported install policy reply".into()));
+    }
+    Ok(saved.install_policy)
+}
+
 fn connect(path: &Path) -> Result<UnixStream> {
     let stream = futures_lite::future::block_on(futures_lite::future::or(
         async { async_io::Async::<UnixStream>::connect(path).await },
@@ -378,4 +469,30 @@ fn connect(path: &Path) -> Result<UnixStream> {
     stream.set_nonblocking(false)?;
     stream.set_write_timeout(Some(Duration::from_secs(2)))?;
     Ok(stream)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::install_policy::{Mode, Window};
+
+    #[test]
+    fn install_policy_request_names_only_the_settings_it_changes() {
+        let wire = |mode, window| {
+            serde_json::to_string(&Request::InstallPolicy {
+                schema: 1,
+                mode,
+                window,
+            })
+            .unwrap()
+        };
+        assert_eq!(
+            wire(Some(Mode::Automatic), None),
+            r#"{"command":"install-policy","schema":1,"mode":"automatic"}"#
+        );
+        assert_eq!(
+            wire(None, Some(Window::default())),
+            r#"{"command":"install-policy","schema":1,"window":{"start_minute":180,"end_minute":300}}"#
+        );
+    }
 }

@@ -49,7 +49,13 @@ fn fresh_image_reaches_one_canonical_baseline_and_preserves_existing_service_sto
     let fixture = Retirement::fresh();
     let data = fixture.migration.fixture.temp.path().join("data");
     let system = data.join("spacewars-system");
-    for name in ["network", "time", "time-check", "update-check"] {
+    for name in [
+        "install-policy",
+        "network",
+        "time",
+        "time-check",
+        "update-check",
+    ] {
         let directory = system.join(name);
         fs::create_dir_all(&directory).unwrap();
         for path in [&system, &directory] {
@@ -80,7 +86,13 @@ fn fresh_image_reaches_one_canonical_baseline_and_preserves_existing_service_sto
         &baseline
     );
     assert!(store.is_completed());
-    for name in ["network", "time", "time-check", "update-check"] {
+    for name in [
+        "install-policy",
+        "network",
+        "time",
+        "time-check",
+        "update-check",
+    ] {
         assert_eq!(
             fs::read(system.join(name).join("retained-state")).unwrap(),
             name.as_bytes()

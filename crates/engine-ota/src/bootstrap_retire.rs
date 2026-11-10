@@ -18,8 +18,15 @@ use std::os::unix::fs::MetadataExt;
 
 pub(super) const DIRECTORY: &str = "spacewars-retired";
 /// Fresh images run these services before OTA is provisioned. Bootstrap keeps
-/// their stores; none grants recovery or signed-feed authority.
-pub(super) const PRESERVED: &[&str] = &["network", "time", "time-check", "update-check"];
+/// their stores; none grants recovery or signed-feed authority. The install
+/// policy is the owner's saved preference and exists only once it is changed.
+pub(super) const PRESERVED: &[&str] = &[
+    "install-policy",
+    "network",
+    "time",
+    "time-check",
+    "update-check",
+];
 const SYSTEM_DIRECTORY: &str = "spacewars-system";
 const RECOVERY: &str = "recovery";
 const BOOTSTRAP_ENTRIES: &[&str] = &["completed", "package"];

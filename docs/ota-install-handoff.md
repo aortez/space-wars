@@ -392,9 +392,10 @@ install, explicit game termination, cancellation of a live offer or
 preparation, rollback of a panel install and lost CLI replies. Local
 socket/Slint tests do not replace those checks.
 
-Ask/Automatic preferences and overnight admission are not implemented. They
-follow this manual path and must reuse the same writer, locks, recovery and
-final app handoff.
+The device service saves the Ask/Automatic preference and its window
+([Install policy setting](ota-updates.md#install-policy-setting)), but nothing
+acts on them: overnight admission is not implemented. It follows this manual
+path and must reuse the same writer, locks, recovery and final app handoff.
 
 ## Validation scope
 

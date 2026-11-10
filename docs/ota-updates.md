@@ -31,7 +31,9 @@ good image and quarantines the candidate. Installation is admitted only on a
 unit with a published recovery approval bound to its board, medium, boot set
 and kernel ([recovery qualification](ota-recovery-qualification.md)). Automatic
 installation does not exist yet: every install is a press, and downloads are
-the only unattended step.
+the only unattended step. The service already saves the Ask or Automatic
+preference and its window ([Install policy setting](#install-policy-setting)),
+but nothing acts on it.
 
 Publication is owner-local. Each Nightly generation is built on the workstation
 from the selected `main` commit in the pinned kas container, qualified against
@@ -101,6 +103,32 @@ fail the same way until the build fits the runner or reuses a cache; the
 working path after a merge is the workstation build. The publisher policy pins
 the workflow's trigger set, so a trigger change and the policy change land in
 one commit.
+
+### Install policy setting
+
+The device service saves how a ready update installs. `ask`, the default,
+waits for an explicit confirmation. `automatic` will also let a ready update
+install by itself inside a daily window of local time, 03:00–05:00 unless
+changed. **Nothing acts on the saved mode yet**: every install still needs the
+owner's confirmation, whatever is saved. Generation 26 and earlier do not have
+the setting.
+
+```sh
+engine-os-manager install-policy --mode automatic
+engine-os-manager install-policy --window 22:30-01:00
+```
+
+Either setting changes alone, and `engine-os-manager status` reports both under
+`install_policy` with a generation that counts saved changes. The window is one
+interval of local wall-clock time in minutes after midnight with an exclusive
+end. It may cross midnight, and equal ends are refused. Selecting a channel
+never changes the mode.
+
+The record lives in `/data/spacewars-system/install-policy`. The first change
+creates it, so a unit that keeps the defaults has no such directory. An older
+image ignores it, and bootstrap preserves it with the other service stores. If
+it cannot be read, status omits `install_policy`, changes are refused and the
+mode counts as `ask`.
 
 ### Review corrections and next network gate
 
@@ -179,7 +207,7 @@ test unit and a fresh candidate are available.
 | #263 | The 2026-10-27 approval bundle holds all eleven case reports: seven observed passes, two reviewed from earlier observations, interrupted promotion as owner-accepted risk and power loss as a partial observation plus accepted risk; the confirming normal reboot (#600) was observed on 2026-11-08 |
 | #264 | Native writer connected and in routine use from the Updates panel on all three units; development installs (#566) implemented but not yet enabled on `sw-picade-2`; cancellation, worker failure, lost CLI replies, rollback of a panel install and service or app restart during an install remain untested on hardware |
 | #265 | Daily checks and downloads run unattended on all three units and delivered Release generation 20 by themselves on 2026-10-29; download impact on gameplay and resumed downloads remain unmeasured |
-| #266 | Updates panel with exact consent, the activity bar (#598) and the Install cursor lock (#601) in use; the saved Ask/Automatic setting, overnight window, idle wait, countdown and postponement are not implemented |
+| #266 | Updates panel with exact consent, the activity bar (#598) and the Install cursor lock (#601) in use; the Ask/Automatic setting and its window are saved by the device service and set from its CLI, and nothing acts on them yet; the overnight admission, idle wait, countdown, postponement and the panel's controls are not implemented |
 | #267 | All three units run 6.12 from SD cards with published approvals and take Release or Nightly through the panel; the remaining physical cases are accepted risk under the run-once rule; these pages are the operator documentation |
 
 ### Next implementation sequence
@@ -193,10 +221,14 @@ test unit and a fresh candidate are available.
 2. Enable development installs on `sw-picade-2` and make the two supervised
    runs, one commit and one forced return
    ([rollout](ota-development-installs.md#rollout)).
-3. Automatic installation (#266): a saved Ask/Automatic setting, the overnight
-   window, the idle wait, the countdown and postponement, reusing the manual
-   flow's writer, locks, recovery and app handoff. Pilot it on `sw-picade-2`'s
-   Nightly channel; the household units stay on Release and Ask.
+3. Automatic installation (#266), in three steps. The saved Ask/Automatic
+   setting and window are in the device service
+   ([Install policy setting](#install-policy-setting)). Next comes the
+   admission that reads them: the overnight window, the idle wait, the
+   countdown and postponement, reusing the manual flow's writer, locks,
+   recovery and app handoff. Last come the Updates panel's controls and the
+   countdown on screen. Pilot it on `sw-picade-2`'s Nightly channel; the
+   household units stay on Release and Ask.
 4. Publication (#262): the hosted image workflow keeps manual dispatch only;
    a dispatch succeeds only once the cold build fits the runner or reuses a
    cache, which nobody needs while the workstation builds in minutes. Signing
