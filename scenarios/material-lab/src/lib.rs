@@ -1,6 +1,8 @@
-//! A bounded, slow-motion application of native material loading and unloading.
+//! A bounded, slow-motion application of native material loading, unloading and
+//! paired collisions.
 use bincode::Options;
 use engine_common::{Action, Observation, RenderFrame, Scenario, StepResult, TickModel};
+use engine_material::{ARMOR, Material, WOOD};
 use engine_rapier::world::{
     PhysicsWorld,
     loading::response::compression::CompressionRejection,
@@ -11,8 +13,10 @@ use engine_rapier::world::{
 };
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+mod pair;
 mod render;
 mod scene;
+pub use pair::{Pair, PairBody};
 pub use render::controls as render_controls;
 #[cfg(test)]
 mod tests;
@@ -24,6 +28,7 @@ pub const YIELD_CHECKPOINT_STEP: u32 = 128;
 pub const MAX_SAVE_BYTES: u64 = 1_048_576;
 const SAVE_MAGIC: &[u8; 8] = b"MATLAB01";
 const LOAD_SAVE_MAGIC: &[u8; 8] = b"MATLAB02";
+const PAIR_SAVE_MAGIC: &[u8; 8] = b"MATLAB03";
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Case {
@@ -33,14 +38,27 @@ pub enum Case {
     Support,
     Overload,
     LoadRelease,
+    // Appended: saved case tags of the platen cases stay fixed.
+    WoodWood,
+    WoodArmor,
+}
+/// Initial condition of one free body along the +x contact normal.
+#[derive(Clone, Copy)]
+pub(crate) struct BodySetup {
+    pub material: Material,
+    pub mass: f32,
+    pub position: f32,
+    pub velocity: f32,
 }
 impl Case {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 7] = [
         Self::Elastic,
         Self::PlasticReturn,
         Self::Support,
         Self::Overload,
         Self::LoadRelease,
+        Self::WoodWood,
+        Self::WoodArmor,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -49,6 +67,33 @@ impl Case {
             Self::Support => "Yield & continuing support",
             Self::Overload => "Overloaded support",
             Self::LoadRelease => "Load, release & return",
+            Self::WoodWood => "Wood strikes wood",
+            Self::WoodArmor => "Wood meets armor",
+        }
+    }
+    /// The two free bodies of a paired collision, incoming body first. Both
+    /// carry material, start 1/16 apart and feel no external force.
+    pub(crate) fn free_pair(self) -> Option<[BodySetup; 2]> {
+        let body = |material, mass, position, velocity| BodySetup {
+            material,
+            mass,
+            position,
+            velocity,
+        };
+        match self {
+            // A light body strikes a heavier one at rest and rebounds from it.
+            Self::WoodWood => Some([
+                body(WOOD, 20.0, -0.5 - 1.0 / 16.0, 6.0),
+                body(WOOD, 40.0, 0.5, 0.0),
+            ]),
+            // Equal masses meet head-on. Armor forces small solver steps; mass
+            // 80, the solver's largest, needs the fewest and so stays inside the
+            // solver's fixed error allowances.
+            Self::WoodArmor => Some([
+                body(WOOD, 80.0, -0.5 - 1.0 / 32.0, 2.0),
+                body(ARMOR, 80.0, 0.5 + 1.0 / 32.0, -2.0),
+            ]),
+            _ => None,
         }
     }
     fn parameters(self) -> (f32, f32, u32) {
@@ -58,6 +103,8 @@ impl Case {
             Self::Support => (4000.0, 1.0 / 64.0, 512),
             Self::Overload => (8000.0, 1.0 / 64.0, 272),
             Self::LoadRelease => (8000.0, 1.0 / 64.0, 768),
+            Self::WoodWood => (0.0, 1.0 / 16.0, 352),
+            Self::WoodArmor => (0.0, 1.0 / 16.0, 512),
         }
     }
     pub fn next(self) -> Self {
@@ -93,6 +140,10 @@ pub enum Phase {
     Support,
     Rebound,
     Separated,
+    /// A free pair closing before its first contact.
+    Approach,
+    /// A free pair in contact and still closing.
+    Compression,
 }
 impl Phase {
     pub fn label(self) -> &'static str {
@@ -102,6 +153,8 @@ impl Phase {
             Self::Support => "Support",
             Self::Rebound => "Rebound",
             Self::Separated => "Separated",
+            Self::Approach => "Approach",
+            Self::Compression => "Compression",
         }
     }
 }
@@ -114,7 +167,8 @@ pub struct Event {
 
 pub struct MaterialLabState {
     world: PhysicsWorld,
-    material: RegionToken,
+    /// In body order; the ideal rigid platen of a fixed-support case has none.
+    materials: [Option<RegionToken>; 2],
     pub case: Case,
     pub paused: bool,
     pub steps: u32,
@@ -126,10 +180,10 @@ pub struct MaterialLabState {
 }
 impl MaterialLabState {
     pub fn new(case: Case) -> Self {
-        let (world, material) = scene::build(case);
+        let (world, materials) = scene::build(case);
         Self {
             world,
-            material,
+            materials,
             case,
             paused: true,
             steps: 0,
@@ -148,9 +202,10 @@ impl MaterialLabState {
                 ..Default::default()
             })
     }
+    /// Remaining capacity of the support's material.
     pub fn remaining(&self) -> f64 {
         self.world
-            .loading_material_remaining(self.material)
+            .loading_material_remaining(self.materials[1].unwrap())
             .unwrap()
     }
     pub fn weight(&self) -> f32 {
@@ -163,6 +218,9 @@ impl MaterialLabState {
     }
     /// A load command owns no tick and never resets an existing physical history.
     pub fn set_load(&mut self, load: Load) -> Result<(), String> {
+        if self.case.free_pair().is_some() {
+            return Err("A free pair takes no external load. Choose a platen case.".into());
+        }
         if self.stopped.is_some() {
             return Err("Run ended. Restart the case to change its load.".into());
         }
@@ -207,16 +265,21 @@ impl MaterialLabState {
     }
     pub fn phase(&self) -> Phase {
         let s = self.summary();
+        let pair = self.case.free_pair().is_some();
         if s.indentation < s.plastic_indentation {
-            if self.impacts == 0 {
-                Phase::Falling
-            } else {
+            if self.impacts > 0 {
                 Phase::Separated
+            } else if pair {
+                Phase::Approach
+            } else {
+                Phase::Falling
             }
         } else if self.events.last().is_some_and(|e| e.label == "Impact") {
             Phase::Impact
         } else if s.velocity < 0.0 {
             Phase::Rebound
+        } else if pair {
+            Phase::Compression
         } else {
             Phase::Support
         }
@@ -265,9 +328,14 @@ impl MaterialLabState {
                 }
             }
             Err(reason) => {
-                self.stopped = Some(format!(
-                    "Run stopped: {reason:?}. Last valid state retained."
-                ));
+                let reason = if self.case.free_pair().is_some()
+                    && reason == CompressionRejection::Numerical
+                {
+                    "Numerical accuracy limit reached".to_string()
+                } else {
+                    format!("{reason:?}")
+                };
+                self.stopped = Some(format!("Run stopped: {reason}. Last valid state retained."));
                 self.paused = true;
             }
         }
@@ -278,7 +346,7 @@ impl MaterialLabState {
             "summary": self.summary(), "remaining": self.remaining(), "events": self.events,
             "stopped": self.stopped, "weight": self.weight(),
             "gravity_impulse": self.gravity_impulse(), "load_changes": self.load_changes,
-            "guidance": self.guidance() })
+            "guidance": self.guidance(), "pair": self.pair() })
     }
     pub fn snapshot_bytes(&self) -> Result<Vec<u8>, String> {
         let save = Save {
@@ -290,18 +358,24 @@ impl MaterialLabState {
             stopped: self.stopped.clone(),
             world: self.world.snapshot_bytes().map_err(|e| e.to_string())?,
         };
-        let mut bytes;
-        if self.load_changes.is_empty() && self.case != Case::LoadRelease {
-            bytes = SAVE_MAGIC.to_vec();
-            bytes.extend(codec().serialize(&save).map_err(|e| e.to_string())?);
+        // A free pair accepts no load command, so its envelope has no command list.
+        let plain = self.load_changes.is_empty() && self.case != Case::LoadRelease;
+        let mut bytes = if self.case.free_pair().is_some() {
+            PAIR_SAVE_MAGIC
+        } else if plain {
+            SAVE_MAGIC
         } else {
-            bytes = LOAD_SAVE_MAGIC.to_vec();
-            bytes.extend(
-                codec()
-                    .serialize(&(save, &self.load_changes))
-                    .map_err(|e| e.to_string())?,
-            );
+            LOAD_SAVE_MAGIC
         }
+        .to_vec();
+        bytes.extend(
+            if plain {
+                codec().serialize(&save)
+            } else {
+                codec().serialize(&(save, &self.load_changes))
+            }
+            .map_err(|e| e.to_string())?,
+        );
         Ok(bytes)
     }
     /// Restore paused. The native snapshot owns physical history and numerical allowances.
@@ -310,21 +384,22 @@ impl MaterialLabState {
         if bytes.len() as u64 > MAX_SAVE_BYTES {
             return Err("Not a supported Material Lab save".into());
         }
-        let (save, changes): (Save, Vec<LoadChange>) = if bytes.starts_with(SAVE_MAGIC) {
-            let save: Save = codec()
-                .deserialize(&bytes[8..])
-                .map_err(|e| e.to_string())?;
-            if save.case == Case::LoadRelease {
-                return Err("Load/release case requires a newer lab save".into());
-            }
-            (save, Vec::new())
-        } else if bytes.starts_with(LOAD_SAVE_MAGIC) {
-            codec()
-                .deserialize(&bytes[8..])
-                .map_err(|e| e.to_string())?
-        } else {
-            return Err("Not a supported Material Lab save".into());
-        };
+        let (save, changes): (Save, Vec<LoadChange>) =
+            if bytes.starts_with(SAVE_MAGIC) || bytes.starts_with(PAIR_SAVE_MAGIC) {
+                let save: Save = codec()
+                    .deserialize(&bytes[8..])
+                    .map_err(|e| e.to_string())?;
+                if save.case == Case::LoadRelease {
+                    return Err("Load/release case requires a newer lab save".into());
+                }
+                (save, Vec::new())
+            } else if bytes.starts_with(LOAD_SAVE_MAGIC) {
+                codec()
+                    .deserialize(&bytes[8..])
+                    .map_err(|e| e.to_string())?
+            } else {
+                return Err("Not a supported Material Lab save".into());
+            };
         if save.steps > save.case.parameters().2
             || save.events.len() > 8
             || changes.len() > MAX_DYNAMIC_COMPRESSION_LOAD_CHANGES

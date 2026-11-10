@@ -48,7 +48,7 @@ fn snapshot(h: &mut FunctionalHarness, predicate: impl Fn(&Value) -> bool) -> Va
     }
 }
 fn physics(v: &Value) -> Value {
-    json!({"case":v["case"],"steps":v["steps"],"summary":v["summary"],"remaining":v["remaining"],"events":v["events"],"impacts":v["impacts"],"separations":v["separations"],"weight":v["weight"],"gravity_impulse":v["gravity_impulse"],"load_changes":v["load_changes"]})
+    json!({"case":v["case"],"steps":v["steps"],"summary":v["summary"],"remaining":v["remaining"],"events":v["events"],"impacts":v["impacts"],"separations":v["separations"],"weight":v["weight"],"gravity_impulse":v["gravity_impulse"],"load_changes":v["load_changes"],"pair":v["pair"]})
 }
 fn launch(h: &mut FunctionalHarness, mut s: UiState, renderer: &str) -> UiState {
     s = h.activate_until_scenario("material-lab", s);
@@ -203,5 +203,111 @@ fn material_lab_pause_save_load_and_both_renderers() {
                 .starts_with("Load failed")
         });
         assert_eq!(physics(&end), physics(&refused));
+    });
+}
+fn body(v: &Value, index: usize, field: &str) -> f64 {
+    v["pair"]["bodies"][index][field].as_f64().unwrap()
+}
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn material_lab_free_pairs_step_save_load_and_both_renderers() {
+    run_functional_test_with_seed("material-lab-pairs", "winit-femtovg", 42, |h| {
+        let ready = h.wait_until_ready();
+        let mut s = launch(h, ready, "vector");
+        let mut control = snapshot(h, |v| v["paused"] == true)["control"]
+            .as_u64()
+            .unwrap();
+        for _ in 0..4 {
+            choose(h, &mut s, &mut control, 3);
+        }
+        let initial = snapshot(h, |v| v["case"] == "Wood strikes wood");
+        assert_eq!(initial["steps"], 0);
+        assert_eq!(initial["phase"], "Approach");
+        assert_eq!(body(&initial, 0, "velocity"), 6.0);
+        assert_eq!(body(&initial, 1, "velocity"), 0.0);
+        for index in 0..2 {
+            assert_eq!(body(&initial, index, "remaining"), 1200.0);
+        }
+        h.capture_screenshot("pair-wood-wood-initial-vector.png");
+        // Run until the wood yields, then pause with the control still selected.
+        choose(h, &mut s, &mut control, 0);
+        snapshot(h, |v| body(v, 0, "damage_work") > 0.0);
+        press(h, &mut s, InputButton::South);
+        let paused = snapshot(h, |v| v["paused"] == true);
+        assert!(paused["stopped"].is_null());
+        choose(h, &mut s, &mut control, 4);
+        let saved = snapshot(h, |v| {
+            v["storage_status"].as_str().unwrap().starts_with("Saved")
+        });
+        assert_eq!(physics(&saved), physics(&paused));
+        h.capture_screenshot("pair-wood-wood-saved-vector.png");
+        // A free pair refuses external loads without touching the run.
+        choose(h, &mut s, &mut control, 8);
+        let refused = snapshot(h, |v| {
+            v["storage_status"]
+                .as_str()
+                .unwrap()
+                .starts_with("A free pair")
+        });
+        assert_eq!(physics(&refused), physics(&saved));
+        choose(h, &mut s, &mut control, 1);
+        let next = snapshot(h, |v| {
+            v["steps"].as_u64() == Some(saved["steps"].as_u64().unwrap() + 1)
+        });
+        choose(h, &mut s, &mut control, 5);
+        let loaded = snapshot(h, |v| {
+            v["storage_status"].as_str().unwrap().starts_with("Loaded")
+        });
+        assert_eq!(physics(&loaded), physics(&saved));
+        choose(h, &mut s, &mut control, 1);
+        assert_eq!(
+            physics(&snapshot(h, |v| v["steps"] == next["steps"])),
+            physics(&next)
+        );
+        choose(h, &mut s, &mut control, 0);
+        let end = snapshot(h, |v| v["stopped"].is_string());
+        assert!(end["stopped"].as_str().unwrap().starts_with("Run complete"));
+        assert_eq!(
+            (&end["impacts"], &end["separations"]),
+            (&json!(1), &json!(1))
+        );
+        // The striker is thrown back, the struck body driven away, and equal
+        // wood layers keep equal damage.
+        assert!(body(&end, 0, "velocity") < 0.0 && body(&end, 1, "velocity") > 0.0);
+        assert!(body(&end, 0, "damage_work") > 0.0);
+        assert!((body(&end, 0, "damage_work") - body(&end, 1, "damage_work")).abs() < 1e-6);
+        assert!(body(&end, 1, "remaining") < 1200.0);
+        h.capture_screenshot("pair-wood-wood-complete-vector.png");
+        // The slot survives leaving the lab and changing the renderer.
+        h.pause_guarded(&s);
+        let host_pause = h.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::PauseMain),
+                ..Default::default()
+            },
+            TRANSITION_TIMEOUT,
+        );
+        h.activate_guarded("pause.return-to-launcher", &host_pause);
+        let ready = h.wait_until_ready();
+        s = launch(h, ready, "raster");
+        control = snapshot(h, |_| true)["control"].as_u64().unwrap();
+        choose(h, &mut s, &mut control, 5);
+        let loaded = snapshot(h, |v| {
+            v["storage_status"].as_str().unwrap().starts_with("Loaded")
+        });
+        assert_eq!(physics(&loaded), physics(&saved));
+        h.capture_screenshot("pair-wood-wood-loaded-raster.png");
+        choose(h, &mut s, &mut control, 3);
+        snapshot(h, |v| v["case"] == "Wood meets armor" && v["steps"] == 0);
+        choose(h, &mut s, &mut control, 0);
+        let end = snapshot(h, |v| v["stopped"].is_string());
+        assert!(end["stopped"].as_str().unwrap().starts_with("Run complete"));
+        // Both bodies reverse; only the wood yields and spends capacity.
+        assert!(body(&end, 0, "velocity") < 0.0 && body(&end, 1, "velocity") > 0.0);
+        assert!(body(&end, 0, "permanent_set") > 0.0);
+        assert!(body(&end, 0, "remaining") < body(&end, 0, "capacity"));
+        assert_eq!(body(&end, 1, "damage_work"), 0.0);
+        assert_eq!(body(&end, 1, "remaining"), body(&end, 1, "capacity"));
+        h.capture_screenshot("pair-wood-armor-complete-raster.png");
     });
 }

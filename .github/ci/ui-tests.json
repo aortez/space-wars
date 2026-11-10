@@ -116,6 +116,10 @@
       "reason": "Moss placement, dim-room comparison, rock turning, breakage, removal and paid regrowth in both renderers; Garden Lab pause/step/reset/rendering smoke stays on PRs."
     },
     {
+      "test": "material_lab::material_lab_free_pairs_step_save_load_and_both_renderers",
+      "reason": "The two free-pair cases run to completion, one in each renderer, with a save reloaded across a lab restart; the Material Lab pause, step, save/load and renderer workflow stays on PRs."
+    },
+    {
       "test": "pizza::pizza_event_completes_without_queuing_busy_requests",
       "reason": "Waits for the full 15-second gravity event on GPU; PR smoke covers admission, busy refusal, pause/resume, persistence and lifecycle."
     },
