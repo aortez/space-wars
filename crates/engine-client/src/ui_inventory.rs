@@ -87,7 +87,7 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct UiInventoryContext {
     pub(crate) updates_controls: Vec<UiControl>,
-    pub(crate) updates_focus: i32,
+    pub(crate) updates_selected: Option<String>,
     pub(crate) updates_message: String,
     pub(crate) updates_busy: bool,
     pub(crate) updates_progress_percent: Option<u32>,
@@ -192,10 +192,7 @@ pub(crate) struct UiInventory {
 pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContext) -> UiInventory {
     let mut inventory = match screen {
         UiScreen::LauncherUpdates | UiScreen::PauseUpdates => UiInventory {
-            selected_control: context
-                .updates_controls
-                .get(context.updates_focus as usize)
-                .map(|c| c.id.clone()),
+            selected_control: context.updates_selected.clone(),
             controls: {
                 let mut c = context.updates_controls.clone();
                 c.push(
@@ -214,9 +211,12 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
                 }
                 c
             },
+            // Left and Right reach Automatic install and change its rows.
             actions: vec![
                 UiAction::Up,
                 UiAction::Down,
+                UiAction::Left,
+                UiAction::Right,
                 UiAction::Confirm,
                 UiAction::Back,
             ],

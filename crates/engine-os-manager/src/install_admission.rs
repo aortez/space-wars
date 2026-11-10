@@ -2,7 +2,7 @@
 //! the saved window of usable local time, at most once per window, and never
 //! twice for one image. Nothing here observes the app, counts down or
 //! installs; `install_handoff::automatic` asks and does those.
-use crate::install_policy::{Mode, Preference, Status as Policy, Window};
+use crate::install_policy::{Change, Mode, Preference, Status as Policy, Window};
 use crate::saved_state::{Revised, Saved};
 use crate::schedule_store::StateRecord;
 use crate::{Error, Result};
@@ -245,6 +245,25 @@ impl Gatekeeper {
             (self.now)().as_ref(),
             image,
         )
+    }
+
+    /// The saved preference, or `None` while it is unreadable.
+    pub fn policy(&self) -> Option<Policy> {
+        self.preference.status()
+    }
+
+    /// Saves a change to the preference. See `Preference::change`.
+    pub fn change(&self, change: Change) -> Result<Policy> {
+        self.preference.change(change)
+    }
+
+    /// The local reading now, or `None` while usable time or the time zone is
+    /// unknown.
+    pub fn local(&self) -> Option<Local> {
+        (self.now)().map(|now| Local {
+            date: now.date,
+            minute: now.minute,
+        })
     }
 
     /// Whether the saved mode is Automatic now. A countdown reads it again, so

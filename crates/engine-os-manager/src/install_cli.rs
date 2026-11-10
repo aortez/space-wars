@@ -161,6 +161,9 @@ mod native {
                     .aborted
                     .as_ref()
                     .is_some_and(|aborted| &aborted.ticket == ticket),
+                ServiceRequest::Policy { .. } | ServiceRequest::SavePolicy { .. } => {
+                    reply.policy.is_some()
+                }
             };
             if !matches {
                 return Err(invalid(

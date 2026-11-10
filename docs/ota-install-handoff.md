@@ -148,10 +148,13 @@ Updates is reachable from launcher and paused-game App Settings using touch,
 keyboard, gamepad or the existing guarded UI control interface. It displays the
 exact channel, generation, build and image identity, with an explicit
 **Install & restart** or **End game, install & restart** confirmation. The
-cursor opens on Back and reaches Install only while an offer stands: it stays on
-Back during the availability check, does not move when the offer arrives, and
-returns to Back once the offer is consumed, withdrawn or expired, so a button
-that turns live under a resting cursor cannot take the next press. Desktop
+cursor opens on Back and reaches Install, above it, only while an offer stands:
+it stays on Back during the availability check, does not move when the offer
+arrives, and returns to Back once the offer is consumed, withdrawn or expired,
+so a button that turns live under a resting cursor cannot take the next press.
+Left of Back, **Automatic install** opens the saved setting's page
+([Install policy setting](ota-updates.md#install-policy-setting)); it is
+disabled while an installation runs and absent while one holds the app. Desktop
 installation remains unavailable. While the service reports an installation
 phase, the panel shows an activity bar under the phase message: the native
 writer's byte counts fill it during the write and flush stages, and it sweeps in
@@ -470,7 +473,16 @@ scene and idle time the app reports, and the countdown notice: drawn from the
 service's announcements, gone when they stop or the countdown ends, and
 replaced by a postponement line on any input. A stand-in app and backend take
 the place of the kiosk's renderer and the native writer; no device has run an
-attempt.
+attempt. An open Updates screen reports no idle time, and its last input counts
+once it closes.
+
+The setting's tests read and save it through the real install socket, where a
+saved mode reaches the watcher at once, an unreadable record refuses saves and
+a service without the gate has nothing to offer. The client tests drive its
+button and page with the keyboard and the UI-control ids: opening Updates reads
+it, each press saves only the row it changed, presses made during a save follow
+it as one, a failed save shows the saved setting again, and the page closes when
+an installation takes the app over.
 
 CLI tests exercise the installed parser, exact ticket preservation, explicit
 restart/end-game flags, read-only commands, stale/expired refusals, wrong peers,

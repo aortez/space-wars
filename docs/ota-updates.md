@@ -115,9 +115,9 @@ waits for an explicit confirmation. `automatic` also lets a ready update
 install by itself inside a daily window of local time, 03:00–05:00 unless
 changed ([Automatic installation](#automatic-installation)). A confirmation
 installs at any time in either mode. Generation 26 and earlier do not have the
-setting. The mode has an effect only on an image whose status reports
-`install_automatic`; an image without it saves the mode and still waits for a
-confirmation.
+setting, and generation 27 sets it only from the CLI. The mode has an effect
+only on an image whose status reports `install_automatic`; an image without it
+saves the mode and still waits for a confirmation.
 
 ```sh
 engine-os-manager install-policy --mode automatic
@@ -129,6 +129,19 @@ Either setting changes alone, and `engine-os-manager status` reports both under
 interval of local wall-clock time in minutes after midnight with an exclusive
 end. It may cross midnight, and equal ends are refused. Selecting a channel
 never changes the mode.
+
+On the Updates panel, the **Automatic install** button beside Back names the
+saved setting, Off or the window, and opens a page with two rows. **Mode**
+switches between Ask first and Automatic. **Daily window** moves the whole
+window an hour earlier or later and keeps its length, so a window saved from
+the CLI keeps its minutes. Each press saves at once and names only the setting
+it changed, as the CLI does. The page then reads Saving…, Could not save, or
+Saved with the device service's local time, the clock the window uses; an
+unknown time says so, because nothing installs by itself without one. The
+panel reads and saves through the install socket, which admits the kiosk's
+account as the status socket already does. The button is disabled while the
+service cannot read the setting, and it leaves the screen while an
+installation holds the app.
 
 The record lives in `/data/spacewars-system/install-policy`. The first change
 creates it, so a unit that keeps the defaults has no such directory. An older
@@ -181,7 +194,8 @@ it shows and how long it has gone without a person:
   game all night.
 - **Idle time.** The time since the last key, button, stick movement or touch
   on a control. The app's start counts as use, and so does a button or touch
-  that is still held down.
+  that is still held down. An open Updates screen reports no idle time at all,
+  because it would cover the countdown; its last input counts once it closes.
 
 An attempt starts once the app has shown only the launcher or the Clock for
 ten minutes without use, is not busy with a launch, training or its own
@@ -316,7 +330,7 @@ test unit and a fresh candidate are available.
 | #263 | The 2026-10-27 approval bundle holds all eleven case reports: seven observed passes, two reviewed from earlier observations, interrupted promotion as owner-accepted risk and power loss as a partial observation plus accepted risk; the confirming normal reboot (#600) was observed on 2026-11-08 |
 | #264 | Native writer connected and in routine use from the Updates panel on all three units; development installs (#566) implemented but not yet enabled on `sw-picade-2`; cancellation, worker failure, lost CLI replies, rollback of a panel install and service or app restart during an install remain untested on hardware |
 | #265 | Daily checks and downloads run unattended on all three units and delivered Release generation 20 by themselves on 2026-10-29; download impact on gameplay and resumed downloads remain unmeasured |
-| #266 | Updates panel with exact consent, the activity bar (#598) and the Install cursor lock (#601) in use; the Ask/Automatic setting and its window are saved by the device service and set from its CLI; with Automatic saved the service installs a ready update by itself from an idle launcher or Clock after a sixty-second countdown that the app shows, and use of the app postpones it to the next window; not run on hardware; the panel has no controls for the setting yet |
+| #266 | Updates panel with exact consent, the activity bar (#598) and the Install cursor lock (#601) in use; the Ask/Automatic setting and its window are saved by the device service and set from its CLI; with Automatic saved the service installs a ready update by itself from an idle launcher or Clock after a sixty-second countdown that the app shows, and use of the app postpones it to the next window; the Updates panel shows the setting and changes it on a page of its own; not run on hardware |
 | #267 | All three units run 6.12 from SD cards with published approvals and take Release or Nightly through the panel; the remaining physical cases are accepted risk under the run-once rule; these pages are the operator documentation |
 
 ### Next implementation sequence
@@ -338,8 +352,8 @@ test unit and a fresh candidate are available.
    acts on it: the idle wait, the countdown and postponement, then the
    confirmed flow's writer, locks, recovery and app handoff
    ([Automatic installation](#automatic-installation)), with the countdown
-   on screen. Last come the Updates panel's controls for the setting. Pilot
-   it on `sw-picade-2`'s Nightly channel, with a window that falls inside its
+   on screen, and the Updates panel's controls for the setting. Pilot it on
+   `sw-picade-2`'s Nightly channel, with a window that falls inside its
    powered hours; the household units stay on Release and Ask.
 4. Publication (#262): the hosted image workflow keeps manual dispatch only;
    a dispatch succeeds only once the cold build fits the runner or reuses a
@@ -358,8 +372,7 @@ with downloads in both modes. Automatic installation is opt-in, initially
 03:00–05:00 local, after ten minutes idle in Clock or the launcher, with a
 sixty-second countdown. Input postpones until the next overnight window.
 Running and paused games stay protected. The device service and the app
-implement this; the panel's controls for the setting remain, and until then
-the mode is saved from the CLI.
+implement this, and the setting is saved from the Updates panel or the CLI.
 
 ### Cleanup candidates for later deletion review
 

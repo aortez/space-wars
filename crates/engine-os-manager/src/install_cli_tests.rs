@@ -54,6 +54,7 @@ fn reply(phase: Phase, ticket: Option<Ticket>) -> ServiceReply {
         },
         offer: None,
         aborted: None,
+        policy: None,
     }
 }
 fn uid() -> u32 {

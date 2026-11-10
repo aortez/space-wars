@@ -30,18 +30,7 @@ struct ActivationTarget {
 
 pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
     if window.get_updates_visible() || window.get_install_fenced() {
-        if crate::updates::inventory(window)
-            .iter()
-            .any(|c| c.id == control_id && c.enabled)
-        {
-            if control_id == "updates.confirm" {
-                window.invoke_updates_confirm();
-            } else {
-                window.invoke_updates_cancel();
-            }
-            return true;
-        }
-        return false;
+        return crate::updates::activate(window, control_id);
     }
     if window.get_genomes_visible()
         && crate::genome_controls::inventory(window)

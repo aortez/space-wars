@@ -201,6 +201,8 @@ impl Runtime {
         let (sender, receiver) = mpsc::sync_channel::<Work>(4);
         let shared = coordinator.clone();
         let submit = sender.clone();
+        let automatic = automatic.filter(|_| enabled);
+        let settings = automatic.as_ref().map(|(gate, _)| gate.clone());
         let server = transport::Server::bind(
             path,
             Arc::new(move |p| p.uid == 0 || p.uid == uid),
@@ -212,6 +214,10 @@ impl Runtime {
                         reply(&shared.lock().unwrap(), Some(Failure::Unavailable), false)
                     }
                     Ok(ServiceRequest::Status { .. }) => reply(&shared.lock().unwrap(), None, true),
+                    Ok(ServiceRequest::Policy { .. }) => policy(&shared, settings.as_deref(), None),
+                    Ok(ServiceRequest::SavePolicy { change, .. }) => {
+                        policy(&shared, settings.as_deref(), Some(change))
+                    }
                     Ok(ServiceRequest::Cancel { ticket, .. }) => {
                         let mut state = shared.lock().unwrap();
                         let error = state.cancel(&ticket).err().map(Failure::from);
@@ -236,7 +242,6 @@ impl Runtime {
         )?;
         let stop = Arc::new(AtomicBool::new(false));
         let stopping = stop.clone();
-        let automatic = automatic.filter(|_| enabled);
         let gate = automatic.as_ref().map(|(gate, _)| gate.clone());
         let watcher = automatic
             .map(|(gate, pace)| automatic::spawn(backend.clone(), gate, pace, sender.clone()));
@@ -379,6 +384,59 @@ impl Drop for Runtime {
         }
     }
 }
+/// The saved installation setting for the Updates panel, read after saving the
+/// change when there is one. Saving answers once the change is durable.
+fn policy(
+    state: &Mutex<Coordinator>,
+    gate: Option<&Gatekeeper>,
+    change: Option<PolicyChange>,
+) -> ServiceReply {
+    use crate::install_policy::{Change, Mode, Window};
+    let result = (|| {
+        let gate = gate.ok_or(Failure::Unavailable)?;
+        let saved = match change {
+            Some(change) => {
+                let change = Change {
+                    mode: change.mode.map(|mode| match mode {
+                        InstallMode::Ask => Mode::Ask,
+                        InstallMode::Automatic => Mode::Automatic,
+                    }),
+                    window: change.window.map(|window| Window {
+                        start_minute: window.start_minute,
+                        end_minute: window.end_minute,
+                    }),
+                };
+                let saved = gate.change(change).map_err(|error| {
+                    tracing::warn!(%error, "install policy could not be saved");
+                    Failure::SaveFailed
+                })?;
+                tracing::info!(
+                    generation = saved.generation,
+                    mode = ?saved.mode,
+                    window = ?saved.window,
+                    "install policy saved through the install socket"
+                );
+                saved
+            }
+            None => gate.policy().ok_or(Failure::Unavailable)?,
+        };
+        Ok(InstallPolicy {
+            mode: match saved.mode {
+                Mode::Ask => InstallMode::Ask,
+                Mode::Automatic => InstallMode::Automatic,
+            },
+            window: InstallWindow {
+                start_minute: saved.window.start_minute,
+                end_minute: saved.window.end_minute,
+            },
+            local_minute: gate.local().map(|local| local.minute),
+        })
+    })();
+    let mut value = reply(&state.lock().unwrap(), result.err(), true);
+    value.policy = result.ok();
+    value
+}
+
 fn reply(state: &Coordinator, error: Option<Failure>, enabled: bool) -> ServiceReply {
     let status = if enabled {
         state.status()
@@ -403,6 +461,7 @@ fn reply(state: &Coordinator, error: Option<Failure>, enabled: bool) -> ServiceR
         status,
         offer: None,
         aborted,
+        policy: None,
     }
 }
 
