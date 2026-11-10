@@ -719,8 +719,8 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
     let palette = state.palette();
     let t = (state.phase_tick() as f32 / REFORMING_TICKS as f32).clamp(0.0, 1.0);
     let progress = t * t * (3.0 - 2.0 * t);
-    // Falling's return draws the ink its pieces carry, which a reading that
-    // changes on the way can fade from one glyph to another without a jump.
+    // Falling publishes and draws the same moving pieces, including cells
+    // reused, split or merged when the reading changes on the way home.
     let falling = match &state.active_event {
         Some(crate::events::ActiveEvent::Falling(event))
             if event.phase() == crate::events::EventPhase::Reforming =>
@@ -750,15 +750,14 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
             );
         }
         if let Some(event) = falling {
-            if let Some((position, angle)) = event.segment_pose(segment, layout) {
-                for (cell, ink) in event.return_ink(index) {
+            for pose in event.return_cells(index, segment, layout) {
+                if !pose.footprint.is_empty() {
                     render_square(
                         frame,
-                        position
-                            + (layout.cell_center(segment.id, cell) - anchor).rotate_radians(angle),
-                        layout.pitch,
-                        angle,
-                        ink,
+                        pose.origin,
+                        pose.scale * pose.footprint.max.x / crate::digit_surfaces::CELL_HALF,
+                        pose.angle,
+                        pose.opacity,
                         palette,
                     );
                 }

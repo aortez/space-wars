@@ -977,88 +977,95 @@ fn surface_contract_falling_pieces_ride_their_bodies_and_come_home_as_themselves
 }
 
 #[test]
-fn surface_contract_a_reading_changed_on_the_way_home_keeps_survivors_and_fades_the_rest() {
+fn surface_contract_a_reading_changed_on_the_way_home_reuses_pieces_before_splitting() {
     for font in FONTS {
-        let context = format!("{font:?}");
-        let mut state = clock(
-            800.0 / 480.0,
-            font,
-            ClockTimeFormat::TwentyFourHour,
-            reading(12, 34, 10),
-        );
-        let mut markers = Markers::attach(&state, |_| Some(Vec2::new(-0.2, 0.3)));
-        let fallen = state.digit_surfaces();
-        sync(
-            &mut state,
-            &[ClockAction::preview_event(ClockEventKind::Falling)],
-        );
-        markers.follow(&state);
-        while state.event_phase() != Some(EventPhase::Reforming) || state.phase_tick() < 30 {
+        for (from, to) in [(34, 35), (8, 1)] {
+            let context = format!("{font:?}, 12:{from:02} to 12:{to:02}");
+            let mut state = clock(
+                800.0 / 480.0,
+                font,
+                ClockTimeFormat::TwentyFourHour,
+                reading(12, from, 10),
+            );
+            let mut markers = Markers::attach(&state, |_| Some(Vec2::ZERO));
+            let fallen = state.digit_surfaces();
+            let admitted = state.surface_accounting().admitted;
+            sync(
+                &mut state,
+                &[ClockAction::preview_event(ClockEventKind::Falling)],
+            );
+            while state.event_phase() != Some(EventPhase::Reforming) || state.phase_tick() < 30 {
+                tick(&mut state, &[]);
+                markers.follow(&state);
+            }
+            let mut older = state.digit_surfaces();
             tick(&mut state, &[]);
-            markers.follow(&state);
-        }
-        let mut ink = shared_ink(&state.digit_surfaces());
-        let mut steps = 0;
-        let mut actions = vec![ClockAction::set_reading(reading(12, 35, 0))];
-        while state.event_kind() == Some(ClockEventKind::Falling) {
-            tick(&mut state, &std::mem::take(&mut actions));
-            let surfaces = markers.follow(&state);
-            let context = format!("{context}, step {steps}");
-            assert_face_agreement(&state, &context);
-            ink = assert_ink_continues(&ink, &surfaces, 0.06, &context);
-            assert_one_per_cell(&surfaces, &context);
-            steps += 1;
-        }
-        let after = assert_face_agreement(&state, &context);
-        let fresh = clock(
-            800.0 / 480.0,
-            font,
-            ClockTimeFormat::TwentyFourHour,
-            reading(12, 35, 0),
-        );
-        assert_eq!(after.len(), fresh.digit_surfaces().len(), "{context}");
-        let glyphs = |minute: u8| crate::fonts::glyph(font, Some(minute));
-        let survives =
-            |surface: &DigitSurface| surface.slot != 3 || glyphs(5).contains(surface.cell);
-        for surface in &fallen {
-            let kept = after.iter().any(|s| s.id == surface.id);
+            let mut previous = markers.follow(&state);
+            let mut actions = vec![ClockAction::set_reading(reading(12, to, 0))];
+            while state.event_kind() == Some(ClockEventKind::Falling) {
+                tick(&mut state, &std::mem::take(&mut actions));
+                let surfaces = markers.follow(&state);
+                assert_face_agreement(&state, &context);
+                assert_no_jump(
+                    [&older, &previous, &surfaces],
+                    Layout::new(state.aspect_ratio()).pitch,
+                    &context,
+                );
+                assert_one_per_cell(&surfaces, &context);
+                assert!(
+                    surfaces.iter().all(|s| s.opacity == 1.0),
+                    "{context}: pieces never fade"
+                );
+                older = std::mem::replace(&mut previous, surfaces);
+            }
+            let after = assert_face_agreement(&state, &context);
+            let fresh = clock(
+                800.0 / 480.0,
+                font,
+                ClockTimeFormat::TwentyFourHour,
+                reading(12, to, 0),
+            );
+            assert_eq!(after.len(), fresh.digit_surfaces().len(), "{context}");
+            let kept = fallen
+                .iter()
+                .filter(|old| after.iter().any(|s| s.id == old.id))
+                .count();
             assert_eq!(
                 kept,
-                survives(surface),
-                "{context}: slot {} {:?}",
-                surface.slot,
-                surface.cell
+                fallen.len().min(after.len()),
+                "{context}: reuse every available piece"
             );
-            let marker = markers
-                .markers
-                .iter()
-                .find(|m| m.surface == surface.id)
-                .unwrap();
             assert_eq!(
-                marker.lost,
-                (!kept).then_some(Loss::Retired(Retirement::Replaced)),
-                "{context}"
+                state.surface_accounting().admitted - admitted,
+                after.len().saturating_sub(fallen.len()) as u64,
+                "{context}: only the true shortfall is new"
             );
+            assert_eq!(
+                state.surface_accounting().retired(Retirement::MergedAway),
+                fallen.len().saturating_sub(after.len()) as u64,
+                "{context}: only the true surplus merges"
+            );
+            for marker in &markers.markers {
+                let kept = after.iter().any(|s| s.id == marker.surface);
+                assert_eq!(
+                    marker.lost,
+                    (!kept).then_some(Loss::Retired(Retirement::MergedAway)),
+                    "{context}"
+                );
+            }
+            for old in fallen.iter().filter(|s| s.slot != 3) {
+                let at = after
+                    .iter()
+                    .find(|s| s.id == old.id)
+                    .expect("unaffected digits retain their pieces");
+                assert!((at.origin - old.origin).length() < 1e-3, "{context}");
+            }
         }
-        let arrived: Vec<_> = after
-            .iter()
-            .filter(|s| fallen.iter().all(|old| old.id != s.id))
-            .collect();
-        assert_eq!(
-            arrived.len(),
-            (glyphs(5).0 & !glyphs(4).0).count_ones() as usize,
-            "{context}: exactly the cells the new reading adds are new"
-        );
-        assert!(arrived.iter().all(|s| s.slot == 3
-            && glyphs(5).contains(s.cell)
-            && !markers.markers.iter().any(|m| m.surface == s.id)));
     }
 }
 
 #[test]
 fn surface_contract_a_reading_that_keeps_changing_on_the_way_home_never_jumps_or_duplicates() {
-    // The minute's cell that a 4 has and a 5 lacks fades out, back in as a
-    // new piece and out again, so two fading pieces share it and merge.
     for font in FONTS {
         let context = format!("{font:?}");
         let mut state = clock(
@@ -1074,36 +1081,44 @@ fn surface_contract_a_reading_that_keeps_changing_on_the_way_home_never_jumps_or
         while state.event_phase() != Some(EventPhase::Reforming) || state.phase_tick() < 20 {
             tick(&mut state, &[]);
         }
-        let progress = |state: &ClockState| match &state.active_event {
-            Some(crate::events::ActiveEvent::Falling(event)) => event.progress(),
-            _ => 1.0,
-        };
-        let mut ink = shared_ink(&state.digit_surfaces());
-        let peak = state.surface_accounting().live;
-        let mut window = 0.0;
-        let mut steps = 0;
+        let mut older = state.digit_surfaces();
+        tick(&mut state, &[]);
+        let mut previous = state.digit_surfaces();
+        let peak = [34, 35]
+            .into_iter()
+            .map(|minute| {
+                clock(
+                    800.0 / 480.0,
+                    font,
+                    ClockTimeFormat::TwentyFourHour,
+                    reading(12, minute, 0),
+                )
+                .digit_surfaces()
+                .len()
+            })
+            .max()
+            .unwrap();
         while state.event_kind() == Some(ClockEventKind::Falling) {
             let minute = 34 + (state.phase_tick() / 10) % 2;
-            let before = progress(&state);
-            if state.display().digits[3] != Some(minute as u8 % 10) {
-                window = before;
-            }
+            let context = format!("{context}, tick {}", state.phase_tick());
             tick(
                 &mut state,
                 &[ClockAction::set_reading(reading(12, minute as u8, 0))],
             );
             let surfaces = state.digit_surfaces();
-            let context = format!("{context}, step {steps}");
             assert_face_agreement(&state, &context);
-            // No cell fades faster than the time left for its fade allows.
-            let limit = 0.01 + (progress(&state) - before) / (1.0 - window);
-            ink = assert_ink_continues(&ink, &surfaces, limit, &context);
+            assert_no_jump(
+                [&older, &previous, &surfaces],
+                Layout::new(state.aspect_ratio()).pitch,
+                &context,
+            );
             assert_one_per_cell(&surfaces, &context);
             assert!(
-                surfaces.len() <= 2 * peak,
-                "{context}: fading pieces do not pile up"
+                surfaces.len() <= peak,
+                "{context}: reuse merging pieces instead of accumulating them"
             );
-            steps += 1;
+            assert!(surfaces.iter().all(|s| s.opacity == 1.0), "{context}");
+            older = std::mem::replace(&mut previous, surfaces);
         }
         let after = assert_face_agreement(&state, &context);
         let fresh = clock(
@@ -1230,7 +1245,12 @@ fn assert_no_jump(steps: [&[DigitSurface]; 3], pitch: f32, context: &str) {
         let Some(previous) = origin(before, surface.id) else {
             continue;
         };
-        let speed = origin(older, surface.id).map_or(0.0, |o| (previous - o).length());
+        // A newly admitted surface has no preceding velocity sample. In
+        // particular, a reused merging piece need not have been stationary.
+        let Some(earlier) = origin(older, surface.id) else {
+            continue;
+        };
+        let speed = (previous - earlier).length();
         assert!(
             (surface.origin - previous).length() <= speed * 1.25 + 0.25 * pitch,
             "{context}: surface {} jumps from {previous:?} to {:?}",

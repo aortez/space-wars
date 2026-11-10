@@ -12,6 +12,7 @@ type MenuCase = (&'static str, fn(&MainWindow));
 
 mod cell_swap;
 mod coins;
+mod falling;
 mod pizza;
 mod tanks;
 

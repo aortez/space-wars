@@ -53,10 +53,9 @@ pub enum SegmentRepresentation {
     Reforming(Reformation),
 }
 
-/// Where a segment is returning from. The fields are private so that no event
-/// can describe a reading as reforming at its own anchor having never been lit.
-/// That combination renders as the face appearing at the goal out of nothing,
-/// which is the one thing the return of digit cells may not be.
+/// The segment's pose and lit cells when its return began. An empty source
+/// describes a segment that was dark; the event must supply a path for any
+/// cells a later reading adds there.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Reformation {
     position: Vec2,
@@ -93,11 +92,9 @@ pub struct SegmentState {
 }
 
 impl SegmentState {
-    /// Starts this segment's return from wherever it actually is, as whatever it
-    /// actually was. A segment that never left reforms from its anchor, but it
-    /// still reforms as itself, so its cells travel and cross-fade into the new
-    /// shape instead of appearing there out of nothing. Call this before the new
-    /// reading is applied, while `lit` still describes the old one.
+    /// Records the segment's source pose and shape before applying the new
+    /// reading. A segment without a body records its anchor; that is not a
+    /// source of material for newly lit cells, whose paths the event supplies.
     pub(crate) fn begin_reforming(&mut self, anchor: Vec2) {
         let (position, angle) = match self.representation {
             SegmentRepresentation::Rigid { position, angle } => (position, angle),

@@ -2459,38 +2459,52 @@ the shared scheduling or cleanup rules.
 Several events take the reading apart, and every one of them has to put it back
 by moving matter. A step where the cells vanish and re-materialize in place reads
 as a glitch rather than an animation, however short it is.
-`events/explosion/reassembly.rs` is the reference implementation, and states the
-rules in its own comments:
+`events/explosion/reassembly.rs` provides the reference for reusing, splitting
+and merging pieces. The shared standard is:
 
 - A cell travels from where it actually is to where it belongs. It never appears
   at the goal.
 - A surplus cell joins a neighbour and shrinks, rather than fading out.
-- A shortfall splits a new cell from existing debris and grows it from zero size.
+- Reuse spare cells before creating any new ones. A true shortfall splits new
+  cells across the existing debris; it must not build a miniature glyph from a
+  single source. Grow those cells early enough to see them travel separately.
 - A reading that changes mid-animation retargets without restarting trajectories,
   so a colon blink or a new second does not jerk the whole face.
 - The dim anchors are the substrate. They stay put while the lit cells move.
+- Validate reading changes as well as a fixed reading: a minute rollover,
+  denser and sparser corrections, and a correction during the return. A segment
+  that had no falling body still needs a source for any new cells. Keep the
+  existing return deadline and leave unaffected paths alone.
+- Compare the last physics frame, first return frame, a middle frame and the
+  completed face through the production renderer. Check published surface
+  footprints against the visible cells, including while new cells grow.
 
-`SegmentRepresentation::Reforming` carries the rule in the type. Its payload is a
-`Reformation` whose fields are private and which only
+`SegmentRepresentation::Reforming` records the source of a segment's return.
+Its payload is a `Reformation` whose fields are private and which only
 `SegmentState::begin_reforming` can build, from the segment's actual position,
 angle and the lit cells it came apart with. No later reading changes those
 cells, so a second ticking over during the return cannot redraw what is coming
-home. There is no way to describe a segment as reforming at its own anchor
-having never been lit, which is precisely the case that renders as a reading
-appearing at the goal out of nothing.
+home. A dark segment has an empty source; that snapshot alone does not provide
+a path for newly needed cells. Falling keeps unchanged destinations, sends
+spare pieces to unfilled cells, and only then splits the true shortfall across
+visible pieces. New cells grow over the first 24 ticks of their flight (or the
+time remaining, if shorter), then travel at full size. Surplus pieces shrink
+into the returning face. A later correction redirects a piece from its current
+pose, velocity and size without extending the return. A piece already departing receives
+a fresh surface if reused, following the same lifecycle rule as Explosion.
 
 A reading's light-blocking geometry is the reading. `render::plant_face_polygons`
 and the visible frame both go through `render_marquee_face`, so a digit carried
 off stops shading the plants it used to stand over, and one part way across
 shades what it is actually over.
 
-Conformance, measured rather than read:
+Normal-transition conformance, with reading-change exceptions below:
 
 | Event | How the reading returns | Standard |
 | --- | --- | --- |
 | Exploding digits | Flights easing position, angle and size together, retargeting in flight | Reference |
-| Falling digits | Reforms from each segment's real landing pose, cross-fading the old shape into the new | Met |
-| Cell swaps | Per-cell quadratic bezier with opposing bow; the 15-tick fade only corrects a reading that changed mid-swap | Met |
+| Falling digits | Unchanged cells keep their segment paths; spare pieces fill new destinations, shortfalls split across moving pieces, and surplus pieces shrink into the face | Reuse, split and merge |
+| Cell swaps | Per-cell quadratic bezier with opposing bow; a changed reading still uses a stationary 15-tick correction fade | Met for an unchanged reading |
 | Digit Slide | The old glyph slides out and the new one slides in, clipped per cell | Met |
 | Slot Machine | Every reel opens on the glyph the face was showing and turns, clipped to its own slot, onto a whole stop; nothing is faded on | Met |
 | Coins | Explosion's flights, with the pieces squaring up from discs into cells over the return; a coin the drain took comes home from just below the view, and each coin the magpie kept is grown back from the nearest coin that remains, by the shortfall rule | Met |
@@ -2499,7 +2513,32 @@ Conformance, measured rather than read:
 | Marquee, clock recipes | The reading dissolves into its own animation, which opens on the anchored pose | Met |
 | Marquee, text recipes | The reading is carried clear of the frame and brought back the same way | Met |
 
-Meltdown is the one sanctioned departure, and it is worth being exact about why.
+The 2026-11-09 follow-up audit for #475 reproduced Falling's remaining
+fade-at-the-goal case with **11:11 → 11:12**: segments that had been dark had no
+body, so their new cells faded in at their anchors while the old bars were still
+returning. The reassignment above covers changes both before and during the
+return, with the same 90-tick deadline. Regression checks cover reuse before
+splitting, distribution across donors, sparser readings, repeated corrections,
+all four fonts, and standalone and shared arenas. Visual acceptance also needs
+the cells to read as separate pieces assembling, not a glyph growing from one
+corner; passing position and size checks alone does not establish that. Export
+production-renderer fixtures at wide, Picade and portrait sizes with:
+
+```sh
+SPACEWARS_FALLING_ARTIFACTS=/tmp/clock-falling \
+  cargo test --locked --profile ci -p engine-client --bin engine-client \
+  falling_reading_changes_return_to_the_complete_face_at_target_sizes
+```
+
+The source audit also identifies the remaining limits of this table. Cell Swap
+corrects its landed mask by fading cells out and in. Digit Slide ends an
+interrupted slide when another reading supersedes it; Slot Machine keeps locked
+reels until the ordinary face takes over; clock Marquee recipes replace their glyph masks when
+the reading changes. These correction paths need their own continuity checks;
+an unchanged-reading capture does not qualify them. Marquee's new message
+content also retains its entrance fade.
+
+Meltdown uses a refill rather than returning its original cells.
 Its cells do not travel home: each one grows upward from its own bottom edge at
 its final position, row by row. What travels is the matter, through the water -
 a cell becomes liquid on real contact with the panel top, its area is ledgered
@@ -2579,7 +2618,7 @@ What each event does with the face's surfaces:
 | --- | --- |
 | Face at rest | One per lit cell. Seconds, the colon, colour and a resize keep every id. A changed glyph, from a reading, font or format, is replaced |
 | Digit Slide | A changed slot's old glyph, or every slot's in a preview, slides out departing, and each cell is retired once it is clipped out. The new glyph is admitted sliding in and handed back at the end. Unchanged slots keep their ids |
-| Falling | Each cell rides its segment's body, then returns. Cells the new reading still lights come home as themselves, the rest fade out departing and new ones fade in |
+| Falling | Each cell rides its segment's body, then returns. Reassignment preserves its surface even at a different destination; a true shortfall admits growing surfaces and surplus surfaces depart while shrinking. Drawing and support use the same footprints |
 | Exploding digits | Blocks carry the cells' surfaces through the burst and the flight home. A surplus block departs and is merged away when it has shrunk to nothing. A block split off the debris is a new surface that grows from zero |
 | Coins | As Exploding digits: the pieces carry the surfaces out and home. A round piece's footprint is the square inside its disc, and a turning piece's is as wide as it is drawn |
 | Meltdown | Solid blocks carry their surfaces until they melt, leave the view or are reclaimed. The refill is a new face that grows upward. Water is never a surface |

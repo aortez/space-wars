@@ -125,6 +125,121 @@ fn recovery_uses_latest_time_even_if_digits_change_during_the_fall_and_reform() 
 }
 
 #[test]
+fn new_cells_travel_with_the_return_when_a_falling_reading_changes() {
+    for font in engine_common::ClockFont::ALL {
+        for shared in [false, true] {
+            for change_at in [FALLING_TICKS - 1, FALLING_TICKS + 30] {
+                let context = format!("{font:?}, shared={shared}, change_at={change_at}");
+                let mut state = ready(ClockEventProfile::Off, 7);
+                let mut settings = state.settings();
+                settings.fonts.selected = font;
+                ClockScenario::step(
+                    &mut state,
+                    &[
+                        ClockAction::configure(settings),
+                        ClockAction::set_reading(ClockReading::new(11, 11, 59).unwrap()),
+                    ],
+                    Duration::ZERO,
+                );
+                if shared {
+                    ClockScenario::step(
+                        &mut state,
+                        &[ClockAction::toggle_player_duck(1)],
+                        Duration::ZERO,
+                    );
+                    ticks(&mut state, 90);
+                }
+                let base = (state.body_count(), state.collider_count());
+                let original = state.digit_surfaces();
+                trigger(&mut state);
+                ticks(&mut state, change_at);
+                let before_change = state.digit_surfaces();
+                state.apply_reading(ClockReading::new(11, 12, 0).unwrap(), true);
+                ticks(&mut state, 1);
+                let born = state.digit_surfaces();
+                let new: Vec<_> = born
+                    .iter()
+                    .filter(|s| !original.iter().any(|old| old.id == s.id))
+                    .collect();
+                let mut donors = Vec::new();
+                for child in &new {
+                    let donor = before_change
+                        .iter()
+                        .min_by(|a, b| {
+                            (a.origin - child.origin)
+                                .length_squared()
+                                .total_cmp(&(b.origin - child.origin).length_squared())
+                        })
+                        .unwrap()
+                        .id;
+                    if !donors.contains(&donor) {
+                        donors.push(donor);
+                    }
+                }
+                assert_eq!(
+                    donors.len(),
+                    new.len().min(before_change.len()),
+                    "{context}: distribute shortfalls across existing pieces"
+                );
+                ticks(&mut state, 9);
+                assert_eq!(
+                    state.event_phase(),
+                    Some(EventPhase::Reforming),
+                    "{context}"
+                );
+                let layout = Layout::new(state.aspect_ratio());
+                let surfaces = state.digit_surfaces();
+                let new: Vec<_> = surfaces
+                    .iter()
+                    .filter(|surface| !original.iter().any(|old| old.id == surface.id))
+                    .collect();
+                assert!(!new.is_empty(), "{context}: the new reading needs cells");
+                let expected_count: usize = state
+                    .display()
+                    .digits
+                    .into_iter()
+                    .map(|digit| crate::fonts::glyph(font, digit).cells().count())
+                    .sum();
+                assert_eq!(
+                    new.len(),
+                    expected_count - original.len(),
+                    "{context}: reuse old cells before adding any"
+                );
+                assert!(
+                    original
+                        .iter()
+                        .all(|old| surfaces.iter().any(|s| s.id == old.id && !s.departing)),
+                    "{context}: every original cell is reused"
+                );
+                for surface in new {
+                    let home = layout.slot_cell_center(usize::from(surface.slot), surface.cell);
+                    assert!(
+                        (surface.origin - home).length() > layout.pitch * 0.01,
+                        "{context}: new cell {:?} fades into its destination at {:?}",
+                        surface.cell,
+                        surface.origin
+                    );
+                    assert!(
+                        surface.footprint.max.x < crate::digit_surfaces::CELL_HALF,
+                        "{context}: a new cell grows on the way"
+                    );
+                }
+                ticks(&mut state, FALLING_TICKS + REFORMING_TICKS - change_at - 10);
+                assert!(state.event_kind().is_none(), "{context}");
+                assert_eq!(
+                    (state.body_count(), state.collider_count()),
+                    base,
+                    "{context}"
+                );
+                let mut expected = digits::create_segments();
+                digits::apply_snapshot(&mut expected, state.display());
+                assert_eq!(state.segments(), expected, "{context}");
+            }
+        }
+    }
+}
+
+#[test]
 fn seeded_demo_replays_schedule_and_motion_exactly() {
     let mut a = ready(ClockEventProfile::Demo, 42);
     let mut b = ready(ClockEventProfile::Demo, 42);
