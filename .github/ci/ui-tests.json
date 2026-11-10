@@ -120,6 +120,10 @@
       "reason": "Two free-pair cases and a collapsing support run to completion, with both renderers and saved histories; the shorter Material Lab pause, step, save/load and renderer workflow stays on PRs."
     },
     {
+      "test": "material_lab::material_lab_paired_collapse_preserves_survivor_and_replays_in_both_renderers",
+      "reason": "Paired collapse, surviving material capacity, coasting and cross-renderer replay; shared Material Lab playback and storage smoke stays on PRs."
+    },
+    {
       "test": "pizza::pizza_event_completes_without_queuing_busy_requests",
       "reason": "Waits for the full 15-second gravity event on GPU; PR smoke covers admission, busy refusal, pause/resume, persistence and lifecycle."
     },

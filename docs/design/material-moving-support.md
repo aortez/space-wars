@@ -95,7 +95,8 @@ layers on both free bodies with separate deformation and damage histories.
 This remains a bounded #327 path. Externally driven moving supports,
 angular/oblique contacts, connection loads and transfers between older
 loading modes remain. Material Lab demonstrates the fixed-support cases, two
-paired-material collisions and a fixed collapsing support. Native
+paired-material collisions, a fixed collapsing support and paired collapse. Native
 [paired collapse](material-support-failure.md#two-finite-material-layers) also
-supports exhaustion of either finite layer. Lab cases for moving collapse,
-gameplay integration and general topology consequences remain later slices.
+supports exhaustion of either finite layer. A Lab case for a moving rigid platen
+over one material, gameplay integration and general topology consequences remain
+later slices.

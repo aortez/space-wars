@@ -1,22 +1,22 @@
 //! The qualified full-face two-body fixtures: a platen over a fixed layer, and a free pair.
-use crate::Case;
+use crate::{BodySetup, Case};
 use engine_core::Vec2;
-use engine_material::{Material, Region, Section, WOOD};
+use engine_material::{Region, Section, WOOD};
 use engine_rapier::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderMassProperties, ColliderRole,
     ColliderSpec, PhysicsId, PhysicsWorld, PhysicsWorldConfig, QuarterTurn,
     loading::{CaptureConfig, ContactSource, RegionId, RegionToken},
 };
 
-/// Default represented volume; the collapse case uses a smaller support.
+/// Represented volume of the ordinary fixed support.
 const VOLUME: f32 = 20.0;
 
 pub fn body(role: u64) -> BodyId {
     BodyId::new(PhysicsId::new(role + 1), BodyRole::PRIMARY)
 }
-/// An undamaged layer: its full capacity is `toughness * VOLUME`.
-pub fn region(material: Material) -> Region {
-    Region::new(material, VOLUME).unwrap()
+/// Each pair layer starts undamaged, at its own represented volume.
+pub fn pair_region(body: BodySetup) -> Region {
+    Region::new(body.material, body.volume).unwrap()
 }
 pub fn support_region(case: Case) -> Region {
     if case == Case::SupportFailure {
@@ -42,7 +42,7 @@ pub fn build(case: Case) -> (PhysicsWorld, [Option<RegionToken>; 2]) {
             turn,
             Vec2::X * setup.position,
             setup.mass,
-            Some(region(setup.material)),
+            Some(pair_region(setup)),
         ))
     });
     for role in [0, 1] {
