@@ -47,7 +47,7 @@ only and has never completed a build; see [Publication](#publication) below.
 
 | Unit | Medium and kernel | Image | Channel | Latest records |
 | --- | --- | --- | --- | --- |
-| `spacewars.local`, Pi 5 / HyperPixel | 32 GB SD card since 2026-11-07, Linux 6.12 | Release generation 25 on a normal boot | Release | `ota-pi5-sd-bootstrap-20261107`, `ota-pi5-generation25-install-20261107`, `ota-pi5-generation25-normal-reboot-20261108` |
+| `spacewars.local`, Pi 5 / HyperPixel | 32 GB SD card since 2026-11-07, Linux 6.12 | Release generation 26 on a normal boot | Release | `ota-pi5-sd-bootstrap-20261107`, `ota-pi5-generation25-normal-reboot-20261108`, `ota-pi5-generation26-install-20261109` |
 | `sw-picade.local`, primary Pi 4 / Picade | 32 GB SD card since 2026-11-07, Linux 6.12 | The generation 25 image as its generation-zero baseline | Release | `ota-picade-sd-bootstrap-20261107` |
 | `sw-picade-2.local`, second Pi 4 / Picade | 32 GB SD card since 2026-11-02, Linux 6.12 since 2026-11-06 | Nightly generation 26 on a normal boot | Nightly | `ota-picade2-sd-approval-20261103`, `ota-picade2-kernel612-upgrade-20261106`, `ota-picade2-generation26-install-20261108` |
 | Owner feed | Metadata version 33 | Release: generations 26, 25, 20 and 18; Nightly: generations 1 to 26 | | `ota-release-generation26-20261108` |
@@ -68,12 +68,15 @@ Release rollout so far:
   (`ota-release-generation20-installs-20261030`).
 - **2026-11-07:** generation 25, the first 6.12 Release image, promoted after
   the SD card moves (`ota-release-generation25-20261107`); `spacewars.local`
-  installed it from the panel the same evening.
+  installed it from the panel the same evening
+  (`ota-pi5-generation25-install-20261107`).
 - **2026-11-08:** generation 26 promoted (`ota-release-generation26-20261108`)
   with the Updates-screen activity bar (#598), the confirming normal reboot
   (#600) and the Install cursor lock (#601), after its Nightly install on
-  `sw-picade-2`. The household units take it from their next check with the
-  owner's press.
+  `sw-picade-2`. `spacewars.local` downloaded it at its own daily check on
+  2026-11-09 and installed it from the panel that evening, then restarted
+  into a normal boot by itself (`ota-pi5-generation26-install-20261109`).
+  `sw-picade.local` takes it from its next check with the owner's press.
 
 Nightly generations 21 to 23 never committed on `sw-picade-2`: a failing USB
 stick, a device-service disk permission (#584) and a 6.6 kernel shutdown race
@@ -212,11 +215,11 @@ test unit and a fresh candidate are available.
 
 ### Next implementation sequence
 
-1. Finish the generation 26 Release rollout. `spacewars.local` and
-   `sw-picade.local` download it at their next check and offer it on the
-   Updates panel; the owner's press installs it. The living room's install is
-   the first Pi 5 run of the confirming normal reboot, and the next install
-   made from generation 26 is the first live run of the activity bar and the
+1. Finish the generation 26 Release rollout. `spacewars.local` installed it
+   on 2026-11-09. `sw-picade.local` downloads it at its next check and offers
+   it on the Updates panel; the owner's press installs it. Every generation 26
+   install so far was drawn by the generation 25 app, so the next install made
+   from generation 26 is the first live run of the activity bar and the
    Install cursor lock.
 2. Enable development installs on `sw-picade-2` and make the two supervised
    runs, one commit and one forced return
@@ -1534,6 +1537,9 @@ returns `normal-boot-required`. The first device run was Nightly generation 26
 on `sw-picade-2` on 2026-11-08: the trial committed and the service's normal
 reboot followed 72 s into the trial boot, so the unit came up on a normal boot
 of the new slot with no manual restart (`ota-picade2-generation26-install-20261108`).
+The Pi 5 followed with Release generation 26 on 2026-11-09: its recovery
+service stopped for that reboot 67.5 s into the trial boot
+(`ota-pi5-generation26-install-20261109`).
 Running trial identity comes from the loaded
 command line; replacing the next trial selector cannot change it. Interruption
 during the later update still quarantines the new attempt.
