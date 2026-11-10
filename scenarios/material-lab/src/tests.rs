@@ -1,7 +1,10 @@
 use super::*;
 #[test]
 fn qualified_cases_finish_with_expected_material_behavior() {
-    for case in Case::ALL.into_iter().filter(|c| *c != Case::LoadRelease) {
+    for case in Case::ALL
+        .into_iter()
+        .filter(|c| *c != Case::LoadRelease && c.free_pair().is_none())
+    {
         let mut s = MaterialLabState::new(case);
         for _ in 0..case.parameters().2 {
             s.advance();
@@ -275,4 +278,127 @@ fn malformed_and_mismatched_saves_refuse() {
     let mut bad = SAVE_MAGIC.to_vec();
     bad.extend(codec().serialize(&save).unwrap());
     assert!(MaterialLabState::from_snapshot_bytes(&bad).is_err());
+}
+
+#[test]
+fn free_pairs_recoil_with_separate_damage_and_one_closed_energy_ledger() {
+    for case in [Case::WoodWood, Case::WoodArmor] {
+        let mut s = MaterialLabState::new(case);
+        let start = s.pair().unwrap();
+        for body in &start.bodies {
+            assert_eq!((body.deformation, body.damage_work), (0.0, 0.0));
+            assert_eq!(body.remaining, body.capacity);
+        }
+        assert_eq!(start.accounted_energy(), start.initial_energy);
+        assert_eq!(
+            start.bodies[1].position - start.bodies[0].position - 1.0,
+            case.parameters().1
+        );
+        let momentum = start.total(|b| b.momentum);
+        let mut both_stored_energy = false;
+        while s.stopped.is_none() {
+            s.advance();
+            let p = s.pair().unwrap();
+            // One ledger holds both bodies' motion and both materials' work.
+            assert!(
+                (p.accounted_energy() - p.initial_energy).abs() < 1e-9 * p.initial_energy,
+                "{case:?} step {}: {p:?}",
+                s.steps
+            );
+            assert!((p.total(|b| b.momentum) - momentum).abs() < 1e-3);
+            both_stored_energy |= p.bodies.iter().all(|b| b.elastic_energy > 0.0);
+            for body in &p.bodies {
+                assert!(body.deformation >= body.permanent_set);
+                assert!((body.capacity - body.damage_work - body.remaining).abs() < 1e-9);
+            }
+        }
+        assert!(
+            s.stopped.as_ref().unwrap().starts_with("Run complete"),
+            "{case:?}: {:?}",
+            s.diagnostics()
+        );
+        assert_eq!(s.steps, case.parameters().2);
+        assert_eq!((s.impacts, s.separations), (1, 1));
+        let labels: Vec<_> = s.events.iter().map(|e| e.label.as_str()).collect();
+        assert_eq!(labels, ["Impact", "Support", "Separation"]);
+        assert_eq!(s.phase(), Phase::Separated);
+        assert!(both_stored_energy);
+        let [a, b] = s.pair().unwrap().bodies;
+        // The incoming body is thrown back and the other is driven away.
+        assert!(a.velocity < 0.0 && b.velocity > start.bodies[1].velocity.max(0.0));
+        for body in [&a, &b] {
+            assert_eq!(body.elastic_energy, 0.0);
+            assert_eq!(body.deformation, body.permanent_set);
+        }
+        assert!(a.damage_work > 0.0 && a.permanent_set > 0.0 && a.remaining < a.capacity);
+        if case == Case::WoodWood {
+            // Equal layers share the damage equally, whatever the two masses.
+            assert!((a.damage_work - b.damage_work).abs() < 1e-9);
+            assert!((a.permanent_set - b.permanent_set).abs() < 1e-12);
+        } else {
+            // The armor flexes and returns its energy; only the wood is spent.
+            assert_eq!((b.damage_work, b.permanent_set), (0.0, 0.0));
+            assert_eq!(b.remaining, b.capacity);
+        }
+        println!("{case:?}: A {a:?}\n  B {b:?}");
+    }
+}
+
+#[test]
+fn free_pair_saves_keep_their_own_layout_and_refuse_load_commands() {
+    let mut s = MaterialLabState::new(Case::WoodArmor);
+    let fresh = s.snapshot_bytes().unwrap();
+    assert!(s.set_load(Load::Light).is_err());
+    assert_eq!(s.snapshot_bytes().unwrap(), fresh);
+    for _ in 0..100 {
+        s.advance();
+    }
+    assert_eq!(s.phase(), Phase::Compression);
+    let bytes = s.snapshot_bytes().unwrap();
+    assert!(s.set_load(Load::Released).is_err());
+    assert_eq!(s.snapshot_bytes().unwrap(), bytes);
+    // Spell the field order independently, including the appended case tag.
+    let mut frozen = PAIR_SAVE_MAGIC.to_vec();
+    frozen.extend(
+        codec()
+            .serialize(&(
+                6_u32,
+                s.steps,
+                s.impacts,
+                s.separations,
+                &s.events,
+                &s.stopped,
+                s.world.snapshot_bytes().unwrap(),
+            ))
+            .unwrap(),
+    );
+    assert_eq!(bytes, frozen);
+    assert_eq!(restored(&s).pair(), s.pair());
+    // A pair fits no other envelope, and no platen case fits this one.
+    let retagged = |bytes: &[u8], magic: &[u8; 8]| {
+        let mut bad = bytes.to_vec();
+        bad[..8].copy_from_slice(magic);
+        MaterialLabState::from_snapshot_bytes(&bad)
+    };
+    assert!(retagged(&bytes, SAVE_MAGIC).is_err());
+    assert!(retagged(&bytes, LOAD_SAVE_MAGIC).is_err());
+    let save: Save = codec().deserialize(&bytes[8..]).unwrap();
+    let mut bad = LOAD_SAVE_MAGIC.to_vec();
+    bad.extend(
+        codec()
+            .serialize(&(save, Vec::<LoadChange>::new()))
+            .unwrap(),
+    );
+    assert!(MaterialLabState::from_snapshot_bytes(&bad).is_err());
+    let mut platen = MaterialLabState::new(Case::Elastic);
+    platen.advance();
+    assert!(retagged(&platen.snapshot_bytes().unwrap(), PAIR_SAVE_MAGIC).is_err());
+    let mut save: Save = codec().deserialize(&bytes[8..]).unwrap();
+    save.steps += 1;
+    let mut bad = PAIR_SAVE_MAGIC.to_vec();
+    bad.extend(codec().serialize(&save).unwrap());
+    assert!(MaterialLabState::from_snapshot_bytes(&bad).is_err());
+    for cut in [8, bytes.len() - 1] {
+        assert!(MaterialLabState::from_snapshot_bytes(&bytes[..cut]).is_err());
+    }
 }

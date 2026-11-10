@@ -99,5 +99,6 @@ Tests also check individual and total work, all quarter turns, shared normal
 motion, collider partitions/duplicates, insertion order, public-call partitions
 and exact save/replay. Malformed extensions, per-layer corruption, stale live
 materials, either layer's capacity failure, output limits and retained numerical
-allowances refuse atomically. Material Lab remains on its fixed-support cases;
-a two-material demonstration and angular/oblique contacts are subsequent slices.
+allowances refuse atomically. The [Material Lab](material-lab.md#free-pair-collisions)
+shows a wood–wood and a wood–armor pair through this path; angular/oblique
+contacts are subsequent slices.

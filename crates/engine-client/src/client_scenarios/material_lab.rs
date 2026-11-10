@@ -25,7 +25,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Material Lab: impact, compression and rebound in slow motion. Starts paused. Up/down chooses a control; Space or gamepad bottom face activates. Run/Pause, Single step, Restart case and Next case control playback. Release load, Apply light load and Apply heavy load change the force without advancing time; then Run or Single step to observe the response. The Load, release & return case pauses after yielding and separation to guide these changes. Save pauses and replaces one persistent slot; Load restores paused, including load history. Saves survive restarting the application. Each run has a bounded observation window. Esc/Start opens host pause; R restarts the lab. Vertical displacement is magnified 20x; displayed time and work are physical values.",
+    controls_help: "Material Lab: impact, compression and rebound in slow motion. Starts paused. Up/down chooses a control; Space or gamepad bottom face activates. Run/Pause, Single step, Restart case and Next case control playback. Release load, Apply light load and Apply heavy load change the force without advancing time; then Run or Single step to observe the response. The Load, release & return case pauses after yielding and separation to guide these changes. Wood strikes wood and Wood meets armor are free two-body collisions: both bodies recoil, each material shows its own deformation, damage and capacity, one ledger accounts for the shared energy, and the load controls do not apply. Save pauses and replaces one persistent slot; Load restores paused, including load history. Saves survive restarting the application. Each run has a bounded observation window. Esc/Start opens host pause; R restarts the lab. Displacement is magnified 20x; displayed time and work are physical values.",
     create,
 };
 const COMMAND_KIND: u32 = 1;
@@ -341,5 +341,64 @@ mod tests {
             tick(s, false);
             assert!(s.message.starts_with("Load failed"));
         }
+    }
+    #[test]
+    fn material_lab_free_pair_steps_saves_restores_and_refuses_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut adapter = create(
+            0,
+            &Settings::default(),
+            Viewport::new(800.0, 480.0),
+            ScenarioStartMode::Normal,
+            &ScenarioAsset::MaterialLab(dir.path().join("material-lab.bin")),
+        )
+        .unwrap();
+        let s = adapter
+            .as_any_mut()
+            .downcast_mut::<MaterialLabClientScenario>()
+            .unwrap();
+        s.selected = 3;
+        while s.state.case != Case::WoodArmor {
+            tick(s, true);
+        }
+        assert_eq!(s.state.steps, 0);
+        s.selected = 0;
+        tick(s, true);
+        // Run into the collision, until both layers hold elastic energy.
+        while s.state.pair().unwrap().total(|b| b.elastic_energy) < 20.0 {
+            assert!(
+                !s.state.paused && s.state.stopped.is_none(),
+                "collision stopped before the save checkpoint: {:?}",
+                s.state.diagnostics()
+            );
+            tick(s, false);
+        }
+        let steps = s.state.steps;
+        let pair = s.state.pair();
+        for control in 6..=8 {
+            s.selected = control;
+            tick(s, true);
+            assert!(s.state.paused);
+            assert!(s.message.starts_with("A free pair"));
+            assert_eq!((s.state.steps, s.state.pair()), (steps, pair.clone()));
+        }
+        s.selected = 4;
+        tick(s, true);
+        settle(s);
+        assert!(s.message.starts_with("Saved"));
+        let saved = s.state.snapshot_bytes().unwrap();
+        s.selected = 1;
+        tick(s, true);
+        assert_eq!(s.state.steps, steps + 1);
+        let next = s.state.snapshot_bytes().unwrap();
+        s.selected = 5;
+        tick(s, true);
+        settle(s);
+        assert!(s.state.paused);
+        assert_eq!(s.state.snapshot_bytes().unwrap(), saved);
+        assert_eq!(s.state.pair(), pair);
+        s.selected = 1;
+        tick(s, true);
+        assert_eq!(s.state.snapshot_bytes().unwrap(), next);
     }
 }

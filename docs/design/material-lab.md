@@ -1,8 +1,9 @@
-# Material Lab: loading, release and return (#327)
+# Material Lab: loading, recovery and paired collisions (#327)
 
 `material-lab` is the first application scenario using the bounded native
-[impact-to-support path](material-impact-support.md) and its
-[changing-load extension](material-changing-load.md). Select **Show all scenarios**
+[impact-to-support path](material-impact-support.md), its
+[changing-load extension](material-changing-load.md) and the
+[paired-material path](material-paired-compression.md). Select **Show all scenarios**
 in the launcher, choose **Material Lab**, then start. Direct launch:
 
 ```sh
@@ -14,13 +15,16 @@ face activates it. The controls are Run/Pause, Single step, Restart case, Next
 case, Save, Load, Release load (0), Apply light load (1000) and Apply heavy load
 (8000). Esc/Start opens the ordinary host pause menu. R restarts
 the lab with its default case. The scene renders through both vector and raster
-paths. It uses a labelled schematic with vertical displacement magnified 20x;
+paths. It uses a labelled schematic with normal displacement magnified 20x;
 the displayed time, velocity, work, remaining capacity and permanent indentation
 come from the physical history.
 
-## Cases and playback
+Next case walks the five platen cases and then the two
+[free-pair collisions](#free-pair-collisions).
 
-Every case uses a mass-20 ideal rigid platen, a fixed full-face wood layer,
+## Platen cases and playback
+
+Every platen case uses a mass-20 ideal rigid platen, a fixed full-face wood layer,
 section/deformation depth 1, represented volume 20 and initial remaining capacity
 1200. The physical frame is turned exactly 270 degrees so gravity points down.
 This is the full capacity of the reference wood material (`toughness 60 * volume 20`).
@@ -42,7 +46,7 @@ The on-screen prompt guides these checkpoints. Single step can inspect each
 interval. Resuming without following a prompt still advances the actual chosen
 force; it may reach a native limit rather than complete the guided return.
 
-All five cases accept the three load controls after their first physical step.
+All five platen cases accept the three load controls after their first physical step.
 A load command pauses playback and changes only the force; it does not add a
 tick, reset velocity, repair wood or allocate a second impact budget. Subsequent
 Run/Single step uses the new load. Up to 32 actual changes are allowed, including
@@ -65,6 +69,62 @@ Damage work, viscous loss and recovered elastic energy remain distinct. The
 display shows the applied load, change count, gravity work and gravity impulse;
 the downward force arrow disappears on release. Gravity work integrates each
 load over its own displacement, including negative work on upward motion.
+
+## Free-pair collisions
+
+Two cases put finite material on both bodies. Both bodies are free and
+rotation-locked, meet along a horizontal normal with no external force, and
+start 1/16 apart. Each carries its own full-face layer with section/deformation
+depth 1 and represented volume 20, at the full capacity of its reference material
+(`toughness * 20`: 1200 for wood, 200000 for armor).
+
+| Case | Body A | Body B | Observation window |
+| --- | --- | --- | ---: |
+| Wood strikes wood | wood, mass 20, velocity +6 | wood, mass 40, at rest | 352 steps (0.0859375 s) |
+| Wood meets armor | wood, mass 80, velocity +2 | armor, mass 80, velocity -2 | 512 steps (0.125 s) |
+
+In **Wood strikes wood** the bodies touch from step 43 to step 152. Body A is
+thrown back at 0.450 and body B leaves at 3.225. The two equal layers yield
+equally although the masses differ: each keeps a permanent set of 0.00906 and
+has 1145.67 of its 1200 capacity left, after 54.33 of damage work and 20.66 of
+viscous loss.
+
+In **Wood meets armor** the bodies touch from step 64 to step 220, and both
+reverse to 0.787. Only the wood yields: it keeps a set of 0.02878 and has 1027.34
+capacity left, after 172.66 of damage work and 97.78 of viscous loss. The armor
+flexes, returns its elastic energy and keeps all of its capacity.
+
+The schematic draws both bodies. Each block shortens at its contact face by its
+own layer's deformation; a grey line marks the face's original position on the
+body and an amber line its permanent set. The arrow over a body shows its
+velocity, scaled to the fastest body at the start of the case. The phase reads
+Approach, Impact, Compression, Rebound or Separated.
+
+The table gives one column per body: velocity, momentum, motion energy, deformation,
+permanent set, elastic energy, damage work, viscous loss and capacity left, with
+a bar for each body's remaining share of its own capacity. Deformation is the
+layer's present compression; after separation it equals the permanent set.
+
+**Shared energy** is one ledger for the pair. A bar splits the initial motion
+energy into the motion of both bodies, damage work, elastic energy and viscous
+loss, with the figures beside it. The numerical defect is the energy and
+capacity-charge defect the solver retains; it is never material damage. Those
+five lines sum to the initial motion energy shown under them, and the momentum
+of the pair stays at its initial value.
+
+Run/Pause, Single step, Restart case, Save and Load work as in the platen cases.
+The three load controls pause playback and refuse with a message, because this
+solver path admits no external force.
+
+Armor decides the masses of the second case. Its viscosity sets the solver's
+internal time step, and every internal solve spends part of fixed error
+allowances that nothing renews. Lighter pairs need more solves per displayed
+step and run out soon after separation; some unequal masses run out before it.
+Mass 80, the largest the solver admits, needs two solves per displayed step, and
+the run ends with under half of any allowance used. The wood pair uses about a
+third.
+If a free pair reaches a numerical allowance, playback stops with “Numerical
+accuracy limit reached” and retains the last valid state.
 
 ## Save slot
 
@@ -91,8 +151,11 @@ this case/replay contract; an incompatible future version must reject explicitly
 or supply a migration. The existing four cases without load changes retain the
 `MATLAB01` layout and bytes. Changed loads and the new guided case use `MATLAB02`;
 its command list is bounded to 32 entries and replay must reproduce the complete
-saved envelope. Wrong versions, impossible/no-op commands, reordered histories
-and mismatched physics refuse. Native saves retain their v1–v18 compatibility.
+saved envelope. The two free-pair cases use `MATLAB03`: the `MATLAB01` fields
+with no command list. Their native snapshot becomes v20 on the first physical
+step, when the paired history is enrolled. No layout accepts another
+layout's cases. Wrong versions, impossible/no-op commands, reordered histories
+and mismatched physics refuse. Native saves retain their v1–v20 compatibility.
 
 ## Evidence and limits
 
@@ -104,6 +167,18 @@ uses both renderers, the yielding/separation checkpoints, load changes without
 time advancement, host pause, single step, save/load, process restart and corrupt input;
 it is included in the PR smoke suite.
 
+For the free pairs, scenario tests check at every step that the ledger closes
+and momentum holds, then the contact events, both bodies' recoil, equal damage
+in equal layers and untouched armor. They also cover exact save/load
+continuation, the `MATLAB03` layout, its refusal of other envelopes and the
+refused load commands. A client test saves mid-collision, steps and restores
+through the storage worker. A second public UI workflow runs the wood pair in
+the vector renderer with a mid-run save, step and reload, reloads that save in
+the raster renderer after leaving the lab, and runs the armor case there. It is
+part of the full UI suite, not the PR smoke suite.
+
 This is a bounded two-body demonstration. It does not enable material response
 for existing gameplay, add fracture/topology consequences, or broaden the native
-solver's geometry or connection-loading support. #327 remains open.
+solver's geometry or connection-loading support. A layer that ran out of capacity
+would refuse the step; turning exhausted capacity into breakage is #328. #327
+remains open.
