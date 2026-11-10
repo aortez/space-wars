@@ -236,7 +236,7 @@ fn collapse_and_end_records_are_atomic_when_output_fills() {
 }
 
 #[test]
-fn collapse_policy_keeps_safe_loads_safe_and_refuses_moving_supports() {
+fn collapse_policy_keeps_safe_loads_safe_and_refuses_paired_materials() {
     let mut w = fixture();
     w.set_gravity(Vec2::X * 156.25);
     w.set_pose(body(11), Vec2::X / 128.0, 0.0, true);
@@ -263,5 +263,82 @@ fn collapse_policy_keeps_safe_loads_safe_and_refuses_moving_supports() {
     moving.set_body_kind(body(2), BodyKind::Dynamic, true);
     moving.refresh_mass_properties(body(2));
     moving.set_velocity(body(11), Vec2::X, 0.0, true);
+    let loading = moving.loading.as_mut().unwrap();
+    let driver = loading
+        .bindings
+        .values()
+        .find(|s| s.region.id.entity == body(11).entity)
+        .unwrap()
+        .region;
+    let materials = &mut loading.response.as_mut().unwrap().materials;
+    materials.insert(driver, materials.values().next().unwrap().clone());
     refused(&mut moving, DT, R::UnsupportedScene);
+}
+
+#[test]
+fn moving_collapse_preserves_frozen_fixed_support_v21_histories() {
+    let mut approaching = fixture();
+    approaching.set_pose(body(11), -Vec2::X / 64.0, 0.0, true);
+    approaching.step_material_collapsing_support(DT).unwrap();
+    for original in [approaching, collapsed()] {
+        for removed in [false, true] {
+            let mut w = original.clone();
+            if removed {
+                w.remove_entity(body(11).entity);
+                w.remove_entity(body(2).entity);
+            }
+            let c = continuation(&mut w);
+            let mut frozen = bincode::serialize(&7_u32).unwrap();
+            frozen.extend(model::frozen_v15_history(&c.history));
+            match &c.status {
+                Status::CollapsingSupport(a) => {
+                    bincode::serialize_into(&mut frozen, &7_u32).unwrap();
+                    frozen.extend(compression::scene::frozen_v14_scene(&a.scene.plates));
+                    bincode::serialize_into(
+                        &mut frozen,
+                        &(
+                            a.scene.mass,
+                            a.scene.acceleration,
+                            a.owner,
+                            a.pending_support,
+                        ),
+                    )
+                    .unwrap();
+                }
+                Status::Invalidated(_) => {
+                    bincode::serialize_into(&mut frozen, &(1_u32, 0_u32)).unwrap();
+                }
+                _ => panic!("v21 lifecycle changed"),
+            }
+            assert_eq!(bincode::serialize(&c).unwrap(), frozen);
+            let f = c.history.failure.as_ref().unwrap();
+            let incoming = c.history.incoming.as_ref().map(|v| v.velocity);
+            let event = f.event.as_ref().map(|e| {
+                (
+                    e.elapsed,
+                    e.source,
+                    e.episode,
+                    e.indentation,
+                    e.velocity,
+                    e.plastic_indentation,
+                    e.released_elastic,
+                    e.excess_work,
+                )
+            });
+            bincode::serialize_into(&mut frozen, &(incoming, f.source, event)).unwrap();
+            let bytes = w.snapshot_bytes().unwrap();
+            assert_eq!(&bytes[..4], &21_u32.to_le_bytes());
+            assert!(bytes.ends_with(&frozen));
+            let mut restored = PhysicsWorld::from_snapshot_bytes(&bytes).unwrap();
+            assert_eq!(restored.snapshot_bytes().unwrap(), bytes);
+            assert_eq!(
+                restored.step_material_collapsing_support(DT),
+                w.step_material_collapsing_support(DT)
+            );
+            assert_eq!(
+                restored.snapshot_bytes().unwrap(),
+                w.snapshot_bytes().unwrap()
+            );
+        }
+    }
 }

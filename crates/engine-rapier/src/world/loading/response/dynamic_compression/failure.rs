@@ -1,4 +1,4 @@
-//! Opt-in dissipative collapse of one fixed support at an internal-step boundary.
+//! Opt-in dissipative collapse of one material support at an internal-step boundary.
 use super::*;
 
 /// A single loss of load-bearing capacity, retained with the material's identity.
@@ -11,6 +11,7 @@ pub struct CompressionFailure {
     pub source: ContactSource,
     pub episode: EpisodeId,
     pub indentation: f64,
+    /// Relative normal velocity; the support is stationary in the fixed mode.
     pub velocity: f64,
     pub plastic_indentation: f64,
     pub released_elastic: f64,
@@ -26,23 +27,30 @@ impl CompressionFailure {
 pub(super) struct FailureHistory {
     pub source: ContactSource,
     pub event: Option<CompressionFailure>,
+    // Required v22 extension; the fixed-support v21 layout is unchanged.
+    #[serde(skip)]
+    pub motion: Option<moving::Motion>,
 }
 impl FailureHistory {
     pub fn valid(&self, h: &History) -> bool {
-        if h.moving.is_some()
-            || h.paired.is_some()
-            || h.loads.is_some()
-            || self.source.region.incarnation == 0
-        {
+        if h.paired.is_some() || h.loads.is_some() || self.source.region.incarnation == 0 {
             return false;
         }
-        let Some(e) = &self.event else { return true };
+        let Some(e) = &self.event else {
+            return self.motion.is_none();
+        };
         let c = h.curve();
         let s = &h.summary;
         let flight = s.elapsed - e.elapsed;
-        let mass = f64::from(h.mass);
+        let mass = h.effective_mass();
         let acceleration = f64::from(h.acceleration);
-        e.source == self.source
+        let motion_valid = match (&h.moving, &self.motion) {
+            (None, None) => true,
+            (Some(m), Some(boundary)) => m.valid_failure(boundary, e, flight, c.depth),
+            _ => false,
+        };
+        motion_valid
+            && e.source == self.source
             && e.episode.0 > 0
             && e.elapsed.is_finite()
             && e.elapsed > 0.0
@@ -52,7 +60,7 @@ impl FailureHistory {
             && e.plastic_indentation == s.plastic_indentation
             && e.velocity.is_finite()
             && e.velocity.abs() <= 64.0
-            && f64::from(e.velocity as f32) == e.velocity
+            && (h.moving.is_some() || f64::from(e.velocity as f32) == e.velocity)
             && (mass * (s.velocity - e.velocity - acceleration * flight)).abs()
                 <= s.absolute_errors[1] + 1e-10 * s.scales[1]
             && (s.indentation
@@ -86,20 +94,24 @@ impl History {
     }
 }
 impl PhysicsWorld {
-    /// Opt into irreversible collapse of a single fixed material support.
+    /// Opt into irreversible collapse of a single material support.
     ///
     /// Uses the dynamic-compression admission, time-step and numerical bounds,
-    /// with constant normal gravity and an ideal rigid dynamic platen. Moving
-    /// supports, paired materials and load changes are not admitted by this mode.
+    /// with an ideal rigid dynamic platen. A fixed support admits constant normal
+    /// gravity; a moving support admits two free bodies and zero gravity. Paired
+    /// materials and load changes are not admitted by this mode.
     /// The layer resists through the first internal interval exhausting capacity;
     /// collapse then dissipates its stored elastic energy and excess plastic work.
-    /// Later intervals have zero reaction and charge: the platen follows gravity
-    /// through the collapsed envelope. Mass, geometry and actor ownership remain.
+    /// Later intervals have zero reaction and charge: a fixed-support platen
+    /// follows gravity and two free bodies coast. Mass, geometry and actor
+    /// ownership remain. A moving support retains both bodies' boundary motion
+    /// through `material_moving_support_failure()`.
     ///
     /// One failure and contact End are reported at that internal endpoint. Failure
     /// timing is quantized by the existing subdivision, at most 1/4096 second.
     /// The whole public call is atomic, including failures and output limits.
-    /// Snapshot v21 retains the policy and failure even after invalidation/removal.
+    /// Snapshots v21 (fixed) and v22 (moving) retain the policy and failure even
+    /// after invalidation/removal.
     /// Enrolled histories cannot switch to or from the legacy refusal policy.
     pub fn step_material_collapsing_support(
         &mut self,
@@ -126,3 +138,7 @@ impl PhysicsWorld {
 #[cfg(test)]
 #[path = "tests/failure.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "tests/moving_failure.rs"]
+mod moving_tests;

@@ -124,7 +124,7 @@ impl History {
     // safe-equilibrium histories retain revision 1/v15 bytes.
     pub(super) fn revision(&self) -> u32 {
         if self.failure.is_some() {
-            return 7;
+            return if self.moving.is_some() { 8 } else { 7 };
         }
         if self.paired.is_some() {
             return 6;
@@ -522,6 +522,7 @@ impl History {
             };
             failure_dissipated = event.dissipated();
             f.event = Some(event);
+            f.motion = self.moving.as_ref().map(|m| m.current.clone());
             q.elastic = 0.0;
             q.force = 0.0;
         }

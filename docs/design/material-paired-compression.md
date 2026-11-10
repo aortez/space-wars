@@ -77,7 +77,8 @@ large common motion. They are not enlarged by stronger material, remaining
 capacity, pauses or save/load. Failed material, exhausted allowances and output
 limits discard the entire public call, including both bodies and both charges.
 Failure/severing for paired materials remains later #328 work. The first
-[collapse policy](material-support-failure.md) applies to one fixed support.
+[collapse policy](material-support-failure.md) applies to one material support,
+fixed or moving, against an ideal rigid platen.
 
 Snapshot v20 has a distinct tag and appended active status. Its required
 fixed-size extensions carry both motion and both material histories. Restore

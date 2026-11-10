@@ -43,12 +43,13 @@ pub(super) fn advance(
         History::new(&scene, world)?
     };
     if saved.is_none() && collapse {
-        if history.moving.is_some() || history.paired.is_some() {
+        if history.paired.is_some() {
             return Err(R::UnsupportedScene);
         }
         history.failure = Some(failure::FailureHistory {
             source: scene.plates.sources[1],
             event: None,
+            motion: None,
         });
         if !history.valid() {
             return Err(R::UnsupportedScene);
@@ -77,6 +78,7 @@ pub(super) fn advance(
     } else if revision == 3
         || revision == 5
         || revision == 6
+        || revision == 8
         || (revision == 7 && history.incoming.is_some())
     {
         None
@@ -91,7 +93,7 @@ pub(super) fn advance(
         )?)
     };
     let mut pending_support = saved.is_some_and(
-        |c| matches!(&c.status, Status::Falling(a) | Status::ChangingLoad(a) | Status::MovingSupport(a) | Status::PairedMaterials(a) | Status::CollapsingSupport(a) if a.pending_support),
+        |c| matches!(&c.status, Status::Falling(a) | Status::ChangingLoad(a) | Status::MovingSupport(a) | Status::PairedMaterials(a) | Status::CollapsingSupport(a) | Status::CollapsingMovingSupport(a) if a.pending_support),
     );
     let impact_arrivals = history.incoming.is_some() || history.moving.is_some();
     let mut current = scene;
@@ -277,6 +279,12 @@ pub(super) fn advance(
             Status::Active(Box::new(Active {
                 scene: current,
                 owner: owner.ok_or(R::Numerical)?,
+            }))
+        } else if revision == 8 {
+            Status::CollapsingMovingSupport(Box::new(FallingActive {
+                scene: current,
+                owner,
+                pending_support,
             }))
         } else if revision == 7 {
             Status::CollapsingSupport(Box::new(FallingActive {
