@@ -368,3 +368,97 @@ fn ask_mode_never_looks_at_the_app_and_a_confirmation_is_not_an_attempt() {
     let status = gate.status(Some(IMAGE));
     assert_eq!((status.last_attempt, status.tried_build_id), (None, None));
 }
+
+fn read(f: &Fixture) -> ServiceReply {
+    f.request(ServiceRequest::Policy { schema: SCHEMA })
+}
+fn save(f: &Fixture, mode: Option<InstallMode>, window: Option<InstallWindow>) -> ServiceReply {
+    f.request(ServiceRequest::SavePolicy {
+        schema: SCHEMA,
+        change: PolicyChange { mode, window },
+    })
+}
+
+#[test]
+fn the_panel_reads_and_saves_the_setting_that_the_watcher_follows() {
+    let device = Device::new(Mode::Ask);
+    let gate = device.gate();
+    let f = Fixture::with(Some((gate.clone(), pace(LONG))));
+    let ask = InstallPolicy {
+        mode: InstallMode::Ask,
+        window: InstallWindow {
+            start_minute: 180,
+            end_minute: 300,
+        },
+        local_minute: Some(3 * 60 + 30),
+    };
+    assert_eq!(read(&f).policy, Some(ask));
+    // Saving the mode keeps the window, and the watcher starts watching.
+    let saved = save(&f, Some(InstallMode::Automatic), None);
+    assert_eq!(saved.error, None);
+    assert_eq!(
+        saved.policy,
+        Some(InstallPolicy {
+            mode: InstallMode::Automatic,
+            ..ask
+        })
+    );
+    until("the watcher", || watched(&f) == watching(Hold::Game));
+    // Saving the window keeps the mode.
+    let afternoon = InstallWindow {
+        start_minute: 13 * 60,
+        end_minute: 15 * 60,
+    };
+    let saved = save(&f, None, Some(afternoon));
+    assert_eq!(
+        saved.policy,
+        Some(InstallPolicy {
+            mode: InstallMode::Automatic,
+            window: afternoon,
+            ..ask
+        })
+    );
+    let status = gate.policy().unwrap();
+    assert_eq!(
+        (status.generation, status.mode, status.window.start_minute),
+        (2, Mode::Automatic, 13 * 60)
+    );
+    // Without usable time the reply leaves the minute out.
+    *device.now.lock().unwrap() = None;
+    assert_eq!(read(&f).policy.unwrap().local_minute, None);
+}
+
+#[test]
+fn an_unreadable_setting_is_unavailable_to_the_panel_and_refuses_its_saves() {
+    // Automatic is saved, then the record is edited outside its owner.
+    let device = Device::new(Mode::Automatic);
+    let state = device.dir.path().join("install-policy/state.json");
+    let edited = std::fs::read_to_string(&state)
+        .unwrap()
+        .replace("\"automatic\"", "\"ask\"");
+    std::fs::write(&state, edited).unwrap();
+    let gate = device.gate();
+    let f = Fixture::with(Some((gate.clone(), pace(LONG))));
+    let reply = read(&f);
+    assert_eq!(
+        (reply.error, reply.policy),
+        (Some(Failure::Unavailable), None)
+    );
+    let reply = save(&f, Some(InstallMode::Ask), None);
+    assert_eq!(
+        (reply.error, reply.policy),
+        (Some(Failure::SaveFailed), None)
+    );
+    assert!(!gate.automatic());
+}
+
+#[test]
+fn a_service_without_the_gate_has_no_setting_for_the_panel() {
+    let f = Fixture::new();
+    for reply in [read(&f), save(&f, Some(InstallMode::Automatic), None)] {
+        assert_eq!(
+            (reply.error, reply.policy),
+            (Some(Failure::Unavailable), None)
+        );
+    }
+}

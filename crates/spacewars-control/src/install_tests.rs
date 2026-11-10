@@ -319,6 +319,7 @@ fn written_counts_round_trip_and_cannot_exceed_the_total_or_lack_a_ticket() {
         },
         offer: None,
         aborted: None,
+        policy: None,
     };
     reply.validate().unwrap();
     let json = serde_json::to_string(&reply).unwrap();
@@ -414,4 +415,104 @@ fn a_countdown_names_its_generation_and_its_end() {
             "{invalid}"
         );
     }
+}
+
+#[test]
+fn the_panel_reads_the_setting_and_saves_only_what_it_changes() {
+    let read = r#"{"command":"policy","schema":1}"#;
+    assert!(wire::ServiceRequest::from_json(read.as_bytes()).is_ok());
+    let save = wire::ServiceRequest::SavePolicy {
+        schema: SCHEMA,
+        change: wire::PolicyChange {
+            mode: Some(wire::InstallMode::Automatic),
+            window: None,
+        },
+    };
+    let json = serde_json::to_string(&save).unwrap();
+    assert_eq!(
+        json,
+        r#"{"command":"save-policy","schema":1,"change":{"mode":"automatic"}}"#
+    );
+    let window = r#"{"command":"save-policy","schema":1,"change":{"window":{"start_minute":780,"end_minute":900}}}"#;
+    for valid in [json.as_str(), window] {
+        assert!(
+            wire::ServiceRequest::from_json(valid.as_bytes()).is_ok(),
+            "{valid}"
+        );
+    }
+    for invalid in [
+        r#"{"command":"save-policy","schema":1,"change":{}}"#.to_owned(),
+        window.replace("900", "780"),
+        window.replace("900", "1440"),
+        json.replace("automatic", "sometimes"),
+        json.replace("}}", ",\"countdown\":true}}"),
+        json.replace("\"schema\":1", "\"schema\":2"),
+        read.replace("}", ",\"mode\":\"ask\"}"),
+    ] {
+        assert_eq!(
+            wire::ServiceRequest::from_json(invalid.as_bytes()).err(),
+            Some(Error::Invalid),
+            "{invalid}"
+        );
+    }
+}
+
+#[test]
+fn a_reply_carries_the_setting_only_without_an_error_or_an_offer() {
+    let mut reply = wire::ServiceReply {
+        schema: SCHEMA,
+        error: None,
+        status: wire::Status {
+            phase: wire::Phase::Idle,
+            ticket: None,
+            written: None,
+        },
+        offer: None,
+        aborted: None,
+        policy: None,
+    };
+    let plain = serde_json::to_string(&reply).unwrap();
+    assert!(!plain.contains("policy"));
+    reply.policy = Some(wire::InstallPolicy {
+        mode: wire::InstallMode::Ask,
+        window: wire::InstallWindow {
+            start_minute: 180,
+            end_minute: 300,
+        },
+        local_minute: Some(1334),
+    });
+    assert_eq!(reply.validate(), Ok(()));
+    let json = serde_json::to_string(&reply).unwrap();
+    assert!(json.ends_with(
+        r#","policy":{"mode":"ask","window":{"start_minute":180,"end_minute":300},"local_minute":1334}}"#
+    ));
+    let decoded: wire::ServiceReply = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded.policy, reply.policy);
+    // A device without a usable time says so by leaving the minute out.
+    let unset: wire::ServiceReply =
+        serde_json::from_str(&json.replace(",\"local_minute\":1334", "")).unwrap();
+    assert_eq!(unset.policy.unwrap().local_minute, None);
+    for broken in [
+        |r: &mut wire::ServiceReply| r.error = Some(wire::Failure::SaveFailed),
+        |r: &mut wire::ServiceReply| r.policy.as_mut().unwrap().local_minute = Some(1440),
+        |r: &mut wire::ServiceReply| r.policy.as_mut().unwrap().window.end_minute = 180,
+    ] {
+        let mut changed = reply.clone();
+        broken(&mut changed);
+        assert_eq!(changed.validate(), Err(Error::Invalid));
+    }
+}
+
+#[test]
+fn a_window_moves_by_whole_hours_and_wraps_at_midnight() {
+    let window = |start_minute, end_minute| wire::InstallWindow {
+        start_minute,
+        end_minute,
+    };
+    assert_eq!(window(180, 300).shifted(1), window(240, 360));
+    assert_eq!(window(180, 300).shifted(-3), window(0, 120));
+    assert_eq!(window(0, 120).shifted(-1), window(1380, 60));
+    assert_eq!(window(1410, 60).shifted(1), window(30, 120));
+    assert_eq!(window(810, 855).shifted(24), window(810, 855));
+    assert!(window(1380, 60).valid() && !window(60, 60).valid() && !window(0, 1440).valid());
 }

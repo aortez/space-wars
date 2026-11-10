@@ -1534,7 +1534,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
         screen,
         &UiInventoryContext {
             updates_controls: crate::updates::inventory(window),
-            updates_focus: window.get_updates_focus(),
+            updates_selected: crate::updates::selected(window),
             updates_message: window.get_updates_message().to_string(),
             updates_busy: window.get_updates_busy(),
             updates_progress_percent: {

@@ -15,6 +15,7 @@ fn status() -> ServiceReply {
         },
         offer: None,
         aborted: None,
+        policy: None,
     }
 }
 #[test]

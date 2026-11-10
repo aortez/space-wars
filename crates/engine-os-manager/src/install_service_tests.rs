@@ -431,11 +431,12 @@ fn disabled_backend_exposes_no_install_path() {
     for request in [
         ServiceRequest::Status { schema: SCHEMA },
         ServiceRequest::Offer { schema: SCHEMA },
+        ServiceRequest::Policy { schema: SCHEMA },
     ] {
         let reply: ServiceReply =
             transport::exchange(&path, uid(), None, &request, Duration::from_secs(1)).unwrap();
         assert_eq!(reply.status.phase, Phase::Unavailable);
-        assert!(reply.offer.is_none());
+        assert!(reply.offer.is_none() && reply.policy.is_none());
     }
 }
 

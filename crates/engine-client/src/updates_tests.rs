@@ -6,7 +6,7 @@ use std::{
     cell::Cell,
     sync::{
         Mutex,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     thread,
 };
@@ -60,6 +60,21 @@ impl Harness {
         }
         thread::sleep(Duration::from_millis(5));
     }
+    /// Saves the last rendered frame as a PNG when the environment names a file.
+    fn screenshot(&self, variable: &str) {
+        let Some(path) = std::env::var_os(variable) else {
+            return;
+        };
+        let mut encoder = png::Encoder::new(std::fs::File::create(path).unwrap(), 800, 480);
+        encoder.set_color(png::ColorType::Rgb);
+        encoder.set_depth(png::BitDepth::Eight);
+        let bytes: Vec<_> = self.pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
+        encoder
+            .write_header()
+            .unwrap()
+            .write_image_data(&bytes)
+            .unwrap();
+    }
     fn until(&mut self, render: bool, mut done: impl FnMut(&MainWindow) -> bool) {
         let deadline = Instant::now() + Duration::from_secs(5);
         while !done(&self.window) {
@@ -100,6 +115,7 @@ fn response(phase: Phase) -> ServiceReply {
         },
         offer: None,
         aborted: None,
+        policy: None,
     }
 }
 fn host_request(path: &Path, request: HostRequest) -> HostReply {
@@ -177,6 +193,7 @@ fn external_confirmation(launcher: bool) {
                 },
             })
         })),
+        None,
     );
     h.until(true, |w| !w.get_install_fenced());
     assert!(!h.window.get_updates_visible());
@@ -338,6 +355,7 @@ fn external_abort_retires_the_panel_ticket_despite_a_lost_status_reply() {
                 },
             })
         })),
+        None,
     );
     h.until(true, |w| !w.get_install_fenced());
     let view = pumping_exchange(
@@ -448,6 +466,7 @@ fn external_preparation_can_be_cancelled_before_presenting_the_updater() {
         Rc::new(move || Some(frames.get())),
         uid(),
         None,
+        None,
     );
     let view = pumping_exchange(
         &mut h,
@@ -514,6 +533,7 @@ fn startup_waits_for_authenticated_matching_recovery_and_defers_launch_exactly_o
             transport::exchange(&path, uid(), None, request, Duration::from_millis(100))
                 .map_err(|e| e.to_string())
         })),
+        None,
     );
     let launched = Rc::new(Cell::new(0));
     let count = launched.clone();
@@ -660,6 +680,7 @@ fn acknowledged_host_rejects_stale_clear_and_wrong_ticket_before_new_service_abo
                 result,
             })
         })),
+        None,
     );
     h.until(true, |w| !w.get_install_fenced());
     h.window.set_updates_visible(true);
@@ -787,6 +808,9 @@ fn restart_before_host_prepare_retires_old_offer_and_allows_back_and_reopen() {
                     reply.error = Some(Failure::Stale);
                 }
                 ServiceRequest::Status { .. } => {}
+                ServiceRequest::Policy { .. } | ServiceRequest::SavePolicy { .. } => {
+                    unreachable!("the setting has an exchange of its own")
+                }
             }
             if restarted && reply.offer.is_none() {
                 reply.status = Status {
@@ -814,6 +838,7 @@ fn restart_before_host_prepare_retires_old_offer_and_allows_back_and_reopen() {
                 result: RecoveryDecision::Clear {},
             })
         })),
+        None,
     );
     h.until(true, |w| !w.get_install_fenced());
     h.window.invoke_updates_open();
@@ -913,6 +938,7 @@ fn restarted_app_displays_confirmed_outcome_and_keeps_it_through_cleanup() {
                 },
             })
         })),
+        None,
     );
     h.until(true, |_| calls.load(Ordering::SeqCst) >= 2);
     for _ in 0..5 {
@@ -941,6 +967,7 @@ fn failed_host_listener_cannot_bypass_startup_reconciliation() {
         Rc::new(|| Some(0)),
         uid(),
         Some(Arc::new(|_| panic!("missing host cannot request release"))),
+        None,
     );
     let _deferred = crate::updates::after_startup(&h.window, |_| panic!("startup must stay held"));
     for _ in 0..10 {
@@ -1064,22 +1091,13 @@ fn actual_socket_waits_for_exact_save_and_two_rendered_frames_and_keeps_lost_ack
                 },
             })
         })),
+        None,
     );
     h.until(true, |w| !w.get_install_fenced());
     h.window.invoke_updates_open();
     h.until(true, |w| w.get_updates_can_confirm());
     h.pump(true);
-    if let Some(path) = std::env::var_os("SPACEWARS_UPDATE_SCREENSHOT") {
-        let mut encoder = png::Encoder::new(std::fs::File::create(path).unwrap(), 800, 480);
-        encoder.set_color(png::ColorType::Rgb);
-        encoder.set_depth(png::BitDepth::Eight);
-        let bytes: Vec<_> = h.pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
-        encoder
-            .write_header()
-            .unwrap()
-            .write_image_data(&bytes)
-            .unwrap();
-    }
+    h.screenshot("SPACEWARS_UPDATE_SCREENSHOT");
     assert!(h.window.get_updates_confirm_label().contains("End game"));
     crate::ui_activation::activate(&h.window, "updates.confirm");
     h.until(false, |w| w.get_install_fenced());
@@ -1363,6 +1381,7 @@ fn reopening_updates_with_a_full_queue_reports_failure_and_can_recover() {
         Rc::new(|| Some(0)),
         uid(),
         None,
+        None,
     );
     h.window.invoke_updates_open();
     entries.recv_timeout(Duration::from_secs(2)).unwrap();
@@ -1432,6 +1451,7 @@ fn shipped_kiosk_launch_uses_runtime_identity_without_enabling_direct_launch() {
         Rc::new(|| Some(0)),
         uid(),
         None,
+        None,
     );
     assert_eq!(socket.exists(), cfg!(feature = "pi-kiosk"));
     if let Some(identity) = identity {
@@ -1498,6 +1518,7 @@ fn writing_status_fills_the_activity_bar_and_reports_the_percentage() {
         Rc::new(|| Some(0)),
         uid(),
         None,
+        None,
     );
     h.window.invoke_updates_open();
     h.until(false, |w| w.get_updates_can_confirm());
@@ -1554,6 +1575,9 @@ fn held_offer_exchange(
             Ok(response(Phase::Idle))
         }
         ServiceRequest::Status { .. } => Ok(response(Phase::Preparing)),
+        ServiceRequest::Policy { .. } | ServiceRequest::SavePolicy { .. } => {
+            unreachable!("the setting has an exchange of its own")
+        }
     })
 }
 
@@ -1579,6 +1603,7 @@ fn the_cursor_reaches_install_only_after_the_offer_arrives_and_only_by_hand() {
         ),
         Rc::new(|| Some(0)),
         uid(),
+        None,
         None,
     );
     h.window.invoke_updates_open();
@@ -1637,10 +1662,11 @@ fn an_expired_offer_returns_the_cursor_to_back_and_keeps_it_there() {
         Rc::new(|| Some(0)),
         uid(),
         None,
+        None,
     );
     h.window.invoke_updates_open();
     h.until(false, |w| w.get_updates_can_confirm());
-    h.window.invoke_keyboard_action(1, false);
+    h.window.invoke_keyboard_action(0, false);
     assert_eq!(h.window.get_updates_focus(), 0);
     h.until(false, |w| !w.get_updates_can_confirm());
     assert!(
@@ -1761,6 +1787,7 @@ fn any_input_restarts_the_idle_time_even_inside_updates() {
         Rc::new(move || Some(frames.get())),
         uid(),
         None,
+        None,
     );
     let observe = |h: &mut Harness| {
         pumping_exchange(
@@ -1780,33 +1807,57 @@ fn any_input_restarts_the_idle_time_even_inside_updates() {
             h.pump(false);
         }
     };
+    // The idle time counts from the press when it is no longer than the time
+    // since: counted from the input before, it would be a rest longer. A slow
+    // reply lengthens only the time since, so load cannot fail the check.
+    let since = |pressed: Instant| u64::try_from(pressed.elapsed().as_millis()).unwrap() + 1;
     rest(&mut h);
     let idle = observe(&mut h);
     assert!(idle.idle_ms.unwrap() >= 120, "{:?}", idle.idle_ms);
 
     // Outside Updates, input also changes the revision an offer was made for.
+    let pressed = Instant::now();
     h.window.invoke_updates_activity();
     let used = observe(&mut h);
-    assert!(used.idle_ms.unwrap() < 120, "{:?}", used.idle_ms);
+    assert!(
+        used.idle_ms.unwrap() <= since(pressed),
+        "{:?}",
+        used.idle_ms
+    );
     assert_eq!(used.revision, idle.revision + 1);
 
     // Inside Updates it keeps the revision, so that moving the cursor does not
-    // withdraw an offer, but it is still a person using the app.
+    // withdraw an offer, but it is still a person using the app. The open
+    // screen reports no idle time at all, so no countdown starts behind it.
     h.window.set_updates_visible(true);
-    let opened = observe(&mut h).revision;
-    rest(&mut h);
-    assert!(observe(&mut h).idle_ms.unwrap() >= 120);
+    let opened = observe(&mut h);
+    assert_eq!(opened.idle_ms, None);
     h.window.invoke_updates_activity();
     let used = observe(&mut h);
-    assert!(used.idle_ms.unwrap() < 120, "{:?}", used.idle_ms);
-    assert_eq!(used.revision, opened);
+    assert_eq!((used.idle_ms, used.revision), (None, opened.revision));
+    // Once it closes, the idle time counts from the last input inside it.
+    rest(&mut h);
+    let pressed = Instant::now();
+    h.window.invoke_updates_activity();
+    h.window.set_updates_visible(false);
+    let closed = observe(&mut h);
+    assert!(
+        closed.idle_ms.unwrap() <= since(pressed),
+        "{:?}",
+        closed.idle_ms
+    );
 
     // Losing focus counts as well.
     rest(&mut h);
+    let pressed = Instant::now();
     h.window.invoke_updates_interrupted();
     let used = observe(&mut h);
-    assert!(used.idle_ms.unwrap() < 120, "{:?}", used.idle_ms);
-    assert_eq!(used.revision, opened + 1);
+    assert!(
+        used.idle_ms.unwrap() <= since(pressed),
+        "{:?}",
+        used.idle_ms
+    );
+    assert_eq!(used.revision, closed.revision + 1);
 }
 
 fn counted(
@@ -1924,6 +1975,7 @@ fn the_announced_countdown_is_drawn_and_any_input_postpones_it() {
         Rc::new(move || Some(frames.get())),
         uid(),
         None,
+        None,
     );
     h.pump(true);
     assert_eq!(h.window.get_updates_notice(), "");
@@ -1961,4 +2013,338 @@ fn the_announced_countdown_is_drawn_and_any_input_postpones_it() {
     assert!(used.idle_ms.unwrap() < before.idle_ms.unwrap().max(1_000));
     h.pump(true);
     assert_eq!(h.window.get_updates_notice(), "Update postponed.");
+}
+
+/// The device service's saved setting as the panel's own exchange reaches it:
+/// it applies each save and records every request.
+#[derive(Default)]
+struct SettingService {
+    asked: Mutex<Vec<ServiceRequest>>,
+    /// While set, a save waits.
+    hold: AtomicBool,
+    /// While set, a save fails.
+    fail: AtomicBool,
+}
+impl SettingService {
+    fn exchange(self: &Arc<Self>) -> Exchange {
+        let service = self.clone();
+        let saved = Mutex::new(InstallPolicy {
+            mode: InstallMode::Ask,
+            window: InstallWindow {
+                start_minute: 180,
+                end_minute: 300,
+            },
+            local_minute: Some(14 * 60 + 5),
+        });
+        Arc::new(move |request: &ServiceRequest| {
+            service.asked.lock().unwrap().push(request.clone());
+            let mut reply = response(Phase::Idle);
+            reply.status.ticket = None;
+            match request {
+                ServiceRequest::Policy { .. } => {}
+                ServiceRequest::SavePolicy { change, .. } => {
+                    let end = Instant::now() + Duration::from_secs(5);
+                    while service.hold.load(Ordering::SeqCst) && Instant::now() < end {
+                        thread::sleep(Duration::from_millis(2));
+                    }
+                    if service.fail.load(Ordering::SeqCst) {
+                        reply.error = Some(Failure::SaveFailed);
+                        return Ok(reply);
+                    }
+                    let mut saved = saved.lock().unwrap();
+                    saved.mode = change.mode.unwrap_or(saved.mode);
+                    saved.window = change.window.unwrap_or(saved.window);
+                }
+                _ => unreachable!("installation requests have an exchange of their own"),
+            }
+            reply.policy = Some(*saved.lock().unwrap());
+            Ok(reply)
+        })
+    }
+    fn saves(&self) -> Vec<PolicyChange> {
+        self.asked
+            .lock()
+            .unwrap()
+            .iter()
+            .filter_map(|request| match request {
+                ServiceRequest::SavePolicy { change, .. } => Some(*change),
+                _ => None,
+            })
+            .collect()
+    }
+}
+
+/// A service with no update to offer.
+fn nothing_ready() -> Exchange {
+    Arc::new(|request: &ServiceRequest| {
+        assert!(matches!(request, ServiceRequest::Offer { .. }));
+        let mut reply = response(Phase::Idle);
+        reply.status.ticket = None;
+        reply.error = Some(Failure::NotReady);
+        Ok(reply)
+    })
+}
+
+fn with_setting(h: &Harness, dir: &Path, setting: Exchange) -> Runtime {
+    start(
+        &h.window,
+        Arc::new(RwLock::new(Settings::default())),
+        SettingsWriter::new(dir.join("settings.toml")).unwrap(),
+        h.input.clone(),
+        Some(Host::new(host_identity())),
+        dir.join("host.sock"),
+        nothing_ready(),
+        Rc::new(|| Some(0)),
+        uid(),
+        None,
+        Some(setting),
+    )
+}
+
+fn window(start_minute: u16, end_minute: u16) -> Option<InstallWindow> {
+    Some(InstallWindow {
+        start_minute,
+        end_minute,
+    })
+}
+
+#[test]
+fn the_setting_page_saves_each_change_and_only_the_row_it_changed() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let service = Arc::new(SettingService::default());
+    let _runtime = with_setting(&h, dir.path(), service.exchange());
+    h.window.invoke_updates_open();
+    h.until(true, |w| w.get_updates_automatic_available());
+    h.pump(true);
+    h.screenshot("SPACEWARS_UPDATE_SETTING_BUTTON_SCREENSHOT");
+    assert_eq!(
+        h.window.get_updates_automatic_label(),
+        "Automatic install: Off"
+    );
+    assert_eq!(h.window.get_updates_focus(), 1);
+    // Left from Back reaches the setting's button, and A opens its page.
+    h.window.invoke_keyboard_action(2, false);
+    assert_eq!(
+        crate::updates::selected(&h.window).as_deref(),
+        Some("updates.automatic")
+    );
+    h.window.invoke_keyboard_action(4, false);
+    assert!(h.window.get_updates_automatic_visible());
+    assert_eq!(
+        crate::updates::selected(&h.window).as_deref(),
+        Some("updates.automatic.mode")
+    );
+    h.until(true, |w| {
+        w.get_updates_automatic_status() == "Saved · Device time 14:05"
+    });
+    h.pump(true);
+    h.screenshot("SPACEWARS_UPDATE_SETTING_SCREENSHOT");
+    assert_eq!(
+        (
+            h.window.get_updates_automatic_mode().as_str(),
+            h.window.get_updates_automatic_window().as_str()
+        ),
+        ("Ask first", "03:00–05:00")
+    );
+    // Right on Mode saves Automatic and leaves the window alone.
+    h.window.invoke_keyboard_action(3, false);
+    assert_eq!(h.window.get_updates_automatic_mode(), "Automatic");
+    h.until(false, |w| {
+        w.get_updates_automatic_status().starts_with("Saved")
+    });
+    // Down to the window, and Left moves it an hour earlier with its length.
+    h.window.invoke_keyboard_action(1, false);
+    h.window.invoke_keyboard_action(2, false);
+    assert_eq!(h.window.get_updates_automatic_window(), "02:00–04:00");
+    h.until(false, |w| {
+        w.get_updates_automatic_status().starts_with("Saved")
+    });
+    // A UI-control client presses the same controls.
+    for _ in 0..2 {
+        assert!(crate::ui_activation::activate(
+            &h.window,
+            "updates.automatic.window.next"
+        ));
+    }
+    h.until(false, |w| {
+        w.get_updates_automatic_status().starts_with("Saved")
+            && w.get_updates_automatic_window() == "04:00–06:00"
+    });
+    assert_eq!(
+        service.saves(),
+        [
+            PolicyChange {
+                mode: Some(InstallMode::Automatic),
+                window: None,
+            },
+            PolicyChange {
+                mode: None,
+                window: window(120, 240),
+            },
+            PolicyChange {
+                mode: None,
+                window: window(180, 300),
+            },
+            PolicyChange {
+                mode: None,
+                window: window(240, 360),
+            },
+        ]
+    );
+    // B returns to the button, which names the saved window.
+    h.window.invoke_keyboard_action(5, false);
+    assert!(!h.window.get_updates_automatic_visible());
+    assert_eq!(h.window.get_updates_focus(), 2);
+    assert_eq!(
+        h.window.get_updates_automatic_label(),
+        "Automatic install: 04:00–06:00"
+    );
+    // Right returns to Back, and Up stays there with no update to install.
+    h.window.invoke_keyboard_action(3, false);
+    h.window.invoke_keyboard_action(0, false);
+    assert_eq!(h.window.get_updates_focus(), 1);
+    h.window.invoke_keyboard_action(5, false);
+    assert!(!h.window.get_updates_visible());
+    // Opening Updates again reads the setting again, and the button waits
+    // for that read.
+    h.window.invoke_updates_open();
+    assert!(!h.window.get_updates_automatic_available());
+    assert!(!crate::ui_activation::activate(
+        &h.window,
+        "updates.automatic"
+    ));
+    h.until(false, |w| w.get_updates_automatic_available());
+    let reads = service
+        .asked
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|request| matches!(request, ServiceRequest::Policy { .. }))
+        .count();
+    assert_eq!(reads, 2);
+}
+
+#[test]
+fn changes_made_during_a_save_follow_it_and_a_failed_save_shows_what_is_saved() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let service = Arc::new(SettingService::default());
+    let _runtime = with_setting(&h, dir.path(), service.exchange());
+    h.window.invoke_updates_open();
+    h.until(false, |w| w.get_updates_automatic_available());
+    assert!(crate::ui_activation::activate(
+        &h.window,
+        "updates.automatic"
+    ));
+    service.hold.store(true, Ordering::SeqCst);
+    for _ in 0..3 {
+        assert!(crate::ui_activation::activate(
+            &h.window,
+            "updates.automatic.window.next"
+        ));
+    }
+    for _ in 0..5 {
+        h.pump(false);
+    }
+    assert_eq!(h.window.get_updates_automatic_window(), "06:00–08:00");
+    assert_eq!(h.window.get_updates_automatic_status(), "Saving…");
+    // The first press is with the service; the other two wait and go as one.
+    assert_eq!(service.saves().len(), 1);
+    service.hold.store(false, Ordering::SeqCst);
+    h.until(false, |w| {
+        w.get_updates_automatic_status().starts_with("Saved")
+    });
+    assert_eq!(
+        service.saves(),
+        [
+            PolicyChange {
+                mode: None,
+                window: window(240, 360),
+            },
+            PolicyChange {
+                mode: None,
+                window: window(360, 480),
+            },
+        ]
+    );
+    // A failed save says so and shows the saved setting again.
+    service.fail.store(true, Ordering::SeqCst);
+    assert!(crate::ui_activation::activate(
+        &h.window,
+        "updates.automatic.mode.next"
+    ));
+    assert_eq!(h.window.get_updates_automatic_mode(), "Automatic");
+    h.until(false, |w| w.get_updates_automatic_failed());
+    assert_eq!(
+        (
+            h.window.get_updates_automatic_status().as_str(),
+            h.window.get_updates_automatic_mode().as_str(),
+            h.window.get_updates_automatic_window().as_str(),
+        ),
+        ("Could not save. Try again.", "Ask first", "06:00–08:00")
+    );
+    // The next press tries again.
+    service.fail.store(false, Ordering::SeqCst);
+    assert!(crate::ui_activation::activate(
+        &h.window,
+        "updates.automatic.mode.previous"
+    ));
+    h.until(false, |w| {
+        w.get_updates_automatic_status().starts_with("Saved")
+    });
+    assert_eq!(h.window.get_updates_automatic_mode(), "Automatic");
+    assert!(!h.window.get_updates_automatic_failed());
+}
+
+#[test]
+fn the_setting_button_stays_disabled_without_its_service() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let _runtime = with_setting(
+        &h,
+        dir.path(),
+        Arc::new(|_: &ServiceRequest| Err("service offline".into())),
+    );
+    h.window.invoke_updates_open();
+    h.until(false, |w| {
+        w.get_updates_automatic_label() == "Automatic install: unavailable"
+    });
+    for _ in 0..3 {
+        h.pump(false);
+    }
+    assert!(!h.window.get_updates_automatic_available());
+    h.window.invoke_keyboard_action(2, false);
+    assert_eq!(h.window.get_updates_focus(), 1);
+    assert!(!crate::ui_activation::activate(
+        &h.window,
+        "updates.automatic"
+    ));
+    assert!(!h.window.get_updates_automatic_visible());
+}
+
+/// An installation that takes the app over closes the page and removes its
+/// button.
+#[test]
+fn the_setting_steps_aside_for_an_installation() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let service = Arc::new(SettingService::default());
+    let _runtime = with_setting(&h, dir.path(), service.exchange());
+    h.window.invoke_updates_open();
+    h.until(false, |w| w.get_updates_automatic_available());
+    assert!(crate::ui_activation::activate(
+        &h.window,
+        "updates.automatic"
+    ));
+    assert!(h.window.get_updates_automatic_visible());
+    h.window.set_install_fenced(true);
+    h.until(false, |w| !w.get_updates_automatic_visible());
+    assert!(!h.window.get_updates_automatic_available());
+    let ids: Vec<_> = crate::updates::inventory(&h.window)
+        .into_iter()
+        .map(|control| control.id)
+        .collect();
+    assert_eq!(ids, ["updates.confirm", "updates.cancel"]);
+    assert_eq!(h.window.get_updates_focus(), 1);
 }

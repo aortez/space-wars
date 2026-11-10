@@ -118,7 +118,11 @@ impl Host {
         now: u64,
         frames: Option<u64>,
     ) -> HostReply {
-        let idle_ms = self.idle_ms(window, now);
+        // An open Updates screen is use of the app. A countdown cannot start
+        // behind it, where its notice would not show.
+        let idle_ms = self
+            .idle_ms(window, now)
+            .filter(|_| !window.get_updates_visible());
         HostReply {
             schema: SCHEMA,
             error: None,
@@ -498,6 +502,8 @@ type Exchange = Arc<dyn Fn(&ServiceRequest) -> Result<ServiceReply, String> + Se
 
 #[path = "updates_reconcile.rs"]
 mod reconciliation;
+#[path = "updates_policy.rs"]
+mod setting;
 
 pub(crate) fn install(
     window: &MainWindow,
@@ -507,6 +513,30 @@ pub(crate) fn install(
 ) -> Runtime {
     let host = runtime_identity(std::env::var("INVOCATION_ID").ok()).map(Host::new);
     let available = host.is_some();
+    let exchange: Exchange = Arc::new(move |request| {
+        if !available {
+            return Ok(ServiceReply {
+                schema: SCHEMA,
+                error: Some(Failure::Unavailable),
+                status: Status {
+                    phase: Phase::Unavailable,
+                    ticket: None,
+                    written: None,
+                },
+                offer: None,
+                aborted: None,
+                policy: None,
+            });
+        }
+        transport::exchange(
+            Path::new(SERVICE_SOCKET),
+            0,
+            None,
+            request,
+            Duration::from_secs(4),
+        )
+        .map_err(|e| e.to_string())
+    });
     start(
         window,
         settings,
@@ -514,29 +544,7 @@ pub(crate) fn install(
         input,
         host,
         PathBuf::from(HOST_SOCKET),
-        Arc::new(move |request| {
-            if !available {
-                return Ok(ServiceReply {
-                    schema: SCHEMA,
-                    error: Some(Failure::Unavailable),
-                    status: Status {
-                        phase: Phase::Unavailable,
-                        ticket: None,
-                        written: None,
-                    },
-                    offer: None,
-                    aborted: None,
-                });
-            }
-            transport::exchange(
-                Path::new(SERVICE_SOCKET),
-                0,
-                None,
-                request,
-                Duration::from_secs(4),
-            )
-            .map_err(|e| e.to_string())
-        }),
+        exchange.clone(),
         Rc::new(presented_frames),
         0,
         super::startup_required().then(|| {
@@ -551,6 +559,7 @@ pub(crate) fn install(
                 .map_err(|e| e.to_string())
             }) as reconciliation::Exchange
         }),
+        Some(exchange),
     )
 }
 
@@ -566,6 +575,7 @@ fn start(
     frames: Rc<dyn Fn() -> Option<u64>>,
     service_uid: u32,
     recovery_exchange: Option<reconciliation::Exchange>,
+    setting_exchange: Option<Exchange>,
 ) -> Runtime {
     let startup_required = recovery_exchange.is_some();
     let mut recovery = recovery_exchange.map(reconciliation::Client::new);
@@ -650,9 +660,41 @@ fn start(
         last_poll: Instant::now(),
         generation: 0,
     }));
+    let setting = Rc::new(RefCell::new(setting_exchange.map(setting::Setting::new)));
+    let weak = window.as_weak();
+    let page = setting.clone();
+    window.on_updates_automatic_open(move || {
+        let Some(w) = weak.upgrade() else { return };
+        if w.get_updates_automatic_available() {
+            if let Some(setting) = page.borrow().as_ref() {
+                setting.show(&w);
+            }
+            w.set_updates_automatic_focus(0);
+            w.set_updates_automatic_visible(true);
+        }
+    });
+    let weak = window.as_weak();
+    let page = setting.clone();
+    window.on_updates_automatic_adjust(move |row, step| {
+        let Some(w) = weak.upgrade() else { return };
+        if !w.get_updates_automatic_visible() || !w.get_updates_automatic_available() {
+            return;
+        }
+        if let Some(setting) = page.borrow_mut().as_mut() {
+            setting.adjust(row, step);
+            setting.show(&w);
+        }
+    });
+    let weak = window.as_weak();
+    window.on_updates_automatic_close(move || {
+        if let Some(w) = weak.upgrade() {
+            super::close_automatic(&w);
+        }
+    });
     let weak = window.as_weak();
     let state = panel.clone();
     let sender = commands.clone();
+    let page = setting.clone();
     window.on_updates_open(move || {
         let Some(w) = weak.upgrade() else { return };
         if w.get_install_fenced()
@@ -666,6 +708,13 @@ fn start(
         w.set_updates_can_confirm(false);
         w.set_updates_can_cancel(true);
         w.set_updates_message("Checking installation availability…".into());
+        // The button waits for this read; the timer enables it.
+        w.set_updates_automatic_visible(false);
+        w.set_updates_automatic_available(false);
+        if let Some(setting) = page.borrow_mut().as_mut() {
+            setting.read();
+            setting.show(&w);
+        }
         let mut p = state.borrow_mut();
         p.generation += 1;
         p.offer = None;
@@ -900,6 +949,23 @@ fn start(
         w.set_updates_busy(p.working.is_some());
         if p.working.is_none() {
             w.set_updates_progress(-1.0);
+        }
+        // The setting's page opens from Updates while nothing installs. A
+        // reply that arrives after Updates closed is taken when it opens again.
+        let known = match setting.borrow_mut().as_mut() {
+            Some(setting) if w.get_updates_visible() => {
+                setting.tick(&w);
+                setting.known()
+            }
+            Some(setting) => setting.known(),
+            None => false,
+        };
+        let changeable = known && !w.get_install_fenced() && p.working.is_none();
+        if w.get_updates_automatic_available() != changeable {
+            w.set_updates_automatic_available(changeable);
+        }
+        if w.get_updates_automatic_visible() && (!changeable || !w.get_updates_visible()) {
+            w.set_updates_automatic_visible(false);
         }
         if let Some(recovery) = &mut recovery {
             recovery.tick(&w, host.borrow_mut().as_mut(), &mut p, &commands);

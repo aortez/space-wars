@@ -66,24 +66,33 @@ pub(crate) fn install(
     });
 }
 
-/// Install is focus 0 and Back (or Cancel) is focus 1. The cursor reaches
-/// Install only while an offer stands, and never by itself: a button that
-/// turned live under a resting cursor could otherwise take the next press.
+/// Install is focus 0, Back (or Cancel) is focus 1 and Automatic install, left
+/// of Back, is focus 2. The cursor reaches Install only while an offer stands,
+/// and never by itself: a button that turned live under a resting cursor could
+/// otherwise take the next press.
 pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
+    if window.get_updates_automatic_visible() {
+        return automatic_action(window, action);
+    }
     let can_confirm = window.get_updates_can_confirm();
+    let focus = window.get_updates_focus();
     match action {
-        UiAction::Up | UiAction::Down | UiAction::Left | UiAction::Right => {
-            window.set_updates_focus(if can_confirm {
-                1 - window.get_updates_focus()
-            } else {
-                1
-            });
+        UiAction::Up if can_confirm => window.set_updates_focus(0),
+        UiAction::Down if focus == 0 => window.set_updates_focus(1),
+        UiAction::Left if focus != 0 && window.get_updates_automatic_available() => {
+            window.set_updates_focus(2)
         }
-        UiAction::Confirm if window.get_updates_focus() == 0 => {
+        UiAction::Right if focus == 2 => window.set_updates_focus(1),
+        UiAction::Confirm if focus == 0 => {
             // A press on a disabled Install button does nothing; it must not
             // fall through to Back.
             if can_confirm {
                 window.invoke_updates_confirm();
+            }
+        }
+        UiAction::Confirm if focus == 2 => {
+            if window.get_updates_automatic_available() {
+                window.invoke_updates_automatic_open();
             }
         }
         UiAction::Confirm | UiAction::Back if window.get_updates_can_cancel() => {
@@ -93,33 +102,133 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
     }
 }
 
-/// Returns the cursor to Back once the Install button is disabled, whatever
-/// withdrew the offer: a press, an outcome, an abort or its expiry.
+/// On the Automatic install page, Mode is focus 0, the window 1 and Back 2.
+/// Left and Right change the row under the cursor, and each change saves.
+fn automatic_action(window: &MainWindow, action: UiAction) {
+    let focus = window.get_updates_automatic_focus();
+    match action {
+        UiAction::Up | UiAction::Down => {
+            window.set_updates_automatic_focus(crate::ui_navigation::moved_selection(
+                focus,
+                3,
+                if action == UiAction::Up { -1 } else { 1 },
+            ))
+        }
+        UiAction::Left | UiAction::Right if focus <= 1 => window
+            .invoke_updates_automatic_adjust(focus, if action == UiAction::Left { -1 } else { 1 }),
+        UiAction::Confirm if focus == 0 => window.invoke_updates_automatic_adjust(0, 1),
+        UiAction::Confirm if focus == 2 => close_automatic(window),
+        UiAction::Back => close_automatic(window),
+        _ => {}
+    }
+}
+
+/// Returns from the Automatic install page to its button on Updates.
+pub(crate) fn close_automatic(window: &MainWindow) {
+    window.set_updates_automatic_visible(false);
+    window.set_updates_focus(2);
+}
+
+/// Returns the cursor to Back once the button under it is disabled, whatever
+/// disabled it: for Install a press, an outcome, an abort or its expiry.
 pub(crate) fn settle_focus(window: &MainWindow) {
-    if window.get_updates_focus() == 0 && !window.get_updates_can_confirm() {
+    let focus = window.get_updates_focus();
+    if (focus == 0 && !window.get_updates_can_confirm())
+        || (focus == 2 && !window.get_updates_automatic_available())
+    {
         window.set_updates_focus(1);
     }
 }
 
 pub(crate) fn inventory(window: &MainWindow) -> Vec<UiControl> {
-    [
-        (
+    if window.get_updates_automatic_visible() {
+        let mut controls = Vec::new();
+        for (row, value) in [
+            ("mode", window.get_updates_automatic_mode()),
+            ("window", window.get_updates_automatic_window()),
+        ] {
+            for (suffix, label) in [("previous", "‹"), ("next", "›")] {
+                controls.push(
+                    UiControl::new(format!("updates.automatic.{row}.{suffix}"), label, true)
+                        .with_value(value.as_str()),
+                );
+            }
+        }
+        controls.push(UiControl::new("updates.automatic.back", "Back", true));
+        controls.push(
+            UiControl::new("updates.automatic.status", "Setting", false)
+                .with_value(window.get_updates_automatic_status().as_str()),
+        );
+        return controls;
+    }
+    let mut controls = vec![
+        UiControl::new(
             "updates.confirm",
             window.get_updates_confirm_label().to_string(),
             window.get_updates_can_confirm(),
         ),
-        (
+        UiControl::new(
             "updates.cancel",
             if window.get_install_fenced() {
                 "Cancel"
             } else {
                 "Back"
-            }
-            .into(),
+            },
             window.get_updates_can_cancel(),
         ),
-    ]
-    .into_iter()
-    .map(|(id, label, enabled)| UiControl::new(id, label, enabled))
-    .collect()
+    ];
+    if !window.get_install_fenced() {
+        controls.push(UiControl::new(
+            "updates.automatic",
+            window.get_updates_automatic_label().to_string(),
+            window.get_updates_automatic_available(),
+        ));
+    }
+    controls
+}
+
+/// The control under the cursor, by the focus numbers above.
+pub(crate) fn selected(window: &MainWindow) -> Option<String> {
+    let (ids, focus): (&[&str], i32) = if window.get_updates_automatic_visible() {
+        (
+            &[
+                "updates.automatic.mode",
+                "updates.automatic.window",
+                "updates.automatic.back",
+            ],
+            window.get_updates_automatic_focus(),
+        )
+    } else {
+        (
+            &["updates.confirm", "updates.cancel", "updates.automatic"],
+            window.get_updates_focus(),
+        )
+    };
+    usize::try_from(focus)
+        .ok()
+        .and_then(|focus| ids.get(focus))
+        .map(|id| (*id).to_owned())
+}
+
+/// Presses the control that a UI-control client names, when it is on screen
+/// and enabled.
+pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
+    if !inventory(window)
+        .iter()
+        .any(|control| control.id == control_id && control.enabled)
+    {
+        return false;
+    }
+    match control_id {
+        "updates.confirm" => window.invoke_updates_confirm(),
+        "updates.cancel" => window.invoke_updates_cancel(),
+        "updates.automatic" => window.invoke_updates_automatic_open(),
+        "updates.automatic.mode.previous" => window.invoke_updates_automatic_adjust(0, -1),
+        "updates.automatic.mode.next" => window.invoke_updates_automatic_adjust(0, 1),
+        "updates.automatic.window.previous" => window.invoke_updates_automatic_adjust(1, -1),
+        "updates.automatic.window.next" => window.invoke_updates_automatic_adjust(1, 1),
+        "updates.automatic.back" => close_automatic(window),
+        _ => return false,
+    }
+    true
 }
