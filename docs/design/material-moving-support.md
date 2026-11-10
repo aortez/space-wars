@@ -94,6 +94,6 @@ The [paired-material extension](material-paired-compression.md) admits finite
 layers on both free bodies with separate deformation and damage histories.
 This remains a bounded #327 path. Externally driven moving supports,
 angular/oblique contacts, connection loads and transfers between older
-loading modes remain. Material Lab demonstrates the fixed-support cases and two
+loading modes remain. Material Lab demonstrates the fixed-support cases, two
 paired-material collisions and a fixed collapsing support. Paired-material
 failure, gameplay integration and general topology consequences remain later slices.

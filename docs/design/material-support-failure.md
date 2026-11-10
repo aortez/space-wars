@@ -89,6 +89,8 @@ normal-only motion and material on the support alone. Both recoil before failure
 The relative material law uses reduced mass, and every reaction impulse acts
 equally and oppositely. Collapse adds no impulse to either body. Each then keeps
 its own velocity while moving through the failed envelope.
+Coasting ends at the quarter-depth window, or earlier when a light pair exhausts
+a position allowance. Any moving-collapse Lab case must fit inside that window.
 
 The ordinary failure record reports relative velocity and indentation.
 `material_moving_support_failure()` additionally retains both normal positions
