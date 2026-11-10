@@ -76,9 +76,11 @@ refuse a long run before separation, particularly with unequal materials or
 large common motion. They are not enlarged by stronger material, remaining
 capacity, pauses or save/load. Failed material, exhausted allowances and output
 limits discard the entire public call, including both bodies and both charges.
-Failure/severing for paired materials remains later #328 work. The first
-[collapse policy](material-support-failure.md) applies to one material support,
-fixed or moving, against an ideal rigid platen.
+The separate opt-in [paired-collapse policy](material-support-failure.md#two-finite-material-layers)
+commits exhaustion of either layer, dissipates both elastic stores and lets both
+bodies coast. It preserves any surviving capacity and both permanent sets.
+Ordinary paired compression retains its refusal policy; severing and fragment
+motion remain later #328 work.
 
 Snapshot v20 has a distinct tag and appended active status. Its required
 fixed-size extensions carry both motion and both material histories. Restore

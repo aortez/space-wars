@@ -77,9 +77,9 @@ whole call rolls back, including motion and capacity; a smaller call can fit the
 same internal intervals. Numerical allowances never renew at failure or save/load.
 The original quarter-depth relative-motion window still applies after collapse.
 
-The explicit acceleration API permits only its current value. Two finite
-materials, connection severing, region splitting and fragment motion remain
-subsequent failure-lifecycle work. This path does not close #328.
+The explicit acceleration API permits only its current value. Connection
+severing, region splitting and fragment motion remain subsequent
+failure-lifecycle work. This path does not close #328.
 
 ## A moving material support
 
@@ -111,6 +111,44 @@ velocities, including common motion invisible to the relative summary. Fixed
 collapse keeps its frozen v21 layout; ordinary moving and paired modes keep v19
 and v20 and continue refusing exhaustion.
 
+## Two finite material layers
+
+`PhysicsWorld::step_material_collapsing_pair(dt)` opts into collapse of the
+[paired-material path](material-paired-compression.md): two free bodies, two
+finite layers and zero gravity. Both layers resist through the internal interval
+that first exhausts either capacity. Each charges its own plastic work through
+the sustained-load API. At the endpoint the shared contact path collapses and
+both elastic stores become dissipation. There is no additional impulse.
+
+Each exhausted layer emits one `CompressionFailure`, sorted by `ContactSource`;
+simultaneous exhaustion emits two failures and one contact End. Each failure's
+indentation and permanent set belong to that layer, while its velocity is the
+pair's relative normal velocity. A surviving layer keeps its remaining capacity
+and accumulated damage. Both layers' deformation, permanent set and viscous loss
+freeze at collapse, their elastic storage becomes zero, and later intervals
+have zero reaction, work and capacity charge. Both bodies coast within the same
+quarter-depth and numerical limits as the moving single-layer case.
+
+`material_paired_compression_failure()` retains the contact boundary: absolute
+elapsed time, episode, relative indentation, both normal positions and velocities,
+and each layer's source, failed flag, deformation and energy disposition. Its
+`dissipated()` includes **both** elastic releases and any plastic work exceeding
+an exhausted capacity. Summing only the emitted failures omits the elastic
+release of a surviving layer. `DynamicCompressionInterval.failure_dissipated`
+reports the full contact dissipation once. Per-layer work closes by adding the
+corresponding layer's disposition; total and laboratory-frame balances use their
+sum. Post-collapse layer indentations remain at the boundary, while the aggregate
+relative indentation continues with body motion.
+
+Snapshot v23 has its own tag and active status, with required bounded motion,
+paired-material and collapse extensions. Restore checks both capacities,
+permanent sets and energy dispositions, source/episode identity, and both
+post-collapse trajectories, including after removal. Ordinary paired histories
+retain their v20 material layout. A history cannot switch between the ordinary,
+single-support and paired-collapse APIs. Each internal interval emits two load
+records; each failure and the contact End also count toward the output limit.
+An over-limit call rolls back both bodies, both materials and the boundary.
+
 ## Demonstration and evidence
 
 Material Lab's **Support gives way** uses an undamaged wood layer of represented
@@ -136,3 +174,13 @@ safe contacts and identical histories across geometry/public-step partitions.
 Native tests cover pending contact ownership, corrupt or missing boundary motion,
 removal, output/motion limits, stale policy changes and frozen fixed-collapse saves.
 The current Material Lab collapse demonstration remains the fixed-support case.
+
+Paired-failure tests compare either wood layer and simultaneous wood-layer
+exhaustion with the continuous capacity crossing at equal and unequal masses
+from 5 to 80. Wood/armor in both orders uses the independent continuous series
+reference. Tests close each material's work and both motion balances, preserve
+the surviving capacity, and check both coasting trajectories and exact replay.
+Geometry/public-call partitions, all quarter turns, shared motion, safe separation,
+corrupt dispositions, output/motion limits and frozen v20 material bytes are
+covered. Moving and paired collapse are native engine APIs; their Lab cases
+remain subsequent work.

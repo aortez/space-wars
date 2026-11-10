@@ -216,13 +216,14 @@ impl MovingHistory {
     pub fn valid_failure(
         &self,
         boundary: &Motion,
-        event: &CompressionFailure,
+        indentation: f64,
+        velocity: f64,
         flight: f64,
         depth: f64,
     ) -> bool {
         boundary.valid()
-            && boundary.relative_velocity() == event.velocity
-            && boundary.indentation() == event.indentation
+            && boundary.relative_velocity() == velocity
+            && boundary.indentation() == indentation
             && boundary.velocities == self.current.velocities
             && (0..2).all(|i| {
                 (self.current.positions[i]

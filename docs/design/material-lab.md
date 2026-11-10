@@ -207,4 +207,6 @@ This is a bounded two-body demonstration. It does not enable material response
 for existing gameplay, add fracture/topology consequences, or broaden the native
 solver's geometry or connection-loading support. The explicit collapse case is
 the first #328 failure consequence; other cases keep their refusal on exhaustion.
-Moving-material failure, severing and debris remain later slices. #327 remains open.
+Native moving and paired collapse are available through the
+[failure APIs](material-support-failure.md); their Lab cases, severing and debris
+remain later slices. #327 remains open.

@@ -1,6 +1,13 @@
 //! Opt-in dissipative collapse of one material support at an internal-step boundary.
 use super::*;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum Policy {
+    Refuse,
+    Support,
+    Pair,
+}
+
 /// A single loss of load-bearing capacity, retained with the material's identity.
 /// Motion is unchanged at this boundary. Stored elastic energy and plastic work
 /// beyond the last capacity charge become dissipation, never a second impulse.
@@ -10,6 +17,7 @@ pub struct CompressionFailure {
     pub elapsed: f64,
     pub source: ContactSource,
     pub episode: EpisodeId,
+    /// This layer's displacement; for one material it equals relative displacement.
     pub indentation: f64,
     /// Relative normal velocity; the support is stationary in the fixed mode.
     pub velocity: f64,
@@ -46,7 +54,9 @@ impl FailureHistory {
         let acceleration = f64::from(h.acceleration);
         let motion_valid = match (&h.moving, &self.motion) {
             (None, None) => true,
-            (Some(m), Some(boundary)) => m.valid_failure(boundary, e, flight, c.depth),
+            (Some(m), Some(boundary)) => {
+                m.valid_failure(boundary, e.indentation, e.velocity, flight, c.depth)
+            }
             _ => false,
         };
         motion_valid
@@ -77,20 +87,45 @@ impl FailureHistory {
     }
 }
 impl History {
+    pub(super) fn failure_policy(&self) -> Policy {
+        if self.failure.is_some() {
+            Policy::Support
+        } else if self.paired.as_ref().is_some_and(|p| p.failure_enabled()) {
+            Policy::Pair
+        } else {
+            Policy::Refuse
+        }
+    }
     pub(super) fn collapsed(&self) -> bool {
         self.failure.as_ref().is_some_and(|f| f.event.is_some())
+            || self.paired.as_ref().is_some_and(|p| p.collapsed())
     }
     pub(super) fn released_elastic(&self) -> f64 {
         self.failure
             .as_ref()
             .and_then(|f| f.event.as_ref())
-            .map_or(0.0, |e| e.released_elastic)
+            .map_or_else(
+                || self.paired.as_ref().map_or(0.0, |p| p.released_elastic()),
+                |e| e.released_elastic,
+            )
     }
     pub(super) fn failure_excess(&self) -> f64 {
         self.failure
             .as_ref()
             .and_then(|f| f.event.as_ref())
-            .map_or(0.0, |e| e.excess_work)
+            .map_or_else(
+                || self.paired.as_ref().map_or(0.0, |p| p.failure_excess()),
+                |e| e.excess_work,
+            )
+    }
+    pub(super) fn committed_failures(&self) -> Vec<CompressionFailure> {
+        if let Some(event) = self.failure.as_ref().and_then(|f| f.event.as_ref()) {
+            vec![event.clone()]
+        } else {
+            self.paired
+                .as_ref()
+                .map_or_else(Vec::new, |p| p.committed_failures())
+        }
     }
 }
 impl PhysicsWorld {
@@ -117,7 +152,7 @@ impl PhysicsWorld {
         &mut self,
         dt: f32,
     ) -> Result<DynamicCompressionStep, R> {
-        step::advance(self, dt, true)
+        step::advance(self, dt, Policy::Support)
     }
 
     /// The committed failure, available after pause, restore or invalidation.

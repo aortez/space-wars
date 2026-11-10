@@ -12,7 +12,9 @@ mod step;
 pub use failure::CompressionFailure;
 use model::{History, MaterialCurve};
 pub use moving::{MovingSupportFailure, MovingSupportSummary};
-pub use paired::MaterialCompressionSummary;
+pub use paired::{
+    MaterialCompressionSummary, MaterialFailureDisposition, PairedCompressionFailure,
+};
 
 /// Largest number of internal midpoint reaction solves per public call.
 pub const MAX_DYNAMIC_COMPRESSION_STEPS: usize = 1024;
@@ -68,7 +70,8 @@ pub struct DynamicCompressionInterval {
     pub outgoing: f32,
     pub errors: [f64; 3],
     /// Elastic release and excess plastic work dissipated at a collapse boundary.
-    /// Add this to the load's storage change, damage, viscosity and charge error.
+    /// Add this once to the summed loads' storage change, damage, viscosity and
+    /// charge error. Includes a surviving paired layer's elastic release.
     pub failure_dissipated: f64,
 }
 
@@ -77,6 +80,8 @@ pub struct DynamicCompressionStep {
     pub events: Vec<CompressionEvent>,
     pub intervals: Vec<DynamicCompressionInterval>,
     pub summary: Option<DynamicCompressionSummary>,
+    /// Exhausted regions, emitted once in source order at each collapse boundary.
+    /// A paired contact's full dissipation also includes any surviving layer.
     pub failures: Vec<CompressionFailure>,
 }
 
@@ -98,6 +103,7 @@ enum Status {
     PairedMaterials(Box<FallingActive>),
     CollapsingSupport(Box<FallingActive>),
     CollapsingMovingSupport(Box<FallingActive>),
+    CollapsingPairedMaterials(Box<FallingActive>),
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct FallingActive {
@@ -190,8 +196,10 @@ impl Continuation {
             PAIRED_COMPRESSION_SNAPSHOT_VERSION
         } else if self.revision == 7 {
             COLLAPSING_SUPPORT_SNAPSHOT_VERSION
-        } else {
+        } else if self.revision == 8 {
             MOVING_COLLAPSE_SNAPSHOT_VERSION
+        } else {
+            PAIRED_COLLAPSE_SNAPSHOT_VERSION
         }
     }
     pub(in crate::world) fn snapshot_tag(&self) -> u64 {
@@ -209,8 +217,10 @@ impl Continuation {
             PAIRED_COMPRESSION_SNAPSHOT_TAG
         } else if self.revision == 7 {
             COLLAPSING_SUPPORT_SNAPSHOT_TAG
-        } else {
+        } else if self.revision == 8 {
             MOVING_COLLAPSE_SNAPSHOT_TAG
+        } else {
+            PAIRED_COLLAPSE_SNAPSHOT_TAG
         }
     }
     pub(in crate::world) fn serialize_extensions(
@@ -227,7 +237,7 @@ impl Continuation {
                 .map_err(|e| PhysicsWorldError(e.to_string()))?;
         } else if self.revision == 4 {
             self.history.serialize_loads(bytes)?;
-        } else if matches!(self.revision, 5 | 6 | 8) {
+        } else if matches!(self.revision, 5 | 6 | 8 | 9) {
             let moving = self
                 .history
                 .moving
@@ -236,7 +246,7 @@ impl Continuation {
             bincode::serialize_into(&mut *bytes, moving)
                 .map_err(|e| PhysicsWorldError(e.to_string()))?;
         }
-        if self.revision == 6 {
+        if matches!(self.revision, 6 | 9) {
             let paired = self
                 .history
                 .paired
@@ -261,6 +271,12 @@ impl Continuation {
                 .ok_or_else(|| PhysicsWorldError("missing moving collapse history".into()))?;
             bincode::serialize_into(bytes, &(failure, &failure.motion))
                 .map_err(|e| PhysicsWorldError(e.to_string()))?;
+        } else if self.revision == 9 {
+            self.history
+                .paired
+                .as_ref()
+                .ok_or_else(|| PhysicsWorldError("missing paired history".into()))?
+                .serialize_failure(bytes)?;
         }
         Ok(())
     }
@@ -275,13 +291,13 @@ impl Continuation {
             );
         } else if self.revision == 4 {
             self.history.deserialize_loads(reader)?;
-        } else if matches!(self.revision, 5 | 6 | 8) {
+        } else if matches!(self.revision, 5 | 6 | 8 | 9) {
             self.history.moving = Some(
                 bincode::deserialize_from(&mut *reader)
                     .map_err(|e| PhysicsWorldError(e.to_string()))?,
             );
         }
-        if self.revision == 6 {
+        if matches!(self.revision, 6 | 9) {
             self.history.paired = Some(
                 bincode::deserialize_from(&mut *reader)
                     .map_err(|e| PhysicsWorldError(e.to_string()))?,
@@ -297,6 +313,12 @@ impl Continuation {
                 bincode::deserialize_from(reader).map_err(|e| PhysicsWorldError(e.to_string()))?;
             failure.motion = motion;
             self.history.failure = Some(failure);
+        } else if self.revision == 9 {
+            self.history
+                .paired
+                .as_mut()
+                .ok_or_else(|| PhysicsWorldError("missing paired history".into()))?
+                .deserialize_failure(reader)?;
         }
         Ok(())
     }
@@ -338,11 +360,24 @@ impl Continuation {
             {
                 Some((&a.scene, a.owner))
             }
+            Status::CollapsingPairedMaterials(a)
+                if self.revision == 9 && (!a.pending_support || a.owner.is_some()) =>
+            {
+                Some((&a.scene, a.owner))
+            }
             _ => None,
         }
     }
     pub(in crate::world) fn valid_for(&self, world: &PhysicsWorld) -> bool {
         if self.revision != self.history.revision() || !self.history.valid() {
+            return false;
+        }
+        if self
+            .history
+            .paired
+            .as_ref()
+            .is_some_and(|p| !p.failure_sources_valid(world))
+        {
             return false;
         }
         if let Some(f) = &self.history.failure {
@@ -386,16 +421,17 @@ impl Continuation {
                 .as_ref()
                 .is_none_or(|f| f.source == scene.plates.sources[1])
             && self.history.paired.as_ref().is_none_or(|p| {
-                world
-                    .loading
-                    .as_ref()
-                    .unwrap()
-                    .response
-                    .as_ref()
-                    .unwrap()
-                    .materials
-                    .get(&scene.plates.sources[0].region)
-                    == Some(&p.material(0))
+                p.failure_sources_match(scene.plates.sources)
+                    && world
+                        .loading
+                        .as_ref()
+                        .unwrap()
+                        .response
+                        .as_ref()
+                        .unwrap()
+                        .materials
+                        .get(&scene.plates.sources[0].region)
+                        == Some(&p.material(0))
             })
             && owner.is_some()
                 == (!self.history.collapsed()
@@ -456,7 +492,7 @@ impl PhysicsWorld {
         &mut self,
         dt: f32,
     ) -> Result<DynamicCompressionStep, compression::CompressionRejection> {
-        step::advance(self, dt, false)
+        step::advance(self, dt, failure::Policy::Refuse)
     }
     pub fn material_dynamic_compression_summary(&self) -> Option<DynamicCompressionSummary> {
         Some(
