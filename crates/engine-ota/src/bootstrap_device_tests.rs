@@ -55,7 +55,13 @@ fn only_safe_pre_ota_service_stores_are_preserved_during_bootstrap() {
     let system = temp.path().join("spacewars-system");
     fs::create_dir(&system).unwrap();
     fs::set_permissions(&system, fs::Permissions::from_mode(0o700)).unwrap();
-    for name in ["time", "network", "time-check", "update-check"] {
+    for name in [
+        "install-policy",
+        "time",
+        "network",
+        "time-check",
+        "update-check",
+    ] {
         fs::create_dir(system.join(name)).unwrap();
         fs::set_permissions(system.join(name), fs::Permissions::from_mode(0o700)).unwrap();
         fs::write(system.join(name).join("state"), b"preserve me").unwrap();

@@ -713,7 +713,8 @@ An ordinary legacy reboot is allowed; its new boot ID does not overwrite the
 first observed ID. Missing, corrupt, partial or conflicting state requires
 explicit reconciliation, and is never deleted or silently reinitialized.
 The existing `time`, `network`, `time-check` and `update-check` service stores
-are preserved, including scheduling history. Recovery, trust, staged updates,
+are preserved, including scheduling history, and so is a saved `install-policy`
+preference. Recovery, trust, staged updates,
 unknown entries and unsafe directory ownership or links still stop preparation.
 A provisioned unit retires those records first; see
 [Upgrade a provisioned unit's boot set](#upgrade-a-provisioned-units-boot-set).
@@ -1650,8 +1651,8 @@ refuses a tryboot, an active bootstrap or running writers, and opens the journal
 under the same authorization as other maintenance commands. It then moves, and
 never copies or deletes:
 
-- every `/data/spacewars-system` entry except the `network`, `time`,
-  `time-check` and `update-check` stores, which bootstrap preserves;
+- every `/data/spacewars-system` entry except the `install-policy`, `network`,
+  `time`, `time-check` and `update-check` stores, which bootstrap preserves;
 - `completed` and `package` from `/data/spacewars-bootstrap`.
 
 They go into one private directory, `/data/spacewars-retired/ID`, beside a

@@ -19,6 +19,7 @@ impl Fixture {
         }
         for store in [
             "install-handoff",
+            "install-policy",
             "network",
             "recovery",
             "time",
