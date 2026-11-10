@@ -675,6 +675,9 @@ mod daemon {
         let install_policy = Arc::new(engine_os_manager::install_policy::Preference::open(
             engine_os_manager::install_policy::STATE_DIRECTORY.as_ref(),
         ));
+        let install_admission = engine_os_manager::install_admission::History::open(
+            engine_os_manager::install_admission::STATE_DIRECTORY.as_ref(),
+        );
         let (record, reason) = store.load();
         let mut saved = record.clone();
         let boot_id = linux::boot_id()?;
@@ -742,6 +745,19 @@ mod daemon {
                 status.time_check = Some(checks.status()?);
                 status.update = Some(update_status.status()?);
                 status.install_policy = saved_policy.status();
+                let moment = status
+                    .usable_time()
+                    .and_then(engine_os_manager::install_admission::Moment::local);
+                let admission = install_admission.status(
+                    status.install_policy.as_ref(),
+                    moment.as_ref(),
+                    status
+                        .update
+                        .as_ref()
+                        .and_then(|update| update.ready.as_ref())
+                        .map(|image| image.build_id.as_str()),
+                );
+                status.install_admission = Some(admission);
                 Ok(status)
             }),
             Some(Arc::new(move || sync.sync_now())),

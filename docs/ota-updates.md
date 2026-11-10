@@ -130,6 +130,38 @@ image ignores it, and bootstrap preserves it with the other service stores. If
 it cannot be read, status omits `install_policy`, changes are refused and the
 mode counts as `ask`.
 
+### Automatic install gate
+
+The service also reports whether an automatic attempt could start now, under
+`install_admission` in `engine-os-manager status`. **Nothing acts on this gate
+yet**; it shows what the saved policy would allow. Beside the gate, `local`
+gives the local date and the minutes after midnight it was judged at, so a
+unit's time zone can be checked from its status.
+
+| Gate | Meaning |
+| --- | --- |
+| `open` | The mode is Automatic, a verified image is ready, and local time is inside a window that has not had its attempt |
+| `not-automatic` | The saved mode is Ask, or the preference is unreadable |
+| `no-image` | No verified image is ready |
+| `image-tried` | An automatic attempt already tried this image; only a confirmation installs it |
+| `time-unknown` | Device time is not usable, or the time zone is unknown; night is never assumed |
+| `outside-window` | Local time is outside the saved window |
+| `window-used` | This window had its attempt, or the last attempt was under twelve hours ago |
+| `history-unavailable` | The saved attempt history cannot be read |
+
+A window is identified by the local date on which it opens, so one that
+crosses midnight is a single window and the repeated hour when clocks fall
+back adds no attempt. Each window allows one attempt, whatever ends it, and
+the next attempt waits at least twelve hours, so changing the window or the
+time zone cannot reopen the same night. If the clock is corrected to before
+the saved attempt, the current window counts as used and later windows open
+normally. An image that an automatic attempt has tried never installs by
+itself again, whether it committed, failed or rolled back.
+
+The history is saved in `/data/spacewars-system/install-admission` when the
+first attempt begins, so no unit has it yet. Bootstrap does not preserve it:
+it belongs to the production records a boot-set upgrade retires.
+
 ### Review corrections and next network gate
 
 PR #510's review found missing prelaunch isolation checks in the native NM test
@@ -207,7 +239,7 @@ test unit and a fresh candidate are available.
 | #263 | The 2026-10-27 approval bundle holds all eleven case reports: seven observed passes, two reviewed from earlier observations, interrupted promotion as owner-accepted risk and power loss as a partial observation plus accepted risk; the confirming normal reboot (#600) was observed on 2026-11-08 |
 | #264 | Native writer connected and in routine use from the Updates panel on all three units; development installs (#566) implemented but not yet enabled on `sw-picade-2`; cancellation, worker failure, lost CLI replies, rollback of a panel install and service or app restart during an install remain untested on hardware |
 | #265 | Daily checks and downloads run unattended on all three units and delivered Release generation 20 by themselves on 2026-10-29; download impact on gameplay and resumed downloads remain unmeasured |
-| #266 | Updates panel with exact consent, the activity bar (#598) and the Install cursor lock (#601) in use; the Ask/Automatic setting and its window are saved by the device service and set from its CLI, and nothing acts on them yet; the overnight admission, idle wait, countdown, postponement and the panel's controls are not implemented |
+| #266 | Updates panel with exact consent, the activity bar (#598) and the Install cursor lock (#601) in use; the Ask/Automatic setting and its window are saved by the device service and set from its CLI, and status reports whether an automatic attempt could start, but nothing acts on either yet; the idle wait, countdown, postponement and the panel's controls are not implemented |
 | #267 | All three units run 6.12 from SD cards with published approvals and take Release or Nightly through the panel; the remaining physical cases are accepted risk under the run-once rule; these pages are the operator documentation |
 
 ### Next implementation sequence
@@ -221,14 +253,16 @@ test unit and a fresh candidate are available.
 2. Enable development installs on `sw-picade-2` and make the two supervised
    runs, one commit and one forced return
    ([rollout](ota-development-installs.md#rollout)).
-3. Automatic installation (#266), in three steps. The saved Ask/Automatic
-   setting and window are in the device service
-   ([Install policy setting](#install-policy-setting)). Next comes the
-   admission that reads them: the overnight window, the idle wait, the
-   countdown and postponement, reusing the manual flow's writer, locks,
-   recovery and app handoff. Last come the Updates panel's controls and the
-   countdown on screen. Pilot it on `sw-picade-2`'s Nightly channel; the
-   household units stay on Release and Ask.
+3. Automatic installation (#266), in steps. The saved Ask/Automatic setting
+   and window are in the device service
+   ([Install policy setting](#install-policy-setting)), and so is the rule
+   for when an attempt may start
+   ([Automatic install gate](#automatic-install-gate)). Next comes the
+   coordinator that acts on the gate: the idle wait, the countdown and
+   postponement, reusing the manual flow's writer, locks, recovery and app
+   handoff. Last come the Updates panel's controls and the countdown on
+   screen. Pilot it on `sw-picade-2`'s Nightly channel; the household units
+   stay on Release and Ask.
 4. Publication (#262): the hosted image workflow keeps manual dispatch only;
    a dispatch succeeds only once the cold build fits the runner or reuses a
    cache, which nobody needs while the workstation builds in minutes. Signing

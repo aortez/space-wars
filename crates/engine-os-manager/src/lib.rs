@@ -28,6 +28,8 @@ pub mod time_runtime;
 pub mod time_schedule;
 
 #[cfg(target_os = "linux")]
+pub mod install_admission;
+#[cfg(target_os = "linux")]
 pub mod install_handoff;
 #[cfg(target_os = "linux")]
 pub mod install_policy;

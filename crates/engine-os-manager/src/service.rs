@@ -37,6 +37,20 @@ pub struct DeviceStatus {
     /// for confirmation.
     #[serde(default)]
     pub install_policy: Option<crate::install_policy::Status>,
+    /// Whether an automatic attempt could start now. Nothing acts on it yet.
+    #[serde(default)]
+    pub install_admission: Option<crate::install_admission::Status>,
+}
+
+impl DeviceStatus {
+    /// The reading other device decisions may use: usable time from a live
+    /// observation whose time metadata is intact.
+    pub fn usable_time(&self) -> Option<engine_ota::UsableTime> {
+        (self.service_healthy && self.time.usable)
+            .then_some(self.time.utc_us)
+            .flatten()
+            .and_then(|us| engine_ota::UsableTime::from_unix_microseconds(us).ok())
+    }
 }
 
 pub struct ObservedState {
@@ -66,6 +80,7 @@ impl ObservedState {
             time_check: None,
             update: None,
             install_policy: None,
+            install_admission: None,
         })
     }
 }
