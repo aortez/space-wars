@@ -18,6 +18,9 @@ pub(super) struct History {
     pub(super) moving: Option<moving::MovingHistory>,
     #[serde(skip)]
     pub(super) paired: Option<paired::PairedHistory>,
+    // Required v21 extension, including the explicit collapse policy.
+    #[serde(skip)]
+    pub(super) failure: Option<failure::FailureHistory>,
     pub(super) summary: DynamicCompressionSummary,
 }
 
@@ -108,6 +111,7 @@ impl History {
             loads: None,
             moving,
             paired: paired::PairedHistory::new(world, scene)?,
+            failure: None,
             summary: DynamicCompressionSummary::default(),
         };
         h.summary = h.initial_summary();
@@ -116,9 +120,12 @@ impl History {
         }
         Ok(h)
     }
-    // Only an explicit load change upgrades an enrolled history. Otherwise old
-    // overload and exact safe-equilibrium histories retain revision 1/v15 bytes.
+    // Retained policy selects the format. Legacy overload and exact
+    // safe-equilibrium histories retain revision 1/v15 bytes.
     pub(super) fn revision(&self) -> u32 {
+        if self.failure.is_some() {
+            return 7;
+        }
         if self.paired.is_some() {
             return 6;
         }
@@ -168,6 +175,17 @@ impl History {
         )
     }
     pub(super) fn segment(&self, x: f64, h: f64) -> Result<Segment, R> {
+        if self.collapsed() {
+            return Ok(Segment {
+                p: self.summary.plastic_indentation,
+                dp: 0.0,
+                elastic: 0.0,
+                loss: 0.0,
+                work: 0.0,
+                force: 0.0,
+                mean: 0.0,
+            });
+        }
         if let Some(p) = &self.paired {
             return p.segment(x, h);
         }
@@ -228,6 +246,7 @@ impl History {
             && c.ey > 0.0
             && (self.paired.is_some() || c.ey < c.depth / 4.0)
             && self.valid_loads()
+            && self.failure.as_ref().is_none_or(|f| f.valid(self))
             && self.paired.as_ref().is_none_or(|p| p.valid(self))
             && self.moving.as_ref().is_none_or(|m| m.valid(self))
             && (if falling {
@@ -276,10 +295,11 @@ impl History {
                 (0.0..=c.depth / 4.0).contains(&s.plastic_indentation)
             } else {
                 (0.0..=c.depth / 4.0 - c.ey).contains(&s.plastic_indentation)
-                    && s.indentation - s.plastic_indentation <= c.ey + 1e-14 * c.depth
+                    && (self.collapsed()
+                        || s.indentation - s.plastic_indentation <= c.ey + 1e-14 * c.depth)
             })
             && s.damage_work >= 0.0
-            && (self.paired.is_some() || s.damage_work < self.initial.remaining)
+            && (self.paired.is_some() || self.collapsed() || s.damage_work < self.initial.remaining)
             && s.viscous_loss >= 0.0
             && s.reaction_impulse >= 0.0
             && s.scales == start.scales
@@ -290,6 +310,7 @@ impl History {
                 s.scales[0],
             )
             && (self.paired.is_some()
+                || self.collapsed()
                 || near(
                     s.elastic_energy,
                     c.energy(s.indentation, s.plastic_indentation),
@@ -302,7 +323,7 @@ impl History {
             )
             && near(
                 s.charge_error,
-                self.plastic_work() - s.damage_work,
+                self.plastic_work() - s.damage_work - self.failure_excess(),
                 s.scales[0],
             )
             && (0.0..=1e-5 * s.scales[0]).contains(&s.absolute_charge_error)
@@ -332,7 +353,8 @@ impl History {
                     - s.kinetic_energy
                     - s.elastic_energy
                     - self.plastic_work()
-                    - s.viscous_loss,
+                    - s.viscous_loss
+                    - self.released_elastic(),
                 s.scales[0],
             )
             && near(
@@ -464,24 +486,45 @@ impl History {
         {
             return Err(R::Numerical);
         }
-        let (q, loads) = if let Some(paired) = &mut self.paired {
+        let was_collapsed = self.collapsed();
+        let (mut q, loads) = if let Some(paired) = &mut self.paired {
             let (loads, q) = paired.finish(scene, x, h, owner)?;
             (q, Some(loads))
         } else {
-            (
-                c.segment(old.indentation, old.plastic_indentation, x, dt),
-                None,
-            )
+            (self.segment(x, dt)?, None)
         };
-        let (remaining, charge, charge_error) = if let Some(loads) = &loads {
+        let (remaining, charge, charge_error, excess) = if let Some(loads) = &loads {
             (
                 0.0,
                 loads[0].damage_work + loads[1].damage_work,
                 loads[0].charge_error + loads[1].charge_error,
+                0.0,
             )
+        } else if was_collapsed {
+            (0.0, 0.0, 0.0, 0.0)
         } else {
-            charge(&scene.plates.material, &q, h)?
+            charge_with_policy(&scene.plates.material, &q, h, self.failure.is_some())?
         };
+        let mut failure_dissipated = 0.0;
+        if !was_collapsed
+            && remaining == 0.0
+            && let Some(f) = &mut self.failure
+        {
+            let event = CompressionFailure {
+                elapsed: exact_time(old.elapsed, dt)?,
+                source: f.source,
+                episode: owner.ok_or(R::Numerical)?,
+                indentation: x,
+                velocity: v,
+                plastic_indentation: q.p,
+                released_elastic: q.elastic,
+                excess_work: excess,
+            };
+            failure_dissipated = event.dissipated();
+            f.event = Some(event);
+            q.elastic = 0.0;
+            q.force = 0.0;
+        }
         let kinetic = 0.5 * self.effective_mass() * v * v;
         let kinetic_change = kinetic - old.kinetic_energy;
         let impulse = q.mean * dt;
@@ -505,8 +548,9 @@ impl History {
             self.initial.remaining - remaining
         };
         next.viscous_loss = add(old.viscous_loss, q.loss)?;
-        next.charge_error =
-            self.paired.as_ref().map_or(c.y * q.p, |p| p.plastic_work()) - next.damage_work;
+        next.charge_error = self.paired.as_ref().map_or(c.y * q.p, |p| p.plastic_work())
+            - next.damage_work
+            - self.failure_excess();
         next.absolute_charge_error = if let Some(p) = &self.paired {
             p.summaries().iter().map(|s| s.absolute_charge_error).sum()
         } else {
@@ -566,10 +610,20 @@ impl History {
             outgoing: v as f32,
             errors,
             load,
+            failure_dissipated,
         })
     }
 }
 pub(super) fn charge(material: &StoredRegion, q: &Segment, h: f32) -> Result<(f64, f64, f64), R> {
+    let (remaining, charge, error, _) = charge_with_policy(material, q, h, false)?;
+    Ok((remaining, charge, error))
+}
+fn charge_with_policy(
+    material: &StoredRegion,
+    q: &Segment,
+    h: f32,
+    collapse: bool,
+) -> Result<(f64, f64, f64, f64), R> {
     let c = MaterialCurve::new(material);
     let mut region = material.region().map_err(|_| R::UnsupportedScene)?;
     let outcome = sustained(
@@ -583,21 +637,28 @@ pub(super) fn charge(material: &StoredRegion, q: &Segment, h: f32) -> Result<(f6
         },
     )
     .map_err(|_| R::Numerical)?;
-    if outcome.failed[0]
-        || outcome.ledger.excess != 0.0
-        || region.absorb(outcome.consumed[0]) != Ok(0.0)
-        || region.failed()
-    {
+    if !collapse && (outcome.failed[0] || outcome.ledger.excess != 0.0) {
+        return Err(R::FailedRegion);
+    }
+    let remainder = region
+        .absorb(outcome.consumed[0])
+        .map_err(|_| R::Numerical)?;
+    if !collapse && (remainder != 0.0 || region.failed()) {
         return Err(R::FailedRegion);
     }
     let charge = material.remaining - region.remaining_precise();
-    let error = c.y * q.dp - charge;
+    let excess = if region.failed() {
+        (c.y * q.dp - charge).max(0.0)
+    } else {
+        0.0
+    };
+    let error = c.y * q.dp - charge - excess;
     if (q.dp > 0.0 && (charge <= 0.0 || error.abs() > 1e-5 * c.y * q.dp))
         || (q.dp == 0.0 && charge != 0.0)
     {
         return Err(R::Numerical);
     }
-    Ok((region.remaining_precise(), charge, error))
+    Ok((region.remaining_precise(), charge, error, excess))
 }
 pub(super) fn add(old: f64, change: f64) -> Result<f64, R> {
     let next = old + change;

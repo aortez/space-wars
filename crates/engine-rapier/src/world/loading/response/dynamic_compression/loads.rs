@@ -67,6 +67,7 @@ impl History {
 
     fn accepts_acceleration(&self, acceleration: f32) -> bool {
         acceleration.is_finite()
+            && (self.failure.is_none() || acceleration == self.acceleration)
             && (self.moving.is_none() || acceleration == 0.0)
             && (0.0..=1e6).contains(&acceleration)
             && f64::from(self.mass) * f64::from(acceleration)

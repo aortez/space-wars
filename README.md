@@ -99,7 +99,8 @@ The local launcher includes the following scenarios and presets:
   support and rebound. Five falling-platen cases have load/release controls;
   two free-pair collisions (wood on wood, wood on armor) show both bodies'
   recoil, each material's deformation, damage and capacity, and one shared
-  energy ledger. Pause, single step and exact save/load replay.
+  energy ledger. A collapsing-support case pauses at failure, then lets the
+  platen fall. Pause, single step and exact save/load replay.
   Enable **Show all scenarios** in the launcher. See [Material Lab](docs/design/material-lab.md).
 - **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with
   independently driven pin-slot suspension wheels on a rotating circular planet.

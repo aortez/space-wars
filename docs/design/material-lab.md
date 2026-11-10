@@ -19,12 +19,13 @@ paths. It uses a labelled schematic with normal displacement magnified 20x;
 the displayed time, velocity, work, remaining capacity and permanent indentation
 come from the physical history.
 
-Next case walks the five platen cases and then the two
-[free-pair collisions](#free-pair-collisions).
+Next case walks the five load-controlled platen cases, the two
+[free-pair collisions](#free-pair-collisions), then the
+[collapsing support](#collapsing-support).
 
 ## Platen cases and playback
 
-Every platen case uses a mass-20 ideal rigid platen, a fixed full-face wood layer,
+The five load-controlled cases use a mass-20 ideal rigid platen, a fixed full-face wood layer,
 section/deformation depth 1, represented volume 20 and initial remaining capacity
 1200. The physical frame is turned exactly 270 degrees so gravity points down.
 This is the full capacity of the reference wood material (`toughness 60 * volume 20`).
@@ -126,6 +127,26 @@ third.
 If a free pair reaches a numerical allowance, playback stops with “Numerical
 accuracy limit reached” and retains the last valid state.
 
+## Collapsing support
+
+**Support gives way** demonstrates the opt-in
+[support-failure path](material-support-failure.md). Its wood layer has represented
+volume 2 and starts with its full capacity of 120. The mass-20 platen falls from
+a gap of 1/64 under a fixed load of 8000. The case completes after 144 steps
+(0.03515625 s), within the original motion and numerical limits.
+
+Run pauses automatically when the layer collapses. Capacity is zero, the phase
+reads Collapsed, and contact history records the end of support and one Collapse.
+The display adds **Collapse loss**, comprising the released elastic store and
+any plastic work beyond the final capacity charge. This energy is dissipated;
+it does not become another impulse or additional material damage.
+
+Run again continues the platen's fall under gravity with no supporting reaction.
+The failed layer is drawn dimly at its collapse position while the platen moves
+through its envelope. Permanent set, damage and the failure observation stay
+fixed. Pause, Single step and Save/Load work before and after collapse. The three
+load controls refuse with a message because this mode uses constant gravity.
+
 ## Save slot
 
 Save pauses the run and replaces `material-lab.bin` in the application's actual
@@ -154,8 +175,10 @@ its command list is bounded to 32 entries and replay must reproduce the complete
 saved envelope. The two free-pair cases use `MATLAB03`: the `MATLAB01` fields
 with no command list. Their native snapshot becomes v20 on the first physical
 step, when the paired history is enrolled. No layout accepts another
-layout's cases. Wrong versions, impossible/no-op commands, reordered histories
-and mismatched physics refuse. Native saves retain their v1–v20 compatibility.
+layout's cases. The collapse case uses `MATLAB04`, with the same bounded fields
+and no command list; its native history becomes v21 on enrollment. Wrong versions,
+impossible/no-op commands, reordered histories and mismatched physics refuse.
+Native saves retain their v1–v21 compatibility.
 
 ## Evidence and limits
 
@@ -175,10 +198,13 @@ refused load commands. A client test saves mid-collision, steps and restores
 through the storage worker. A second public UI workflow runs the wood pair in
 the vector renderer with a mid-run save, step and reload, reloads that save in
 the raster renderer after leaving the lab, and runs the armor case there. It is
-part of the full UI suite, not the PR smoke suite.
+part of the full UI suite, not the PR smoke suite. It also saves and reloads the
+collapsed support, repeats a single step exactly, and checks the continued fall
+with the same failure and damage. Scenario tests verify the collapse ledger,
+automatic pause, completion, terminal replay and envelope restrictions.
 
 This is a bounded two-body demonstration. It does not enable material response
 for existing gameplay, add fracture/topology consequences, or broaden the native
-solver's geometry or connection-loading support. A layer that ran out of capacity
-would refuse the step; turning exhausted capacity into breakage is #328. #327
-remains open.
+solver's geometry or connection-loading support. The explicit collapse case is
+the first #328 failure consequence; other cases keep their refusal on exhaustion.
+Moving-material failure, severing and debris remain later slices. #327 remains open.

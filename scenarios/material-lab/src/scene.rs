@@ -8,7 +8,7 @@ use engine_rapier::world::{
     loading::{CaptureConfig, ContactSource, RegionId, RegionToken},
 };
 
-/// Represented volume of every material layer.
+/// Default represented volume; the collapse case uses a smaller support.
 const VOLUME: f32 = 20.0;
 
 pub fn body(role: u64) -> BodyId {
@@ -17,6 +17,13 @@ pub fn body(role: u64) -> BodyId {
 /// An undamaged layer: its full capacity is `toughness * VOLUME`.
 pub fn region(material: Material) -> Region {
     Region::new(material, VOLUME).unwrap()
+}
+pub fn support_region(case: Case) -> Region {
+    if case == Case::SupportFailure {
+        Region::new(WOOD, 2.0).unwrap()
+    } else {
+        Region::with_remaining(WOOD, VOLUME, 1200.0).unwrap()
+    }
 }
 /// Material tokens are in body order; an ideal rigid platen has none.
 pub fn build(case: Case) -> (PhysicsWorld, [Option<RegionToken>; 2]) {
@@ -69,7 +76,7 @@ fn platen(case: Case) -> (PhysicsWorld, [Option<RegionToken>; 2]) {
         turn,
         turn.rotate(Vec2::X),
         20.0,
-        Some(Region::with_remaining(WOOD, VOLUME, 1200.0).unwrap()),
+        Some(support_region(case)),
     );
     (world, [None, Some(material)])
 }
