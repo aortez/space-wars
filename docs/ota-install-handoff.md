@@ -12,9 +12,9 @@ The native manual writer is connected to these gates. Installation remains
 retained, owner-approved physical evidence. All three units have carried
 published approvals since 2026-10-27 and 2026-10-28, renewed after each medium
 or kernel change, and the panel has installed Release generation 20 on both
-household units (2026-10-30), generation 25 on the living room (2026-11-07) and
-Nightly generations 20 and 24 to 26 on `sw-picade-2`. There is no runtime
-switch to bypass that gate.
+household units (2026-10-30), generations 25 and 26 on the living room
+(2026-11-07 and 2026-11-09) and Nightly generations 20 and 24 to 26 on
+`sw-picade-2`. There is no runtime switch to bypass that gate.
 
 The contract lives in
 [`spacewars-control::install`](../crates/spacewars-control/src/install.rs) and
@@ -167,8 +167,9 @@ On the trial boot that commits an update, the committed outcome says the device
 restarts once more to confirm the new software, because the recovery service
 requests that normal reboot itself. A panel opened on a committed trial boot
 that was not confirmed yet is told that a normal restart is pending rather than
-that installation is unavailable. Generation 26 on `sw-picade-2` restarted this
-way on 2026-11-08 (`ota-picade2-generation26-install-20261108`).
+that installation is unavailable. Generation 26 restarted this way on
+`sw-picade-2` on 2026-11-08 (`ota-picade2-generation26-install-20261108`) and on
+the living room's Pi 5 on 2026-11-09 (`ota-pi5-generation26-install-20261109`).
 A valid launcher draft is included and retained in memory when preparation
 starts. Settings changes, other queued saves, scene changes, focus loss and
 preparation expiry revoke an unacknowledged handoff. A failed save cannot ack.
@@ -389,11 +390,13 @@ image update, not copying just the service executable onto an older image.
 The physical recovery matrix and owner approval are complete
 ([recovery qualification](ota-recovery-qualification.md)), and the coordinated
 image's permissions, presentation, write/readback, trial commit and confirming
-reboot have run on the devices through UI and CLI confirmations. Still
-unexercised on hardware: worker failure, service or app restart during an
-install, explicit game termination, cancellation of a live offer or
-preparation, rollback of a panel install and lost CLI replies. Local
-socket/Slint tests do not replace those checks.
+reboot have run on the devices through UI and CLI confirmations. So has the
+end-session consent, through `--end-game` and **End game, install & restart**,
+since 2026-10-28, over the Clock wherever the records name the session; no
+recorded install has ended a match with players. Still unexercised on hardware:
+worker failure, service or app restart during an install, cancellation of a
+live offer or preparation, rollback of a panel install and lost CLI replies.
+Local socket/Slint tests do not replace those checks.
 
 With the Automatic preference saved
 ([Install policy setting](ota-updates.md#install-policy-setting)), the device
