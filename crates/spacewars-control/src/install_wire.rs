@@ -183,14 +183,40 @@ impl From<Error> for Failure {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "command", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum HostRequest {
-    Observe { schema: u32, nonce: u64 },
-    Prepare { schema: u32, prepare: Prepare },
-    Abort { schema: u32, aborted: Aborted },
+    Observe {
+        schema: u32,
+        nonce: u64,
+    },
+    /// `Observe` from a service that is counting down to an installation
+    /// nobody confirmed. The app shows the countdown while these keep
+    /// arriving, and any use of the app ends it.
+    Countdown {
+        schema: u32,
+        nonce: u64,
+        /// The generation that installs when the countdown ends.
+        generation: u64,
+        /// CLOCK_BOOTTIME milliseconds on the same device.
+        ends_ms: u64,
+    },
+    Prepare {
+        schema: u32,
+        prepare: Prepare,
+    },
+    Abort {
+        schema: u32,
+        aborted: Aborted,
+    },
 }
 impl Message for HostRequest {
     fn validate(&self) -> Result<(), Error> {
         match self {
             Self::Observe { schema: SCHEMA, .. } => Ok(()),
+            Self::Countdown {
+                schema: SCHEMA,
+                generation,
+                ends_ms,
+                ..
+            } if *generation != 0 && *ends_ms != 0 => Ok(()),
             Self::Prepare {
                 schema: SCHEMA,
                 prepare,
@@ -204,6 +230,19 @@ impl Message for HostRequest {
     }
 }
 
+/// What the app shows, for a decision that would interrupt it without asking.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Scene {
+    /// The launcher or one of its panels; no scenario is running.
+    Launcher,
+    /// The Clock, however it was started.
+    Clock,
+    /// Any other scenario, whether it is running, paused or finished and
+    /// whoever started it.
+    Game,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HostView {
@@ -214,6 +253,14 @@ pub struct HostView {
     pub game: bool,
     pub fenced: bool,
     pub available: bool,
+    /// Absent from an app that does not report it; an automatic installation
+    /// then assumes a game.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scene: Option<Scene>,
+    /// Milliseconds since a person last used the app, counted from its start
+    /// at the latest. Absent when the app cannot tell, which is never idle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idle_ms: Option<u64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -28,7 +28,10 @@ adapters live in `install_service.rs`, `install_transport.rs` and the client's
 The user approves one exact verified image and its restart consequence. An
 active or paused game additionally requires explicit end-session consent.
 Checking for updates, downloading, selecting a channel or reading status cannot
-create that consent.
+create that consent. The one standing approval is the saved Automatic mode:
+with it the device service confirms for the owner, for an idle launcher or
+Clock only, and never with the consent that ends a game
+([Automatic installation](ota-updates.md#automatic-installation)).
 
 ```mermaid
 sequenceDiagram
@@ -49,7 +52,7 @@ sequenceDiagram
 ```
 
 The native adapter connects the existing writer and trial protocol to the two
-durable journals. `ManualAuthorization` is a non-cloneable, non-serializable consent value;
+durable journals. `Authorization` is a non-cloneable, non-serializable consent value;
 it is **not** a write permit or a `RecoveryCapability`. It cannot enable the
 owner-only supervised admission bypass. Normal service installation must retain
 the qualified boot/watchdog capability gate and all signed-image checks.
@@ -392,10 +395,17 @@ install, explicit game termination, cancellation of a live offer or
 preparation, rollback of a panel install and lost CLI replies. Local
 socket/Slint tests do not replace those checks.
 
-The device service saves the Ask/Automatic preference and its window
-([Install policy setting](ota-updates.md#install-policy-setting)), but nothing
-acts on them: overnight admission is not implemented. It follows this manual
-path and must reuse the same writer, locks, recovery and final app handoff.
+With the Automatic preference saved
+([Install policy setting](ota-updates.md#install-policy-setting)), the device
+service makes and confirms an offer itself after its idle wait and countdown
+([Automatic installation](ota-updates.md#automatic-installation)). That
+confirmation enters this path at the same point as a press and uses the same
+coordinator, writer, locks, recovery and final app handoff; the service has no
+second way to write. During the countdown the service's looks at the app are
+`countdown` requests: they answer like an observation and carry the generation
+and the end, which the app draws over the launcher or the Clock. Drawing it
+changes neither the host revision nor the idle time. It has not run on
+hardware.
 
 ## Validation scope
 
@@ -445,6 +455,19 @@ then Back and reopening Updates. Signed-feed tests reproduce the installer's tru
 rewrite and restore readiness while rejecting payload/recovery replacement,
 candidate revocation and expiry. Runtime tests cover maintenance contention and
 reoffering after cancellation without another scheduled check or network hold.
+
+Automatic-attempt tests drive the same service and app sockets with the saved
+preference and attempt history on disk: an idle launcher and an idle Clock
+count down and reach the backend's admission, a game and an app that reports
+nothing never do, use of the app or saving Ask during the countdown postpones
+to the next window, a restarted service does not count down again, a device
+that would refuse a person's offer keeps its window, and an image that cannot
+be recorded as tried is not handed to the writer. The client tests cover the
+scene and idle time the app reports, and the countdown notice: drawn from the
+service's announcements, gone when they stop or the countdown ends, and
+replaced by a postponement line on any input. A stand-in app and backend take
+the place of the kiosk's renderer and the native writer; no device has run an
+attempt.
 
 CLI tests exercise the installed parser, exact ticket preservation, explicit
 restart/end-game flags, read-only commands, stale/expired refusals, wrong peers,

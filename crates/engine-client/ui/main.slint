@@ -622,6 +622,8 @@ export component MainWindow inherits Window {
     in-out property <int> updates-focus: 1;
     in property <bool> updates-busy: false;
     in property <float> updates-progress: -1;
+    // The countdown of an installation nobody confirmed, or its postponement.
+    in property <string> updates-notice: "";
     callback updates-open();
     callback updates-confirm();
     callback updates-cancel();
@@ -3963,6 +3965,30 @@ export component MainWindow inherits Window {
                 x: 24px; y: parent.height - 84px; width: parent.width - 48px; height: 48px;
                 text: root.install-fenced ? "Cancel" : "Back"; selected: root.updates-focus == 1; enabled: root.updates-can-cancel;
                 activated => { root.updates-cancel(); }
+            }
+        }
+    }
+
+    // Over everything but Updates, so that it shows above the Clock as well.
+    if root.updates-notice != "" && !root.updates-visible && !root.install-fenced: Rectangle {
+        x: 0; y: 0; width: parent.width; height: parent.width < 600px ? 56px : 48px;
+        background: #050514e6;
+        Text {
+            x: 12px; y: 0; width: parent.width - 24px; height: parent.height;
+            text: root.updates-notice; color: #d7efff; font-size: parent.width < 600px ? 13px : 17px;
+            horizontal-alignment: center; vertical-alignment: center;
+            wrap: word-wrap;
+        }
+        // A touch on the notice is use of the app, which postpones.
+        TouchArea {
+            width: parent.width; height: parent.height;
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.down) {
+                    UserActivity.pointer-held = true;
+                    UserActivity.notify();
+                } else if (event.kind == PointerEventKind.up || event.kind == PointerEventKind.cancel) {
+                    UserActivity.pointer-held = false;
+                }
             }
         }
     }

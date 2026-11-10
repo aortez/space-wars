@@ -25,6 +25,8 @@ fn fixture_context() -> Context {
             game: true,
             fenced: false,
             observed_ms: 100,
+            scene: None,
+            idle_ms: None,
         }),
     }
 }

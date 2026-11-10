@@ -11,6 +11,14 @@ struct TestBackend {
     delay: Mutex<Option<Delay>>,
     parked: Mutex<Option<std::sync::Weak<()>>>,
     safe_shutdown: AtomicBool,
+    /// What a context answers instead of observing the app.
+    refusal: Mutex<Option<Failure>>,
+}
+/// What the fixture's app says about itself beyond its revision.
+#[derive(Clone, Copy)]
+struct Shown {
+    scene: Option<Scene>,
+    idle_ms: Option<u64>,
 }
 struct Delay {
     after_consumption: bool,
@@ -23,20 +31,14 @@ impl Delay {
         self.release.recv_timeout(Duration::from_secs(3)).unwrap();
     }
 }
-impl Backend for TestBackend {
-    fn context(&self) -> Result<Context, Failure> {
-        if self.revision.load(Ordering::SeqCst) == 0 {
-            return Err(Failure::NotReady);
-        }
+impl TestBackend {
+    fn view(&self, request: impl FnOnce(u64) -> HostRequest) -> Result<HostObservation, Failure> {
         let nonce = transport::boot_ms().unwrap();
         let reply: HostReply = transport::exchange(
             &self.path,
             uid(),
             Some(self.host.pid),
-            &HostRequest::Observe {
-                schema: SCHEMA,
-                nonce,
-            },
+            &request(nonce),
             Duration::from_secs(1),
         )
         .map_err(|_| Failure::NotReady)?;
@@ -44,18 +46,42 @@ impl Backend for TestBackend {
         if view.nonce != nonce || view.host != self.host || !view.available {
             return Err(Failure::Stale);
         }
+        Ok(HostObservation::of(&view, self.host.clone(), nonce))
+    }
+}
+impl Backend for TestBackend {
+    fn context(&self) -> Result<Context, Failure> {
+        if self.revision.load(Ordering::SeqCst) == 0 {
+            return Err(Failure::NotReady);
+        }
+        if let Some(failure) = *self.refusal.lock().unwrap() {
+            return Err(failure);
+        }
         Ok(Context {
             boot_id: "boot".into(),
             ready: Some(self.ready.clone()),
             maintenance_clear: true,
-            host: Some(HostObservation {
-                instance: self.host.clone(),
-                revision: view.revision,
-                settings_revision: view.settings_revision,
-                game: view.game,
-                fenced: view.fenced,
-                observed_ms: nonce,
-            }),
+            host: Some(self.observe()?),
+        })
+    }
+    fn observe(&self) -> Result<HostObservation, Failure> {
+        self.view(|nonce| HostRequest::Observe {
+            schema: SCHEMA,
+            nonce,
+        })
+    }
+    fn countdown(&self, generation: u64, ends_ms: u64) -> Result<HostObservation, Failure> {
+        self.view(|nonce| HostRequest::Countdown {
+            schema: SCHEMA,
+            nonce,
+            generation,
+            ends_ms,
+        })
+    }
+    fn ready(&self) -> Option<automatic::Image> {
+        Some(automatic::Image {
+            build_id: self.ready.candidate.build_id.clone(),
+            generation: self.ready.candidate.generation,
         })
     }
     fn prepare(&self, prepare: &Prepare) -> Result<(Acknowledgement, HostInstance), Failure> {
@@ -133,9 +159,19 @@ struct Fixture {
     entered: mpsc::Receiver<()>,
     release: mpsc::SyncSender<()>,
     fenced: Arc<AtomicBool>,
+    shown: Arc<Mutex<Shown>>,
+    /// How often the app was asked what it shows.
+    observations: Arc<AtomicUsize>,
+    /// How often the app was told that a handoff is over.
+    aborts: Arc<AtomicUsize>,
+    /// The countdowns the app was told about: generation and end.
+    countdowns: Arc<Mutex<Vec<(u64, u64)>>>,
 }
 impl Fixture {
     fn new() -> Self {
+        Self::with(None)
+    }
+    fn with(automatic: Option<(Arc<Gatekeeper>, automatic::Pace)>) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("service.sock");
         let host_path = dir.path().join("host.sock");
@@ -152,6 +188,19 @@ impl Fixture {
         let (entered, entries) = mpsc::sync_channel(1);
         let (release, released) = mpsc::sync_channel(1);
         let released = Mutex::new(released);
+        // An app that says nothing about its scene, as before automatic
+        // installation: every existing case is a game.
+        let shown = Arc::new(Mutex::new(Shown {
+            scene: None,
+            idle_ms: None,
+        }));
+        let showing = shown.clone();
+        let observations = Arc::new(AtomicUsize::new(0));
+        let asked = observations.clone();
+        let aborts = Arc::new(AtomicUsize::new(0));
+        let told = aborts.clone();
+        let countdowns = Arc::new(Mutex::new(Vec::new()));
+        let announced = countdowns.clone();
         let server = transport::Server::bind(
             &host_path,
             Arc::new(|p| p.uid == uid()),
@@ -162,16 +211,29 @@ impl Fixture {
                     view: None,
                     acknowledgement: None,
                 };
-                match HostRequest::from_json(bytes).unwrap() {
-                    HostRequest::Observe { nonce, .. } => {
+                let request = HostRequest::from_json(bytes).unwrap();
+                if let HostRequest::Countdown {
+                    generation,
+                    ends_ms,
+                    ..
+                } = &request
+                {
+                    announced.lock().unwrap().push((*generation, *ends_ms));
+                }
+                match request {
+                    HostRequest::Observe { nonce, .. } | HostRequest::Countdown { nonce, .. } => {
+                        asked.fetch_add(1, Ordering::SeqCst);
+                        let shown = *showing.lock().unwrap();
                         reply.view = Some(HostView {
                             nonce,
                             host: identity.clone(),
                             revision: observed.load(Ordering::SeqCst),
                             settings_revision: 1,
-                            game: true,
+                            game: shown.scene != Some(Scene::Launcher),
                             fenced: fence.load(Ordering::SeqCst),
                             available: true,
+                            scene: shown.scene,
+                            idle_ms: shown.idle_ms,
                         })
                     }
                     HostRequest::Prepare { prepare, .. } => {
@@ -190,7 +252,10 @@ impl Fixture {
                             settings_revision: prepare.settings_revision,
                         });
                     }
-                    HostRequest::Abort { .. } => fence.store(false, Ordering::SeqCst),
+                    HostRequest::Abort { .. } => {
+                        told.fetch_add(1, Ordering::SeqCst);
+                        fence.store(false, Ordering::SeqCst)
+                    }
                 }
                 serde_json::to_vec(&reply).unwrap()
             }),
@@ -213,8 +278,17 @@ impl Fixture {
             delay: Mutex::new(None),
             parked: Mutex::new(None),
             safe_shutdown: AtomicBool::new(false),
+            refusal: Mutex::new(None),
         });
-        let service = Runtime::bind(&path, "boot".into(), uid(), backend.clone(), true).unwrap();
+        let service = Runtime::bind(
+            &path,
+            "boot".into(),
+            uid(),
+            backend.clone(),
+            true,
+            automatic,
+        )
+        .unwrap();
         Self {
             _dir: dir,
             _host: server,
@@ -224,6 +298,10 @@ impl Fixture {
             entered: entries,
             release,
             fenced,
+            shown,
+            observations,
+            aborts,
+            countdowns,
         }
     }
     fn request(&self, request: ServiceRequest) -> ServiceReply {
@@ -322,7 +400,7 @@ fn changed_host_aborts_and_service_restart_cannot_reuse_consent() {
     f.wait(Phase::Aborted);
     assert_eq!(f.backend.accepted.load(Ordering::SeqCst), 0);
     let other = f._dir.path().join("replacement.sock");
-    f.service = Runtime::bind(&other, "boot".into(), uid(), f.backend.clone(), true).unwrap();
+    f.service = Runtime::bind(&other, "boot".into(), uid(), f.backend.clone(), true, None).unwrap();
     f.path = other;
     assert_eq!(
         f.request(ServiceRequest::Confirm {
@@ -341,8 +419,15 @@ fn changed_host_aborts_and_service_restart_cannot_reuse_consent() {
 fn disabled_backend_exposes_no_install_path() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("native.sock");
-    let _runtime =
-        Runtime::bind(&path, "boot".into(), uid(), Arc::new(Unavailable), false).unwrap();
+    let _runtime = Runtime::bind(
+        &path,
+        "boot".into(),
+        uid(),
+        Arc::new(Unavailable),
+        false,
+        None,
+    )
+    .unwrap();
     for request in [
         ServiceRequest::Status { schema: SCHEMA },
         ServiceRequest::Offer { schema: SCHEMA },
@@ -358,8 +443,15 @@ fn disabled_backend_exposes_no_install_path() {
 fn slow_reconciliation_does_not_block_live_install_status() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("install.sock");
-    let _service =
-        Runtime::bind(&path, "boot".into(), uid(), Arc::new(Unavailable), false).unwrap();
+    let _service = Runtime::bind(
+        &path,
+        "boot".into(),
+        uid(),
+        Arc::new(Unavailable),
+        false,
+        None,
+    )
+    .unwrap();
     let recovery_path = dir.path().join("reconcile.sock");
     let (entered, entries) = mpsc::sync_channel(1);
     let (release, released) = mpsc::sync_channel(1);
@@ -442,6 +534,15 @@ fn a_failed_observation_retires_the_offer_even_after_the_host_recovers() {
 struct Unavailable;
 impl Backend for Unavailable {
     fn context(&self) -> Result<Context, Failure> {
+        panic!("disabled backend was called")
+    }
+    fn observe(&self) -> Result<HostObservation, Failure> {
+        panic!("disabled backend was called")
+    }
+    fn countdown(&self, _: u64, _: u64) -> Result<HostObservation, Failure> {
+        panic!("disabled backend was called")
+    }
+    fn ready(&self) -> Option<automatic::Image> {
         panic!("disabled backend was called")
     }
     fn prepare(&self, _: &Prepare) -> Result<(Acknowledgement, HostInstance), Failure> {
@@ -527,3 +628,6 @@ fn final_admission_and_writing_do_not_block_status_or_cancellation() {
         );
     }
 }
+
+#[path = "install_automatic_service_tests.rs"]
+mod automatic_attempts;

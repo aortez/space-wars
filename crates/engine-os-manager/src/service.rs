@@ -37,6 +37,12 @@ pub struct DeviceStatus {
     /// for confirmation.
     #[serde(default)]
     pub install_policy: Option<crate::install_policy::Status>,
+    /// Whether an automatic attempt could start now.
+    #[serde(default)]
+    pub install_admission: Option<crate::install_admission::Status>,
+    /// What the service that starts automatic attempts last did.
+    #[serde(default)]
+    pub install_automatic: Option<crate::install_handoff::automatic::Status>,
 }
 
 pub struct ObservedState {
@@ -66,6 +72,8 @@ impl ObservedState {
             time_check: None,
             update: None,
             install_policy: None,
+            install_admission: None,
+            install_automatic: None,
         })
     }
 }

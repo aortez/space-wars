@@ -29,11 +29,12 @@ the recovery service confirms its health and commits, and since #600 the
 service reboots into the normal boot by itself. A failed trial returns to the
 good image and quarantines the candidate. Installation is admitted only on a
 unit with a published recovery approval bound to its board, medium, boot set
-and kernel ([recovery qualification](ota-recovery-qualification.md)). Automatic
-installation does not exist yet: every install is a press, and downloads are
-the only unattended step. The service already saves the Ask or Automatic
-preference and its window ([Install policy setting](#install-policy-setting)),
-but nothing acts on it.
+and kernel ([recovery qualification](ota-recovery-qualification.md)). Every
+install is a press unless the owner saves the Automatic mode
+([Install policy setting](#install-policy-setting)). The service then also
+installs a ready update by itself, at night, from an idle launcher or Clock
+([Automatic installation](#automatic-installation)). The default is Ask, no
+unit has Automatic saved, and no automatic installation has run on hardware.
 
 Publication is owner-local. Each Nightly generation is built on the workstation
 from the selected `main` commit in the pinned kas container, qualified against
@@ -107,11 +108,13 @@ one commit.
 ### Install policy setting
 
 The device service saves how a ready update installs. `ask`, the default,
-waits for an explicit confirmation. `automatic` will also let a ready update
+waits for an explicit confirmation. `automatic` also lets a ready update
 install by itself inside a daily window of local time, 03:00–05:00 unless
-changed. **Nothing acts on the saved mode yet**: every install still needs the
-owner's confirmation, whatever is saved. Generation 26 and earlier do not have
-the setting.
+changed ([Automatic installation](#automatic-installation)). A confirmation
+installs at any time in either mode. Generation 26 and earlier do not have the
+setting. The mode has an effect only on an image whose status reports
+`install_automatic`; an image without it saves the mode and still waits for a
+confirmation.
 
 ```sh
 engine-os-manager install-policy --mode automatic
@@ -129,6 +132,109 @@ creates it, so a unit that keeps the defaults has no such directory. An older
 image ignores it, and bootstrap preserves it with the other service stores. If
 it cannot be read, status omits `install_policy`, changes are refused and the
 mode counts as `ask`.
+
+### Automatic install gate
+
+The service reports whether an automatic attempt could start now, under
+`install_admission` in `engine-os-manager status`. The service that starts
+attempts asks the same gate. Beside the gate, `local` gives the local date and
+the minutes after midnight it was judged at, so a unit's time zone can be
+checked from its status before Automatic is saved: a unit whose zone is UTC
+reads the 03:00–05:00 window as the Pacific evening.
+
+| Gate | Meaning |
+| --- | --- |
+| `open` | The mode is Automatic, a verified image is ready, and local time is inside a window that has not had its attempt |
+| `not-automatic` | The saved mode is Ask, or the preference is unreadable |
+| `no-image` | No verified image is ready |
+| `image-tried` | An automatic attempt already tried this image; only a confirmation installs it |
+| `time-unknown` | Device time is not usable, or the time zone is unknown; night is never assumed |
+| `outside-window` | Local time is outside the saved window |
+| `window-used` | This window had its attempt, or the last attempt was under twelve hours ago |
+| `history-unavailable` | The saved attempt history cannot be read |
+
+A window is identified by the local date on which it opens, so one that
+crosses midnight is a single window and the repeated hour when clocks fall
+back adds no attempt. Each window allows one attempt, whatever ends it, and
+the next attempt waits at least twelve hours, so changing the window or the
+time zone cannot reopen the same night. If the clock is corrected to before
+the saved attempt, the current window counts as used and later windows open
+normally. An image that an automatic attempt has tried never installs by
+itself again, whether it committed, failed or rolled back.
+
+The history is saved in `/data/spacewars-system/install-admission` when the
+first attempt begins, so no unit has it yet. Bootstrap does not preserve it:
+it belongs to the production records a boot-set upgrade retires.
+
+### Automatic installation
+
+While the gate is open, the device service looks at the app every thirty
+seconds. A closed gate does not ask the app anything. The app answers with what
+it shows and how long it has gone without a person:
+
+- **Scene.** The launcher with any of its panels, the Clock, or a game. Every
+  other scenario is a game, whether it is running, paused or finished and
+  whoever started it, so a unit whose idle activity is Spacewars bots shows a
+  game all night.
+- **Idle time.** The time since the last key, button, stick movement or touch
+  on a control. The app's start counts as use, and so does a button or touch
+  that is still held down.
+
+An attempt starts once the app has shown only the launcher or the Clock for
+ten minutes without use, is not busy with a launch, training or its own
+settings work, is not held by another installation, and the device would
+accept a person's offer for the same image at that moment. That last condition
+covers the recovery approval, a normal boot, settled journals and the verified
+image. Until all of it holds, the window keeps its attempt.
+
+The service then saves that the window's attempt is spent and waits sixty
+seconds, looking at the app every second. Each look tells the app which
+generation installs and when, and the app shows it in a bar across the top of
+the launcher or the Clock: "Generation 27 installs in 47 s · Press any button
+or touch here to postpone". The countdown ends without an installation, until
+the next window, when anybody uses the app, a game starts, the app stops
+answering or restarts, or the owner saves `ask`. A service restart ends it as
+well, because the spent attempt was saved before the countdown began. After a
+press or a touch the bar reads "Update postponed." for a few seconds; when the
+service stops announcing the countdown for any other reason, the bar goes away
+within three seconds.
+
+After the countdown the service makes the offer and confirms it itself, and
+from there the installation is the confirmed one: the app saves its settings,
+shows the Updates screen and acknowledges; the writer, the trial boot and the
+commit or rollback follow as after a press. Input that reaches the app before
+it has shown that screen still stops the installation, and so does the
+screen's Cancel button until the app acknowledges, about a second later. From
+then on it runs to its outcome, as after a press. The service's confirmation
+says that it ends the Clock when the Clock is on. It never says that it ends a
+game, and the coordinator refuses to end one without that. The image is saved
+as tried once this consent is consumed and before anything is written; if that
+cannot be saved, nothing is written.
+
+`engine-os-manager status` reports the service's side under
+`install_automatic`:
+
+| Phase | Meaning |
+| --- | --- |
+| `waiting` | The gate is closed or no image can be offered, and no countdown has ended since the service started |
+| `watching` | The gate is open; `hold` says what the attempt waits for |
+| `countdown` | The window's attempt is spent; the installation starts at `countdown_ends_ms`, in milliseconds since boot, unless the app is used |
+| `postponed` | The last countdown ended without an installation; `hold` says why |
+| `started` | The last countdown handed its installation to the confirmed path; `engine-os-manager install status` reports its phases |
+
+| Hold | Meaning |
+| --- | --- |
+| `app-unavailable` | The app did not answer as the live kiosk, is busy with work of its own or is held by an installation |
+| `game` | The app shows a game, or does not say what it shows |
+| `in-use` | A person used the app within the last ten minutes, or the app cannot tell |
+| `not-automatic` | The saved mode stopped being Automatic during the countdown |
+| `refused` | The device would refuse this installation now, whoever asked; the service log names the reason |
+
+`postponed` and `started` stay readable until the gate opens again or the
+service restarts. The service's journal keeps the history: it records each
+countdown, postponement and start, and each change in what an open gate waits
+for, at the service's default log level. Nothing here has run on a device: the
+tests drive the real service and app sockets with a stand-in app and writer.
 
 ### Review corrections and next network gate
 
@@ -207,7 +313,7 @@ test unit and a fresh candidate are available.
 | #263 | The 2026-10-27 approval bundle holds all eleven case reports: seven observed passes, two reviewed from earlier observations, interrupted promotion as owner-accepted risk and power loss as a partial observation plus accepted risk; the confirming normal reboot (#600) was observed on 2026-11-08 |
 | #264 | Native writer connected and in routine use from the Updates panel on all three units; development installs (#566) implemented but not yet enabled on `sw-picade-2`; cancellation, worker failure, lost CLI replies, rollback of a panel install and service or app restart during an install remain untested on hardware |
 | #265 | Daily checks and downloads run unattended on all three units and delivered Release generation 20 by themselves on 2026-10-29; download impact on gameplay and resumed downloads remain unmeasured |
-| #266 | Updates panel with exact consent, the activity bar (#598) and the Install cursor lock (#601) in use; the Ask/Automatic setting and its window are saved by the device service and set from its CLI, and nothing acts on them yet; the overnight admission, idle wait, countdown, postponement and the panel's controls are not implemented |
+| #266 | Updates panel with exact consent, the activity bar (#598) and the Install cursor lock (#601) in use; the Ask/Automatic setting and its window are saved by the device service and set from its CLI; with Automatic saved the service installs a ready update by itself from an idle launcher or Clock after a sixty-second countdown that the app shows, and use of the app postpones it to the next window; not run on hardware; the panel has no controls for the setting yet |
 | #267 | All three units run 6.12 from SD cards with published approvals and take Release or Nightly through the panel; the remaining physical cases are accepted risk under the run-once rule; these pages are the operator documentation |
 
 ### Next implementation sequence
@@ -221,14 +327,17 @@ test unit and a fresh candidate are available.
 2. Enable development installs on `sw-picade-2` and make the two supervised
    runs, one commit and one forced return
    ([rollout](ota-development-installs.md#rollout)).
-3. Automatic installation (#266), in three steps. The saved Ask/Automatic
-   setting and window are in the device service
-   ([Install policy setting](#install-policy-setting)). Next comes the
-   admission that reads them: the overnight window, the idle wait, the
-   countdown and postponement, reusing the manual flow's writer, locks,
-   recovery and app handoff. Last come the Updates panel's controls and the
-   countdown on screen. Pilot it on `sw-picade-2`'s Nightly channel; the
-   household units stay on Release and Ask.
+3. Automatic installation (#266), in steps. The saved Ask/Automatic setting
+   and window are in the device service
+   ([Install policy setting](#install-policy-setting)), with the rule for
+   when an attempt may start
+   ([Automatic install gate](#automatic-install-gate)) and the service that
+   acts on it: the idle wait, the countdown and postponement, then the
+   confirmed flow's writer, locks, recovery and app handoff
+   ([Automatic installation](#automatic-installation)), with the countdown
+   on screen. Last come the Updates panel's controls for the setting. Pilot
+   it on `sw-picade-2`'s Nightly channel, with a window that falls inside its
+   powered hours; the household units stay on Release and Ask.
 4. Publication (#262): the hosted image workflow keeps manual dispatch only;
    a dispatch succeeds only once the cold build fits the runner or reuses a
    cache, which nobody needs while the workstation builds in minutes. Signing
@@ -241,12 +350,13 @@ test unit and a fresh candidate are available.
    bootstrap on every unit, so a shorter bootstrap for freshly flashed media is
    a candidate when the next flash comes.
 
-**Agreed product policy, still to integrate:** defaults are Release and Ask
-before installing, with downloads in both modes. Automatic installation is
-opt-in, initially 03:00–05:00 local,
-after ten minutes idle in Clock or the launcher, with a sixty-second countdown.
-Input postpones until the next overnight window. Running and paused games stay
-protected.
+**Agreed product policy:** defaults are Release and Ask before installing,
+with downloads in both modes. Automatic installation is opt-in, initially
+03:00–05:00 local, after ten minutes idle in Clock or the launcher, with a
+sixty-second countdown. Input postpones until the next overnight window.
+Running and paused games stay protected. The device service and the app
+implement this; the panel's controls for the setting remain, and until then
+the mode is saved from the CLI.
 
 ### Cleanup candidates for later deletion review
 

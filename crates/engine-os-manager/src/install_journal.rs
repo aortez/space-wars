@@ -5,7 +5,7 @@
 //! the acknowledged reboot handoff. Restart reconciliation takes the same lock, so a
 //! surviving worker cannot race an abort decision. The startup worker reconciles
 //! this journal and renews its durable deployment hold until the host is released.
-use super::{HOST_FRESH_MS, HostObservation, ManualAuthorization};
+use super::{Authorization, HOST_FRESH_MS, HostObservation};
 use crate::schedule_store::{StateRecord, Store};
 use crate::{Error, Result};
 use engine_ota::install_lock::InstallLock;
@@ -242,7 +242,7 @@ impl Journal {
         &mut self,
         lock: &InstallLock,
         recovery: &mut RecoveryStore,
-        authorization: ManualAuthorization,
+        authorization: Authorization,
         plan: Plan,
     ) -> Result<Action> {
         lock.check()?;
@@ -252,7 +252,7 @@ impl Journal {
     fn begin_inner(
         &mut self,
         recovery: &mut RecoveryStore,
-        authorization: ManualAuthorization,
+        authorization: Authorization,
         plan: Plan,
     ) -> Result<Action> {
         let (before, transaction) = plan
@@ -267,7 +267,7 @@ impl Journal {
 
     fn arm_inner(
         &mut self,
-        authorization: ManualAuthorization,
+        authorization: Authorization,
         before: Sha256,
         transaction: &Transaction,
     ) -> Result<()> {

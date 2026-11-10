@@ -74,8 +74,8 @@ enum Command {
         channel: String,
     },
     /// Save how a ready update installs: after a confirmation, or also by itself
-    /// in a nightly window. Automatic installation is not implemented yet, so the
-    /// saved mode changes nothing until it is.
+    /// in a nightly window, once the app has shown only the launcher or the
+    /// Clock for ten minutes without anybody using it.
     #[command(group(clap::ArgGroup::new("change").required(true).multiple(true)))]
     InstallPolicy {
         #[arg(long, group = "change", value_parser = ["ask", "automatic"])]
@@ -200,6 +200,25 @@ enum CanonicalCommand {
     Finish,
 }
 
+/// Warnings, unless `RUST_LOG` says otherwise. Left alone, the service also
+/// records what its automatic installation does: nobody confirmed that, so the
+/// journal is where its countdown, postponement and start can be found later.
+fn log_filter(from_environment: bool) -> tracing_subscriber::EnvFilter {
+    let filter = tracing_subscriber::EnvFilter::builder()
+        .with_default_directive(tracing::level_filters::LevelFilter::WARN.into())
+        .from_env_lossy();
+    #[cfg(target_os = "linux")]
+    if !from_environment {
+        let automatic = format!(
+            "{}=info",
+            engine_os_manager::install_handoff::automatic::LOG_TARGET
+        );
+        return filter.add_directive(automatic.parse().expect("a module path and a level"));
+    }
+    let _ = from_environment;
+    filter
+}
+
 fn main() -> ExitCode {
     #[cfg(target_os = "linux")]
     engine_os_manager::network_sessions::initialize_host_namespace();
@@ -210,11 +229,7 @@ fn main() -> ExitCode {
             std::io::stderr().is_terminal()
                 && std::env::var_os("NO_COLOR").is_none_or(|value| value.is_empty()),
         )
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::builder()
-                .with_default_directive(tracing::level_filters::LevelFilter::WARN.into())
-                .from_env_lossy(),
-        )
+        .with_env_filter(log_filter(std::env::var_os("RUST_LOG").is_some()))
         .init();
     match run(Args::parse()) {
         Ok(()) => ExitCode::SUCCESS,
@@ -228,6 +243,22 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_default_log_also_records_automatic_installation() {
+        let automatic = "engine_os_manager::install_handoff::automatic=info";
+        assert_eq!(
+            format!(
+                "{}=info",
+                engine_os_manager::install_handoff::automatic::LOG_TARGET
+            ),
+            automatic
+        );
+        assert!(log_filter(false).to_string().contains(automatic));
+        // A level chosen through RUST_LOG is left exactly as chosen.
+        assert!(!log_filter(true).to_string().contains(automatic));
+    }
 
     #[test]
     fn install_policy_requires_a_setting_and_accepts_either_or_both() {
@@ -675,6 +706,9 @@ mod daemon {
         let install_policy = Arc::new(engine_os_manager::install_policy::Preference::open(
             engine_os_manager::install_policy::STATE_DIRECTORY.as_ref(),
         ));
+        let install_admission = engine_os_manager::install_admission::History::open(
+            engine_os_manager::install_admission::STATE_DIRECTORY.as_ref(),
+        );
         let (record, reason) = store.load();
         let mut saved = record.clone();
         let boot_id = linux::boot_id()?;
@@ -716,10 +750,24 @@ mod daemon {
             boot_id.clone(),
         )?;
         let update_status = updates.handle();
-        let _install = engine_os_manager::install_handoff::service::Runtime::bind_native(
+        // Installation decisions read the time the installer itself trusts.
+        let install_clock = updates.handle();
+        let install_gate = Arc::new(engine_os_manager::install_admission::Gatekeeper::new(
+            install_policy.clone(),
+            install_admission,
+            Arc::new(move || {
+                install_clock
+                    .install_time()
+                    .ok()
+                    .and_then(engine_os_manager::install_admission::Moment::local)
+            }),
+        ));
+        let install = engine_os_manager::install_handoff::service::Runtime::bind_native(
             boot_id.clone(),
             updates.handle(),
+            install_gate.clone(),
         )?;
+        let install_automatic = install.automatic();
         let update_action = update_status.clone();
         let time_checks = engine_os_manager::time_runtime::spawn(
             shared.clone(),
@@ -742,6 +790,16 @@ mod daemon {
                 status.time_check = Some(checks.status()?);
                 status.update = Some(update_status.status()?);
                 status.install_policy = saved_policy.status();
+                let admission = install_gate.status(
+                    status
+                        .update
+                        .as_ref()
+                        .and_then(|update| update.ready.as_ref())
+                        .map(|image| image.build_id.as_str()),
+                );
+                status.install_admission = Some(admission);
+                status.install_automatic =
+                    install_automatic.as_ref().and_then(|watch| watch.read());
                 Ok(status)
             }),
             Some(Arc::new(move || sync.sync_now())),

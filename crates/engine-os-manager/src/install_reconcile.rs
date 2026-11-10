@@ -242,14 +242,7 @@ fn observe_host(request: &ReconcileRequest) -> Result<HostObservation> {
     if peer != request.host || view.host != peer || view.nonce != request.nonce {
         return Err(invalid("host observation changed"));
     }
-    Ok(HostObservation {
-        instance: peer,
-        revision: view.revision,
-        settings_revision: view.settings_revision,
-        game: view.game,
-        fenced: view.fenced,
-        observed_ms,
-    })
+    Ok(HostObservation::of(&view, peer, observed_ms))
 }
 
 fn decision(

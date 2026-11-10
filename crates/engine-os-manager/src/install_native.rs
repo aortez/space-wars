@@ -20,19 +20,6 @@ impl Native {
     }
 
     fn context_for(&self, selected: &InstallCandidate) -> Result<Context, Failure> {
-        let observed_ms = transport::boot_ms().map_err(|_| Failure::NotReady)?;
-        let nonce = observed_ms.max(1);
-        let (reply, peer) = host_exchange(
-            &HostRequest::Observe {
-                schema: SCHEMA,
-                nonce,
-            },
-            Duration::from_secs(1),
-        )?;
-        let view = reply.view.ok_or(Failure::NotReady)?;
-        if view.nonce != nonce || view.host != peer || !view.available {
-            return Err(Failure::NotReady);
-        }
         Ok(Context {
             boot_id: self.boot_id.clone(),
             ready: Some(
@@ -40,14 +27,7 @@ impl Native {
                     .map_err(Failure::from)?,
             ),
             maintenance_clear: true,
-            host: Some(HostObservation {
-                instance: peer,
-                revision: view.revision,
-                settings_revision: view.settings_revision,
-                game: view.game,
-                fenced: view.fenced,
-                observed_ms,
-            }),
+            host: Some(self.observe()?),
         })
     }
 
@@ -163,6 +143,28 @@ impl Backend for Native {
         }
         self.context_for(&selected)
     }
+    fn observe(&self) -> Result<HostObservation, Failure> {
+        view(|nonce| HostRequest::Observe {
+            schema: SCHEMA,
+            nonce,
+        })
+    }
+    fn countdown(&self, generation: u64, ends_ms: u64) -> Result<HostObservation, Failure> {
+        view(|nonce| HostRequest::Countdown {
+            schema: SCHEMA,
+            nonce,
+            generation,
+            ends_ms,
+        })
+    }
+    fn ready(&self) -> Option<automatic::Image> {
+        let selected = self.updates.install_candidate().ok()?;
+        let image = selected.candidate.image();
+        Some(automatic::Image {
+            build_id: image.build_id.clone(),
+            generation: image.generation,
+        })
+    }
     fn prepare(&self, prepare: &Prepare) -> Result<(Acknowledgement, HostInstance), Failure> {
         let (reply, peer) = host_exchange(
             &HostRequest::Prepare {
@@ -211,6 +213,17 @@ impl crate::bootstrap_activation::RequestPermit for native_install::TrialPermit<
     fn fail(&mut self) -> engine_ota::Result<()> {
         self.fail()
     }
+}
+/// One authenticated look at an available app.
+fn view(request: impl FnOnce(u64) -> HostRequest) -> Result<HostObservation, Failure> {
+    let observed_ms = transport::boot_ms().map_err(|_| Failure::NotReady)?;
+    let nonce = observed_ms.max(1);
+    let (reply, peer) = host_exchange(&request(nonce), Duration::from_secs(1))?;
+    let view = reply.view.ok_or(Failure::NotReady)?;
+    if view.nonce != nonce || view.host != peer || !view.available {
+        return Err(Failure::NotReady);
+    }
+    Ok(HostObservation::of(&view, peer, observed_ms))
 }
 fn invalid(message: &str) -> crate::Error {
     crate::Error::Invalid(message.into())
