@@ -98,8 +98,12 @@ impl Client {
             host.finish(Err(Failure::Stale));
             window.set_install_fenced(false);
             window.set_updates_can_cancel(true);
-            let abandoned_offer =
-                resolved.is_none() && offered.is_some_and(|ticket| ticket.service != reply.service);
+            let abandoned_offer = resolved.is_none()
+                && offered
+                    .as_ref()
+                    .is_some_and(|ticket| ticket.service != reply.service);
+            host.unattended
+                .resolved(resolved.or(offered.as_ref().filter(|_| abandoned_offer)));
             if resolved.is_some() || abandoned_offer {
                 self.cleanup = resolved.is_some();
                 panel.generation += 1;

@@ -154,7 +154,10 @@ arrives, and returns to Back once the offer is consumed, withdrawn or expired,
 so a button that turns live under a resting cursor cannot take the next press.
 Left of Back, **Automatic install** opens the saved setting's page
 ([Install policy setting](ota-updates.md#install-policy-setting)); it is
-disabled while an installation runs and absent while one holds the app. Desktop
+disabled while an installation runs and absent while one holds the app.
+Opening Updates reads the setting. When the app opens Updates by itself, for an
+installation confirmed elsewhere or for an outcome after a restart, it reads
+the setting once the hold lifts. Desktop
 installation remains unavailable. While the service reports an installation
 phase, the panel shows an activity bar under the phase message: the native
 writer's byte counts fill it during the write and flush stages, and it sweeps in
@@ -237,6 +240,20 @@ confirmations keep polling even before the app receives Prepare. A matching Clea
 from a new service incarnation retires the old unheld offer so Back and reopening
 Updates work after an early service restart. A delayed Clear for an earlier offer
 cannot discard a newer offer, and Clear never releases a held preparation.
+
+An outcome waits for Back after a press on Install. When nobody pressed
+Install, because the Automatic setting or a command confirmed the installation
+elsewhere, its outcome closes Updates once it has gone a minute without use, so
+the launcher and the Clock return and later automatic attempts are not held
+behind it. Nothing closes while an installation holds the app or an offer
+stands. The outcome usually shows after the restart, so the app notes the
+ticket of such an installation in `/var/lib/spacewars/unattended-install.json`
+as it accepts the preparation; an installation pressed here removes the note.
+The note counts only for the installation it names. It stays until a
+reconciliation settles another installation or none, as the service reports
+once it has retired an outcome, because a trial boot that commits can show the
+outcome and the normal boot after it then shows it again. Older images ignore
+the file.
 
 ## Manual device CLI
 
