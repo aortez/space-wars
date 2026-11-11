@@ -19,13 +19,21 @@ fn choose(h: &mut FunctionalHarness, s: &mut UiState, current: &mut usize, targe
     press(h, s, InputButton::South);
 }
 fn snapshot(h: &mut FunctionalHarness, predicate: impl Fn(&Value) -> bool) -> Value {
+    snapshot_after(h, None, predicate)
+}
+/// The status samples the garden about once a second. With `after`, only a
+/// later sample counts.
+fn snapshot_after(
+    h: &mut FunctionalHarness,
+    after: Option<u64>,
+    predicate: impl Fn(&Value) -> bool,
+) -> Value {
     let deadline = Instant::now() + Duration::from_secs(30);
     loop {
-        let status = h
-            .client
-            .request_before("status\n", Instant::now() + Duration::from_secs(2))
-            .unwrap();
-        if let Some(line) = status.lines().find_map(|l| l.strip_prefix("garden_lab=")) {
+        let status = status(h);
+        if after.is_none_or(|after| sample(&status) > after)
+            && let Some(line) = status.lines().find_map(|l| l.strip_prefix("garden_lab="))
+        {
             let v: Value = serde_json::from_str(line).unwrap();
             if predicate(&v) {
                 h.history
@@ -39,6 +47,19 @@ fn snapshot(h: &mut FunctionalHarness, predicate: impl Fn(&Value) -> bool) -> Va
         );
         thread::sleep(Duration::from_millis(50));
     }
+}
+fn status(h: &mut FunctionalHarness) -> String {
+    h.client
+        .request_before("status\n", Instant::now() + Duration::from_secs(2))
+        .unwrap()
+}
+/// Which sample a status shows: the client's update count when it took it.
+fn sample(status: &str) -> u64 {
+    status
+        .lines()
+        .find_map(|l| l.strip_prefix("updates_total="))
+        .and_then(|n| n.parse().ok())
+        .expect("status without updates_total")
 }
 fn tissues(v: &Value) -> &Vec<Value> {
     v["tissues"].as_array().unwrap()
@@ -54,9 +75,12 @@ fn tick(v: &Value) -> u64 {
 }
 fn fresh(h: &mut FunctionalHarness, s: &mut UiState, c: &mut usize) -> Value {
     choose(h, s, c, 12);
+    // The status can still show the garden from before the reset, which may
+    // also be paused near the start. Any later sample shows the reset.
+    let reset = sample(&status(h));
     *c = 0;
     choose(h, s, c, 0);
-    snapshot(h, |v| {
+    snapshot_after(h, Some(reset), |v| {
         v["paused"] == true
             && tick(v) <= 2
             && v["availability"] == json!([1000, 1000])
