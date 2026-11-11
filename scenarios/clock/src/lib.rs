@@ -38,6 +38,9 @@ mod fonts;
 pub mod grass;
 #[cfg(test)]
 mod input_tests;
+mod lamps;
+#[cfg(test)]
+mod lamps_tests;
 mod layout;
 pub mod lighting_fixture;
 #[cfg(test)]
@@ -528,6 +531,8 @@ pub struct ClockState {
     spider_visit: Option<spider::visit::SpiderVisit>,
     spider_accounting: spider::SpiderAccounting,
     crow_visit: Option<crow::CrowVisit>,
+    // The corner lamps' moods, on their own seeded stream.
+    lamps: lamps::Lamps,
     player_duck_sequence: u64,
     player_seed: u64,
     font_rng: StdRng,
@@ -1340,6 +1345,20 @@ impl ClockState {
             _ => None,
         }
     }
+    pub fn lamps_state(&self) -> engine_common::ClockLampsState {
+        self.lamps.state(self.config.event_profile)
+    }
+
+    /// Starts a lamp mood now, whatever the profile, as an event preview
+    /// would. It gives way to an event or visit that starts meanwhile.
+    pub fn preview_lamp_mood(
+        &mut self,
+        kind: engine_common::ClockLampMood,
+        lamp: engine_common::ClockLampSide,
+    ) {
+        self.lamps.preview(kind, lamp);
+    }
+
     pub fn crow_state(&self) -> Option<engine_common::ClockCrowState> {
         self.crow_visit.as_ref().map(crow::CrowVisit::diagnostics)
     }
@@ -1909,6 +1928,45 @@ impl ClockState {
             self.sync_event_schedule();
         }
         self.update_crow(true);
+        let scene = lamps::Scene {
+            profile: self.config.event_profile,
+            quiet: self.lamps_quiet(),
+            next_event_in: self.lamps_gap(),
+        };
+        self.lamps.step(scene);
+    }
+
+    /// Ticks until whatever would next cut a lamp's mood short: the
+    /// schedule's next event, or the next minute's change when a
+    /// time-change event would start with it. A reading's second only says
+    /// how many whole seconds are left, so count one fewer.
+    fn lamps_gap(&self) -> Option<u64> {
+        let scheduled = self
+            .schedule
+            .next_event_tick
+            .map(|at| at.saturating_sub(self.schedule.tick));
+        let minute = self
+            .schedule
+            .time_change_event()
+            .and(self.reading)
+            .map(|reading| u64::from(59 - reading.second().min(59)) * u64::from(FIXED_HZ));
+        match (scheduled, minute) {
+            (Some(scheduled), Some(minute)) => Some(scheduled.min(minute)),
+            (scheduled, minute) => scheduled.or(minute),
+        }
+    }
+
+    /// Whether a lamp may have a mood: the clock has a reading and nothing
+    /// else is going on, not even an event's cooldown or a notice.
+    fn lamps_quiet(&self) -> bool {
+        self.reading.is_some()
+            && self.active_event.is_none()
+            && self.schedule.lifecycle == EventLifecycle::Idle
+            && self.duck_visit.is_none()
+            && self.crow_visit.is_none()
+            && self.spider.is_none()
+            && self.event_notice.is_none()
+            && self.ceiling.phase == ceiling::Phase::Closed
     }
 
     fn update_crow(&mut self, advance: bool) {
@@ -2124,6 +2182,7 @@ impl Scenario for ClockScenario {
             spider_visit: None,
             spider_accounting: spider::SpiderAccounting::default(),
             crow_visit: None,
+            lamps: lamps::Lamps::new(seed),
             player_duck_sequence: 0,
             player_seed: seed ^ 0x504c_4159_4455_434b,
             font_rng: StdRng::seed_from_u64(seed ^ 0x464f_4e54),

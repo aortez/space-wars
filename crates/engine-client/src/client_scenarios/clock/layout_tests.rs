@@ -54,12 +54,13 @@ fn centered_clock_and_wooden_floor_render_across_formats_and_layouts() {
             assert_eq!(background, at(width / 2, height * 91 / 100));
             assert_ne!(header, background);
             assert_ne!(base, background);
-            // Bright cyan excludes dim guides, the frame and the AM/PM label.
+            // Bright cyan excludes dim guides, the frame, the AM/PM label
+            // and the warm white of the lamps' bulbs.
             let lit: Vec<_> = normal_pixels
                 .as_slice()
                 .iter()
                 .enumerate()
-                .filter(|(_, p)| p.r >= 60 && p.g >= 200 && p.b >= 200)
+                .filter(|(_, p)| p.r >= 60 && p.r < p.g && p.g >= 200 && p.b >= 200)
                 .map(|(i, _)| (i % width, i / width))
                 .collect();
             let top = lit.iter().map(|p| p.1).min().unwrap();

@@ -1,5 +1,6 @@
-//! A decorative wooden surround, with two dim lamps in its upper corners.
-//! Its side and top rails join the physical floor, which supplies the wooden base.
+//! A decorative wooden surround, with a lamp in each upper corner (see
+//! `lamp`). Its side and top rails join the physical floor, which supplies
+//! the wooden base.
 
 use super::*;
 use crate::events::duck::DuckEvent;
@@ -11,7 +12,6 @@ use engine_common::{RenderCircle, RenderLine};
 mod tests;
 
 const FRAME_LAYER: i32 = 10;
-const LAMP_LAYER: i32 = 11;
 const DOOR_LAYER: i32 = 12;
 const SHADOW_LAYER: i32 = 9;
 
@@ -98,34 +98,7 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
         }
     }
 
-    let radius = ((layout.bounds_max.x - layout.bounds_min.x) * 0.22).min(96.0);
-    // Nestle the lamp housings just inside the junction of the two rails.
-    let lamp_inset = width * 1.3;
-    for x in [
-        layout.bounds_min.x + lamp_inset,
-        layout.bounds_max.x - lamp_inset,
-    ] {
-        let center = RenderPoint::new(x, layout.bounds_max.y - lamp_inset);
-        for shell in (1..=12).rev() {
-            frame.push_primitive(
-                LAMP_LAYER,
-                RenderPrimitive::Circle(RenderCircle::filled(
-                    center,
-                    radius * shell as f32 / 12.0,
-                    RenderColor::rgba(1.0, 0.55, 0.20, 0.012),
-                )),
-            );
-        }
-        for (radius, color) in [
-            (width * 0.28, RenderColor::rgb(0.30, 0.18, 0.075)),
-            (width * 0.13, RenderColor::rgb(0.78, 0.52, 0.24)),
-        ] {
-            frame.push_primitive(
-                LAMP_LAYER,
-                RenderPrimitive::Circle(RenderCircle::filled(center, radius, color)),
-            );
-        }
-    }
+    super::lamp::render(frame, state, layout);
     for door in doors.into_iter().flatten() {
         let inward = door.angle.signum();
         let cut_edge =

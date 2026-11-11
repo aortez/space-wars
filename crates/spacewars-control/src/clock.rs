@@ -76,6 +76,9 @@ pub struct ClockState {
     pub explosion: Option<engine_common::ClockExplosionState>,
     #[serde(default)]
     pub coins: Option<engine_common::ClockCoinsState>,
+    /// The corner lamps: the mood under way and how many the run has had.
+    #[serde(default)]
+    pub lamps: Option<engine_common::ClockLampsState>,
     #[serde(default)]
     pub tanks: Option<engine_common::ClockTanksState>,
     pub player_duck: Option<engine_common::ClockPlayerDuckState>,
@@ -463,6 +466,7 @@ mod tests {
             spider: None,
             explosion: None,
             coins: None,
+            lamps: None,
             tanks: None,
             player_duck: None,
             automatic_events_suspended: false,

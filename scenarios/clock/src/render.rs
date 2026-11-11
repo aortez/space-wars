@@ -23,6 +23,7 @@ mod floor;
 mod frame;
 mod glow;
 pub(crate) mod grass_inspection;
+mod lamp;
 mod magpie;
 mod marquee;
 mod meltdown;
@@ -83,6 +84,14 @@ pub(crate) fn water_fixture_cell(frame: &mut RenderFrame, center: Vec2, pitch: f
 }
 
 pub fn render_frame(state: &ClockState) -> RenderFrame {
+    let mut frame = compose(state);
+    // A spotlight lights whatever cells the scene drew, whichever way it
+    // drew them.
+    lamp::illuminate(&mut frame, state, Layout::new(state.aspect_ratio()));
+    frame
+}
+
+fn compose(state: &ClockState) -> RenderFrame {
     let layout = Layout::new(state.aspect_ratio());
     let mut frame = RenderFrame::new(Camera2::new(RenderPoint::ZERO, CAMERA_HEIGHT));
     if let Some((message, _)) = state.event_notice {

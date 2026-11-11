@@ -318,6 +318,27 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 );
             }
         }
+        if let Some(lamps) = &state.lamps {
+            let mood = lamps.mood.map_or("steady".into(), |mood| {
+                format!(
+                    "{} {} {}/{} at {}/1000{}",
+                    mood.lamp.as_str(),
+                    mood.kind.as_str(),
+                    mood.tick,
+                    mood.ticks,
+                    mood.brightness_milli,
+                    if mood.yielding { ", giving way" } else { "" }
+                )
+            });
+            // Nothing is due during a mood or under Off.
+            let due = lamps.due_in_quiet_ticks.map_or(String::new(), |ticks| {
+                format!(", next due in {ticks} quiet ticks")
+            });
+            println!(
+                "Lamps: {mood}; flickers={} outages={} spotlights={}{due}",
+                lamps.flickers, lamps.outages, lamps.spotlights
+            );
+        }
         if let Some(crow) = &state.crow {
             println!(
                 "Crow #{}: {}, age={} phase tick={}, position={:?}, target={:?}, hops={}, escapes={}, ground={:?} visits={} pecks={}, water={} wet={}/1000 departures={}",

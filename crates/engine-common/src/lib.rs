@@ -1070,6 +1070,76 @@ pub struct ClockTanksState {
     pub entry_failure: Option<String>,
 }
 
+/// One of the two lamps in the upper corners of the Clock's frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockLampSide {
+    Left,
+    Right,
+}
+
+impl ClockLampSide {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Left => "left",
+            Self::Right => "right",
+        }
+    }
+}
+
+/// What a corner lamp does now and then while the scene is quiet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockLampMood {
+    /// A few quick dips in brightness.
+    Flicker,
+    /// It sputters out, stays dark for a few seconds and sputters back on.
+    Outage,
+    /// Its head narrows the light into a beam that sweeps across the reading.
+    Spotlight,
+}
+
+impl ClockLampMood {
+    pub const ALL: [Self; 3] = [Self::Flicker, Self::Outage, Self::Spotlight];
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Flicker => "flicker",
+            Self::Outage => "outage",
+            Self::Spotlight => "spotlight",
+        }
+    }
+}
+
+/// The corner lamps: the mood under way, how many of each kind the run has
+/// had and how much more quiet the next one waits for.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockLampsState {
+    pub mood: Option<ClockLampMoodState>,
+    pub flickers: u32,
+    pub outages: u32,
+    pub spotlights: u32,
+    /// Quiet ticks left before the next mood is due: 0 once it is due and
+    /// waiting for a gap that holds it, and None while one is under way and
+    /// while the event profile is Off, which keeps the lamps steady.
+    pub due_in_quiet_ticks: Option<u32>,
+}
+
+/// A lamp's mood in progress.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockLampMoodState {
+    pub kind: ClockLampMood,
+    pub lamp: ClockLampSide,
+    pub tick: u32,
+    pub ticks: u32,
+    /// The bulb's brightness, 0..=1000 when steady or dimmed; a spotlight
+    /// runs a little brighter.
+    pub brightness_milli: u16,
+    /// An event, a visit or a setting cut the mood short, and the lamp is
+    /// returning to its steady look.
+    pub yielding: bool,
+}
+
 /// Bounded Crow visitor diagnostics, independent of the timed animation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockCrowState {
