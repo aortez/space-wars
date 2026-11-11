@@ -134,14 +134,18 @@ fn adapter_oracle_detects_corrupt_vertices_and_indices() {
 }
 
 #[test]
-fn clock_corpus_matches_full_renderer_layout_and_fine_arc_counts() {
-    for (width, height, expected) in [(800., 480., 5), (1024., 768., 1)] {
+fn clock_corpus_matches_full_renderer_stroke_cohorts() {
+    for (width, height, digit_cohort) in [(800., 480., 5), (1024., 768., 1)] {
         for name in ["clock-idle", "clock-rain"] {
             let captured = clock_capture(name, Viewport::new(width, height)).unwrap();
             assert_eq!(captured.len(), 1);
-            assert_eq!(captured[0].outlines.len(), 88);
-            assert!(classes(&captured)[0].iter().all(|&c| c == expected));
-            validate(&captured, expected).unwrap();
+            assert_eq!(captured[0].outlines.len(), 90);
+            let labels = classes(&captured);
+            // The 88 digit strokes precede two lamp hoods using prepared topology.
+            let mut expected = vec![digit_cohort; 88];
+            expected.extend([2, 2]);
+            assert_eq!(labels[0], expected, "{name} at {width}x{height}");
+            validate(&captured, 0).unwrap();
         }
     }
 }
