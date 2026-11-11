@@ -35,6 +35,7 @@ pub(crate) const SPOTLIGHT_TICKS: u32 =
 /// A bulb coming back from an outage warms up from this brightness.
 const WARM_UP_FROM: f32 = 0.55;
 const WARM_UP_TICKS: u32 = 24;
+pub(crate) const SPARK_TICKS: u32 = 24;
 
 /// How a lamp looks this tick.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -82,6 +83,8 @@ pub(crate) struct Mood {
     steps: Vec<(u32, f32)>,
     /// From this tick on, the bulb warms back up to steady.
     warm_from: u32,
+    /// An occasional spark burst as the filament finally goes dark.
+    spark_at: Option<u32>,
     /// Spotlight: where the beam settles first, and where its sweep ends.
     sweep: [Vec2; 2],
     /// The tick at which it gave way, and how it looked then.
@@ -98,6 +101,7 @@ impl Mood {
             preview,
             steps: Vec::new(),
             warm_from: u32::MAX,
+            spark_at: None,
             sweep: [Vec2::ZERO; 2],
             yielded: None,
         };
@@ -123,6 +127,7 @@ impl Mood {
                     mood.steps.push((at, level));
                     at += rng.random_range(3..=9);
                 }
+                let dark_from = at;
                 mood.steps.push((at, 0.0));
                 at += rng.random_range(150..=300);
                 for flash in 0..rng.random_range(2..=4) {
@@ -136,6 +141,9 @@ impl Mood {
                 }
                 mood.warm_from = at;
                 at += WARM_UP_TICKS;
+                if rng.random_bool(0.5) {
+                    mood.spark_at = Some(dark_from);
+                }
             }
             ClockLampMood::Spotlight => {
                 // Settle on the digit nearest the lamp, then sweep to one of
@@ -294,6 +302,15 @@ impl Lamps {
             .as_ref()
             .filter(|mood| mood.lamp == lamp)
             .map_or(Look::STEADY, Mood::look)
+    }
+
+    pub fn spark_tick(&self, lamp: usize) -> Option<u32> {
+        let mood = self.mood.as_ref()?;
+        if mood.lamp != lamp || mood.yielding() {
+            return None;
+        }
+        let tick = mood.tick.checked_sub(mood.spark_at?)?;
+        (tick < SPARK_TICKS).then_some(tick)
     }
 
     pub fn step(&mut self, scene: Scene) {

@@ -175,7 +175,9 @@ Now and then, while the scene is quiet, one lamp has a mood:
 - **Flicker.** Two to five quick dips in brightness, over in under two seconds.
 - **Outage.** The bulb sputters out, stays dark for 2.5 to 5 seconds,
   sputters back on and warms up. The glow, the bloom and the thrown light go
-  with it, so its corner of the room goes dark.
+  with it, so its corner of the room goes dark. About half of outages give
+  off a tiny flash and five golden sparks as the bulb goes dark; the sparks
+  fall inward and fade within 0.4 seconds, stopping if the lamp gives way.
 - **Spotlight.** The thrown light gathers into a beam that narrows onto the
   digit nearest the lamp, rests there, sweeps across to one of the far two
   digits, holds and widens back out, seven seconds in all. The beam lays a
@@ -241,8 +243,8 @@ profile, as an event preview does. There is no menu control for the lamps
 yet.
 
 The capture test draws the steady lamps, a spotlight at rest and partway
-through its sweep, and an outage through the production raster and vector
-adapters at 800×480, 1024×768 and 480×800. It checks that each mood ends on
+through its sweep, and an outage with sparks through the production raster and
+vector adapters at 800×480, 1024×768 and 480×800. It checks that each mood ends on
 exactly the steady face, and, given a directory, writes the stills and every
 second frame of the 800×480 film:
 

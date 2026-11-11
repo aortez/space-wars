@@ -1,7 +1,7 @@
 //! Fixed-reading captures of the corner lamps through both production scene
 //! adapters: the steady lamps, a spotlight resting on the digit nearest its
-//! lamp and partway through its sweep, and an outage's dark corner, in the
-//! device-sized views. Every mood ends on exactly the steady face. A sample
+//! lamp and partway through its sweep, and an outage's sparks and dark corner
+//! in the device-sized views. Every mood ends on exactly the steady face. A sample
 //! always runs; the stills and every second frame of the 800x480 film are
 //! written out when `SPACEWARS_LAMPS_ARTIFACTS` names a directory, for the
 //! docs' pictures.
@@ -107,12 +107,27 @@ fn lamps_render_steady_spotlight_and_outage_and_come_back_at_target_sizes() {
                 let still = match (mood, current.tick) {
                     (ClockLampMood::Spotlight, 72) => Some("spotlight"),
                     (ClockLampMood::Spotlight, 186) => Some("sweep"),
+                    (ClockLampMood::Outage, _) if dark == 9 => Some("sparks"),
                     (ClockLampMood::Outage, _) if dark == 40 => Some("outage"),
                     _ => None,
                 };
                 let film = width == 800 && output.is_some() && current.tick % 2 == 0;
                 if still.is_some() || film || current.tick % 60 == 0 {
                     let frame = ClockScenario::render_frame(&state);
+                    if still == Some("sparks") {
+                        assert!(
+                            frame
+                                .layers
+                                .iter()
+                                .filter(|layer| layer.z == 11)
+                                .any(|layer| {
+                                    layer.primitives.iter().any(|primitive| {
+                                        matches!(primitive, engine_common::RenderPrimitive::Line(_))
+                                    })
+                                }),
+                            "the outage fixture must include sparks"
+                        );
+                    }
                     let pixels = draw(&ui, window, &frame, viewport);
                     if current.tick % 60 == 0 {
                         let vector = svg(&frame, viewport);
@@ -155,7 +170,7 @@ fn lamps_render_steady_spotlight_and_outage_and_come_back_at_target_sizes() {
             );
         }
     }
-    assert_eq!(traces.len(), 9, "a still was missed: {traces:?}");
+    assert_eq!(traces.len(), 12, "a still was missed: {traces:?}");
     if let Some(path) = &output {
         std::fs::write(
             path.join("captures.json"),

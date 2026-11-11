@@ -1,7 +1,7 @@
 //! The corner lamps and their moods: when they come, how they look, how
 //! they give way, and that they never move the event schedule.
 
-use crate::lamps::{Lamps, Look, SPOTLIGHT_TICKS, Scene, YIELD_TICKS};
+use crate::lamps::{Lamps, Look, SPARK_TICKS, SPOTLIGHT_TICKS, Scene, YIELD_TICKS};
 use crate::{ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState};
 use engine_common::{
     ClockEventKind, ClockEventProfile, ClockLampMood, ClockLampSide, RenderFrame, RenderPrimitive,
@@ -212,6 +212,49 @@ fn a_preview_runs_with_the_profile_off_but_a_drawn_mood_does_not() {
     until_mood(&mut lamps, quiet(ClockEventProfile::Demo), 60 * 60).unwrap();
     lamps.step(quiet(ClockEventProfile::Off));
     assert!(lamps.mood().unwrap().yielding());
+}
+
+#[test]
+fn outage_sparks_are_occasional_brief_and_yield_with_the_lamp() {
+    let scene = quiet(ClockEventProfile::Off);
+    let mut bursts = 0;
+    for seed in 0..24 {
+        let mut lamps = Lamps::new(seed);
+        let mut interrupted = Lamps::new(seed);
+        lamps.preview(ClockLampMood::Outage, ClockLampSide::Right);
+        interrupted.preview(ClockLampMood::Outage, ClockLampSide::Right);
+        let mut spark_ticks = 0;
+        while lamps.mood().is_some() {
+            assert_eq!(lamps.spark_tick(0), None);
+            if let Some(tick) = lamps.spark_tick(1) {
+                assert_eq!(tick, spark_ticks);
+                assert_eq!(lamps.look(1).brightness, 0.0);
+                spark_ticks += 1;
+                if tick == 0 {
+                    assert_eq!(interrupted.spark_tick(1), Some(0));
+                    interrupted.step(Scene {
+                        quiet: false,
+                        ..scene
+                    });
+                    assert!(interrupted.mood().unwrap().yielding());
+                }
+                assert_eq!(interrupted.spark_tick(1), None);
+            }
+            lamps.step(scene);
+            interrupted.step(scene);
+        }
+        assert!(spark_ticks == 0 || spark_ticks == SPARK_TICKS);
+        bursts += u32::from(spark_ticks > 0);
+        assert_eq!(lamps.spark_tick(1), None);
+        for kind in [ClockLampMood::Flicker, ClockLampMood::Spotlight] {
+            lamps.preview(kind, ClockLampSide::Right);
+            while lamps.mood().is_some() {
+                assert_eq!(lamps.spark_tick(1), None);
+                lamps.step(scene);
+            }
+        }
+    }
+    assert!(bursts > 0 && bursts < 24, "{bursts} of 24 outages sparked");
 }
 
 #[test]

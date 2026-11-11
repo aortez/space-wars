@@ -102,6 +102,60 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
             pool_of_light(frame, pool);
         }
         head(frame, &light, layout);
+        if let Some(tick) = state.lamps.spark_tick(lamp) {
+            sparks(frame, &light, layout, tick);
+        }
+    }
+}
+
+fn sparks(frame: &mut RenderFrame, light: &Light, layout: Layout, tick: u32) {
+    let width = layout.frame_width;
+    let origin = light.center + Vec2::new(light.aim.cos(), light.aim.sin()) * (width * 0.16);
+    let inward = -light.center.x.signum();
+    let time = tick as f32 / crate::FIXED_HZ as f32;
+    if tick < 6 {
+        frame.push_primitive(
+            LAMP_LAYER,
+            RenderPrimitive::Circle(RenderCircle::filled(
+                RenderPoint::new(origin.x, origin.y),
+                width * (0.4 + time * 5.0),
+                RenderColor::rgba(1.0, 0.87, 0.48, 0.6 * (1.0 - tick as f32 / 6.0)),
+            )),
+        );
+    }
+    // A few hot flecks fall inward from the bulb, with short fading trails.
+    for (index, (vx, vy)) in [
+        (1.6, -0.5),
+        (3.0, -1.7),
+        (4.7, -0.9),
+        (2.0, -3.4),
+        (3.8, 0.1),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let life = crate::lamps::SPARK_TICKS as f32 / crate::FIXED_HZ as f32 - index as f32 * 0.025;
+        if time >= life {
+            continue;
+        }
+        let position = |t: f32| {
+            let p = origin + Vec2::new(inward * vx * t, vy * t - 12.0 * t * t) * width;
+            RenderPoint::new(p.x, p.y)
+        };
+        let alpha = (1.0 - time / life).sqrt();
+        for (thickness, color) in [
+            (0.25, RenderColor::rgba(1.0, 0.42, 0.08, alpha * 0.25)),
+            (0.09, RenderColor::rgba(1.0, 0.91, 0.56, alpha)),
+        ] {
+            frame.push_primitive(
+                LAMP_LAYER,
+                RenderPrimitive::Line(engine_common::RenderLine::new(
+                    position((time - 0.045).max(0.0)),
+                    position(time),
+                    Stroke::new(color, (width * thickness).max(0.8)),
+                )),
+            );
+        }
     }
 }
 
