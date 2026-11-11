@@ -33,8 +33,10 @@ and kernel ([recovery qualification](ota-recovery-qualification.md)). Every
 install is a press unless the owner saves the Automatic mode
 ([Install policy setting](#install-policy-setting)). The service then also
 installs a ready update by itself, at night, from an idle launcher or Clock
-([Automatic installation](#automatic-installation)). The default is Ask, no
-unit has Automatic saved, and no automatic installation has run on hardware.
+([Automatic installation](#automatic-installation)). The default is Ask.
+`sw-picade-2` is the only unit with Automatic saved, and there generation 27
+installed generation 28 by itself on 2026-11-10, the first automatic
+installation on hardware.
 
 Publication is owner-local. Each Nightly generation is built on the workstation
 from the selected `main` commit in the pinned kas container, qualified against
@@ -228,6 +230,12 @@ game, and the coordinator refuses to end one without that. The image is saved
 as tried once this consent is consumed and before anything is written; if that
 cannot be saved, nothing is written.
 
+The outcome of a press waits for Back. The outcome of an installation nobody
+pressed Install for, which the Automatic setting or a command confirmed
+elsewhere, closes Updates once it has gone a minute without use, so that the
+Clock and later attempts are not held behind it
+([outcome reconciliation](ota-install-handoff.md#startup-and-outcome-reconciliation)).
+
 `engine-os-manager status` reports the service's side under
 `install_automatic`:
 
@@ -250,8 +258,20 @@ cannot be saved, nothing is written.
 `postponed` and `started` stay readable until the gate opens again or the
 service restarts. The service's journal keeps the history: it records each
 countdown, postponement and start, and each change in what an open gate waits
-for, at the service's default log level. Nothing here has run on a device: the
-tests drive the real service and app sockets with a stand-in app and writer.
+for, at the service's default log level. The tests drive the real service and
+app sockets with a stand-in app and writer.
+
+The first run on a device was the Nightly pilot on `sw-picade-2` on 2026-11-10
+(`ota-picade2-generation28-automatic-install-20261110`). With Automatic saved
+for 20:30–23:00 from the CLI, generation 27 counted down from the Clock at
+20:37:58 PST and installed generation 28, which committed and restarted into
+its normal boot at 20:43 with the setting kept. Its outcome screen then stayed
+open, holding the Clock and the next window's attempt behind it, and the
+screen's **Automatic install** button was disabled and unnamed because the app
+had not read the setting for a screen it opened itself. The app now closes
+such an outcome and reads the setting for those screens. The app that starts
+an installation makes the note that marks it as nobody's press, so an
+installation started by generation 28 or earlier still waits for Back.
 
 ### Review corrections and next network gate
 
@@ -352,9 +372,11 @@ test unit and a fresh candidate are available.
    acts on it: the idle wait, the countdown and postponement, then the
    confirmed flow's writer, locks, recovery and app handoff
    ([Automatic installation](#automatic-installation)), with the countdown
-   on screen, and the Updates panel's controls for the setting. Pilot it on
-   `sw-picade-2`'s Nightly channel, with a window that falls inside its
-   powered hours; the household units stay on Release and Ask.
+   on screen, and the Updates panel's controls for the setting. The pilot on
+   `sw-picade-2`'s Nightly channel, with a window inside its powered hours,
+   installed generation 28 by itself on 2026-11-10
+   ([Automatic installation](#automatic-installation)); the household units
+   stay on Release and Ask.
 4. Publication (#262): the hosted image workflow keeps manual dispatch only;
    a dispatch succeeds only once the cold build fits the runner or reuses a
    cache, which nobody needs while the workstation builds in minutes. Signing

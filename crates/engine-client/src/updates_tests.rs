@@ -2348,3 +2348,257 @@ fn the_setting_steps_aside_for_an_installation() {
     assert_eq!(ids, ["updates.confirm", "updates.cancel"]);
     assert_eq!(h.window.get_updates_focus(), 1);
 }
+
+/// What the device service does once an installation is confirmed: it asks the
+/// app what it shows, then hands it the preparation. Runs off the UI thread.
+fn hand_over(path: &Path) -> HostReply {
+    let view = host_request(
+        path,
+        HostRequest::Observe {
+            schema: SCHEMA,
+            nonce: 7,
+        },
+    )
+    .view
+    .unwrap();
+    host_request(
+        path,
+        HostRequest::Prepare {
+            schema: SCHEMA,
+            prepare: Prepare {
+                schema: SCHEMA,
+                ticket: ticket(),
+                host: view.host,
+                host_revision: view.revision,
+                settings_revision: view.settings_revision,
+                expires_ms: transport::boot_ms().unwrap() + PREPARE_MS,
+            },
+        },
+    )
+}
+
+/// The installation the app noted as nobody's press, if any.
+fn noted(dir: &Path) -> Option<Ticket> {
+    let bytes = std::fs::read(dir.join("unattended-install.json")).ok()?;
+    Some(serde_json::from_slice(&bytes).unwrap())
+}
+
+/// An installation that ends without a restart. Only the outcome of one
+/// nobody pressed Install for closes Updates by itself; either outcome reads
+/// the setting again for its button.
+fn outcome_without_a_restart(pressed: bool) {
+    let mut h = Harness::new();
+    h.window.set_launcher_visible(true);
+    h.window.set_ingame_menu_visible(false);
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("host.sock");
+    let handed = Arc::new(AtomicBool::new(false));
+    let confirmed = handed.clone();
+    let host_path = socket.clone();
+    let service = Arc::new(SettingService::default());
+    let mut host = Host::new(host_identity());
+    host.unattended.close_ms = 300;
+    let frames = h.frames.clone();
+    let _runtime = start(
+        &h.window,
+        Arc::new(RwLock::new(Settings::default())),
+        SettingsWriter::new(dir.path().join("settings.toml")).unwrap(),
+        h.input.clone(),
+        Some(host),
+        socket.clone(),
+        Arc::new(move |request| {
+            let mut reply = response(Phase::Preparing);
+            match request {
+                ServiceRequest::Offer { .. } => {
+                    reply.status.phase = Phase::Offered;
+                    reply.offer = Some(Offer {
+                        schema: SCHEMA,
+                        ticket: ticket(),
+                        candidate: Candidate {
+                            id: ticket().candidate,
+                            channel: Channel::Nightly,
+                            generation: 29,
+                            build_id: "test-image".into(),
+                        },
+                        ends_game: false,
+                        expires_ms: transport::boot_ms().unwrap() + 300_000,
+                    });
+                }
+                ServiceRequest::Confirm { .. } => {
+                    assert!(hand_over(&host_path).acknowledgement.is_some());
+                    confirmed.store(true, Ordering::SeqCst);
+                }
+                ServiceRequest::Status { .. } => {}
+                _ => unreachable!("the setting has an exchange of its own"),
+            }
+            Ok(reply)
+        }),
+        Rc::new(move || Some(frames.get())),
+        uid(),
+        None,
+        Some(service.exchange()),
+    );
+    if pressed {
+        h.window.invoke_updates_open();
+        h.until(true, |w| w.get_updates_can_confirm());
+        h.window.invoke_updates_confirm();
+    } else {
+        // The Automatic setting or a command confirmed it elsewhere.
+        let path = socket.clone();
+        let done = handed.clone();
+        thread::spawn(move || {
+            assert!(hand_over(&path).acknowledgement.is_some());
+            done.store(true, Ordering::SeqCst);
+        });
+    }
+    h.until(true, |_| handed.load(Ordering::SeqCst));
+    assert!(h.window.get_updates_visible());
+    assert!(h.window.get_install_fenced());
+    assert!(!h.window.get_updates_automatic_available());
+    assert_eq!(noted(dir.path()), (!pressed).then(ticket));
+    let aborted = pumping_exchange(
+        &mut h,
+        &socket,
+        HostRequest::Abort {
+            schema: SCHEMA,
+            aborted: Aborted {
+                schema: SCHEMA,
+                ticket: ticket(),
+            },
+        },
+    );
+    assert!(aborted.error.is_none(), "{aborted:?}");
+    let shown = Instant::now();
+    assert!(h.window.get_updates_message().contains("cancelled"));
+    assert!(!h.window.get_install_fenced());
+    h.until(true, |w| w.get_updates_automatic_available());
+    if pressed {
+        while shown.elapsed() < Duration::from_millis(700) {
+            h.pump(true);
+        }
+        assert!(
+            h.window.get_updates_visible(),
+            "the outcome of a press waits for Back"
+        );
+    } else {
+        h.until(true, |w| !w.get_updates_visible());
+        assert!(shown.elapsed() >= Duration::from_millis(250));
+        assert!(h.window.get_launcher_visible());
+    }
+}
+
+#[test]
+fn the_outcome_of_an_installation_confirmed_elsewhere_closes_by_itself() {
+    outcome_without_a_restart(false);
+}
+
+#[test]
+fn the_outcome_of_a_pressed_installation_waits_for_back() {
+    outcome_without_a_restart(true);
+}
+
+/// Startup reconciliation that finds the outcome of `ticket()`'s installation,
+/// then nothing once the app has shown it.
+fn finished(outcome: InstallOutcome) -> reconciliation::Exchange {
+    let calls = AtomicUsize::new(0);
+    Arc::new(move |request| {
+        Ok(ReconcileReply {
+            schema: SCHEMA,
+            nonce: request.nonce,
+            host: request.host.clone(),
+            service: Id::from_bytes([8; 32]).unwrap(),
+            result: if calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                RecoveryDecision::Finished {
+                    ticket: ticket(),
+                    transaction: Id::from_bytes([4; 32]).unwrap(),
+                    outcome,
+                }
+            } else {
+                RecoveryDecision::Clear {}
+            },
+        })
+    })
+}
+
+/// The app after the restart that finished an installation, with the note it
+/// made before, if any.
+fn restarted(h: &Harness, dir: &Path, note: Option<Ticket>, setting: Option<Exchange>) -> Runtime {
+    if let Some(note) = note {
+        std::fs::write(
+            dir.join("unattended-install.json"),
+            serde_json::to_vec(&note).unwrap(),
+        )
+        .unwrap();
+    }
+    let mut host = Host::new(host_identity());
+    host.unattended.close_ms = 300;
+    start(
+        &h.window,
+        Arc::new(RwLock::new(Settings::default())),
+        SettingsWriter::new(dir.join("settings.toml")).unwrap(),
+        h.input.clone(),
+        Some(host),
+        dir.join("host.sock"),
+        Arc::new(|_| Err("unused".into())),
+        Rc::new(|| Some(0)),
+        uid(),
+        Some(finished(InstallOutcome::Committed)),
+        setting,
+    )
+}
+
+/// The outcome the restart found names the setting on its button, and waits
+/// for Back unless the app noted its installation as nobody's press.
+#[test]
+fn the_outcome_after_a_restart_reads_the_setting_and_waits_for_back() {
+    let mut h = Harness::new();
+    let dir = tempfile::tempdir().unwrap();
+    let service = Arc::new(SettingService::default());
+    // A note left by an earlier installation does not name this one.
+    let earlier = Ticket {
+        sequence: 2,
+        ..ticket()
+    };
+    let _runtime = restarted(&h, dir.path(), Some(earlier), Some(service.exchange()));
+    h.until(true, |w| !w.get_install_fenced());
+    assert!(h.window.get_updates_visible());
+    assert!(h.window.get_updates_message().contains("installed"));
+    h.until(true, |w| w.get_updates_automatic_available());
+    assert_eq!(
+        h.window.get_updates_automatic_label(),
+        "Automatic install: Off"
+    );
+    assert_eq!(noted(dir.path()), None);
+    let shown = Instant::now();
+    while shown.elapsed() < Duration::from_millis(700) {
+        h.pump(true);
+    }
+    assert!(h.window.get_updates_visible());
+}
+
+/// After a restart, the outcome of an installation nobody pressed Install for
+/// closes Updates once it has gone a while without use.
+#[test]
+fn the_outcome_after_a_restart_closes_by_itself_once_unused() {
+    let mut h = Harness::new();
+    h.window.set_launcher_visible(true);
+    h.window.set_ingame_menu_visible(false);
+    let dir = tempfile::tempdir().unwrap();
+    let _runtime = restarted(&h, dir.path(), Some(ticket()), None);
+    h.until(true, |w| !w.get_install_fenced());
+    assert!(h.window.get_updates_visible());
+    assert!(h.window.get_updates_message().contains("installed"));
+    // The note stays until the device service has retired the outcome.
+    assert_eq!(noted(dir.path()), Some(ticket()));
+    let used = Instant::now();
+    while used.elapsed() < Duration::from_millis(700) {
+        h.window.invoke_updates_activity();
+        h.pump(true);
+    }
+    assert!(h.window.get_updates_visible(), "use keeps the outcome open");
+    h.until(true, |_| noted(dir.path()).is_none());
+    let quiet = Instant::now();
+    h.until(true, |w| !w.get_updates_visible());
+    assert!(quiet.elapsed() >= Duration::from_millis(250));
+    assert!(h.window.get_launcher_visible());
+}

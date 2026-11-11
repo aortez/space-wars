@@ -57,6 +57,7 @@ struct Host {
     /// says so. The service may announce that countdown once more before it
     /// has looked again.
     postponed: Option<(u64, u64)>,
+    unattended: unattended::Unattended,
 }
 impl Host {
     fn new(identity: HostInstance) -> Self {
@@ -73,6 +74,7 @@ impl Host {
             input_ms: transport::boot_ms().ok(),
             notice: None,
             postponed: None,
+            unattended: unattended::Unattended::new(),
         }
     }
     /// A person used the app: restarts the idle time the device service reads.
@@ -165,6 +167,16 @@ impl Host {
             self.used(Some(now));
         }
         now.checked_sub(self.input_ms?)
+    }
+    /// Whether the outcome of an installation nobody pressed Install for has
+    /// gone long enough without use to close Updates.
+    fn closes(&mut self, window: &MainWindow, now: u64) -> bool {
+        if !self.unattended.waiting() {
+            return false;
+        }
+        let idle_ms = self.idle_ms(window, now);
+        self.unattended
+            .due(window.get_updates_visible(), now, idle_ms)
     }
     fn scene(window: &MainWindow) -> String {
         format!(
@@ -482,6 +494,15 @@ impl Panel {
             .as_ref()
             .or_else(|| self.offer.as_ref().map(|offer| &offer.ticket))
     }
+    /// Whether a person pressed Install here for this ticket. The Automatic
+    /// setting and commands confirm their installations elsewhere.
+    fn pressed(&self, ticket: &Ticket) -> bool {
+        self.awaiting
+            && self
+                .offer
+                .as_ref()
+                .is_some_and(|offer| &offer.ticket == ticket)
+    }
     fn retire(&mut self, ticket: &Ticket) -> bool {
         if self.ticket() != Some(ticket) {
             return false;
@@ -504,6 +525,8 @@ type Exchange = Arc<dyn Fn(&ServiceRequest) -> Result<ServiceReply, String> + Se
 mod reconciliation;
 #[path = "updates_policy.rs"]
 mod setting;
+#[path = "updates_unattended.rs"]
+mod unattended;
 
 pub(crate) fn install(
     window: &MainWindow,
@@ -580,6 +603,9 @@ fn start(
     let startup_required = recovery_exchange.is_some();
     let mut recovery = recovery_exchange.map(reconciliation::Client::new);
     let mut host = host;
+    if let Some(host) = &mut host {
+        host.unattended.load(writer.config_directory());
+    }
     if startup_required {
         if let Some(host) = &mut host {
             host.startup_blocked = true;
@@ -782,14 +808,12 @@ fn start(
                 w.set_updates_message("Cancelling installation…".into());
             }
         } else if !w.get_install_fenced() {
-            w.set_updates_visible(false);
-            p.opening = false;
-            p.generation += 1;
-            p.busy = false;
+            close(&w, &mut p);
         }
     });
     let timer = Timer::default();
     let weak = window.as_weak();
+    let mut was_fenced = window.get_install_fenced();
     timer.start(TimerMode::Repeated, Duration::from_millis(20), move || {
         let Some(w) = weak.upgrade() else { return };
         let now = transport::boot_ms().unwrap_or(u64::MAX);
@@ -830,6 +854,7 @@ fn start(
                     *settings.write().unwrap() = snapshot.clone();
                     let ticket = host.pending.as_ref().unwrap().request.ticket.clone();
                     let mut p = panel.borrow_mut();
+                    host.unattended.started(&ticket, p.pressed(&ticket));
                     if p.ticket() != Some(&ticket) {
                         // External confirmation supersedes old panel requests.
                         // Their delayed replies cannot replace live progress.
@@ -970,6 +995,30 @@ fn start(
         if let Some(recovery) = &mut recovery {
             recovery.tick(&w, host.borrow_mut().as_mut(), &mut p, &commands);
         }
+        let fenced = w.get_install_fenced();
+        if was_fenced && !fenced {
+            // Updates that the app opened by itself, for an installation
+            // confirmed elsewhere or for the outcome after a restart, did not
+            // read the setting as opening Updates does.
+            if w.get_updates_visible()
+                && let Some(setting) = setting.borrow_mut().as_mut()
+            {
+                setting.read();
+            }
+            if let Some(host) = host.borrow_mut().as_mut() {
+                host.unattended.ended(w.get_updates_visible(), now);
+            }
+        }
+        was_fenced = fenced;
+        if !fenced
+            && p.ticket().is_none()
+            && host
+                .borrow_mut()
+                .as_mut()
+                .is_some_and(|host| host.closes(&w, now))
+        {
+            close(&w, &mut p);
+        }
         super::settle_focus(&w);
         if w.get_updates_visible()
             && !p.busy
@@ -987,6 +1036,14 @@ fn start(
         _timer: timer,
         _server: server,
     }
+}
+
+/// Closes Updates while nothing installs.
+fn close(window: &MainWindow, panel: &mut Panel) {
+    window.set_updates_visible(false);
+    panel.opening = false;
+    panel.generation += 1;
+    panel.busy = false;
 }
 
 fn submit(
