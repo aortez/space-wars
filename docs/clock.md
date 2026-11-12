@@ -17,7 +17,9 @@ Explosion (#76) scatters individual lit cells as bouncing rigid-body debris;
 its reassembly (#135) brings the blocks back into the latest clock face.
 Coins (#581) turns the lit cells into coins that drop and pile, a magpie
 carries a few of them off, and the rest fly home by the same reassembly,
-which grows back what the bird kept.
+which grows back what the bird kept. The corner lamps (#621) now and then
+flicker, go out for a few seconds or turn into a spotlight that sweeps the
+reading.
 
 ## Layout
 
@@ -70,8 +72,9 @@ share the frame's warm color, bevel and grain. The physical floor supplies the
 base, so drain gaps remain open all the way through; no second decorative rail
 covers them. Floor heights, colliders and duck courses retain their geometry.
 
-Two small amber lights sit just inside the junctions of the top and side rails,
-illuminating the upper corners. Lit digit cells, the colon
+A small brass lamp sits just inside each junction of the top and side rails,
+lighting its upper corner; [Corner lamps](#corner-lamps-621) has how they look
+and the moods they have. Lit digit cells, the colon
 and AM/PM cast a dim halo in their current color, while inactive cells stay
 subdued. The header uses a dark warm finish, and narrow shadows inside the side
 and top rails give the room depth. The frame scales with the shorter display
@@ -86,7 +89,7 @@ lights remain visible throughout events, including when the normal face fades
 away for a marquee.
 
 Both render adapters use the same bounded geometry: four translucent shells per
-emitting cell, plus a fixed surround and two corner lights. There is no blur
+emitting cell, plus a fixed surround and the two corner lamps. There is no blur
 buffer, lighting simulation or new collider for the lighting. Classic retains
 the original seven-segment geometry; additional faces are described below.
 
@@ -109,6 +112,8 @@ overlay, not device screenshots:
 The [portrait fixture](screenshots/clock/portrait-framed-clock-fixture.png) covers
 480×800. Regenerate date-visible captures with `SPACEWARS_CALENDAR_ARTIFACTS` and
 the `clock_calendar_date_renders_in_band_through_native_text_overlay` test below.
+These fixtures predate the lamp heads of #621; [Corner lamps](#corner-lamps-621)
+has current captures.
 
 The shared wooden material also follows the moving floor during Rain:
 
@@ -153,6 +158,113 @@ and these doorway captures come from the device:
 | Entrance lifted | Entrance closed flush |
 | --- | --- |
 | ![Hinged wall lifted on HyperPixel](screenshots/clock/hyperpixel-hinged-door-open.png) | ![Wall closed flush on HyperPixel](screenshots/clock/hyperpixel-hinged-door-closed.png) |
+
+### Corner lamps (#621)
+
+Each lamp is a small brass head on the junction of the rails: a mount, a hood
+turned the way its light points, and a warm bulb with a hot core and a soft
+bloom, so it reads as lit at the device's scale. Around it is the corner's
+original glow. Below it, behind the cells, is a softer light the lamp throws
+down and into the room, seven overlapping discs along its aim that grow wider
+and fainter with distance, so the light has no edge to speak of. Steady lamps
+draw the same primitives every tick, so they never change a frame on their
+own.
+
+Now and then, while the scene is quiet, one lamp has a mood:
+
+- **Flicker.** Two to five quick dips in brightness, over in under two seconds.
+- **Outage.** The bulb sputters out, stays dark for 2.5 to 5 seconds,
+  sputters back on and warms up. The glow, the bloom and the thrown light go
+  with it, so its corner of the room goes dark. About half of outages give
+  off a tiny flash and five golden sparks as the bulb goes dark; the sparks
+  fall inward and fade within 0.4 seconds, stopping if the lamp gives way.
+- **Spotlight.** The thrown light gathers into a beam that narrows onto the
+  digit nearest the lamp, rests there, sweeps across to one of the far two
+  digits, holds and widens back out, seven seconds in all. The beam lays a
+  pool of warm light on the wall behind the face; the cells inside the pool
+  brighten toward warm white, and the dark guides of unlit cells show in it.
+  The corner's glow dims while its light is in the beam.
+
+| Steady | Spotlight on the nearest digit |
+| --- | --- |
+| ![The 12:39 face with a lamp head in each upper corner, each throwing a soft warm light down into the room](screenshots/clock/lamps-800x480-steady.png) | ![The left lamp's beam on the first digit, its cells brighter and its unlit guides showing in the pool](screenshots/clock/lamps-800x480-spotlight.png) |
+
+| Partway through the sweep | Outage |
+| --- | --- |
+| ![The beam crossing the second digit on its way to the minutes](screenshots/clock/lamps-800x480-sweep.png) | ![The right lamp out, its corner dark, the left lamp steady](screenshots/clock/lamps-800x480-outage.png) |
+
+![A spotlight from the left lamp, an outage of the right one and a flicker, every second frame at 800×480](screenshots/clock/lamps-800x480.gif)
+
+The sweep at [1024×768](screenshots/clock/lamps-1024x768-sweep.png), and a
+spotlight in the
+[480×800 portrait](screenshots/clock/lamps-480x800-spotlight.png), where the
+beam falls almost straight down onto the first digit.
+
+**When.** The lamps draw from a seeded stream of their own, never the event
+schedule's, so they never move an event: the same seed runs the same events,
+at the same ticks, whatever the lamps do. A mood comes due after 45 to 120
+quiet seconds under Calm and 12 to 24 under Demo, and Off keeps the lamps
+steady. Quiet means the clock has a reading and nothing else is going on: no
+event or its cooldown, no duck, crow or spider, no notice and no ceiling
+opening. Calm makes half of the moods flickers and a quarter each outages and
+spotlights; Demo, there to show them off, makes it 30, 35 and 35 percent. Over
+an hour of Calm with the reading moving on every second, four seeds had 22 to
+30 moods each, one every two to three minutes, with the scene quiet 60 to 68
+percent of the time.
+
+A mood that comes due waits for a gap long enough to hold it: it starts only
+if it will end at least half a second before both the schedule's next event
+and the next minute's change, which brings a Digit Slide when one is ready.
+Anything that starts anyway (an event, a visit, a notice, or the profile
+switched to Off) takes the scene back. The lamp returns to steady from
+wherever its mood had it within half a second, and a dark bulb catches once
+on the way.
+
+**Drawing.** Both render adapters take the same bounded geometry. The head is
+a hood polygon and three discs (mount, bulb and core); the bloom, the glow and
+the thrown light are translucent discs; a spotlight's beam is six nested fans
+clipped to the view and its pool eight discs. The beam and the thrown light
+sit behind the cells, like the ceiling's sunlight. The light on the cells is a
+warm copy of each lit cell, label or dark guide whose center is in the pool,
+on a layer of its own above the cells and labels and below visitors. It reads
+whatever the scene drew, so it follows any face. The steady lamps are 52
+primitives, 24 more than before (565 for the whole 23:58 face with the date at
+800×480), and a spotlight added at most 30 more at 800×480, 1024×768 and
+480×800.
+
+**Diagnostics.** `clock state --json` carries a `lamps` block: the mood under
+way (`kind`, `lamp`, `tick` of `ticks`, the bulb's `brightness_milli` and
+whether it is `yielding`), how many `flickers`, `outages` and `spotlights`
+the run has had, and `due_in_quiet_ticks`, the quiet ticks the next mood waits
+for: 0 once it is due and waiting for a gap, `null` during a mood and under
+Off. `spacewars-cli clock state` prints it on one line. Fixtures and captures
+start a mood with `ClockState::preview_lamp_mood`, which runs whatever the
+profile, as an event preview does. There is no menu control for the lamps
+yet.
+
+The capture test draws the steady lamps, a spotlight at rest and partway
+through its sweep, and an outage with sparks through the production raster and
+vector adapters at 800×480, 1024×768 and 480×800. It checks that each mood ends on
+exactly the steady face, and, given a directory, writes the stills and every
+second frame of the 800×480 film:
+
+```sh
+SPACEWARS_LAMPS_ARTIFACTS=/tmp/clock-lamps \
+  cargo +1.89.0 test --locked --profile ci -p engine-client --bin engine-client ui_render_tests::lamps
+cd /tmp/clock-lamps/film
+ffmpeg -framerate 30 -i frame-%04d.png -vf "scale=600:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96:stats_mode=full[p];[b][p]paletteuse=dither=none" -loop 0 ../lamps-800x480.gif
+```
+
+`lamps_tests` cover Off holding the lamps steady; the wait for quiet and for
+a gap that holds the mood; moods bounded, seeded and back to steady, one lamp
+at a time; the return within half a second from anywhere in each mood; a
+preview running under Off where a drawn mood stops; moods only in quiet gaps
+of a Demo run, whose events are the same with or without extra spotlights;
+moods fitting between the events and minute changes of a clock whose reading
+moves on every second; steady lamps drawing the same frame for ten seconds,
+and an outage darkening only its lamp; the spotlight's light copying the cells
+it lands on, staying in view at three aspect ratios and sweeping away from its
+lamp; and an event under a spotlight taking the scene back.
 
 ## Clock fonts
 

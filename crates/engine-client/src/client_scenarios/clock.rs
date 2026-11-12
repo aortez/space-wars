@@ -268,6 +268,7 @@ impl ClientScenario for ClockClientScenario {
             spider: self.state.spider_state(),
             explosion: self.state.explosion_state(),
             coins: self.state.coins_state(),
+            lamps: Some(self.state.lamps_state()),
             tanks: self.state.tanks_state(),
             player_duck: self.state.player_duck_state(),
             automatic_events_suspended: self.state.automatic_events_suspended(),
