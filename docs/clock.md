@@ -162,15 +162,19 @@ and these doorway captures come from the device:
 ### Corner lamps (#621)
 
 Each lamp is a small brass head on the junction of the rails: a mount, a hood
-turned the way its light points, and a warm bulb with a hot core and a soft
-bloom, so it reads as lit at the device's scale. Around it is the corner's
-original glow. Below it, behind the cells, is a softer light the lamp throws
-down and into the room, seven overlapping discs along its aim that grow wider
-and fainter with distance, so the light has no edge to speak of. Steady lamps
-draw the same primitives every tick, so they never change a frame on their
-own.
+turned the way its light points, and a bulb with a soft bloom, so it reads as
+lit at the device's scale. Around it is the corner's original glow. Below it,
+behind the cells, is a softer light the lamp throws down and into the room,
+seven overlapping discs along its aim that grow wider and fainter with
+distance, so the light has no edge to speak of.
 
-Now and then, while the scene is quiet, one lamp has a mood:
+At rest a lamp gives 40% of its full light (#629): the glow, the bloom and the
+thrown light at 40% of full, and a bulb that glows amber, without the hot core
+it shows above rest. Steady lamps draw the same primitives every tick, so they
+never change a frame on their own.
+
+Now and then, while the scene is quiet, one lamp has a mood. Flickers and
+outages dim it from rest; a spotlight brightens it past full:
 
 - **Flicker.** Two to five quick dips in brightness, over in under two seconds.
 - **Outage.** The bulb sputters out, stays dark for 2.5 to 5 seconds,
@@ -183,11 +187,14 @@ Now and then, while the scene is quiet, one lamp has a mood:
   digits, holds and widens back out, seven seconds in all. The beam lays a
   pool of warm light on the wall behind the face; the cells inside the pool
   brighten toward warm white, and the dark guides of unlit cells show in it.
-  The corner's glow dims while its light is in the beam.
+  As the beam narrows, the bulb brightens from rest to a little past full and
+  its hot core shows. Most of the extra light goes into the beam, so the
+  corner's glow rises only a little: 15% above rest while the light is in the
+  beam, and a third above rest at most as the beam narrows and widens.
 
 | Steady | Spotlight on the nearest digit |
 | --- | --- |
-| ![The 12:39 face with a lamp head in each upper corner, each throwing a soft warm light down into the room](screenshots/clock/lamps-800x480-steady.png) | ![The left lamp's beam on the first digit, its cells brighter and its unlit guides showing in the pool](screenshots/clock/lamps-800x480-spotlight.png) |
+| ![The 12:39 face at rest, a dim amber lamp in each upper corner](screenshots/clock/lamps-800x480-steady.png) | ![The left lamp's beam on the first digit, its cells brighter and its unlit guides showing in the pool](screenshots/clock/lamps-800x480-spotlight.png) |
 
 | Partway through the sweep | Outage |
 | --- | --- |
@@ -221,26 +228,26 @@ wherever its mood had it within half a second, and a dark bulb catches once
 on the way.
 
 **Drawing.** Both render adapters take the same bounded geometry. The head is
-a hood polygon and three discs (mount, bulb and core); the bloom, the glow and
-the thrown light are translucent discs; a spotlight's beam is six nested fans
-clipped to the view and its pool eight discs. The beam and the thrown light
-sit behind the cells, like the ceiling's sunlight. The light on the cells is a
-warm copy of each lit cell, label or dark guide whose center is in the pool,
-on a layer of its own above the cells and labels and below visitors. It reads
-whatever the scene drew, so it follows any face. The steady lamps are 52
-primitives, 24 more than before (565 for the whole 23:58 face with the date at
-800×480), and a spotlight added at most 30 more at 800×480, 1024×768 and
-480×800.
+a hood polygon and up to three discs (mount, glass and, above rest, the core);
+the bloom, the glow and the thrown light are translucent discs; a spotlight's
+beam is six nested fans clipped to the view and its pool eight discs. The beam
+and the thrown light sit behind the cells, like the ceiling's sunlight. The
+light on the cells is a warm copy of each lit cell, label or dark guide whose
+center is in the pool, on a layer of its own above the cells and labels and
+below visitors. It reads whatever the scene drew, so it follows any face. The
+resting lamps are 50 primitives, 22 more than the lamps before #621 (563 for
+the whole 23:58 face with the date at 800×480), and a spotlight added at most
+31 more at 800×480, 1024×768 and 480×800.
 
 **Diagnostics.** `clock state --json` carries a `lamps` block: the mood under
-way (`kind`, `lamp`, `tick` of `ticks`, the bulb's `brightness_milli` and
-whether it is `yielding`), how many `flickers`, `outages` and `spotlights`
-the run has had, and `due_in_quiet_ticks`, the quiet ticks the next mood waits
-for: 0 once it is due and waiting for a gap, `null` during a mood and under
-Off. `spacewars-cli clock state` prints it on one line. Fixtures and captures
-start a mood with `ClockState::preview_lamp_mood`, which runs whatever the
-profile, as an event preview does. There is no menu control for the lamps
-yet.
+way (`kind`, `lamp`, `tick` of `ticks`, the bulb's `brightness_milli`, 400 at
+rest and 1000 at full, and whether it is `yielding`), how many `flickers`,
+`outages` and `spotlights` the run has had, and `due_in_quiet_ticks`, the quiet
+ticks the next mood waits for: 0 once it is due and waiting for a gap, `null`
+during a mood and under Off. `spacewars-cli clock state` prints it on one line.
+Fixtures and captures start a mood with `ClockState::preview_lamp_mood`, which
+runs whatever the profile, as an event preview does. There is no menu control
+for the lamps yet.
 
 The capture test draws the steady lamps, a spotlight at rest and partway
 through its sweep, and an outage with sparks through the production raster and
@@ -264,7 +271,9 @@ moods fitting between the events and minute changes of a clock whose reading
 moves on every second; steady lamps drawing the same frame for ten seconds,
 and an outage darkening only its lamp; the spotlight's light copying the cells
 it lands on, staying in view at three aspect ratios and sweeping away from its
-lamp; and an event under a spotlight taking the scene back.
+lamp; and an event under a spotlight taking the scene back. The tests in
+`render::lamp` pin a resting lamp's light at 40% of its full light, with full
+light as #621 drew it, and show the hot core only above rest.
 
 ## Clock fonts
 

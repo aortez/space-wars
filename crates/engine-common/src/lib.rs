@@ -1132,8 +1132,8 @@ pub struct ClockLampMoodState {
     pub lamp: ClockLampSide,
     pub tick: u32,
     pub ticks: u32,
-    /// The bulb's brightness, 0..=1000 when steady or dimmed; a spotlight
-    /// runs a little brighter.
+    /// The bulb's brightness: 400 at rest, 0 when out and 1000 at full; a
+    /// spotlight runs a little past full.
     pub brightness_milli: u16,
     /// An event, a visit or a setting cut the mood short, and the lamp is
     /// returning to its steady look.
