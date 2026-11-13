@@ -70,7 +70,7 @@ pub(super) fn render(frame: &mut RenderFrame, magpie: &Magpie, layout: Layout) {
     ) {
         let flap = magpie.flight.wing;
         frame.push_primitive(
-            8,
+            CREATURE_LAYER,
             RenderPrimitive::Polygon(RenderPolygon {
                 points: vec![
                     transform(-1.0, 6.0),
@@ -84,7 +84,7 @@ pub(super) fn render(frame: &mut RenderFrame, magpie: &Magpie, layout: Layout) {
         );
         // The white of the primaries along the wing's trailing edge.
         frame.push_primitive(
-            8,
+            CREATURE_LAYER,
             RenderPrimitive::Polygon(RenderPolygon {
                 points: vec![
                     transform(-4.0, 7.0 + flap * 3.5),
@@ -111,7 +111,7 @@ pub(super) fn render(frame: &mut RenderFrame, magpie: &Magpie, layout: Layout) {
             let a = transform(column as f32 - 9.0, (rows.len() - row - 1) as f32);
             let b = transform(column as f32 - 8.0, (rows.len() - row) as f32);
             frame.push_primitive(
-                8,
+                CREATURE_LAYER,
                 rectangle(
                     RenderPoint::new(a.x.min(b.x), a.y),
                     RenderPoint::new(a.x.max(b.x), b.y),
@@ -126,7 +126,7 @@ pub(super) fn render(frame: &mut RenderFrame, magpie: &Magpie, layout: Layout) {
         let (x, y) = if head_down { BEAK_DOWN } else { BEAK_UP };
         let tip = transform(x, y);
         frame.push_primitive(
-            8,
+            CREATURE_LAYER,
             RenderPrimitive::Circle(RenderCircle {
                 center: RenderPoint::new(tip.x + mirror * radius * 0.55, tip.y - radius * 0.2),
                 radius,

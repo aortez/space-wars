@@ -97,6 +97,21 @@ fn target(brain: &Brain, lamp: usize) -> Option<u64> {
         .map(|(_, body)| body.entity.value())
 }
 
+/// Where the mover in a lamp's light is, in world units, while its look
+/// carries one.
+fn subject(brain: &Brain, lamp: usize, stage: &Stage) -> Option<Vec2> {
+    let subject = brain.lamps[lamp].look.subject?;
+    assert!((subject.size - 0.5).abs() < 1e-6, "{subject:?}");
+    Some(stage.face_origin + subject.position * stage.pitch)
+}
+
+/// Whether a lamp's look should carry the mover it follows: while it
+/// notices or tracks one and its beam has narrowed.
+fn shows_subject(brain: &Brain, lamp: usize) -> bool {
+    matches!(brain.activity(lamp), Activity::Notice | Activity::Track)
+        && brain.lamps[lamp].look.narrow > 0.0
+}
+
 /// The largest angle a tracking beam strays from a mover at eight cells a
 /// second, once it has followed it for half a second.
 const TRACKING_DEGREES: f32 = 4.0;
@@ -126,8 +141,18 @@ fn a_lamp_notices_a_mover_on_its_side_follows_it_closely_and_rests_after_losing_
             if tracked.is_some_and(|from| tick >= from + FIXED_HZ / 2) {
                 worst = worst.max(off_by(&brain, 0, &stage, position));
             }
+            // Its look carries the mover, where it is this tick, while it
+            // notices or tracks it.
+            match subject(&brain, 0, &stage) {
+                Some(at) => {
+                    assert!(shows_subject(&brain, 0), "tick {tick}");
+                    assert!(at.distance_to(position) < 1e-3 * stage.pitch, "tick {tick}");
+                }
+                None => assert!(!shows_subject(&brain, 0), "tick {tick}"),
+            }
             // The right lamp leaves the left lamp's mover to it.
             assert_eq!(brain.activity(1), Activity::Rest, "tick {tick}");
+            assert_eq!(subject(&brain, 1, &stage), None);
             position += Vec2::new(speed, 0.0) * DT;
             tick += 1;
         }
@@ -149,6 +174,8 @@ fn a_lamp_notices_a_mover_on_its_side_follows_it_closely_and_rests_after_losing_
             if tick == 0 {
                 assert_eq!(brain.activity(0), Activity::Search);
             }
+            // Searching for it, the lamp holds no mover in its light.
+            assert_eq!(subject(&brain, 0, &stage), None, "tick {tick}");
             if brain.lamps[0].look == Look::STEADY {
                 rested.get_or_insert(tick);
             } else {
@@ -244,14 +271,27 @@ fn a_mover_crossing_the_middle_passes_to_the_lamp_on_its_new_side() {
         for tick in 0..10 * FIXED_HZ {
             let percepts = seeing(vec![mover(1, position, Vec2::new(speed, 0.0), 10.0)]);
             brain.step(&mut rng, &percepts, stage, true);
+            // Only the lamp following the mover carries it, where it is now.
+            for lamp in 0..2 {
+                match subject(&brain, lamp, &stage) {
+                    Some(at) => {
+                        assert_eq!(target(&brain, lamp), Some(1), "tick {tick}");
+                        assert!(shows_subject(&brain, lamp), "tick {tick}");
+                        assert!(at.distance_to(position) < 1e-3 * stage.pitch, "tick {tick}");
+                    }
+                    None => assert!(!shows_subject(&brain, lamp), "tick {tick}"),
+                }
+            }
             let side = stage.side(position.x);
             if side == Some(1) && handed.is_none() {
                 handed = Some(tick);
                 assert_eq!(brain.counts().handoffs, 1, "tick {tick}");
                 assert_eq!(brain.activity(1), Activity::Track);
                 assert_eq!(target(&brain, 1), Some(1));
+                assert!(subject(&brain, 1, &stage).is_some());
                 assert_eq!(brain.activity(0), Activity::Rest);
                 assert_eq!(target(&brain, 0), None);
+                assert_eq!(subject(&brain, 0, &stage), None);
             }
             // Never both on it: it is not salient enough to share.
             assert!(

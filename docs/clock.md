@@ -188,10 +188,12 @@ across the floor is followed like the duck. A lamp does one thing at a time:
   rests again if the mover dulls or leaves. A knock is not something to turn
   toward: it startles the lamps or dips their power, as below.
 - **Track.** The light gathers into a spotlight that follows the mover, a
-  little ahead of it. The beam lays a pool of warm light on the wall behind
-  the face; the cells inside the pool brighten toward warm white, and the dark
-  guides of unlit cells show in it. A mover that stops is watched for three
-  quarters of a second as it settles, and then the lamp rests; one that leaves
+  little ahead of it. The beam lays a pool of warm light over the wall and the
+  floor, and whatever small thing is drawn over the pool warms toward white in
+  it: the cells, with the dark guides of unlit cells just showing, the duck, a
+  coin, the spider, a bird. The mover shades what the beam warms behind it,
+  away from the lamp. A mover that stops is watched for three quarters of a
+  second as it settles, and then the lamp rests; one that leaves
   the view is searched for. Either way, another mover that catches the lamp's
   eye meanwhile takes the beam straight away.
 - **Search.** The beam, a little wider, drifts on the way the mover went and
@@ -269,7 +271,7 @@ resting face stays still.
 
 | Steady | Following a ball |
 | --- | --- |
-| ![The 12:39 face at rest, a dim amber lamp in each upper corner](screenshots/clock/lamps-800x480-steady.png) | ![The left lamp's beam on a ball rolling along the floor, the cells it crosses brighter](screenshots/clock/lamps-800x480-track.png) |
+| ![The 12:39 face at rest, a dim amber lamp in each upper corner](screenshots/clock/lamps-800x480-steady.png) | ![The left lamp's beam on a ball rolling along the floor, the ball lit in its pool](screenshots/clock/lamps-800x480-track.png) |
 
 | Presenting the minutes | Outage |
 | --- | --- |
@@ -316,14 +318,42 @@ the minutes change every minute and the hours once an hour.
 **Drawing.** Both render adapters take the same bounded geometry. The head is
 a hood polygon and up to three discs (mount, glass and, above rest, the core);
 the bloom, the glow and the thrown light are translucent discs; a narrowed
-beam is six nested fans clipped to the view and its pool eight discs. The beam
-and the thrown light sit behind the cells, like the ceiling's sunlight. The
-light on the cells is a warm copy of each lit cell, label or dark guide whose
-center is in the pool, on a layer of its own above the cells and labels and
-below visitors. It reads whatever the scene drew, so it follows any face. The
-resting lamps are 50 primitives, 22 more than the lamps before #621 (564 for
-the whole 23:58 face with the date at 800×480). A present adds 31 more at
-800×480, 1024×768 and 480×800, and a beam on a ball on the floor 9.
+beam is six nested fans clipped to the view and its pool eight discs. The
+beam, the pool and the thrown light sit behind the cells and over the floor,
+like the ceiling's sunlight. Whatever small thing the scene drew over the
+pool, a cell, a label, a dark guide, the duck, a coin, the spider, a bird or
+a fixture ball, as a polygon, disc or line, takes the pool's light in place:
+its colors move toward warm white by as much as the light at its middle
+gives. The mover the lamp follows shades what lies behind it as the lamp sees
+it, taking nearly half the light just past its edge and none from about its
+own length behind its middle, but it never shades itself. A thing that
+reaches more than about a third of the pool's radius from its middle takes
+less of the light, and one that reaches past half of it, like Meltdown's
+water, stays as the scene drew it, so nothing snaps into or out of the light
+as it grows. The light reads whatever the scene drew, so it follows any face,
+keeps each thing in its place in the drawing order and adds nothing to the
+frame. The resting lamps are 50 primitives, 22 more than the lamps before
+#621 (564 for the whole 23:58 face with the date at 800×480). A present adds
+15 more at 800×480, 1024×768 and 480×800, and a beam on a ball on the floor 9.
+
+**On the cabinets.** On 2026-11-13 a Raspberry Pi 4 cabinet, sw-picade-2 at
+1024×768 over HDMI and drawing through the GPU scene, ran this code from
+`/tmp` with events Off, once with Lively lamps and once with Steady ones. Each
+pass sampled the idle face and then the duck, the spider and coins twice,
+every two seconds. Every sample of both passes held 60 frames a second, and
+the display flipped 60 pages a second in every window. In the 27 samples taken
+while a beam was narrowed onto a mover, the frame's work on the CPU took a
+median 0.94 ms, at most 3.1 ms, against 0.81 ms at the same points with Steady
+lamps, and drawing the scene 0.32 ms against 0.26 ms. The two passes showed
+different minutes, and the idle faces put 0.06 ms of the first difference and
+0.02 ms of the second down to the face itself. The headless benchmark,
+`benchmark-clock.sh` with the CPU raster at scale 1 and three 40-second runs a
+case, took 7.2, 7.5 and 7.5 ms a frame for the idle face, the duck and the
+spider at 1024×768, and 4.4, 4.6 and 4.8 ms at 800×480, at worst 9.6 ms at the
+95th percentile. A beam is narrowed for about a tenth of the duck's frames and
+13 to 29% of the spider's in those runs. No HyperPixel was measured live, so
+800×480 has only the headless numbers. The build measured also drew four discs
+of shadow behind a followed mover, which this code leaves out.
 
 **Diagnostics.** `clock state --json` carries a `lamps` block. For `left` and
 `right` it gives the lamp's `temperament` (`eager` or `lazy`); its `state`
@@ -360,14 +390,17 @@ out, and a bulb goes out of heat during an event after at least 10 seconds of
 tracking in the minute before, as this run has it. Resting lamps draw the same frame for ten seconds, and an outage
 darkens only its lamp and ends on the same rest. At three aspect ratios a
 present lights the cells in its pool, a ball rolled in from the right is
-followed by one lamp and then the other, every beam stays in view, and the
-lamps come back to the very same rest. The `lamps`
+followed by one lamp and then the other, every beam stays in view, the light
+only warms things in its pools, each in its place and as opaque as it was,
+and the lamps come back to the very same rest. A ball the left lamp follows
+is lit. The `lamps`
 state shows each lamp's activity, target and drives, and an older state reads
 as resting lamps. The ignored `what_an_hour_of_demo_looks_like` reports the
 hour above.
 
 The tests in `lamps::brain` feed the lamps percepts by hand: a lamp notices a
-mover on its side, follows it closely and rests after losing it; the eager
+mover on its side, follows it closely, holds it in its light only while it
+notices or tracks it, and rests after losing it; the eager
 lamp notices what the lazy one lets pass; a lamp takes up only movers that
 catch its eye on their own, whatever interest it has left; a lamp tires of a
 mover and notices it again ten seconds later; a mover crossing the middle
@@ -380,8 +413,12 @@ digits that changed on its side; a resting lamp is exactly steady but for its
 fidgets; the beam moves under its limits and stops at the room's edge for a
 mover that runs out; Steady lamps rest; and the brain is seeded. The tests in
 `render::lamp` pin the light a steady scene's lamps give off at 40% of full,
-with full light as #621 drew it; the amber glass at rest; and the hot core
-fading in above rest.
+with full light as #621 drew it; the amber glass at rest; the hot core fading
+in above rest; a pool warming the small things drawn over it in place,
+whatever their shape, and leaving larger things, what lies under the pool and
+text as they are; the shadow of the mover a lamp follows, which shades what is
+behind the mover but not the mover; and a thing growing in a pool, which fades
+out of its light without a snap.
 
 The capture test draws the steady lamps, a ball the left lamp follows and
 hands to the right one, the right lamp presenting the minutes, and an outage

@@ -41,6 +41,8 @@ pub(crate) const GLOW_LAYER: i32 = 2;
 const INACTIVE_CELL_LAYER: i32 = 3;
 pub(crate) const ACTIVE_CELL_LAYER: i32 = 4;
 pub(crate) const LABEL_LAYER: i32 = 5;
+/// The creatures over the face: the crow, the magpie and the spider.
+const CREATURE_LAYER: i32 = 8;
 
 const BACKGROUND_COLOR: RenderColor = RenderColor::rgb(0.018, 0.025, 0.055);
 const FLOOR_COLOR: RenderColor = RenderColor::rgb(0.22, 0.14, 0.078);
@@ -49,7 +51,9 @@ const FLOOR_EDGE_COLOR: RenderColor = RenderColor::rgb(0.32, 0.21, 0.12);
 /// surrounding wood, which the old tone was too close to for the layer to read.
 pub(crate) const SOIL_COLOR: RenderColor = RenderColor::rgb(0.155, 0.112, 0.082);
 /// The arena fixture's balls: pale, like the wood they rest on, so they read
-/// as objects in the room rather than as the face.
+/// as objects in the room rather than as the face. They are drawn among the
+/// creatures, over the spotlights' pools, so a spotlight warms them as it
+/// does the other visitors.
 const FIXTURE_COLOR: RenderColor = RenderColor::rgb(0.74, 0.66, 0.52);
 /// Cover tones from withered to sunlit, indexed by band. Distinct from the
 /// soil and shoot palettes so a frame reader can tell the three apart.
@@ -85,10 +89,16 @@ pub(crate) fn water_fixture_cell(frame: &mut RenderFrame, center: Vec2, pitch: f
 
 pub fn render_frame(state: &ClockState) -> RenderFrame {
     let mut frame = compose(state);
-    // A spotlight lights whatever cells the scene drew, whichever way it
-    // drew them.
+    // A spotlight warms whatever small things the scene drew over its pool,
+    // whichever way it drew them.
     lamp::illuminate(&mut frame, state, Layout::new(state.aspect_ratio()));
     frame
+}
+
+/// The frame as the scene draws it, before the spotlights light it.
+#[cfg(test)]
+pub(crate) fn render_unlit(state: &ClockState) -> RenderFrame {
+    compose(state)
 }
 
 fn compose(state: &ClockState) -> RenderFrame {
@@ -271,7 +281,7 @@ fn compose(state: &ClockState) -> RenderFrame {
     for fixture in state.arena_fixtures() {
         for ball in &fixture.balls {
             frame.push_primitive(
-                ARENA_LAYER,
+                CREATURE_LAYER,
                 RenderPrimitive::Circle(RenderCircle::filled(
                     RenderPoint::new(ball.position.x, ball.position.y),
                     fixture.radius,
@@ -517,7 +527,7 @@ pub(crate) fn plant_actor_polygons(state: &ClockState) -> Vec<Vec<Vec2>> {
     {
         magpie::render(&mut frame, magpie, layout);
     }
-    let mut polygons = filled_polygons(frame, 8);
+    let mut polygons = filled_polygons(frame, CREATURE_LAYER);
     if let Some(crate::events::ActiveEvent::Aquarium(event)) = &state.active_event {
         let mut fish = RenderFrame::default();
         aquarium::residents(&mut fish, event);

@@ -8,7 +8,8 @@ use super::visit::{LONGEST, Visit, gone, preview, run, spider, visited};
 use super::*;
 use engine_common::{ClockSpiderHold, ClockSpiderPhase, RenderPrimitive};
 
-/// The renderer's layer for the spider, its line and the hatch.
+/// The renderer's layer for the spider, its line and the hatch. The other
+/// creatures and the fixture balls share it, but these visits have none.
 const SPIDER_LAYER: i32 = 8;
 
 /// The spider layer's line primitives as (start, end).

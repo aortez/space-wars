@@ -4,7 +4,7 @@ use super::*;
 use crate::lamps::PRESENT_NARROW;
 use engine_common::{
     ClockLampActivity, ClockLampMode, ClockLampSide, ClockLampTemperament, ClockLampsState,
-    RenderFrame, RenderPrimitive,
+    RenderColor, RenderFrame, RenderPoint, RenderPrimitive,
 };
 use engine_core::Vec2;
 use std::time::Duration;
@@ -316,7 +316,7 @@ fn layer(frame: &RenderFrame, z: i32) -> Vec<RenderPrimitive> {
         .collect()
 }
 
-const LIT_LAYER: i32 = 7;
+const CREATURE_LAYER: i32 = 8;
 const LAMP_LAYER: i32 = 11;
 
 /// How much light one side's lamp spreads around its corner: the summed
@@ -342,7 +342,11 @@ fn resting_lamps_draw_the_same_frame_and_an_outage_darkens_only_its_lamp() {
         ClockScenario::step(&mut state, &[], TICK);
     }
     assert_eq!(ClockScenario::render_frame(&state), steady);
-    assert!(layer(&steady, LIT_LAYER).is_empty());
+    assert_eq!(
+        crate::render::render_unlit(&state),
+        steady,
+        "rest lights nothing"
+    );
     // Out: the right lamp's corner goes dark and the left lamp is untouched.
     state.preview_lamp(ClockLampActivity::Out, ClockLampSide::Right);
     let mut dark = None;
@@ -369,10 +373,47 @@ fn resting_lamps_draw_the_same_frame_and_an_outage_darkens_only_its_lamp() {
     assert_eq!(ClockScenario::render_frame(&state), steady);
 }
 
-/// Checks that every beam and pool in `frame` stays in view, that the light
-/// on the cells copies the cells it lands on, and that the lamps add a
-/// bounded number of primitives to `steady`. Returns the lit cells.
-fn bounded_light(frame: &RenderFrame, steady: &RenderFrame, aspect: f32) -> usize {
+/// `primitive` with its colors made black, as opaque as they were, so two
+/// primitives compare by shape.
+fn shape(primitive: &RenderPrimitive) -> RenderPrimitive {
+    let black = |color: &mut RenderColor| {
+        *color = RenderColor::rgba(0.0, 0.0, 0.0, color.a);
+    };
+    let mut shape = primitive.clone();
+    match &mut shape {
+        RenderPrimitive::Circle(circle) => {
+            circle
+                .fill
+                .iter_mut()
+                .for_each(|fill| black(&mut fill.color));
+            circle
+                .stroke
+                .iter_mut()
+                .for_each(|stroke| black(&mut stroke.color));
+        }
+        RenderPrimitive::Polygon(polygon) => {
+            polygon
+                .fill
+                .iter_mut()
+                .for_each(|fill| black(&mut fill.color));
+            polygon
+                .stroke
+                .iter_mut()
+                .for_each(|stroke| black(&mut stroke.color));
+        }
+        RenderPrimitive::Line(line) => black(&mut line.stroke.color),
+        RenderPrimitive::Text(text) => black(&mut text.color),
+    }
+    shape
+}
+
+/// Checks that every beam in the frame `state` draws stays in view; that the
+/// light only warms what the scene drew in its pools, each thing in its place
+/// and order and as opaque as it was; and that the lamps add a bounded number
+/// of primitives to `steady`. Returns how many things the light warmed.
+fn bounded_light(state: &ClockState, steady: &RenderFrame, aspect: f32) -> usize {
+    let frame = ClockScenario::render_frame(state);
+    let unlit = crate::render::render_unlit(state);
     let count = |frame: &RenderFrame| {
         frame
             .layers
@@ -389,27 +430,42 @@ fn bounded_light(frame: &RenderFrame, steady: &RenderFrame, aspect: f32) -> usiz
             }
         }
     }
-    let cells: Vec<_> = [3, 4, 5]
-        .into_iter()
-        .flat_map(|z| layer(frame, z))
-        .filter_map(|primitive| match primitive {
-            RenderPrimitive::Polygon(polygon) => Some(polygon.points),
-            _ => None,
-        })
+    // Where each spotlight's pool lies, and how far it reaches.
+    let layout = Layout::new(aspect);
+    let face = Vec2::new(layout.face_origin.x, layout.face_origin.y);
+    let pools: Vec<Vec2> = (0..2)
+        .map(|lamp| state.lamps.look(lamp))
+        .filter(|look| look.narrow > 0.0)
+        .map(|look| face + look.target * layout.pitch)
         .collect();
-    let lit = layer(frame, LIT_LAYER);
-    for primitive in &lit {
-        let RenderPrimitive::Polygon(polygon) = primitive else {
-            panic!("the light on the cells is cell-shaped");
-        };
-        assert!(cells.contains(&polygon.points));
+    let reach = 3.6 * layout.pitch;
+    let depths = |frame: &RenderFrame| frame.layers.iter().map(|l| l.z).collect::<Vec<_>>();
+    assert_eq!(depths(&frame), depths(&unlit), "{aspect}");
+    let mut warmed = 0;
+    for z in depths(&frame) {
+        let (lit, drawn) = (layer(&frame, z), layer(&unlit, z));
+        assert_eq!(lit.len(), drawn.len(), "{aspect}: layer {z}");
+        for (lit, drawn) in lit.iter().zip(&drawn) {
+            assert_eq!(shape(lit), shape(drawn), "{aspect}: layer {z}");
+            if lit != drawn {
+                warmed += 1;
+                let middle = middle(drawn);
+                assert!(
+                    pools.iter().any(|pool| pool.distance_to(middle) < reach),
+                    "{aspect}: layer {z} warmed outside the pools at {middle:?}"
+                );
+            }
+        }
     }
+    // Each lamp adds at most its beam's six fans, its pool's eight discs and
+    // its hot core, and the ball a disc.
     assert!(
-        count(frame) < count(steady) + 160,
-        "{aspect}: {}",
-        count(frame)
+        count(&frame) <= count(steady) + 2 * (6 + 8 + 1) + 1,
+        "{aspect}: {} against {}",
+        count(&frame),
+        count(steady)
     );
-    lit.len()
+    warmed
 }
 
 #[test]
@@ -436,7 +492,7 @@ fn a_present_lights_the_cells_in_its_pool_and_every_beam_stays_in_view() {
         state.preview_lamp(ClockLampActivity::Present, ClockLampSide::Left);
         let mut held = 0;
         while state.lamps_state().left.state == ClockLampActivity::Present {
-            let lit = bounded_light(&ClockScenario::render_frame(&state), &steady, aspect);
+            let lit = bounded_light(&state, &steady, aspect);
             if state.lamps_state().left.narrow_milli == (PRESENT_NARROW * 1000.0) as u16 {
                 assert!(lit > 0, "{aspect}: the pool lights nothing");
                 held += 1;
@@ -451,7 +507,7 @@ fn a_present_lights_the_cells_in_its_pool_and_every_beam_stays_in_view() {
         let (index, _) = roll(&mut state, width - 3.0, -15.0);
         let mut followed = [0u32; 2];
         for _ in 0..5 * FIXED_HZ {
-            bounded_light(&ClockScenario::render_frame(&state), &steady, aspect);
+            bounded_light(&state, &steady, aspect);
             for (lamp, side) in sides(&state.lamps_state()).iter().enumerate() {
                 followed[lamp] += u32::from(side.state == ClockLampActivity::Track);
             }
@@ -468,6 +524,65 @@ fn a_present_lights_the_cells_in_its_pool_and_every_beam_stays_in_view() {
         }
         assert_eq!(ClockScenario::render_frame(&state), steady, "{aspect}");
     }
+}
+
+/// Where a primitive sits: a disc's center, a line's middle, or the mean of
+/// a polygon's points.
+fn middle(primitive: &RenderPrimitive) -> Vec2 {
+    match primitive {
+        RenderPrimitive::Circle(circle) => Vec2::new(circle.center.x, circle.center.y),
+        RenderPrimitive::Line(line) => {
+            Vec2::new(line.start.x + line.end.x, line.start.y + line.end.y) * 0.5
+        }
+        RenderPrimitive::Polygon(polygon) => {
+            polygon
+                .points
+                .iter()
+                .fold(Vec2::ZERO, |sum, p| sum + Vec2::new(p.x, p.y))
+                / polygon.points.len() as f32
+        }
+        RenderPrimitive::Text(text) => Vec2::new(text.position.x, text.position.y),
+    }
+}
+
+#[test]
+fn a_followed_ball_is_lit_and_nothing_outside_the_pool_changes() {
+    let mut state = clock(ClockEventProfile::Off, ClockLampMode::Lively, 7);
+    let aspect = state.aspect_ratio();
+    let steady = ClockScenario::render_frame(&state);
+    roll(&mut state, 3.0, 15.0);
+    let mut followed = 0;
+    for _ in 0..3 * FIXED_HZ {
+        ClockScenario::step(&mut state, &[], TICK);
+        // At this seed the left lamp is eager, and follows the ball first.
+        let left = state.lamps_state().left;
+        if left.state != ClockLampActivity::Track || left.narrow_milli < 1000 {
+            continue;
+        }
+        followed += 1;
+        bounded_light(&state, &steady, aspect);
+        let frame = ClockScenario::render_frame(&state);
+        let unlit = crate::render::render_unlit(&state);
+        let ball = state.arena_fixtures()[0].balls[0].position;
+        // The ball's disc, as the scene drew it and as the light leaves it.
+        let disc = |frame: &RenderFrame| {
+            layer(frame, CREATURE_LAYER)
+                .into_iter()
+                .find_map(|primitive| match primitive {
+                    RenderPrimitive::Circle(circle)
+                        if circle.center == RenderPoint::new(ball.x, ball.y) =>
+                    {
+                        circle.fill.map(|fill| fill.color)
+                    }
+                    _ => None,
+                })
+                .expect("the ball's disc")
+        };
+        let (lit, drawn) = (disc(&frame), disc(&unlit));
+        let sum = |color: RenderColor| color.r + color.g + color.b;
+        assert!(sum(lit) > sum(drawn) + 0.1, "{lit:?} from {drawn:?}");
+    }
+    assert!(followed > FIXED_HZ / 2, "followed for {followed} ticks");
 }
 
 #[test]
