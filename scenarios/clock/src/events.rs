@@ -716,6 +716,9 @@ pub(super) struct EventSchedule {
     pub lifecycle_tick: u64,
     pub tick: u64,
     pub event_id: u64,
+    /// How many events have started, visitors aside, so one that starts is
+    /// told from the last even when it is of the same kind.
+    pub events_started: u64,
     pub next_event_tick: Option<u64>,
     pub ready_at: [u64; ClockEventKind::ALL.len()],
     last_kind: Option<ClockEventKind>,
@@ -735,6 +738,7 @@ impl EventSchedule {
             lifecycle_tick: 0,
             tick: 0,
             event_id: 0,
+            events_started: 0,
             next_event_tick: None,
             ready_at: [0; ClockEventKind::ALL.len()],
             last_kind: None,
@@ -750,6 +754,7 @@ impl EventSchedule {
 
     pub fn start(&mut self, kind: ClockEventKind) -> u64 {
         self.event_id += 1;
+        self.events_started += 1;
         self.preserve_periodic_deadline =
             EVENT_CATALOG[kind as usize].trigger == ClockEventTrigger::TimeChange;
         if self.preserve_periodic_deadline {

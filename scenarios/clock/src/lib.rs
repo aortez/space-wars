@@ -1928,12 +1928,48 @@ impl ClockState {
             self.sync_event_schedule();
         }
         self.update_crow(true);
+        let (view, facts) = self.lamp_sight(&layout);
+        self.lamps.perceive(
+            &Self::scene_worlds(&self.arena, self.active_event.as_ref()),
+            view,
+            facts,
+        );
         let scene = lamps::Scene {
             profile: self.config.event_profile,
             quiet: self.lamps_quiet(),
             next_event_in: self.lamps_gap(),
         };
         self.lamps.step(scene);
+    }
+
+    /// Every physics world the scene simulates in: the arena's, where the
+    /// residents stay, and the event's own while it simulates apart. Each
+    /// keeps its place in the list, empty while it is gone, and steps every
+    /// tick before the lamps look, so the contacts they read are this tick's.
+    fn scene_worlds<'a>(
+        arena: &'a arena::ClockArena,
+        event: Option<&'a ActiveEvent>,
+    ) -> [Option<&'a engine_rapier::world::PhysicsWorld>; 2] {
+        [arena.world(), event.and_then(ActiveEvent::own_world)]
+    }
+
+    /// Where the lamps look, and what the scene shows them besides its
+    /// bodies.
+    fn lamp_sight(&self, layout: &Layout) -> (lamps::View, lamps::Facts) {
+        let view = lamps::View {
+            min: engine_core::Vec2::new(layout.bounds_min.x, layout.bounds_min.y),
+            max: engine_core::Vec2::new(layout.bounds_max.x, layout.bounds_max.y),
+            pitch: layout.pitch,
+        };
+        let facts = lamps::Facts {
+            event: self.event_kind(),
+            events_started: self.schedule.events_started,
+            font: self.display.font,
+            digits: self.display.digits,
+            ceiling_open: self.ceiling.phase != ceiling::Phase::Closed,
+            reading: self.reading,
+        };
+        (view, facts)
     }
 
     /// Ticks until whatever would next cut a lamp's mood short: the

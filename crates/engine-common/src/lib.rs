@@ -1112,8 +1112,9 @@ impl ClockLampMood {
 }
 
 /// The corner lamps: the mood under way, how many of each kind the run has
-/// had and how much more quiet the next one waits for.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+/// had, how much more quiet the next one waits for, and what the lamps
+/// perceive.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockLampsState {
     pub mood: Option<ClockLampMoodState>,
     pub flickers: u32,
@@ -1123,6 +1124,69 @@ pub struct ClockLampsState {
     /// waiting for a gap that holds it, and None while one is under way and
     /// while the event profile is Off, which keeps the lamps steady.
     pub due_in_quiet_ticks: Option<u32>,
+    #[serde(default)]
+    pub perceived: ClockLampPercepts,
+}
+
+/// What the corner lamps perceive this tick: the bodies moving in view, the
+/// knocks bodies took and what changed in the scene. Positions and sizes are
+/// in thousandths of a view unit, and velocities in thousandths of one a
+/// second.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockLampPercepts {
+    /// The most salient movers, most salient first.
+    pub movers: Vec<ClockLampMover>,
+    /// The strongest impacts, strongest first.
+    pub impacts: Vec<ClockLampImpact>,
+    pub event: Option<ClockEventKind>,
+    /// The event under way began this tick, though the one before was of
+    /// its kind.
+    pub event_began: bool,
+    /// The event that ended this tick.
+    pub event_ended: Option<ClockEventKind>,
+    /// The slots of the face whose digit changed this tick, and when the font
+    /// changed, every slot that shows a digit.
+    pub changed_digits: Vec<u8>,
+    pub ceiling_open: bool,
+    /// Thousandths of the day gone, when the clock has a reading.
+    pub time_of_day_milli: Option<u32>,
+    /// The bodies looked at this tick, across every world.
+    pub bodies_visited: u32,
+}
+
+/// A body the lamps see moving.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockLampMover {
+    /// The world it is in, by its place in the scene's list: 0 for the
+    /// arena, 1 for an event's own.
+    pub world: u8,
+    pub entity: u64,
+    pub role: u32,
+    /// The middle of its solid bounds, and its velocity there.
+    pub position_milli: [i32; 2],
+    pub velocity_milli: [i32; 2],
+    /// Half the longer side of its solid bounds.
+    pub size_milli: i32,
+    /// Ticks since it started moving. A pause of under five seconds does
+    /// not stop it.
+    pub age_ticks: u64,
+    /// Thousandths of its speed in cells a second times its size in cells,
+    /// up to twice that while it is new.
+    pub salience_milli: i32,
+}
+
+/// A body the lamps saw knocked by its contacts in one step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockLampImpact {
+    /// The world it is in, as for a mover.
+    pub world: u8,
+    pub entity: u64,
+    pub role: u32,
+    /// Where the contact that pushed it hardest touches it.
+    pub position_milli: [i32; 2],
+    /// Thousandths of how much its velocity changed along its contacts'
+    /// push, and no more than the push, in cells a second.
+    pub strength_milli: i32,
 }
 
 /// A lamp's mood in progress.

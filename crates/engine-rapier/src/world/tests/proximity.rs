@@ -1,6 +1,6 @@
 //! What is near a point, nearest first and within a bounded look; where a
-//! moved body is before the next step; and how a position-driven body will
-//! move through it.
+//! moved body is before the next step; how a position-driven body will move
+//! through it; and what a body's contacts do to it.
 use super::*;
 
 const DT: f32 = 1.0 / 60.0;
@@ -146,4 +146,102 @@ fn a_position_driven_body_moves_as_its_next_pose_says_before_it_gets_there() {
     assert!((incoming - expected).length() < 1e-3, "{incoming:?}");
     assert_eq!(world.velocity_at_point(body(1), point), Some(Vec2::ZERO));
     assert_eq!(world.incoming_velocity_at_point(body(1), point, 0.0), None);
+}
+
+#[test]
+fn a_body_s_contacts_push_and_drag_it_by_their_impulses_over_its_mass() {
+    let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+        gravity: Vec2::new(0.0, -10.0),
+        ..PhysicsWorldConfig::default()
+    });
+    // A floor whose top is at y = 1, and a ball falling onto it at 6.
+    assert!(world.insert_body(
+        body(1),
+        BodySpec {
+            kind: BodyKind::Fixed,
+            ..BodySpec::default()
+        },
+        &[ColliderSpec::cuboid(collider(1), 10.0, 1.0)],
+    ));
+    assert!(world.insert_body(
+        body(2),
+        BodySpec {
+            kind: BodyKind::Dynamic,
+            position: Vec2::new(2.0, 1.55),
+            linear_velocity: Vec2::new(0.0, -6.0),
+            ..BodySpec::default()
+        },
+        &[ColliderSpec::ball(collider(2), 0.5)],
+    ));
+    assert_eq!(world.body_contact_push(body(2)), None);
+    // The step that stops it: the floor's push is the change in its
+    // velocity, and the step of gravity the floor took away too.
+    let mut landed = None;
+    for _ in 0..10 {
+        let before = world.motion(body(2)).unwrap().linear_velocity;
+        world.step(DT);
+        let after = world.motion(body(2)).unwrap().linear_velocity;
+        if let Some(push) = world.body_contact_push(body(2)) {
+            landed = Some((push, after - before - Vec2::new(0.0, -10.0) * DT));
+            break;
+        }
+    }
+    let (push, change) = landed.expect("the ball lands");
+    assert!(change.y > 5.0, "{change:?}");
+    assert!(
+        (push.velocity_change - change).length() < 1e-3,
+        "{push:?} {change:?}"
+    );
+    // The floor touches the ball at its bottom, below it.
+    assert!(
+        (push.strongest.position - Vec2::new(2.0, 1.0)).length() < 0.05,
+        "{push:?}"
+    );
+    assert!(push.strongest.normal.y < -0.99, "{push:?}");
+    // At rest, the floor holds up its weight. A lasting contact also counts
+    // the impulse cached from the step before, one of the solver's substeps.
+    for _ in 0..60 {
+        world.step(DT);
+    }
+    let push = world.body_contact_push(body(2)).unwrap();
+    let substeps = PhysicsWorldConfig::default().solver_iterations as f32;
+    let weight = Vec2::new(0.0, 10.0 * DT * (1.0 + 1.0 / substeps));
+    assert!((push.velocity_change - weight).length() < 1e-3, "{push:?}");
+    // The fixed floor is never pushed, and an unknown body is no body.
+    assert_eq!(world.body_contact_push(body(1)), None);
+    assert_eq!(world.body_contact_push(body(99)), None);
+    // Asleep, the ball is pushed no more.
+    assert!(
+        (0..600).any(|_| world.step(DT).sleeping_bodies > 0),
+        "the ball sleeps"
+    );
+    assert_eq!(world.body_contact_push(body(2)), None);
+    // A box landing as it slides: the floor stops its fall and its friction
+    // slows the slide, all in the change in its velocity.
+    assert!(world.insert_body(
+        body(3),
+        BodySpec {
+            kind: BodyKind::Dynamic,
+            position: Vec2::new(-4.0, 1.55),
+            linear_velocity: Vec2::new(6.0, -6.0),
+            ..BodySpec::default()
+        },
+        &[ColliderSpec::cuboid(collider(3), 0.5, 0.5)],
+    ));
+    let mut landed = None;
+    for _ in 0..10 {
+        let before = world.motion(body(3)).unwrap().linear_velocity;
+        world.step(DT);
+        let after = world.motion(body(3)).unwrap().linear_velocity;
+        if let Some(push) = world.body_contact_push(body(3)) {
+            landed = Some((push, after - before - Vec2::new(0.0, -10.0) * DT));
+            break;
+        }
+    }
+    let (push, change) = landed.expect("the box lands");
+    assert!(change.x < -0.5 && change.y > 5.0, "{change:?}");
+    assert!(
+        (push.velocity_change - change).length() < 1e-3,
+        "{push:?} {change:?}"
+    );
 }

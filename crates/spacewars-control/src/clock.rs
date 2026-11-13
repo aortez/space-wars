@@ -76,7 +76,8 @@ pub struct ClockState {
     pub explosion: Option<engine_common::ClockExplosionState>,
     #[serde(default)]
     pub coins: Option<engine_common::ClockCoinsState>,
-    /// The corner lamps: the mood under way and how many the run has had.
+    /// The corner lamps: the mood under way, how many the run has had and
+    /// what the lamps perceive.
     #[serde(default)]
     pub lamps: Option<engine_common::ClockLampsState>,
     #[serde(default)]
