@@ -506,7 +506,18 @@ fn aquarium_preview_pause_enablement_and_restart_use_the_public_ui() {
         let page = harness.change_clock_setting("pause.clock.aquarium", "On", &page);
         let configured = harness.clock_state();
         assert!(configured.settings.events.aquarium);
-        assert_eq!(configured.aquarium, paused.aquarium);
+        // Configuring while paused leaves the aquarium as it was. The live
+        // minute can change meanwhile, and its new digits reshape the fish's
+        // obstacles without a step.
+        let mut expected = paused.aquarium;
+        if configured.display_digits != paused.display_digits
+            && let (Some(expected), Some(actual)) = (&mut expected, &configured.aquarium)
+        {
+            expected.geometry_revisions = actual.geometry_revisions;
+            expected.navigation_searches = actual.navigation_searches;
+            expected.clearance_corrections = actual.clearance_corrections;
+        }
+        assert_eq!(configured.aquarium, expected);
         let page = harness.activate_guarded("pause.clock.back", &page);
         harness.activate_guarded("pause.restart", &page);
         harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
