@@ -74,6 +74,8 @@ const PAIRED_COMPRESSION_SNAPSHOT_VERSION: u32 = 20;
 const PAIRED_COMPRESSION_SNAPSHOT_TAG: u64 = 0x5041_4952_434f_4d50;
 const COLLAPSING_SUPPORT_SNAPSHOT_VERSION: u32 = 21;
 const COLLAPSING_SUPPORT_SNAPSHOT_TAG: u64 = 0x434f_4c4c_4150_5345;
+const MOVING_COLLAPSE_SNAPSHOT_VERSION: u32 = 22;
+const MOVING_COLLAPSE_SNAPSHOT_TAG: u64 = 0x4d4f_5645_434f_4c4c;
 const MOVING_SUPPORT_SNAPSHOT_TAG: u64 = 0x4d4f_5645_5355_5050;
 const CHANGING_LOAD_SNAPSHOT_TAG: u64 = 0x4348_4e47_4c4f_4144;
 const FALLING_SUPPORT_SNAPSHOT_TAG: u64 = 0x4641_4c4c_5355_5050;
@@ -3064,6 +3066,7 @@ impl PhysicsWorld {
             MOVING_SUPPORT_SNAPSHOT_VERSION,
             PAIRED_COMPRESSION_SNAPSHOT_VERSION,
             COLLAPSING_SUPPORT_SNAPSHOT_VERSION,
+            MOVING_COLLAPSE_SNAPSHOT_VERSION,
         ]
         .contains(&snapshot.version)
         {
@@ -3155,6 +3158,7 @@ impl PhysicsWorld {
             MOVING_SUPPORT_SNAPSHOT_VERSION,
             PAIRED_COMPRESSION_SNAPSHOT_VERSION,
             COLLAPSING_SUPPORT_SNAPSHOT_VERSION,
+            MOVING_COLLAPSE_SNAPSHOT_VERSION,
         ]
         .contains(&snapshot.version)
         {
@@ -3177,8 +3181,10 @@ impl PhysicsWorld {
                 MOVING_SUPPORT_SNAPSHOT_TAG
             } else if snapshot.version == PAIRED_COMPRESSION_SNAPSHOT_VERSION {
                 PAIRED_COMPRESSION_SNAPSHOT_TAG
-            } else {
+            } else if snapshot.version == COLLAPSING_SUPPORT_SNAPSHOT_VERSION {
                 COLLAPSING_SUPPORT_SNAPSHOT_TAG
+            } else {
+                MOVING_COLLAPSE_SNAPSHOT_TAG
             };
             if tag != expected_tag {
                 return Err(PhysicsWorldError(

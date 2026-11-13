@@ -1,9 +1,11 @@
 # A collapsing material support (#328)
 
 `PhysicsWorld::step_material_collapsing_support(dt)` opts into a bounded,
-irreversible failure response for one fixed material layer under an ideal rigid
-dynamic platen. It uses the existing [dynamic compression](material-dynamic-compression.md)
-law, geometry, mass limits and numerical allowances, with constant normal gravity.
+irreversible failure response for one material layer under an ideal rigid
+dynamic platen. The support may be fixed under constant normal gravity, or a
+second free body with zero gravity. It uses the existing
+[dynamic compression](material-dynamic-compression.md) law, geometry, mass limits
+and numerical allowances.
 The ordinary dynamic-compression API retains its refusal on capacity exhaustion.
 An enrolled history keeps its selected policy; changing APIs cannot reset it.
 
@@ -22,9 +24,10 @@ This is an explicit dissipative-collapse policy:
 - The layer's stored elastic energy becomes `released_elastic` dissipation.
   The boundary adds no impulse and promises no elastic return afterward.
 - Subsequent intervals have zero force, impulse, material work and charge.
-  Permanent set and viscous loss stay fixed while the platen follows gravity.
+  Permanent set and viscous loss stay fixed while the platen follows gravity
+  or both free bodies coast.
 
-The complete balance is:
+The compression summary's energy balance is:
 
 ```
 initial kinetic + initial elastic + gravity work
@@ -60,7 +63,8 @@ region remains registered with zero capacity. Mass, body geometry and actor
 ownership remain intact. Hosts retain responsibility for actor retirement and
 debris; ordinary stepping or public edits invalidate this specialized continuation.
 
-Snapshot v21 has its own tag and appended active status. Its required bounded
+Fixed-support collapse selects snapshot v21 with its own tag and appended active
+status. Its required bounded
 extension contains the initial incoming motion, source and optional single failure.
 Restore validates capacity, deformation and work, identifiers, contact ownership
 and the post-failure ballistic trajectory against the original error allowances.
@@ -71,12 +75,39 @@ One material load is emitted per internal interval. Failure and contact End each
 count toward the output limit. If the public call cannot accommodate them, the
 whole call rolls back, including motion and capacity; a smaller call can fit the
 same internal intervals. Numerical allowances never renew at failure or save/load.
-The original quarter-depth motion window still applies after collapse.
+The original quarter-depth relative-motion window still applies after collapse.
 
-This mode admits a single fixed support and constant normal gravity. The explicit
-acceleration API permits only its current value. Moving supports, two finite
+The explicit acceleration API permits only its current value. Two finite
 materials, connection severing, region splitting and fragment motion remain
-subsequent failure-lifecycle work. This slice does not close #328.
+subsequent failure-lifecycle work. This path does not close #328.
+
+## A moving material support
+
+The same opt-in API also accepts the [moving-support](material-moving-support.md)
+scene: two free, rotation-locked bodies with masses in `[5,80]`, zero gravity,
+normal-only motion and material on the support alone. Both recoil before failure.
+The relative material law uses reduced mass, and every reaction impulse acts
+equally and oppositely. Collapse adds no impulse to either body. Each then keeps
+its own velocity while moving through the failed envelope.
+
+The ordinary failure record reports relative velocity and indentation.
+`material_moving_support_failure()` additionally retains both normal positions
+and velocities at the internal collapse endpoint, in platen/support order. These
+values remain fixed even when the public call continues beyond failure, or when
+the bodies are later removed. They are observations, not actor-retirement commands.
+
+The laboratory-frame energy balance is the sum of both bodies' kinetic energies,
+elastic storage, damage, viscous loss, collapse dissipation and charge/numerical
+errors. Total momentum has only the already measured numerical defects. Shared
+translation cannot supply more damage or enlarge the existing error allowances.
+
+Moving collapse selects snapshot v22 with a distinct tag and active status. Its
+bounded extension requires the original two-body motion history, failure history
+and optional boundary motion. Before failure there is no boundary motion; after
+failure there must be exactly one. Restore checks both coasting trajectories and
+velocities, including common motion invisible to the relative summary. Fixed
+collapse keeps its frozen v21 layout; ordinary moving and paired modes keep v19
+and v20 and continue refusing exhaustion.
 
 ## Demonstration and evidence
 
@@ -94,3 +125,12 @@ orders and public-step partitions retain the same physical result. Unit tests
 cover safe loads, mode restrictions, exact continuation, one-time emission,
 output-limit rollback and corrupt/removed histories. The Lab tests and its full
 UI workflow cover the pause, single-step, save/load and continued fall.
+
+Moving-failure tests compare capacity crossing against the continuous law at the
+reduced mass for equal and unequal mass pairs from 5 to 80, all quarter turns,
+and shared velocities of -1, 0 and 1. They check both subsequent straight-line
+trajectories, total and relative energy, momentum, one-time failure, exact replay,
+safe contacts and identical histories across geometry/public-step partitions.
+Native tests cover pending contact ownership, corrupt or missing boundary motion,
+removal, output/motion limits, stale policy changes and frozen fixed-collapse saves.
+The current Material Lab collapse demonstration remains the fixed-support case.

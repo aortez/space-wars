@@ -65,7 +65,10 @@ allowance. Energy and impulse retain the `1e-5` factors on `Y*depth` and
 defects accumulate across every interval and survive pauses, saves and separation.
 Small bodies, large translations or long runs can exhaust an allowance. The
 entire public call then refuses without changing either body, capacity or output.
-Finite-region failure also still refuses; its lifecycle remains #328.
+The ordinary API still refuses finite-region failure. The opt-in
+[collapse policy](material-support-failure.md#a-moving-material-support) commits
+one failure, dissipates the elastic store and lets both bodies coast with their
+boundary motion retained. It uses snapshot v22 and the same error allowances.
 
 ## Save and qualification
 
@@ -92,5 +95,5 @@ layers on both free bodies with separate deformation and damage histories.
 This remains a bounded #327 path. Externally driven moving supports,
 angular/oblique contacts, connection loads and transfers between older
 loading modes remain. Material Lab demonstrates the fixed-support cases and two
-paired-material collisions; gameplay integration and persistent failure
-consequences are later slices.
+paired-material collisions and a fixed collapsing support. Paired-material
+failure, gameplay integration and general topology consequences remain later slices.

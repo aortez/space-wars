@@ -18,6 +18,15 @@ pub struct MovingSupportSummary {
     pub scales: [f64; 5],
 }
 
+/// Retained motion at collapse, in platen/support order along the contact normal.
+/// A public step may continue past this boundary; these values do not advance.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MovingSupportFailure {
+    pub failure: CompressionFailure,
+    pub positions: [f64; 2],
+    pub velocities: [f32; 2],
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub(super) struct Motion {
     pub positions: [f64; 2],
@@ -155,7 +164,12 @@ impl MovingHistory {
         let initial_energy: f64 = self.energy(&self.initial).iter().sum();
         let energy: f64 = self.energy(&self.current).iter().sum();
         let expected = [
-            initial_energy - energy - s.elastic_energy - history.plastic_work() - s.viscous_loss,
+            initial_energy
+                - energy
+                - s.elastic_energy
+                - history.plastic_work()
+                - s.viscous_loss
+                - history.released_elastic(),
             -s.reaction_impulse
                 - f64::from(self.masses[0])
                     * (f64::from(self.current.velocities[0])
@@ -199,6 +213,25 @@ impl MovingHistory {
                     && self.errors == [0.0; 5]
                     && self.absolute_errors == [0.0; 5]))
     }
+    pub fn valid_failure(
+        &self,
+        boundary: &Motion,
+        event: &CompressionFailure,
+        flight: f64,
+        depth: f64,
+    ) -> bool {
+        boundary.valid()
+            && boundary.relative_velocity() == event.velocity
+            && boundary.indentation() == event.indentation
+            && boundary.velocities == self.current.velocities
+            && (0..2).all(|i| {
+                (self.current.positions[i]
+                    - boundary.positions[i]
+                    - f64::from(boundary.velocities[i]) * flight)
+                    .abs()
+                    <= self.absolute_errors[3 + i] + 1e-10 * depth
+            })
+    }
     fn summary(&self, curve: &MaterialCurve) -> MovingSupportSummary {
         MovingSupportSummary {
             masses: self.masses,
@@ -221,6 +254,25 @@ impl PhysicsWorld {
     pub fn material_moving_support_summary(&self) -> Option<MovingSupportSummary> {
         let h = &self.loading.as_ref()?.dynamic_compression.as_ref()?.history;
         Some(h.moving.as_ref()?.summary(&h.curve()))
+    }
+
+    /// Both bodies' motion at the one committed collapse boundary, including
+    /// after invalidation or removal. Reading does not consume the observation.
+    pub fn material_moving_support_failure(&self) -> Option<MovingSupportFailure> {
+        let f = self
+            .loading
+            .as_ref()?
+            .dynamic_compression
+            .as_ref()?
+            .history
+            .failure
+            .as_ref()?;
+        let motion = f.motion.as_ref()?;
+        Some(MovingSupportFailure {
+            failure: f.event.clone()?,
+            positions: motion.positions,
+            velocities: motion.velocities,
+        })
     }
 }
 

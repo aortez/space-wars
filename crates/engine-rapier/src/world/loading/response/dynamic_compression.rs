@@ -11,7 +11,7 @@ mod paired;
 mod step;
 pub use failure::CompressionFailure;
 use model::{History, MaterialCurve};
-pub use moving::MovingSupportSummary;
+pub use moving::{MovingSupportFailure, MovingSupportSummary};
 pub use paired::MaterialCompressionSummary;
 
 /// Largest number of internal midpoint reaction solves per public call.
@@ -97,6 +97,7 @@ enum Status {
     MovingSupport(Box<FallingActive>),
     PairedMaterials(Box<FallingActive>),
     CollapsingSupport(Box<FallingActive>),
+    CollapsingMovingSupport(Box<FallingActive>),
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct FallingActive {
@@ -187,8 +188,10 @@ impl Continuation {
             MOVING_SUPPORT_SNAPSHOT_VERSION
         } else if self.revision == 6 {
             PAIRED_COMPRESSION_SNAPSHOT_VERSION
-        } else {
+        } else if self.revision == 7 {
             COLLAPSING_SUPPORT_SNAPSHOT_VERSION
+        } else {
+            MOVING_COLLAPSE_SNAPSHOT_VERSION
         }
     }
     pub(in crate::world) fn snapshot_tag(&self) -> u64 {
@@ -204,8 +207,10 @@ impl Continuation {
             MOVING_SUPPORT_SNAPSHOT_TAG
         } else if self.revision == 6 {
             PAIRED_COMPRESSION_SNAPSHOT_TAG
-        } else {
+        } else if self.revision == 7 {
             COLLAPSING_SUPPORT_SNAPSHOT_TAG
+        } else {
+            MOVING_COLLAPSE_SNAPSHOT_TAG
         }
     }
     pub(in crate::world) fn serialize_extensions(
@@ -222,7 +227,7 @@ impl Continuation {
                 .map_err(|e| PhysicsWorldError(e.to_string()))?;
         } else if self.revision == 4 {
             self.history.serialize_loads(bytes)?;
-        } else if self.revision == 5 || self.revision == 6 {
+        } else if matches!(self.revision, 5 | 6 | 8) {
             let moving = self
                 .history
                 .moving
@@ -248,6 +253,14 @@ impl Continuation {
                 .ok_or_else(|| PhysicsWorldError("missing collapse history".into()))?;
             bincode::serialize_into(bytes, &(&self.history.incoming, failure))
                 .map_err(|e| PhysicsWorldError(e.to_string()))?;
+        } else if self.revision == 8 {
+            let failure = self
+                .history
+                .failure
+                .as_ref()
+                .ok_or_else(|| PhysicsWorldError("missing moving collapse history".into()))?;
+            bincode::serialize_into(bytes, &(failure, &failure.motion))
+                .map_err(|e| PhysicsWorldError(e.to_string()))?;
         }
         Ok(())
     }
@@ -262,7 +275,7 @@ impl Continuation {
             );
         } else if self.revision == 4 {
             self.history.deserialize_loads(reader)?;
-        } else if self.revision == 5 || self.revision == 6 {
+        } else if matches!(self.revision, 5 | 6 | 8) {
             self.history.moving = Some(
                 bincode::deserialize_from(&mut *reader)
                     .map_err(|e| PhysicsWorldError(e.to_string()))?,
@@ -278,6 +291,11 @@ impl Continuation {
             let (incoming, failure) =
                 bincode::deserialize_from(reader).map_err(|e| PhysicsWorldError(e.to_string()))?;
             self.history.incoming = incoming;
+            self.history.failure = Some(failure);
+        } else if self.revision == 8 {
+            let (mut failure, motion): (failure::FailureHistory, Option<moving::Motion>) =
+                bincode::deserialize_from(reader).map_err(|e| PhysicsWorldError(e.to_string()))?;
+            failure.motion = motion;
             self.history.failure = Some(failure);
         }
         Ok(())
@@ -312,6 +330,11 @@ impl Continuation {
                 if self.revision == 7
                     && (!a.pending_support
                         || (a.owner.is_some() && self.history.incoming.is_some())) =>
+            {
+                Some((&a.scene, a.owner))
+            }
+            Status::CollapsingMovingSupport(a)
+                if self.revision == 8 && (!a.pending_support || a.owner.is_some()) =>
             {
                 Some((&a.scene, a.owner))
             }
