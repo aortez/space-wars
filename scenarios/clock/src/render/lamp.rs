@@ -2,8 +2,10 @@
 //! the glow it spreads around its corner and the softer light it throws down
 //! into the room. A lamp rests at `REST_BRIGHTNESS` of its full light, its bulb
 //! an amber glow without the hot core. What the lamp does dims or darkens all
-//! of these, or gathers the thrown light into a spotlight's beam, which lays a
-//! pool of light on the face and brightens the cells inside it, lit or not.
+//! of these, or gathers the thrown light into a spotlight's beam. The beam
+//! lays a pool of light over the wall and the floor and warms the small
+//! things drawn over the pool, the cells lit or not; the mover it follows
+//! shades those behind it.
 
 use super::*;
 use crate::lamps::{Look, REST_BRIGHTNESS};
@@ -15,9 +17,31 @@ mod tests;
 
 /// The lamp heads and their glow sit over the room and the frame.
 const LAMP_LAYER: i32 = 11;
-/// The spotlight's light on the cells: above the cells and the labels,
-/// below visitors and the frame.
-const LIT_LAYER: i32 = 7;
+/// The layers drawn over the pool, which its light warms in place, and how
+/// far toward warm white it takes what is on them at full light: the dark
+/// guides of unlit cells just enough to show. The pool's own discs light
+/// the wall and what is drawn under them.
+const LIT_LAYERS: [(i32, f32); 4] = [
+    (INACTIVE_CELL_LAYER, 0.22),
+    (ACTIVE_CELL_LAYER, 0.42),
+    (LABEL_LAYER, 0.42),
+    (CREATURE_LAYER, 0.42),
+];
+const LIT_COLOR: RenderColor = RenderColor::rgb(1.0, 0.93, 0.78);
+/// A pool lights a thing whole, by the light at its middle, so it lights
+/// only things that reach no farther than `SMALL` of its radius from their
+/// middle, and less those that reach past `SMALL_FADE`, so nothing snaps in
+/// or out of the light as it grows. Larger things, like Meltdown's water,
+/// stay as the scene drew them.
+const SMALL: f32 = 0.5;
+const SMALL_FADE: f32 = 0.35;
+/// The shadow of the mover a spotlight follows, on what the pool warms
+/// behind it: how far behind the mover its middle lies and how far it
+/// spreads from there, in sizes of the mover, and how much of the light it
+/// takes at its deepest.
+const SHADOW_OFFSET: f32 = 0.6;
+const SHADOW_SPREAD: f32 = 1.3;
+const SHADOW_DEPTH: f32 = 0.6;
 
 /// How far from straight down a steady lamp's light leans into the room.
 const REST_TILT: f32 = 0.6;
@@ -92,9 +116,73 @@ impl Light {
     }
 }
 
+/// A spotlight's pool, and the mover in it while the lamp follows one.
+struct Spot {
+    pool: Pool,
+    caster: Option<Caster>,
+}
+
+/// A mover in a spotlight, in world units.
+#[derive(Debug, Clone, Copy)]
+struct Caster {
+    center: Vec2,
+    size: f32,
+    /// The middle of the shadow it casts, behind it as the lamp sees it.
+    shadow: Vec2,
+}
+
+impl Spot {
+    fn new(lamp: usize, look: Look, layout: Layout) -> Option<Self> {
+        let light = Light::new(lamp, look, layout);
+        let pool = light.pool.filter(|pool| pool.strength > 0.0)?;
+        let caster = look.subject.map(|subject| {
+            let center = Vec2::new(layout.face_origin.x, layout.face_origin.y)
+                + subject.position * layout.pitch;
+            let size = subject.size * layout.pitch;
+            let away = (center - light.center).normalized();
+            Caster {
+                center,
+                size,
+                shadow: center + away * (size * SHADOW_OFFSET),
+            }
+        });
+        Some(Self { pool, caster })
+    }
+
+    /// How much of the pool's light reaches `point`: none past its rim, and
+    /// less in the shadow of the mover in it.
+    fn light_at(&self, point: Vec2) -> f32 {
+        let light =
+            self.pool.strength * falloff(point.distance_to(self.pool.center) / self.pool.radius);
+        let shade = self.caster.map_or(0.0, |caster| caster.shade(point));
+        light * (1.0 - shade)
+    }
+
+    /// How much of the pool's light reaches a thing whose middle is at
+    /// `point` and which reaches `extent` from there: as much as reaches
+    /// its middle if it is small, and none if it is large.
+    fn light_on(&self, point: Vec2, extent: f32) -> f32 {
+        let large = (extent / self.pool.radius - SMALL_FADE) / (SMALL - SMALL_FADE);
+        self.light_at(point) * (1.0 - smooth(large.clamp(0.0, 1.0)))
+    }
+}
+
+impl Caster {
+    /// How much of the light its shadow takes at `point`: the most behind
+    /// its middle, and none on the mover itself.
+    fn shade(&self, point: Vec2) -> f32 {
+        if point.distance_to(self.center) <= self.size {
+            return 0.0;
+        }
+        let depth = 1.0 - point.distance_to(self.shadow) / (self.size * SHADOW_SPREAD);
+        SHADOW_DEPTH * smooth(depth.clamp(0.0, 1.0))
+    }
+}
+
 pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
     for lamp in 0..2 {
-        let light = Light::new(lamp, state.lamps.look(lamp), layout);
+        let look = state.lamps.look(lamp);
+        let light = Light::new(lamp, look, layout);
         throw(frame, &light);
         beam(frame, &light, layout);
         if let Some(pool) = light.pool {
@@ -160,61 +248,101 @@ fn sparks(frame: &mut RenderFrame, light: &Light, layout: Layout, tick: u32) {
     }
 }
 
-/// Brightens whatever cells a spotlight's pool reaches: lit cells and
-/// labels toward warm white, the dark guides just enough to show.
+/// Warms every small thing drawn over a spotlight's pool, whichever way the
+/// scene drew it, as far as the pool's light reaches it. A thing takes the
+/// light in place, toward warm white, so it keeps its place in the order the
+/// scene drew it and the frame gains nothing.
 pub(super) fn illuminate(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
-    let pools: Vec<Pool> = (0..2)
-        .filter_map(|lamp| Light::new(lamp, state.lamps.look(lamp), layout).pool)
-        .filter(|pool| pool.strength > 0.0)
+    let spots: Vec<Spot> = (0..2)
+        .filter_map(|lamp| Spot::new(lamp, state.lamps.look(lamp), layout))
         .collect();
-    if pools.is_empty() {
+    light_scene(frame, &spots);
+}
+
+/// Warms what `spots` reach, as `illuminate` does.
+fn light_scene(frame: &mut RenderFrame, spots: &[Spot]) {
+    let Some(largest) = spots
+        .iter()
+        .map(|spot| spot.pool.radius * SMALL)
+        .reduce(f32::max)
+    else {
         return;
-    }
-    let mut lit = Vec::new();
-    for layer in &frame.layers {
-        let gain = match layer.z {
-            ACTIVE_CELL_LAYER | LABEL_LAYER => 0.42,
-            INACTIVE_CELL_LAYER => 0.22,
-            _ => continue,
+    };
+    for layer in &mut frame.layers {
+        let Some(&(_, gain)) = LIT_LAYERS.iter().find(|(z, _)| *z == layer.z) else {
+            continue;
         };
-        for primitive in &layer.primitives {
-            let RenderPrimitive::Polygon(polygon) = primitive else {
+        for primitive in &mut layer.primitives {
+            let Some((center, extent)) = footprint(primitive) else {
                 continue;
             };
-            let Some(fill) = polygon.fill.as_ref().filter(|fill| fill.color.a > 0.0) else {
-                continue;
-            };
-            if polygon.points.is_empty() {
+            if extent >= largest {
                 continue;
             }
-            let centroid = polygon
-                .points
-                .iter()
-                .fold(Vec2::ZERO, |sum, p| sum + Vec2::new(p.x, p.y))
-                / polygon.points.len() as f32;
-            let light: f32 = pools
-                .iter()
-                .map(|pool| {
-                    pool.strength * falloff(centroid.distance_to(pool.center) / pool.radius)
-                })
-                .sum();
+            let light: f32 = spots.iter().map(|spot| spot.light_on(center, extent)).sum();
             if light > 0.0 {
-                lit.push(RenderPolygon::filled(
-                    polygon.points.clone(),
-                    RenderColor::rgba(1.0, 0.93, 0.78, (gain * light * fill.color.a).min(0.85)),
-                ));
+                warm(primitive, (gain * light).min(0.85));
             }
         }
     }
-    for polygon in lit {
-        frame.push_primitive(LIT_LAYER, RenderPrimitive::Polygon(polygon));
+}
+
+/// Where a primitive sits and how far it reaches from there; None for text.
+fn footprint(primitive: &RenderPrimitive) -> Option<(Vec2, f32)> {
+    let point = |p: &RenderPoint| Vec2::new(p.x, p.y);
+    match primitive {
+        RenderPrimitive::Circle(circle) => Some((point(&circle.center), circle.radius)),
+        RenderPrimitive::Line(line) => {
+            let (start, end) = (point(&line.start), point(&line.end));
+            Some(((start + end) * 0.5, start.distance_to(end) * 0.5))
+        }
+        RenderPrimitive::Polygon(polygon) if !polygon.points.is_empty() => {
+            let center = polygon
+                .points
+                .iter()
+                .fold(Vec2::ZERO, |sum, p| sum + point(p))
+                / polygon.points.len() as f32;
+            let extent = polygon
+                .points
+                .iter()
+                .map(|p| center.distance_to(point(p)))
+                .fold(0.0, f32::max);
+            Some((center, extent))
+        }
+        RenderPrimitive::Polygon(_) | RenderPrimitive::Text(_) => None,
+    }
+}
+
+/// Takes a primitive's fill and outline `amount` of the way to warm white,
+/// as warm light laid over it would, and leaves how opaque they are.
+fn warm(primitive: &mut RenderPrimitive, amount: f32) {
+    let toward = |color: &mut RenderColor| {
+        color.r += (LIT_COLOR.r - color.r) * amount;
+        color.g += (LIT_COLOR.g - color.g) * amount;
+        color.b += (LIT_COLOR.b - color.b) * amount;
+    };
+    let (fill, stroke) = match primitive {
+        RenderPrimitive::Circle(circle) => (circle.fill.as_mut(), circle.stroke.as_mut()),
+        RenderPrimitive::Polygon(polygon) => (polygon.fill.as_mut(), polygon.stroke.as_mut()),
+        RenderPrimitive::Line(line) => (None, Some(&mut line.stroke)),
+        RenderPrimitive::Text(_) => (None, None),
+    };
+    if let Some(fill) = fill {
+        toward(&mut fill.color);
+    }
+    if let Some(stroke) = stroke {
+        toward(&mut stroke.color);
     }
 }
 
 /// Full light over the pool's inner third, fading to nothing at its rim.
 fn falloff(distance: f32) -> f32 {
-    let t = ((distance - 0.35) / 0.65).clamp(0.0, 1.0);
-    1.0 - t * t * (3.0 - 2.0 * t)
+    1.0 - smooth(((distance - 0.35) / 0.65).clamp(0.0, 1.0))
+}
+
+/// Eases from 0 to 1 as `t` does, without a corner at either end.
+fn smooth(t: f32) -> f32 {
+    t * t * (3.0 - 2.0 * t)
 }
 
 /// The steady light falling from the lamp: overlapping discs along its

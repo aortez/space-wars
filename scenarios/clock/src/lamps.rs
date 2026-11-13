@@ -44,6 +44,8 @@ pub(crate) struct Look {
     /// Where the spotlight points, in face units from the face's lower-left
     /// corner. It means nothing while `narrow` is zero.
     pub target: Vec2,
+    /// The mover in the spotlight, while the lamp follows one in view.
+    pub subject: Option<Subject>,
 }
 
 impl Look {
@@ -51,7 +53,17 @@ impl Look {
         brightness: REST_BRIGHTNESS,
         narrow: 0.0,
         target: Vec2::ZERO,
+        subject: None,
     };
+}
+
+/// A mover in a spotlight, in face units like a look's target.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Subject {
+    /// The middle of its solid bounds.
+    pub position: Vec2,
+    /// Half the longer side of its solid bounds.
+    pub size: f32,
 }
 
 /// Where a lamp's head hangs: just inside the junction of the frame's top

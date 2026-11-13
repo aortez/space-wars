@@ -44,7 +44,7 @@ pub(super) fn render(frame: &mut RenderFrame, crow: &CrowVisit, layout: Layout) 
     if matches!(crow.phase, Phase::Entering | Phase::Flying | Phase::Leaving) {
         let flap = crow.flight.wing;
         frame.push_primitive(
-            8,
+            CREATURE_LAYER,
             RenderPrimitive::Polygon(RenderPolygon {
                 points: vec![
                     transform(-3.0, 5.0),
@@ -69,7 +69,7 @@ pub(super) fn render(frame: &mut RenderFrame, crow: &CrowVisit, layout: Layout) 
             let a = transform(column as f32 - 7.0, (rows.len() - row - 1) as f32);
             let b = transform(column as f32 - 6.0, (rows.len() - row) as f32);
             frame.push_primitive(
-                8,
+                CREATURE_LAYER,
                 rectangle(
                     RenderPoint::new(a.x.min(b.x), a.y),
                     RenderPoint::new(a.x.max(b.x), b.y),

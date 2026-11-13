@@ -29,7 +29,7 @@ use engine_core::Vec2;
 use rand::{Rng, rngs::StdRng};
 
 use super::perception::{Key, MOVING, Mover, Percepts};
-use super::{Look, REST_BRIGHTNESS, SPARK_TICKS, SPOT_PEAK, WARM_UP_FROM, WARM_UP_TICKS};
+use super::{Look, REST_BRIGHTNESS, SPARK_TICKS, SPOT_PEAK, Subject, WARM_UP_FROM, WARM_UP_TICKS};
 use crate::{FIXED_HZ, layout::DIGIT_ORIGINS};
 
 #[cfg(test)]
@@ -333,6 +333,9 @@ struct Lamp {
     target: Option<Key>,
     /// Where that mover was last seen, and its velocity then.
     seen: (Vec2, Vec2),
+    /// The mover in its light this tick, where it is and how big, while it
+    /// notices or tracks one in view.
+    subject: Option<(Vec2, f32)>,
     /// Where a present points, in face cells.
     present_at: Vec2,
     /// A mover it tired of, and the tick until which it leaves it alone.
@@ -367,6 +370,7 @@ impl Lamp {
             ticks: 0,
             target: None,
             seen: (Vec2::ZERO, Vec2::ZERO),
+            subject: None,
             present_at: Vec2::ZERO,
             tired_of: None,
             still: 0,
@@ -590,14 +594,22 @@ impl Lamp {
         let cooling = if self.outage.is_some() { 4.0 } else { 1.0 };
         self.heat +=
             DT * (above / HEAT_SECONDS - (1.0 - above) * cooling * self.heat / COOL_SECONDS);
+        let face = |point: Vec2| (point - stage.face_origin) * (1.0 / stage.pitch);
         self.look = Look {
             brightness,
             narrow: self.narrow,
             target: if self.narrow > 0.0 {
-                (self.aim - stage.face_origin) * (1.0 / stage.pitch)
+                face(self.aim)
             } else {
                 Vec2::ZERO
             },
+            subject: self
+                .subject
+                .filter(|_| self.narrow > 0.0)
+                .map(|(position, size)| Subject {
+                    position: face(position),
+                    size: size / stage.pitch,
+                }),
         };
         // The effects run on.
         if let Some(flicker) = &mut self.flicker {
@@ -826,6 +838,10 @@ impl Brain {
             }
         }
         for (index, lamp) in self.lamps.iter_mut().enumerate() {
+            lamp.subject = matches!(lamp.activity, Activity::Notice | Activity::Track)
+                .then(|| find(percepts, lamp.target))
+                .flatten()
+                .map(|mover| (mover.position, mover.size));
             lamp.act(index, &stage);
             if lamp.outage.as_ref().is_some_and(Outage::done) {
                 lamp.outage = None;
