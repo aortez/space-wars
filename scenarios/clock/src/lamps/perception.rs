@@ -30,7 +30,7 @@ const MAX_IMPACTS: usize = 4;
 /// at most 255, or 335 under Tanks.
 const MAX_BODIES: usize = 512;
 /// A body moving at this many cells a second or more is a mover.
-const MOVING: f32 = 1.0;
+pub(super) const MOVING: f32 = 1.0;
 /// A body whose contacts change its velocity by this many cells a second or
 /// more in one step takes a knock.
 const KNOCK: f32 = 6.0;
@@ -126,6 +126,9 @@ pub(crate) struct Percepts {
     pub movers: Vec<Mover>,
     /// The strongest impacts, strongest first.
     pub impacts: Vec<Impact>,
+    /// The bodies the lamps follow, however they rank among the movers and
+    /// however slowly they move, while they stay in view.
+    pub attended: Vec<Mover>,
     pub signals: Signals,
     /// The bodies looked at, across every world.
     pub visited: usize,
@@ -181,7 +184,7 @@ impl Percepts {
 /// while it is gone. A world that moves to another place, as an event's own
 /// world does when the arena adopts it, brings bodies the lamps take for
 /// new ones.
-type Key = (usize, BodyId);
+pub(super) type Key = (usize, BodyId);
 
 /// When a body started moving and when it last moved.
 #[derive(Debug, Clone, Copy)]
@@ -210,6 +213,9 @@ pub(crate) struct Perception {
     /// kind and by how many events had started.
     event: Option<(ClockEventKind, u64)>,
     face: Option<(ClockFont, [Option<u8>; DIGIT_SLOT_COUNT])>,
+    /// The bodies the lamps follow, which each look describes whatever they
+    /// do.
+    attending: [Option<Key>; 2],
     percepts: Percepts,
     /// Looks at nothing, for comparing a scene with and without perception.
     #[cfg(test)]
@@ -219,6 +225,11 @@ pub(crate) struct Perception {
 impl Perception {
     pub fn percepts(&self) -> &Percepts {
         &self.percepts
+    }
+
+    /// Tells the next looks which bodies the lamps follow.
+    pub fn attend(&mut self, keys: [Option<Key>; 2]) {
+        self.attending = keys;
     }
 
     /// Looks at the bodies of `worlds` inside `view`, and at the scene.
@@ -231,6 +242,7 @@ impl Perception {
         self.tick += 1;
         self.percepts.movers.clear();
         self.percepts.impacts.clear();
+        self.percepts.attended.clear();
         self.percepts.visited = 0;
         self.now.clear();
         for (index, world) in worlds.iter().enumerate() {
@@ -240,6 +252,23 @@ impl Perception {
         }
         std::mem::swap(&mut self.before, &mut self.now);
         self.before.sort_unstable_by_key(|memory| memory.key);
+        for (place, key) in self.attending.into_iter().enumerate() {
+            let Some(key) = key.filter(|key| !self.attending[..place].contains(&Some(*key))) else {
+                continue;
+            };
+            let Some(world) = worlds.get(key.0).copied().flatten() else {
+                continue;
+            };
+            let age = self
+                .before
+                .binary_search_by_key(&key, |memory| memory.key)
+                .ok()
+                .and_then(|found| self.before[found].moving)
+                .map_or(0, |moving| self.tick - moving.since);
+            if let Some(mover) = describe(world, key, age, view) {
+                self.percepts.attended.push(mover);
+            }
+        }
         self.percepts.signals = self.signals(facts);
     }
 
@@ -322,26 +351,8 @@ impl Perception {
 
     /// Ranks a moving body that is at least partly in view among the movers.
     fn consider(&mut self, world: &PhysicsWorld, key: Key, age: u64, view: View) {
-        let Some((min, max)) = world.body_solid_bounds(key.1) else {
+        let Some(mover) = describe(world, key, age, view) else {
             return;
-        };
-        if !view.overlaps(min, max) {
-            return;
-        }
-        let position = (min + max) * 0.5;
-        let size = (max.x - min.x).max(max.y - min.y) * 0.5;
-        let velocity = world
-            .velocity_at_point(key.1, position)
-            .unwrap_or(Vec2::ZERO);
-        let novelty = 1.0 + (-(age as f32) / NOVELTY_TICKS).exp();
-        let mover = Mover {
-            world: key.0,
-            body: key.1,
-            position,
-            velocity,
-            size,
-            age,
-            salience: velocity.length() / view.pitch * (size / view.pitch) * novelty,
         };
         let movers = &mut self.percepts.movers;
         let at = movers
@@ -382,6 +393,31 @@ impl Perception {
         self.face = Some((facts.font, facts.digits));
         signals
     }
+}
+
+/// A body that is at least partly in view, as the lamps see it: where it is,
+/// how it moves, how big it is and how much it stands out, `age` ticks after
+/// it started moving.
+fn describe(world: &PhysicsWorld, key: Key, age: u64, view: View) -> Option<Mover> {
+    let (min, max) = world.body_solid_bounds(key.1)?;
+    if !view.overlaps(min, max) {
+        return None;
+    }
+    let position = (min + max) * 0.5;
+    let size = (max.x - min.x).max(max.y - min.y) * 0.5;
+    let velocity = world
+        .velocity_at_point(key.1, position)
+        .unwrap_or(Vec2::ZERO);
+    let novelty = 1.0 + (-(age as f32) / NOVELTY_TICKS).exp();
+    Some(Mover {
+        world: key.0,
+        body: key.1,
+        position,
+        velocity,
+        size,
+        age,
+        salience: velocity.length() / view.pitch * (size / view.pitch) * novelty,
+    })
 }
 
 #[cfg(test)]

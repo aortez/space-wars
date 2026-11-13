@@ -39,6 +39,8 @@ fn rain_is_visible_in_both_render_paths_and_leaves_the_clock_face_readable() {
         Viewport::new(480.0, 800.0),
     ] {
         let config = ClockConfig {
+            // Steady lamps, which never change a frame on their own.
+            lamps: engine_common::ClockLampMode::Steady,
             aspect_ratio: viewport.aspect_ratio(),
             event_profile: ClockEventProfile::Off,
             time_format: ClockTimeFormat::TwelveHour,

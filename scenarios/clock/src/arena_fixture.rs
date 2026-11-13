@@ -123,6 +123,18 @@ impl ArenaFixture {
         Self::dropped(layout, &[-0.85, 0.85])
     }
 
+    /// A ball on the floor `from` cells in from the view's left edge, rolling
+    /// at `speed` cells a second, to the right when it is positive.
+    pub fn rolling(layout: Layout, from: f32, speed: f32) -> FixtureBall {
+        FixtureBall {
+            position: Vec2::new(
+                layout.bounds_min.x + from * layout.pitch,
+                layout.floor_y + Self::radius(layout) * 1.05,
+            ),
+            velocity: Vec2::new(speed * layout.pitch, 0.0),
+        }
+    }
+
     /// Balls at rest a little above the floor, at `across` fractions of the
     /// view's half width.
     fn dropped(layout: Layout, across: &[f32]) -> Vec<FixtureBall> {

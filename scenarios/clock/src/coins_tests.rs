@@ -22,6 +22,8 @@ const REFORMING_AT: u64 = GATHERING_AT + GATHERING_TICKS;
 fn ready(aspect: f32, seed: u64, format: ClockTimeFormat) -> ClockState {
     let mut state = ClockScenario::init(
         ClockConfig {
+            // Steady lamps, which never change a frame on their own.
+            lamps: engine_common::ClockLampMode::Steady,
             aspect_ratio: aspect,
             event_profile: ClockEventProfile::Off,
             time_format: format,
@@ -42,6 +44,8 @@ fn ready(aspect: f32, seed: u64, format: ClockTimeFormat) -> ClockState {
 fn ready_in(aspect: f32, seed: u64, font: ClockFont) -> ClockState {
     let mut state = ClockScenario::init(
         ClockConfig {
+            // Steady lamps, which never change a frame on their own.
+            lamps: engine_common::ClockLampMode::Steady,
             aspect_ratio: aspect,
             event_profile: ClockEventProfile::Off,
             fonts: ClockFontSettings {

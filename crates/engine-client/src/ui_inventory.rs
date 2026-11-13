@@ -166,6 +166,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) clock_meltdown_enabled: bool,
     pub(crate) clock_duck_enabled: bool,
     pub(crate) clock_crow: String,
+    pub(crate) clock_lamps: String,
     pub(crate) clock_explosion_enabled: bool,
     pub(crate) clock_aquarium_enabled: bool,
     pub(crate) clock_marquee_enabled: bool,
@@ -865,6 +866,11 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.clock.crow",
                 &context.clock_crow,
             );
+            push_choice(
+                &mut controls,
+                "launcher.settings.clock.lamps",
+                &context.clock_lamps,
+            );
             controls.push(UiControl::new(
                 "launcher.settings.clock.fonts",
                 "Fonts",
@@ -894,6 +900,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.clock.spider",
                 "launcher.settings.clock.coins",
                 "launcher.settings.clock.tanks",
+                "launcher.settings.clock.lamps",
                 "launcher.settings.back",
             ]
         }
@@ -1278,6 +1285,8 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
             .with_value(if context.clock_show_date { "On" } else { "Off" }),
     );
     controls.push(UiControl::new("pause.clock.fonts", "Fonts", true));
+    controls
+        .push(UiControl::new("pause.clock.lamps", "Lamps", true).with_value(&context.clock_lamps));
     controls.push(
         UiControl::new("pause.clock.aquarium", "Aquarium", true).with_value(
             if context.clock_aquarium_enabled {
@@ -1317,6 +1326,7 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
                 "pause.clock.spider",
                 "pause.clock.coins",
                 "pause.clock.tanks",
+                "pause.clock.lamps",
             ],
             context.ingame_clock_focus_index,
         ),
@@ -1374,6 +1384,7 @@ mod tests {
             clock_meltdown_enabled: true,
             clock_duck_enabled: true,
             clock_crow: "Varied".into(),
+            clock_lamps: "Lively".into(),
             clock_explosion_enabled: true,
             clock_aquarium_enabled: true,
             clock_marquee_enabled: true,
@@ -1652,7 +1663,7 @@ mod tests {
                 "launcher.settings.spacewars.player-2",
             ),
             ("pizza", 14, "launcher.settings.pizza.live-ball-limit"),
-            ("clock", 47, "launcher.settings.clock.duck"),
+            ("clock", 49, "launcher.settings.clock.duck"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             (
                 "spacewars-surface-blocks",
@@ -1975,7 +1986,7 @@ mod tests {
             inventory.selected_control.as_deref(),
             Some("pause.clock.color-cycle")
         );
-        assert_eq!(inventory.controls.len(), 29);
+        assert_eq!(inventory.controls.len(), 30);
         assert!(inventory.controls.iter().all(|control| control.enabled));
         context.clock_controls_pending = true;
         let pending = inventory_for_screen(UiScreen::PauseClock, &context);

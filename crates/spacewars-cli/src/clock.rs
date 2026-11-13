@@ -2,7 +2,8 @@ use super::{CliError, control_error, human_error, parse_timeout};
 use clap::Subcommand;
 use engine_common::{
     ClockArenaOwner, ClockArenaState, ClockArenaUnavailable, ClockDigitSurfaceState,
-    ClockLampPercepts, ClockSurfaceChangeKind, ClockSurfaceRetirement,
+    ClockLampBrainState, ClockLampMode, ClockLampPercepts, ClockLampsState, ClockSurfaceChangeKind,
+    ClockSurfaceRetirement,
 };
 use spacewars_control::{
     ClockEventKind, ClockMarqueeMessage, ClockMessageRequest, ClockState, ClockStatePredicate,
@@ -319,25 +320,9 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
             }
         }
         if let Some(lamps) = &state.lamps {
-            let mood = lamps.mood.map_or("steady".into(), |mood| {
-                format!(
-                    "{} {} {}/{} at {}/1000{}",
-                    mood.lamp.as_str(),
-                    mood.kind.as_str(),
-                    mood.tick,
-                    mood.ticks,
-                    mood.brightness_milli,
-                    if mood.yielding { ", giving way" } else { "" }
-                )
-            });
-            // Nothing is due during a mood or under Off.
-            let due = lamps.due_in_quiet_ticks.map_or(String::new(), |ticks| {
-                format!(", next due in {ticks} quiet ticks")
-            });
-            println!(
-                "Lamps: {mood}; flickers={} outages={} spotlights={}{due}",
-                lamps.flickers, lamps.outages, lamps.spotlights
-            );
+            println!("{}", lamps_line(lamps, state.settings.lamps));
+            println!("{}", lamp_line("Left", &lamps.left));
+            println!("{}", lamp_line("Right", &lamps.right));
             println!("{}", perceived_line(&lamps.perceived));
         }
         if let Some(crow) = &state.crow {
@@ -698,6 +683,46 @@ fn print_arena(arena: &ClockArenaState) {
     }
 }
 
+/// The lamps' setting, and how many times the run's lamps have done each
+/// thing.
+fn lamps_line(lamps: &ClockLampsState, mode: ClockLampMode) -> String {
+    format!(
+        "Lamps: {}; notices={} tracks={} handoffs={} startles={} outages={} presents={} fidgets={} dips={}",
+        mode.label(),
+        lamps.notices,
+        lamps.tracks,
+        lamps.handoffs,
+        lamps.startles,
+        lamps.outages,
+        lamps.presents,
+        lamps.fidgets,
+        lamps.dips
+    )
+}
+
+/// What one lamp is doing, on one line: its temperament, its activity and
+/// for how many ticks, the mover it holds, where its light points, how
+/// narrow and bright it is, and its drives. A mover is `world:entity/role`,
+/// as the perceive line names it. The aim is in thousandths of a view unit,
+/// and the rest in thousandths.
+fn lamp_line(side: &str, lamp: &ClockLampBrainState) -> String {
+    let target = lamp.target.map_or(String::new(), |target| {
+        format!(" {}:{}/{}", target.world, target.entity, target.role)
+    });
+    format!(
+        "{side} lamp ({}): {}{target} for {} ticks; aim={:?} narrow={} brightness={}; interest={} boredom={} heat={}",
+        lamp.temperament.as_str(),
+        lamp.state.as_str(),
+        lamp.state_ticks,
+        lamp.aim_milli,
+        lamp.narrow_milli,
+        lamp.brightness_milli,
+        lamp.drives.interest_milli,
+        lamp.drives.boredom_milli,
+        lamp.drives.heat_milli
+    )
+}
+
 /// What the lamps perceive this tick, on one line: how many bodies they
 /// looked at, the most salient mover, the strongest impact and what changed.
 /// A body is `world:entity/role`, its world 0 for the arena and 1 for an
@@ -849,7 +874,55 @@ mod tests {
     use super::*;
     use crate::{Args, Command};
     use clap::Parser;
-    use engine_common::{ClockLampImpact, ClockLampMover};
+    use engine_common::{
+        ClockLampActivity, ClockLampDrives, ClockLampImpact, ClockLampMover, ClockLampTarget,
+        ClockLampTemperament,
+    };
+
+    #[test]
+    fn the_lamp_lines_show_the_setting_the_counts_and_each_lamps_mind() {
+        let mut lamps = ClockLampsState {
+            notices: 4,
+            tracks: 5,
+            handoffs: 1,
+            outages: 2,
+            presents: 3,
+            fidgets: 6,
+            ..ClockLampsState::default()
+        };
+        assert_eq!(
+            lamps_line(&lamps, ClockLampMode::Lively),
+            "Lamps: Lively; notices=4 tracks=5 handoffs=1 startles=0 outages=2 presents=3 fidgets=6 dips=0"
+        );
+        assert_eq!(
+            lamp_line("Right", &lamps.right),
+            "Right lamp (lazy): rest for 0 ticks; aim=[0, 0] narrow=0 brightness=0; \
+             interest=0 boredom=0 heat=0"
+        );
+        lamps.left = ClockLampBrainState {
+            temperament: ClockLampTemperament::Eager,
+            state: ClockLampActivity::Track,
+            state_ticks: 84,
+            target: Some(ClockLampTarget {
+                world: 0,
+                entity: 7001,
+                role: 0,
+            }),
+            aim_milli: [-1500, 250],
+            narrow_milli: 1000,
+            brightness_milli: 1150,
+            drives: ClockLampDrives {
+                interest_milli: 1200,
+                boredom_milli: 340,
+                heat_milli: 520,
+            },
+        };
+        assert_eq!(
+            lamp_line("Left", &lamps.left),
+            "Left lamp (eager): track 0:7001/0 for 84 ticks; aim=[-1500, 250] narrow=1000 \
+             brightness=1150; interest=1200 boredom=340 heat=520"
+        );
+    }
 
     #[test]
     fn the_perceive_line_names_the_top_mover_and_impact_and_what_changed() {

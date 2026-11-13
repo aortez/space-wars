@@ -1,9 +1,9 @@
 //! The two corner lamps: a small brass head where the rails meet, a warm bulb,
 //! the glow it spreads around its corner and the softer light it throws down
 //! into the room. A lamp rests at `REST_BRIGHTNESS` of its full light, its bulb
-//! an amber glow without the hot core. A mood dims or darkens all of these, or
-//! gathers the thrown light into a spotlight's beam, which lays a pool of light
-//! on the face and brightens the cells inside it, lit or not.
+//! an amber glow without the hot core. What the lamp does dims or darkens all
+//! of these, or gathers the thrown light into a spotlight's beam, which lays a
+//! pool of light on the face and brightens the cells inside it, lit or not.
 
 use super::*;
 use crate::lamps::{Look, REST_BRIGHTNESS};
@@ -60,14 +60,8 @@ struct Pool {
 
 impl Light {
     fn new(lamp: usize, look: Look, layout: Layout) -> Self {
-        // Nestle the heads just inside the junction of the two rails.
-        let inset = layout.frame_width * 1.3;
-        let (x, inward) = if lamp == 0 {
-            (layout.bounds_min.x + inset, 1.0)
-        } else {
-            (layout.bounds_max.x - inset, -1.0)
-        };
-        let center = Vec2::new(x, layout.bounds_max.y - inset);
+        let center = crate::lamps::head(lamp, &layout);
+        let inward = if lamp == 0 { 1.0 } else { -1.0 };
         let narrow = look.narrow.clamp(0.0, 1.0);
         let brightness = look.brightness.max(0.0);
         let target =

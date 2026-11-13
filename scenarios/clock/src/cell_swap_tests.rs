@@ -10,6 +10,8 @@ fn reading(hour: u8, minute: u8, second: u8) -> ClockReading {
 fn ready(from: ClockReading, format: ClockTimeFormat, font: ClockFont) -> ClockState {
     let mut state = ClockScenario::init(
         ClockConfig {
+            // Steady lamps, which never change a frame on their own.
+            lamps: engine_common::ClockLampMode::Steady,
             time_format: format,
             event_profile: ClockEventProfile::Off,
             fonts: ClockFontSettings {

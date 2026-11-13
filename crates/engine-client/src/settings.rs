@@ -722,6 +722,22 @@ enabled = true
     }
 
     #[test]
+    fn lamps_are_lively_in_old_settings_and_round_trip_both_modes() {
+        use engine_common::ClockLampMode;
+        let mut settings: Settings =
+            toml::from_str("[clock]\nevent_profile = 'off'\nshow_date = true\n").unwrap();
+        assert_eq!(settings.clock.lamps, ClockLampMode::Lively);
+        assert!(settings.clock.show_date);
+        for mode in ClockLampMode::ALL {
+            settings.clock.lamps = mode;
+            let saved = toml::to_string(&settings).unwrap();
+            assert!(saved.contains(&format!("lamps = \"{}\"", mode.label().to_lowercase())));
+            let loaded: Settings = toml::from_str(&saved).unwrap();
+            assert_eq!(loaded.clock, settings.clock);
+        }
+    }
+
+    #[test]
     fn pre_crow_settings_enable_the_visitor_without_changing_saved_choices() {
         let settings: Settings = toml::from_str("[clock]\nevent_profile = 'off'\nshow_date = true\n[clock.events]\nfalling = false\ncolor_cycle = false\nmeltdown = false\nduck = false\nmarquee = false\ndigit_slide = false\nrain = false\n").unwrap();
         assert!(settings.clock.events.crow);

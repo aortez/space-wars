@@ -11,6 +11,8 @@ const ASPECTS: [f32; 4] = [0.6, 1024.0 / 768.0, 800.0 / 480.0, 4.0];
 fn ready(aspect_ratio: f32, hour: u8, time_format: ClockTimeFormat) -> ClockState {
     let mut state = ClockScenario::init(
         ClockConfig {
+            // Steady lamps, which never change a frame on their own.
+            lamps: engine_common::ClockLampMode::Steady,
             aspect_ratio,
             time_format,
             event_profile: ClockEventProfile::Off,

@@ -9,6 +9,8 @@ use events::explosion::{BURST_TICKS, EXPLOSION_TICKS, MAX_EXPLOSION_CELLS, WARNI
 fn ready(aspect: f32, seed: u64, format: ClockTimeFormat) -> ClockState {
     let mut state = ClockScenario::init(
         ClockConfig {
+            // Steady lamps, which never change a frame on their own.
+            lamps: engine_common::ClockLampMode::Steady,
             aspect_ratio: aspect,
             event_profile: ClockEventProfile::Off,
             time_format: format,

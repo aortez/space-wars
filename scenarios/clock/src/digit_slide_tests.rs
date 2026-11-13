@@ -12,6 +12,8 @@ fn tick(state: &mut ClockState, reading: Option<ClockReading>) {
 fn ready(reading: ClockReading, format: ClockTimeFormat) -> ClockState {
     let mut state = ClockScenario::init(
         ClockConfig {
+            // Steady lamps, which never change a frame on their own.
+            lamps: engine_common::ClockLampMode::Steady,
             time_format: format,
             ..ClockConfig::default()
         },

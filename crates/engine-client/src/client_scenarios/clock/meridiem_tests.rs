@@ -17,6 +17,8 @@ fn meridiem_events_reach_both_render_paths_and_recover_latest_time_pixels() {
         ] {
             for (hour, next_hour) in [(11, 12), (23, 0)] {
                 let config = ClockConfig {
+                    // Steady lamps, which never change a frame on their own.
+                    lamps: engine_common::ClockLampMode::Steady,
                     aspect_ratio: viewport.aspect_ratio(),
                     time_format: ClockTimeFormat::TwelveHour,
                     event_profile: ClockEventProfile::Off,

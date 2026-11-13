@@ -353,6 +353,32 @@ pub struct ClockSettings {
     pub rain_amount: ClockRainAmount,
     /// Chosen once at admission; live setting changes affect the next crow.
     pub crow_water_tolerance: ClockCrowWaterTolerance,
+    /// Whether the corner lamps act on what they see, whatever the event
+    /// profile; lively in old settings.
+    pub lamps: ClockLampMode,
+}
+
+/// How the corner lamps behave, apart from the events.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[repr(u8)]
+pub enum ClockLampMode {
+    /// They rest at their steady glow.
+    Steady = 0,
+    /// They notice what moves and follow it, startle at knocks, light the
+    /// digits that change and go out when their bulbs get too hot.
+    #[default]
+    Lively = 1,
+}
+
+impl ClockLampMode {
+    pub const ALL: [Self; 2] = [Self::Steady, Self::Lively];
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Steady => "Steady",
+            Self::Lively => "Lively",
+        }
+    }
 }
 
 /// Most visitors dislike rain; an occasional hardy bird tolerates much more.
@@ -1087,45 +1113,131 @@ impl ClockLampSide {
     }
 }
 
-/// What a corner lamp does now and then while the scene is quiet.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// What a corner lamp is doing.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum ClockLampMood {
-    /// A few quick dips in brightness.
-    Flicker,
+pub enum ClockLampActivity {
+    /// It glows dim and steady, and fidgets now and then.
+    #[default]
+    Rest,
+    /// It turns toward a mover that caught its eye and brightens a little.
+    Notice,
+    /// It narrows its light into a spotlight that follows a mover.
+    Track,
+    /// It sweeps where the mover it followed was last seen.
+    Search,
+    /// It flares or flickers at a knock near it.
+    Startle,
     /// It sputters out, stays dark for a few seconds and sputters back on.
-    Outage,
-    /// Its head narrows the light into a beam that sweeps across the reading.
-    Spotlight,
+    Out,
+    /// It lights the digits that changed on its side.
+    Present,
 }
 
-impl ClockLampMood {
-    pub const ALL: [Self; 3] = [Self::Flicker, Self::Outage, Self::Spotlight];
+impl ClockLampActivity {
+    pub const ALL: [Self; 7] = [
+        Self::Rest,
+        Self::Notice,
+        Self::Track,
+        Self::Search,
+        Self::Startle,
+        Self::Out,
+        Self::Present,
+    ];
 
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Flicker => "flicker",
-            Self::Outage => "outage",
-            Self::Spotlight => "spotlight",
+            Self::Rest => "rest",
+            Self::Notice => "notice",
+            Self::Track => "track",
+            Self::Search => "search",
+            Self::Startle => "startle",
+            Self::Out => "out",
+            Self::Present => "present",
         }
     }
 }
 
-/// The corner lamps: the mood under way, how many of each kind the run has
-/// had, how much more quiet the next one waits for, and what the lamps
-/// perceive.
+/// How a corner lamp takes to what it sees, drawn from the run's seed: one
+/// lamp is eager and the other lazy.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockLampTemperament {
+    /// It notices less, turns more slowly and tires sooner.
+    #[default]
+    Lazy,
+    /// It notices more, turns faster and follows longer.
+    Eager,
+}
+
+impl ClockLampTemperament {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Lazy => "lazy",
+            Self::Eager => "eager",
+        }
+    }
+}
+
+/// The corner lamps: what each is doing, how many times the run's lamps have
+/// done each thing, and what they perceive.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ClockLampsState {
-    pub mood: Option<ClockLampMoodState>,
-    pub flickers: u32,
+    pub left: ClockLampBrainState,
+    pub right: ClockLampBrainState,
+    pub notices: u32,
+    pub tracks: u32,
+    /// Movers one lamp handed to the other on that lamp's side, most as they
+    /// crossed the middle.
+    pub handoffs: u32,
+    pub startles: u32,
     pub outages: u32,
-    pub spotlights: u32,
-    /// Quiet ticks left before the next mood is due: 0 once it is due and
-    /// waiting for a gap that holds it, and None while one is under way and
-    /// while the event profile is Off, which keeps the lamps steady.
-    pub due_in_quiet_ticks: Option<u32>,
-    #[serde(default)]
+    pub presents: u32,
+    pub fidgets: u32,
+    /// Knocks big enough to dip the power to both lamps.
+    pub dips: u32,
     pub perceived: ClockLampPercepts,
+}
+
+/// One corner lamp: its temperament, what it is doing and to what, where
+/// its light points and the drives that steer it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockLampBrainState {
+    pub temperament: ClockLampTemperament,
+    pub state: ClockLampActivity,
+    /// Ticks since it began.
+    pub state_ticks: u32,
+    /// The mover it notices, follows or searches for.
+    pub target: Option<ClockLampTarget>,
+    /// Where its light points, in thousandths of a view unit. It means
+    /// nothing while the light is not narrowed.
+    pub aim_milli: [i32; 2],
+    /// Thousandths of how far its light is narrowed into a spotlight.
+    pub narrow_milli: u16,
+    /// The bulb's brightness in thousandths of its full light. A resting
+    /// lamp gives less than full, and a spotlight a little more.
+    pub brightness_milli: u16,
+    pub drives: ClockLampDrives,
+}
+
+/// The drives that steer a lamp, in thousandths.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockLampDrives {
+    /// How much what it sees holds its eye: it notices at 1000.
+    pub interest_milli: u16,
+    /// How tired it is of the mover it follows: it gives up at 1000.
+    pub boredom_milli: u16,
+    /// How hot its bulb is from burning bright: it goes out at 1000.
+    pub heat_milli: u16,
+}
+
+/// The body a lamp attends to, named as the lamps' percepts name it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockLampTarget {
+    pub world: u8,
+    pub entity: u64,
+    pub role: u32,
 }
 
 /// What the corner lamps perceive this tick: the bodies moving in view, the
@@ -1187,21 +1299,6 @@ pub struct ClockLampImpact {
     /// Thousandths of how much its velocity changed along its contacts'
     /// push, and no more than the push, in cells a second.
     pub strength_milli: i32,
-}
-
-/// A lamp's mood in progress.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ClockLampMoodState {
-    pub kind: ClockLampMood,
-    pub lamp: ClockLampSide,
-    pub tick: u32,
-    pub ticks: u32,
-    /// The bulb's brightness in thousandths of its full light. A steady lamp
-    /// rests below full, and a spotlight runs a little past it.
-    pub brightness_milli: u16,
-    /// An event, a visit or a setting cut the mood short, and the lamp is
-    /// returning to its steady look.
-    pub yielding: bool,
 }
 
 /// Bounded Crow visitor diagnostics, independent of the timed animation.

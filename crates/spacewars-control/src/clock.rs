@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 24;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 25;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -76,8 +76,8 @@ pub struct ClockState {
     pub explosion: Option<engine_common::ClockExplosionState>,
     #[serde(default)]
     pub coins: Option<engine_common::ClockCoinsState>,
-    /// The corner lamps: the mood under way, how many the run has had and
-    /// what the lamps perceive.
+    /// The corner lamps: what each is doing, to what and why, how many times
+    /// the run's lamps have done each thing, and what they perceive.
     #[serde(default)]
     pub lamps: Option<engine_common::ClockLampsState>,
     #[serde(default)]

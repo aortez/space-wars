@@ -245,6 +245,7 @@ fn activation_target(
         "pause.clock.spider" => pause_clock(21, UiAction::Confirm),
         "pause.clock.coins" => pause_clock(22, UiAction::Confirm),
         "pause.clock.tanks" => pause_clock(23, UiAction::Confirm),
+        "pause.clock.lamps" => pause_clock(24, UiAction::Confirm),
         "pause.clock.preview-event.previous" => pause_clock(4, UiAction::Left),
         "pause.clock.preview-event.next" => pause_clock(4, UiAction::Right),
         "pause.clock.back" => pause_clock(5, UiAction::Confirm),
@@ -323,6 +324,7 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         "launcher.settings.clock.spider" => 20,
         "launcher.settings.clock.coins" => 21,
         "launcher.settings.clock.tanks" => 22,
+        "launcher.settings.clock.lamps" => 23,
         _ => return None,
     };
     Some(launcher_settings(Some(focus_index), action))

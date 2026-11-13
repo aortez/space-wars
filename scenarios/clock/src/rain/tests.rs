@@ -578,6 +578,8 @@ fn extreme_aspects_keep_finite_bounded_physics_and_clean_up() {
 fn clock_stays_live_while_raining_or_draining_and_pause_resize_replace_clean_up() {
     for elapsed in [0, 600, 1201, 2401] {
         let config = ClockConfig {
+            // Steady lamps, which never change a frame on their own.
+            lamps: engine_common::ClockLampMode::Steady,
             event_profile: ClockEventProfile::Off,
             time_format: ClockTimeFormat::TwelveHour,
             rain_amount: ClockRainAmount::Heavy,

@@ -5,6 +5,8 @@ use std::time::Duration;
 fn ready(profile: ClockEventProfile, seed: u64) -> ClockState {
     let mut state = ClockScenario::init(
         ClockConfig {
+            // Steady lamps, which never change a frame on their own.
+            lamps: engine_common::ClockLampMode::Steady,
             event_profile: profile,
             events: ClockEvents {
                 falling: true,
