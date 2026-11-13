@@ -1,13 +1,17 @@
-//! The two corner lamps: a small brass head where the rails meet, a warm
-//! bulb, the glow it spreads around its corner and the softer light it
-//! throws down into the room. A mood dims or darkens all of these, or
-//! gathers the thrown light into a spotlight's beam, which lays a pool of
-//! light on the face and brightens the cells inside it, lit or not.
+//! The two corner lamps: a small brass head where the rails meet, a warm bulb,
+//! the glow it spreads around its corner and the softer light it throws down
+//! into the room. A lamp rests at `REST_BRIGHTNESS` of its full light, its bulb
+//! an amber glow without the hot core. A mood dims or darkens all of these, or
+//! gathers the thrown light into a spotlight's beam, which lays a pool of light
+//! on the face and brightens the cells inside it, lit or not.
 
 use super::*;
-use crate::lamps::Look;
+use crate::lamps::{Look, REST_BRIGHTNESS};
 use crate::presentation::Bounds;
 use std::f32::consts::{FRAC_PI_2, PI};
+
+#[cfg(test)]
+mod tests;
 
 /// The lamp heads and their glow sit over the room and the frame.
 const LAMP_LAYER: i32 = 11;
@@ -35,14 +39,14 @@ struct Light {
     brightness: f32,
     /// The way the head points, counterclockwise from +x.
     aim: f32,
-    /// The steady light thrown down into the room: 1 is steady.
+    /// The light thrown down into the room, as a fraction of full.
     throw: f32,
     /// The spotlight's beam: half the angle it spreads over, how far it
     /// reaches and its strength, 0 while the lamp is steady.
     spread: f32,
     reach: f32,
     beam: f32,
-    /// The glow around the corner: 1 is steady.
+    /// The glow around the corner, as a fraction of full.
     halo: f32,
     pool: Option<Pool>,
 }
@@ -82,7 +86,8 @@ impl Light {
             spread: mix(OPEN_SPREAD, (radius * 0.85 / distance).atan()),
             reach: mix(CAMERA_HEIGHT * THROW_REACH, distance + radius * 0.2),
             beam: brightness * narrow,
-            // The light drawn into the beam leaves the corner dimmer.
+            // The beam draws on the glow around the corner, which rises
+            // less than the bulb as the beam narrows.
             halo: brightness * (1.0 - 0.6 * narrow),
             pool: (narrow > 0.0).then_some(Pool {
                 center: target,
@@ -101,6 +106,8 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
         if let Some(pool) = light.pool {
             pool_of_light(frame, pool);
         }
+        glow(frame, &light, layout);
+        bloom(frame, &light, layout);
         head(frame, &light, layout);
         if let Some(tick) = state.lamps.spark_tick(lamp) {
             sparks(frame, &light, layout, tick);
@@ -110,7 +117,7 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
 
 fn sparks(frame: &mut RenderFrame, light: &Light, layout: Layout, tick: u32) {
     let width = layout.frame_width;
-    let origin = light.center + Vec2::new(light.aim.cos(), light.aim.sin()) * (width * 0.16);
+    let origin = bulb(light, layout);
     let inward = -light.center.x.signum();
     let time = tick as f32 / crate::FIXED_HZ as f32;
     if tick < 6 {
@@ -301,39 +308,54 @@ fn pool_of_light(frame: &mut RenderFrame, pool: Pool) {
     }
 }
 
+/// Where the bulb sits in the head, a little forward along its aim.
+fn bulb(light: &Light, layout: Layout) -> Vec2 {
+    light.center + Vec2::new(light.aim.cos(), light.aim.sin()) * (layout.frame_width * 0.16)
+}
+
+/// The glow the lamp spreads around its corner.
+fn glow(frame: &mut RenderFrame, light: &Light, layout: Layout) {
+    if light.halo <= 0.0 {
+        return;
+    }
+    let center = RenderPoint::new(light.center.x, light.center.y);
+    let radius = ((layout.bounds_max.x - layout.bounds_min.x) * 0.22).min(96.0);
+    for shell in (1..=12).rev() {
+        frame.push_primitive(
+            LAMP_LAYER,
+            RenderPrimitive::Circle(RenderCircle::filled(
+                center,
+                radius * shell as f32 / 12.0,
+                RenderColor::rgba(1.0, 0.55, 0.20, 0.012 * light.halo),
+            )),
+        );
+    }
+}
+
+/// A soft bloom, so the bulb reads as lit at the device's scale.
+fn bloom(frame: &mut RenderFrame, light: &Light, layout: Layout) {
+    if light.brightness <= 0.0 {
+        return;
+    }
+    let bulb = bulb(light, layout);
+    for (radius, alpha) in [(2.6, 0.04), (1.6, 0.075), (0.9, 0.15)] {
+        frame.push_primitive(
+            LAMP_LAYER,
+            RenderPrimitive::Circle(RenderCircle::filled(
+                RenderPoint::new(bulb.x, bulb.y),
+                layout.frame_width * radius,
+                RenderColor::rgba(1.0, 0.72, 0.38, alpha * light.brightness),
+            )),
+        );
+    }
+}
+
+/// The head itself: the mount, the hood and the bulb's glass and core.
 fn head(frame: &mut RenderFrame, light: &Light, layout: Layout) {
     let width = layout.frame_width;
     let center = RenderPoint::new(light.center.x, light.center.y);
-    let lit = light.brightness.min(1.0);
-    // The glow spread around the corner.
-    if light.halo > 0.0 {
-        let radius = ((layout.bounds_max.x - layout.bounds_min.x) * 0.22).min(96.0);
-        for shell in (1..=12).rev() {
-            frame.push_primitive(
-                LAMP_LAYER,
-                RenderPrimitive::Circle(RenderCircle::filled(
-                    center,
-                    radius * shell as f32 / 12.0,
-                    RenderColor::rgba(1.0, 0.55, 0.20, 0.012 * light.halo),
-                )),
-            );
-        }
-    }
-    let bulb = light.center + Vec2::new(light.aim.cos(), light.aim.sin()) * (width * 0.16);
+    let bulb = bulb(light, layout);
     let bulb = RenderPoint::new(bulb.x, bulb.y);
-    // A soft bloom, so the bulb reads as lit at the device's scale.
-    if light.brightness > 0.0 {
-        for (radius, alpha) in [(2.6, 0.04), (1.6, 0.075), (0.9, 0.15)] {
-            frame.push_primitive(
-                LAMP_LAYER,
-                RenderPrimitive::Circle(RenderCircle::filled(
-                    bulb,
-                    width * radius,
-                    RenderColor::rgba(1.0, 0.72, 0.38, alpha * light.brightness),
-                )),
-            );
-        }
-    }
     // The mount where the rails meet, then the hood: the back half of the
     // head, turned the way the light points.
     frame.push_primitive(
@@ -362,27 +384,46 @@ fn head(frame: &mut RenderFrame, light: &Light, layout: Layout) {
             )),
         }),
     );
-    // The glass, from a dark filament up to warm light, and its hot core.
-    let [dark, warm] = [[0.24, 0.11, 0.05], [1.0, 0.80, 0.46]];
-    let glass = |channel: usize| dark[channel] + (warm[channel] - dark[channel]) * lit;
     frame.push_primitive(
         LAMP_LAYER,
         RenderPrimitive::Circle(RenderCircle::filled(
             bulb,
             width * 0.34,
-            RenderColor::rgb(glass(0), glass(1), glass(2)),
+            glass(light.brightness),
         )),
     );
-    if lit > 0.0 {
+    // The hot core shows only above rest, and fully at full light.
+    let core = ((light.brightness - REST_BRIGHTNESS) / (1.0 - REST_BRIGHTNESS)).min(1.0);
+    if core > 0.0 {
         frame.push_primitive(
             LAMP_LAYER,
             RenderPrimitive::Circle(RenderCircle::filled(
                 bulb,
                 width * 0.16,
-                RenderColor::rgba(1.0, 0.96, 0.84, lit),
+                RenderColor::rgba(1.0, 0.96, 0.84, core),
             )),
         );
     }
+}
+
+/// The bulb's glass: a dark filament when out, an amber glow at rest and
+/// warm light at full.
+fn glass(brightness: f32) -> RenderColor {
+    const DARK: [f32; 3] = [0.24, 0.11, 0.05];
+    const AMBER: [f32; 3] = [0.86, 0.50, 0.20];
+    const WARM: [f32; 3] = [1.0, 0.80, 0.46];
+    let brightness = brightness.clamp(0.0, 1.0);
+    let (from, to, t) = if brightness < REST_BRIGHTNESS {
+        (DARK, AMBER, brightness / REST_BRIGHTNESS)
+    } else {
+        (
+            AMBER,
+            WARM,
+            (brightness - REST_BRIGHTNESS) / (1.0 - REST_BRIGHTNESS),
+        )
+    };
+    let channel = |i: usize| from[i] * (1.0 - t) + to[i] * t;
+    RenderColor::rgb(channel(0), channel(1), channel(2))
 }
 
 /// A convex polygon clipped to the view, so no point of it leaves the
