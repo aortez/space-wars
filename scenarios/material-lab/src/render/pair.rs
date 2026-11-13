@@ -45,12 +45,9 @@ pub fn draw(f: &mut RenderFrame, s: &MaterialLabState, pair: &Pair) {
     );
     table(f, pair);
     ledger(f, pair);
-    history(
-        f,
-        s,
-        4.5,
-        if pair.collapse_loss > 0.0 { -2.7 } else { -2.0 },
-    );
+    // A collapse adds a ledger row, so the history moves down one row.
+    let shift = if pair.collapse_loss > 0.0 { ROW } else { 0.0 };
+    history(f, s, 4.5, -2.0 - shift);
 }
 
 /// One body, shortened by its own layer's deformation at the contact face.
@@ -96,15 +93,9 @@ fn block(f: &mut RenderFrame, index: usize, body: &PairBody, fastest: f32) {
         }
     }
     // Drawn first: the face shows through only while elastic compression
-    // holds it away from both marks.
-    line(
-        f,
-        face,
-        BOTTOM,
-        face,
-        BOTTOM + HEIGHT,
-        if body.failed { AMBER } else { CYAN },
-    );
+    // holds it away from both marks. It stays cyan after a failure because
+    // amber is the permanent set.
+    line(f, face, BOTTOM, face, BOTTOM + HEIGHT, CYAN);
     line(
         f,
         original,

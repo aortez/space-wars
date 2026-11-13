@@ -15,6 +15,8 @@ fn paired_collapse_pauses_then_coasts_with_surviving_capacity_and_one_energy_led
     let mut boundary = None;
     while s.stopped.is_none() {
         s.advance();
+        // Drawing every state runs the collapse view without a display.
+        render::frame(&s);
         let pair = s.pair().unwrap();
         assert!((pair.accounted_energy() - pair.initial_energy).abs() < 1e-8);
         assert!((pair.total(|b| b.momentum) - start.total(|b| b.momentum)).abs() < 1e-3);
