@@ -126,21 +126,28 @@ impl Region {
     }
 
     /// Partition the material into two regions holding `fraction` and the rest
-    /// of the volume, each at the current integrity. No capacity is created.
+    /// of the volume, at the current integrity. The parts never hold more than
+    /// the whole: rounded part volumes can add an ulp of capacity, so the larger
+    /// part takes the remainder of the balance instead.
     pub fn split(self, fraction: f32) -> Result<(Self, Self), MaterialError> {
         if !(fraction.is_finite() && fraction > 0.0 && fraction < 1.0) {
             return Err(MaterialError::InvalidRegion);
         }
         let integrity = self.remaining / f64::from(self.capacity);
-        let part = |volume: f32| -> Result<Self, MaterialError> {
-            let mut region = Self::new(self.material, volume)?;
-            region.remaining = f64::from(region.capacity) * integrity;
-            Ok(region)
+        let mut part = Self::new(self.material, self.volume * fraction)?;
+        let mut rest = Self::new(self.material, self.volume * (1.0 - fraction))?;
+        let (smaller, larger) = if part.capacity <= rest.capacity {
+            (&mut part, &mut rest)
+        } else {
+            (&mut rest, &mut part)
         };
-        Ok((
-            part(self.volume * fraction)?,
-            part(self.volume * (1.0 - fraction))?,
-        ))
+        smaller.remaining = (f64::from(smaller.capacity) * integrity).min(self.remaining);
+        larger.remaining =
+            (self.remaining - smaller.remaining).clamp(0.0, f64::from(larger.capacity));
+        while larger.remaining > 0.0 && smaller.remaining + larger.remaining > self.remaining {
+            larger.remaining = larger.remaining.next_down();
+        }
+        Ok((part, rest))
     }
 }
 
