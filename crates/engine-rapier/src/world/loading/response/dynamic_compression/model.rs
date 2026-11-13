@@ -45,6 +45,19 @@ pub(super) struct Segment {
     pub force: f64,
     pub mean: f64,
 }
+impl Segment {
+    pub fn unloaded(p: f64) -> Self {
+        Self {
+            p,
+            dp: 0.0,
+            elastic: 0.0,
+            loss: 0.0,
+            work: 0.0,
+            force: 0.0,
+            mean: 0.0,
+        }
+    }
+}
 impl MaterialCurve {
     pub(super) fn new(material: &StoredRegion) -> Self {
         let area = 2.0 * material.thickness;
@@ -126,8 +139,8 @@ impl History {
         if self.failure.is_some() {
             return if self.moving.is_some() { 8 } else { 7 };
         }
-        if self.paired.is_some() {
-            return 6;
+        if let Some(p) = &self.paired {
+            return if p.failure_enabled() { 9 } else { 6 };
         }
         if self.moving.is_some() {
             return 5;
@@ -176,15 +189,7 @@ impl History {
     }
     pub(super) fn segment(&self, x: f64, h: f64) -> Result<Segment, R> {
         if self.collapsed() {
-            return Ok(Segment {
-                p: self.summary.plastic_indentation,
-                dp: 0.0,
-                elastic: 0.0,
-                loss: 0.0,
-                work: 0.0,
-                force: 0.0,
-                mean: 0.0,
-            });
+            return Ok(Segment::unloaded(self.summary.plastic_indentation));
         }
         if let Some(p) = &self.paired {
             return p.segment(x, h);
@@ -488,7 +493,14 @@ impl History {
         }
         let was_collapsed = self.collapsed();
         let (mut q, loads) = if let Some(paired) = &mut self.paired {
-            let (loads, q) = paired.finish(scene, x, h, owner)?;
+            let (loads, q) = paired.finish(
+                scene,
+                x,
+                h,
+                owner,
+                exact_time(old.elapsed, dt)?,
+                &self.moving.as_ref().ok_or(R::Numerical)?.current,
+            )?;
             (q, Some(loads))
         } else {
             (self.segment(x, dt)?, None)
@@ -505,7 +517,6 @@ impl History {
         } else {
             charge_with_policy(&scene.plates.material, &q, h, self.failure.is_some())?
         };
-        let mut failure_dissipated = 0.0;
         if !was_collapsed
             && remaining == 0.0
             && let Some(f) = &mut self.failure
@@ -520,12 +531,16 @@ impl History {
                 released_elastic: q.elastic,
                 excess_work: excess,
             };
-            failure_dissipated = event.dissipated();
             f.event = Some(event);
             f.motion = self.moving.as_ref().map(|m| m.current.clone());
             q.elastic = 0.0;
             q.force = 0.0;
         }
+        let failure_dissipated = if !was_collapsed && self.collapsed() {
+            self.released_elastic() + self.failure_excess()
+        } else {
+            0.0
+        };
         let kinetic = 0.5 * self.effective_mass() * v * v;
         let kinetic_change = kinetic - old.kinetic_energy;
         let impulse = q.mean * dt;
@@ -615,11 +630,7 @@ impl History {
         })
     }
 }
-pub(super) fn charge(material: &StoredRegion, q: &Segment, h: f32) -> Result<(f64, f64, f64), R> {
-    let (remaining, charge, error, _) = charge_with_policy(material, q, h, false)?;
-    Ok((remaining, charge, error))
-}
-fn charge_with_policy(
+pub(super) fn charge_with_policy(
     material: &StoredRegion,
     q: &Segment,
     h: f32,

@@ -2,7 +2,7 @@ use super::super::tests::{body, world};
 use super::*;
 
 const DT: f32 = 1.0 / 8192.0;
-fn pair(speed: f32) -> PhysicsWorld {
+pub(super) fn pair(speed: f32) -> PhysicsWorld {
     let mut w = world();
     w.set_gravity(Vec2::ZERO);
     w.set_body_kind(body(2), BodyKind::Dynamic, true);
@@ -22,7 +22,7 @@ fn pair(speed: f32) -> PhysicsWorld {
     response.materials.insert(driver, material);
     w
 }
-fn continuation(w: &mut PhysicsWorld) -> &mut Continuation {
+pub(super) fn continuation(w: &mut PhysicsWorld) -> &mut Continuation {
     w.loading
         .as_mut()
         .unwrap()
@@ -222,5 +222,43 @@ fn each_sections_compliance_controls_elastic_deformation_and_work() {
             Section::new(0.25, 0.5)
         );
         assert_eq!(interval.load.section, Section::new(1.0, 1.0));
+    }
+}
+
+#[test]
+fn paired_collapse_extension_preserves_the_frozen_v20_material_layout() {
+    let mut original = pair(6.0);
+    original
+        .step_material_dynamic_compression(1.0 / 128.0)
+        .unwrap();
+    for removed in [false, true] {
+        let mut w = original.clone();
+        if removed {
+            w.remove_entity(body(11).entity);
+            w.remove_entity(body(2).entity);
+        }
+        let p = continuation(&mut w).history.paired.as_ref().unwrap();
+        // v20 stored only the initial regions and five scalars per layer.
+        let frozen = bincode::serialize(&(
+            &p.initial,
+            p.layers
+                .each_ref()
+                .map(|l| (l.x, l.p, l.loss, l.remaining, l.absolute_charge_error)),
+        ))
+        .unwrap();
+        assert_eq!(bincode::serialize(p).unwrap(), frozen);
+        let bytes = w.snapshot_bytes().unwrap();
+        assert_eq!(&bytes[..4], &20_u32.to_le_bytes());
+        assert!(bytes.ends_with(&frozen));
+        let mut restored = PhysicsWorld::from_snapshot_bytes(&bytes).unwrap();
+        assert_eq!(restored.snapshot_bytes().unwrap(), bytes);
+        assert_eq!(
+            restored.step_material_dynamic_compression(DT),
+            w.step_material_dynamic_compression(DT)
+        );
+        assert_eq!(
+            restored.snapshot_bytes().unwrap(),
+            w.snapshot_bytes().unwrap()
+        );
     }
 }

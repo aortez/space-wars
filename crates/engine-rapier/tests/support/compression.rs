@@ -49,7 +49,15 @@ pub fn fixture(
     frame: (QuarterTurn, Vec2),
     remaining: f64,
 ) -> (PhysicsWorld, RegionToken) {
-    bodies_fixture([mass, mass], false, weight, layout, frame, remaining, None)
+    bodies_fixture(
+        [mass, mass],
+        false,
+        weight,
+        layout,
+        frame,
+        [remaining; 2],
+        None,
+    )
 }
 
 #[allow(dead_code)] // The shared fixture is also compiled by fixed-support tests.
@@ -59,7 +67,7 @@ pub fn moving_scene(
     frame: (QuarterTurn, Vec2),
     remaining: f64,
 ) -> (PhysicsWorld, RegionToken) {
-    bodies_fixture(masses, true, 0.0, layout, frame, remaining, None)
+    bodies_fixture(masses, true, 0.0, layout, frame, [remaining; 2], None)
 }
 
 #[allow(dead_code)]
@@ -69,7 +77,18 @@ pub fn paired_scene(
     layout: (u16, u16, bool),
     frame: (QuarterTurn, Vec2),
 ) -> PhysicsWorld {
-    bodies_fixture(masses, true, 0.0, layout, frame, 1200.0, Some(materials)).0
+    paired_scene_with_remaining(masses, materials, layout, frame, [1200.0; 2])
+}
+
+#[allow(dead_code)]
+pub fn paired_scene_with_remaining(
+    masses: [f32; 2],
+    materials: [engine_material::Material; 2],
+    layout: (u16, u16, bool),
+    frame: (QuarterTurn, Vec2),
+    remaining: [f64; 2],
+) -> PhysicsWorld {
+    bodies_fixture(masses, true, 0.0, layout, frame, remaining, Some(materials)).0
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -79,7 +98,7 @@ fn bodies_fixture(
     weight: f32,
     layout: (u16, u16, bool),
     frame: (QuarterTurn, Vec2),
-    remaining: f64,
+    remaining: [f64; 2],
     materials: Option<[engine_material::Material; 2]>,
 ) -> (PhysicsWorld, RegionToken) {
     let (parts, copies, reverse) = layout;
@@ -136,7 +155,7 @@ fn bodies_fixture(
             let material = materials.map_or(WOOD, |m| m[role as usize]);
             w.register_loading_material(
                 t,
-                Region::with_remaining(material, 20.0, remaining).unwrap(),
+                Region::with_remaining(material, 20.0, remaining[role as usize]).unwrap(),
                 Section::new(1.0, 1.0),
             )
             .unwrap();

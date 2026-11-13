@@ -9,7 +9,7 @@ impl PhysicsHooks for CompliantPair {
 pub(super) fn advance(
     world: &mut PhysicsWorld,
     dt: f32,
-    collapse: bool,
+    policy: failure::Policy,
 ) -> Result<DynamicCompressionStep, R> {
     if !dt.is_finite() || !(0.0..=1.0 / 30.0).contains(&dt) {
         return Err(R::InvalidCommand);
@@ -26,7 +26,7 @@ pub(super) fn advance(
         .as_ref()
         .and_then(|l| l.dynamic_compression.as_ref());
     if saved.is_some_and(|c| {
-        c.active().is_none() || !c.valid_for(world) || c.history.failure.is_some() != collapse
+        c.active().is_none() || !c.valid_for(world) || c.history.failure_policy() != policy
     }) {
         return Err(R::StaleContinuation);
     }
@@ -42,15 +42,27 @@ pub(super) fn advance(
     } else {
         History::new(&scene, world)?
     };
-    if saved.is_none() && collapse {
-        if history.paired.is_some() {
-            return Err(R::UnsupportedScene);
+    if saved.is_none() {
+        match policy {
+            failure::Policy::Refuse => {}
+            failure::Policy::Support => {
+                if history.paired.is_some() {
+                    return Err(R::UnsupportedScene);
+                }
+                history.failure = Some(failure::FailureHistory {
+                    source: scene.plates.sources[1],
+                    event: None,
+                    motion: None,
+                });
+            }
+            failure::Policy::Pair => {
+                history
+                    .paired
+                    .as_mut()
+                    .ok_or(R::UnsupportedScene)?
+                    .enable_failure(scene.plates.sources);
+            }
         }
-        history.failure = Some(failure::FailureHistory {
-            source: scene.plates.sources[1],
-            event: None,
-            motion: None,
-        });
         if !history.valid() {
             return Err(R::UnsupportedScene);
         }
@@ -79,6 +91,7 @@ pub(super) fn advance(
         || revision == 5
         || revision == 6
         || revision == 8
+        || revision == 9
         || (revision == 7 && history.incoming.is_some())
     {
         None
@@ -93,7 +106,7 @@ pub(super) fn advance(
         )?)
     };
     let mut pending_support = saved.is_some_and(
-        |c| matches!(&c.status, Status::Falling(a) | Status::ChangingLoad(a) | Status::MovingSupport(a) | Status::PairedMaterials(a) | Status::CollapsingSupport(a) | Status::CollapsingMovingSupport(a) if a.pending_support),
+        |c| matches!(&c.status, Status::Falling(a) | Status::ChangingLoad(a) | Status::MovingSupport(a) | Status::PairedMaterials(a) | Status::CollapsingSupport(a) | Status::CollapsingMovingSupport(a) | Status::CollapsingPairedMaterials(a) if a.pending_support),
     );
     let impact_arrivals = history.incoming.is_some() || history.moving.is_some();
     let mut current = scene;
@@ -204,16 +217,7 @@ pub(super) fn advance(
         )?;
         let just_collapsed = !was_collapsed && history.collapsed();
         if just_collapsed {
-            failures.push(
-                history
-                    .failure
-                    .as_ref()
-                    .unwrap()
-                    .event
-                    .as_ref()
-                    .unwrap()
-                    .clone(),
-            );
+            failures.extend(history.committed_failures());
         }
         if (just_collapsed || after.plates.x < history.summary.plastic_indentation)
             && let Some(id) = owner.take()
@@ -279,6 +283,12 @@ pub(super) fn advance(
             Status::Active(Box::new(Active {
                 scene: current,
                 owner: owner.ok_or(R::Numerical)?,
+            }))
+        } else if revision == 9 {
+            Status::CollapsingPairedMaterials(Box::new(FallingActive {
+                scene: current,
+                owner,
+                pending_support,
             }))
         } else if revision == 8 {
             Status::CollapsingMovingSupport(Box::new(FallingActive {

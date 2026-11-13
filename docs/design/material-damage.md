@@ -334,7 +334,10 @@ The [paired-material extension](material-paired-compression.md) gives both free
 bodies finite layers, separate retained capacities and one shared work reaction.
 The opt-in [collapsing support](material-support-failure.md) commits exhaustion
 of one fixed or moving layer, dissipates its elastic store and continues the
-bodies' motion with a persistent failure observation. Other paths retain their
+bodies' motion with a persistent failure observation. Its separate
+[paired-collapse API](material-support-failure.md#two-finite-material-layers)
+commits exhaustion of either finite layer, dissipates both elastic stores and
+preserves surviving capacity while both bodies coast. Other paths retain their
 current failure refusals.
 Transfer between older loading modes, general connection
 loads and broader geometry remain future work.

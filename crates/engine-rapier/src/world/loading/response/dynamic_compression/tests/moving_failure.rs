@@ -139,12 +139,13 @@ fn moving_collapse_saves_require_the_boundary_motion_even_after_removal() {
         |f| f.event = None,
         |f| f.motion.as_mut().unwrap().positions[0] += 0.01,
         |f| {
+            // Exact in f32, so only the per-body trajectory check can refuse it.
             f.motion
                 .as_mut()
                 .unwrap()
                 .positions
                 .iter_mut()
-                .for_each(|x| *x += 0.01)
+                .for_each(|x| *x += 1.0 / 128.0)
         },
         |f| {
             f.motion

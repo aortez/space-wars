@@ -1,13 +1,15 @@
 //! Two material layers in series, coupled by a discrete work reaction.
 use super::*;
 use model::{Segment, add};
+mod failure;
+pub use failure::{MaterialFailureDisposition, PairedCompressionFailure};
 
 /// Retained state of one layer, in incoming-body/support order in the pair API.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MaterialCompressionSummary {
     pub material_id: u64,
     /// Signed layer displacement. Negative elastic displacement represents its
-    /// share of the open gap and stores no energy.
+    /// share of the open gap and stores no energy. Frozen after paired collapse.
     pub indentation: f64,
     pub plastic_indentation: f64,
     pub elastic_energy: f64,
@@ -31,6 +33,9 @@ struct Layer {
 pub(super) struct PairedHistory {
     initial: [StoredRegion; 2],
     layers: [Layer; 2],
+    // Required only by v23; ordinary paired-history bytes stay frozen at v20.
+    #[serde(skip)]
+    failure: Option<failure::FailureHistory>,
 }
 
 struct Allocation {
@@ -71,6 +76,7 @@ impl PairedHistory {
                 absolute_charge_error: 0.0,
             }),
             initial,
+            failure: None,
         }))
     }
 
@@ -104,11 +110,15 @@ impl PairedHistory {
                 material_id: self.initial[i].region().unwrap().material().identity(),
                 indentation: l.x,
                 plastic_indentation: l.p,
-                elastic_energy: c.energy(l.x, l.p),
+                elastic_energy: if self.collapsed() {
+                    0.0
+                } else {
+                    c.energy(l.x, l.p)
+                },
                 damage_work: damage,
                 viscous_loss: l.loss,
                 remaining: l.remaining,
-                charge_error: c.y * l.p - damage,
+                charge_error: c.y * l.p - damage - self.layer_excess(i),
                 absolute_charge_error: l.absolute_charge_error,
             }
         })
@@ -121,6 +131,13 @@ impl PairedHistory {
     }
 
     fn allocation(&self, next: f64, h: f64) -> Result<Allocation, R> {
+        if self.collapsed() {
+            return Ok(Allocation {
+                x: self.layers.each_ref().map(|l| l.x),
+                layers: self.layers.each_ref().map(|l| Segment::unloaded(l.p)),
+                total: Segment::unloaded(self.layers.iter().map(|l| l.p).sum()),
+            });
+        }
         let c = self.initial.each_ref().map(MaterialCurve::new);
         let evaluate = |x: [f64; 2]| {
             let q =
@@ -200,14 +217,23 @@ impl PairedHistory {
         x: f64,
         h: f32,
         owner: Option<EpisodeId>,
+        elapsed: f64,
+        motion: &moving::Motion,
     ) -> Result<([CompressionLoad; 2], Segment), R> {
-        let a = self.allocation(x, f64::from(h))?;
+        let mut a = self.allocation(x, f64::from(h))?;
+        let was_collapsed = self.collapsed();
+        let mut excess = [0.0; 2];
         let mut loads = Vec::with_capacity(2);
-        for i in 0..2 {
+        for (i, layer_excess) in excess.iter_mut().enumerate() {
             let c = MaterialCurve::new(&self.initial[i]);
             let before = self.material(i);
             let q = &a.layers[i];
-            let (remaining, charge, charge_error) = model::charge(&before, q, h)?;
+            let (remaining, charge, charge_error, extra) = if was_collapsed {
+                (before.remaining, 0.0, 0.0, 0.0)
+            } else {
+                model::charge_with_policy(&before, q, h, self.failure_enabled())?
+            };
+            *layer_excess = extra;
             loads.push(CompressionLoad {
                 law: engine_material::LAW_VERSION,
                 material_id: before
@@ -225,7 +251,11 @@ impl PairedHistory {
                 plastic_displacement: q.dp,
                 force: q.force,
                 impulse: a.total.mean * f64::from(h),
-                elastic_before: c.energy(self.layers[i].x, self.layers[i].p),
+                elastic_before: if was_collapsed {
+                    0.0
+                } else {
+                    c.energy(self.layers[i].x, self.layers[i].p)
+                },
                 elastic_after: q.elastic,
                 driver_work: q.work,
                 damage_work: charge,
@@ -243,6 +273,17 @@ impl PairedHistory {
                 )?,
             };
         }
+        if !was_collapsed
+            && self.failure_enabled()
+            && self.layers.iter().any(|l| l.remaining == 0.0)
+        {
+            self.commit_failure(elapsed, owner.ok_or(R::Numerical)?, x, motion, excess);
+            a.total.elastic = 0.0;
+            for load in &mut loads {
+                load.elastic_after = 0.0;
+                load.force = 0.0;
+            }
+        }
         Ok((loads.try_into().unwrap(), a.total))
     }
 
@@ -253,6 +294,7 @@ impl PairedHistory {
             || h.moving.is_none()
             || h.loads.is_some()
             || h.incoming.is_some()
+            || !self.valid_failure(h)
         {
             return false;
         }
@@ -278,41 +320,48 @@ impl PairedHistory {
                 || !l.loss.is_finite()
                 || l.loss < 0.0
                 || !(0.0..=m.remaining).contains(&l.remaining)
-                || l.remaining == 0.0
+                || (!self.collapsed() && l.remaining == 0.0)
                 || !(0.0..=1e-5 * c.y * c.depth).contains(&l.absolute_charge_error)
-                || (c.y * l.p - (m.remaining - l.remaining)).abs()
+                || (c.y * l.p - (m.remaining - l.remaining) - self.layer_excess(i)).abs()
                     > l.absolute_charge_error + 1e-10 * c.y * c.depth
             {
                 return false;
             }
         }
         let s = self.summaries();
-        near(
-            s[0].indentation + s[1].indentation,
-            h.summary.indentation,
-            c.depth,
-        ) && near(
-            s[0].plastic_indentation + s[1].plastic_indentation,
-            h.summary.plastic_indentation,
-            c.depth,
-        ) && near(
-            s[0].elastic_energy + s[1].elastic_energy,
-            h.summary.elastic_energy,
-            c.y * c.depth,
-        ) && near(
-            s[0].damage_work + s[1].damage_work,
-            h.summary.damage_work,
-            c.y * c.depth,
-        ) && near(
-            s[0].viscous_loss + s[1].viscous_loss,
-            h.summary.viscous_loss,
-            c.y * c.depth,
-        ) && near(
-            s[0].absolute_charge_error + s[1].absolute_charge_error,
-            h.summary.absolute_charge_error,
-            c.y * c.depth,
-        ) && (h.summary.indentation > h.summary.plastic_indentation
-            || h.summary.elastic_energy == 0.0)
+        (self.collapsed()
+            || near(
+                s[0].indentation + s[1].indentation,
+                h.summary.indentation,
+                c.depth,
+            ))
+            && near(
+                s[0].plastic_indentation + s[1].plastic_indentation,
+                h.summary.plastic_indentation,
+                c.depth,
+            )
+            && near(
+                s[0].elastic_energy + s[1].elastic_energy,
+                h.summary.elastic_energy,
+                c.y * c.depth,
+            )
+            && near(
+                s[0].damage_work + s[1].damage_work,
+                h.summary.damage_work,
+                c.y * c.depth,
+            )
+            && near(
+                s[0].viscous_loss + s[1].viscous_loss,
+                h.summary.viscous_loss,
+                c.y * c.depth,
+            )
+            && near(
+                s[0].absolute_charge_error + s[1].absolute_charge_error,
+                h.summary.absolute_charge_error,
+                c.y * c.depth,
+            )
+            && (h.summary.indentation > h.summary.plastic_indentation
+                || h.summary.elastic_energy == 0.0)
             && (h.summary.solves != 0
                 || self
                     .layers
