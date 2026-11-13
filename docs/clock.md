@@ -17,9 +17,9 @@ Explosion (#76) scatters individual lit cells as bouncing rigid-body debris;
 its reassembly (#135) brings the blocks back into the latest clock face.
 Coins (#581) turns the lit cells into coins that drop and pile, a magpie
 carries a few of them off, and the rest fly home by the same reassembly,
-which grows back what the bird kept. The corner lamps (#621) now and then
-flicker, go out for a few seconds or turn into a spotlight that sweeps the
-reading.
+which grows back what the bird kept. The corner lamps (#621) follow what
+moves with a spotlight, start at knocks, light the digits that change and go
+out for a few seconds when worked too hard (#631).
 
 ## Layout
 
@@ -74,7 +74,7 @@ covers them. Floor heights, colliders and duck courses retain their geometry.
 
 A small brass lamp sits just inside each junction of the top and side rails,
 lighting its upper corner; [Corner lamps](#corner-lamps-621) has how they look
-and the moods they have. Lit digit cells, the colon
+and what they do. Lit digit cells, the colon
 and AM/PM cast a dim halo in their current color, while inactive cells stay
 subdued. The header uses a dark warm finish, and narrow shadows inside the side
 and top rails give the room depth. The frame scales with the shorter display
@@ -170,91 +170,264 @@ distance, so the light has no edge to speak of.
 
 At rest a lamp gives 40% of its full light (#629): the glow, the bloom and the
 thrown light at 40% of full, and a bulb that glows amber, without the hot core
-it shows above rest. Steady lamps draw the same primitives every tick, so they
+it shows above rest. Resting lamps draw the same primitives every tick, so they
 never change a frame on their own.
 
-Now and then, while the scene is quiet, one lamp has a mood. Flickers and
-outages dim it from rest; a spotlight brightens it past full:
+#### What the lamps do (#631)
 
-- **Flicker.** Two to five quick dips in brightness, over in under two seconds.
-- **Outage.** The bulb sputters out, stays dark for 2.5 to 5 seconds,
-  sputters back on and warms up. The glow, the bloom and the thrown light go
-  with it, so its corner of the room goes dark. About half of outages give
-  off a tiny flash and five golden sparks as the bulb goes dark; the sparks
-  fall inward and fade within 0.4 seconds, stopping if the lamp gives way.
-- **Spotlight.** The thrown light gathers into a beam that narrows onto the
-  digit nearest the lamp, rests there, sweeps across to one of the far two
-  digits, holds and widens back out, seven seconds in all. The beam lays a
-  pool of warm light on the wall behind the face; the cells inside the pool
-  brighten toward warm white, and the dark guides of unlit cells show in it.
-  As the beam narrows, the bulb brightens from rest to a little past full: its
-  hot core fades in and its bloom nearly triples. The glow around the corner
-  rises less, since the beam draws on it: 15% above rest while the beam holds,
-  and 36% at most as it narrows and widens.
+Each lamp acts on what it perceives ([below](#what-the-lamps-perceive-630)):
+it follows what moves with a spotlight, starts at knocks, lights the digits
+that change on its side and, worked too long too bright, goes out for a few
+seconds. Nothing in it names an event, visitor or resident, so a ball rolled
+across the floor is followed like the duck. A lamp does one thing at a time:
 
-| Steady | Spotlight on the nearest digit |
+- **Rest.** The steady glow above, its light falling down and inward. Now and
+  then a resting lamp fidgets: two to four quick dips in brightness.
+- **Notice.** A mover catches its eye. The lamp turns toward it, its light
+  narrowing a little and brightening, and tracks it if its interest holds; it
+  rests again if the mover dulls or leaves. A knock is not something to turn
+  toward: it startles the lamps or dips their power, as below.
+- **Track.** The light gathers into a spotlight that follows the mover, a
+  little ahead of it. The beam lays a pool of warm light over the wall and the
+  floor, and whatever small thing is drawn over the pool warms toward white in
+  it: the cells, with the dark guides of unlit cells just showing, the duck, a
+  coin, the spider, a bird. The mover shades what the beam warms behind it,
+  away from the lamp. A mover that stops is watched for three quarters of a
+  second as it settles, and then the lamp rests; one that leaves
+  the view is searched for. Either way, another mover that catches the lamp's
+  eye meanwhile takes the beam straight away.
+- **Search.** The beam, a little wider, drifts on the way the mover went and
+  sweeps three cells either side of where it was last seen. The lamp tracks
+  the mover again if it moves back into view, takes up another that catches
+  its eye, or rests after two seconds.
+- **Present.** When the reading changes, a resting lamp may light the digits
+  that changed on its side, the hours on the left and the minutes on the
+  right. Its beam settles on them for about two seconds and widens back to
+  rest by two and a half.
+- **Out.** The bulb sputters out, stays dark for 2.5 to 5 seconds, sputters
+  back on and warms up. The glow, the bloom and the thrown light go with it,
+  so its corner of the room goes dark. About half of outages give off a tiny
+  flash and five golden sparks as the bulb goes dark; the sparks fall inward
+  and fade within 0.4 seconds.
+
+A knock **startles** a lamp over whatever it is doing, and `clock state`
+reports `startle` as its state for the 0.3 seconds it lasts. The knock must be
+12 cells a second or more within half the room's height of the lamp's head,
+or stronger in proportion farther off. Half of startles flare the bulb by 64
+to 130 percent, fading; the rest are a quick flicker. A lamp startles at most
+once a second.
+
+Three drives steer a lamp:
+
+- **Interest** follows how much the most appealing mover in view catches its
+  eye: the mover's salience (its speed in cells a second times its size in
+  cells, more as it starts moving) over the lamp's threshold, its appeal. The
+  lamp notices a mover of appeal 1 or more once its interest reaches 1, and
+  lets a noticed one go below 0.4. Interest left from a mover it followed
+  makes it quick to take up the next, but only one that catches its eye on
+  its own.
+- **Boredom** builds while it tracks one mover. At 1 the lamp tires of it,
+  rests and leaves that mover alone for 10 seconds.
+- **Heat** builds while the bulb burns brighter than rest: twelve seconds at a
+  full spotlight bring a cold bulb to 1. At rest it sheds nearly two thirds of
+  its heat every 30 seconds, and four times as fast while out. Above 0.85 the
+  bulb sputters now and then, and at 1 it goes out. So a bulb goes out of heat
+  only after long bright work: following the busy movers of an event, or a
+  visitor.
+
+A knock of 30 cells a second or more dips the power to both lamps for about a
+quarter of a second, at most once every 20 seconds, and takes out the hotter
+bulb if its heat is 0.7 or more. A bulb also goes out of nothing once in 30
+to 80 minutes of rest.
+
+The run's seed makes one lamp eager and the other lazy:
+
+| | Lazy | Eager |
+| --- | --- | --- |
+| Salience that catches its eye | 6 | 3 |
+| Interest closes most of its gap in | 0.35 s | 0.12 s |
+| Turns toward a mover before tracking it for | 0.35 s | 0.15 s |
+| Tracks one mover before tiring of it for | 6 s | 10 s |
+| Aim's top speed and acceleration, in cells | 30/s, 110/s² | 45/s, 180/s² |
+| Presents a change on its side, if resting | half the time | 90% of the time |
+| Fidgets once in this much rest | 90 to 200 s | 45 to 120 s |
+
+The lamps share the work. Each minds its own half of the room: a mover more
+than a cell past the middle is the other lamp's while that lamp is free, and
+catches this one's eye at half its salience while the other is busy. Neither
+takes the mover the other holds unless that mover far outshines the rest: a
+salience of 30 or more, three times the next. A tracked mover on the other
+lamp's side passes to that lamp when it is free, that is resting, noticing,
+searching or presenting with its bulb below 0.85, and not tired of the mover:
+as the mover crosses the middle, or as the other lamp comes free while a mover
+this one took up over there, at half its salience, is still there. The two
+are never out together: neither goes out while the other is out. Meanwhile a
+hot bulb takes on nothing new, and one that reaches full heat lets go of what
+it follows and rests.
+
+A beam's aim and width move under top speeds and accelerations, so it swings
+with some weight. At rest the light settles exactly on its place, so the
+resting face stays still.
+
+| Steady | Following a ball |
 | --- | --- |
-| ![The 12:39 face at rest, a dim amber lamp in each upper corner](screenshots/clock/lamps-800x480-steady.png) | ![The left lamp's beam on the first digit, its cells brighter and its unlit guides showing in the pool](screenshots/clock/lamps-800x480-spotlight.png) |
+| ![The 12:39 face at rest, a dim amber lamp in each upper corner](screenshots/clock/lamps-800x480-steady.png) | ![The left lamp's beam on a ball rolling along the floor, the ball lit in its pool](screenshots/clock/lamps-800x480-track.png) |
 
-| Partway through the sweep | Outage |
+| Presenting the minutes | Outage |
 | --- | --- |
-| ![The beam crossing the second digit on its way to the minutes](screenshots/clock/lamps-800x480-sweep.png) | ![The right lamp out, its corner dark, the left lamp steady](screenshots/clock/lamps-800x480-outage.png) |
+| ![The right lamp's beam on the minutes, their cells brighter and their unlit guides showing in the pool](screenshots/clock/lamps-800x480-present.png) | ![The right lamp out, its corner dark, the left lamp steady](screenshots/clock/lamps-800x480-outage.png) |
 
-![A spotlight from the left lamp, an outage of the right one and a flicker, every second frame at 800×480](screenshots/clock/lamps-800x480.gif)
+![A ball rolled across the floor, followed by the left lamp and handed to the right one; the right lamp presenting the minutes; and an outage of the right lamp, every second frame at 800×480](screenshots/clock/lamps-800x480.gif)
 
-The sweep at [1024×768](screenshots/clock/lamps-1024x768-sweep.png), and a
-spotlight in the
-[480×800 portrait](screenshots/clock/lamps-480x800-spotlight.png), where the
-beam falls almost straight down onto the first digit.
+A ball followed at [1024×768](screenshots/clock/lamps-1024x768-track.png), and
+a present in the [480×800 portrait](screenshots/clock/lamps-480x800-present.png),
+where the beam falls steeply onto the minutes.
 
-**When.** The lamps draw from a seeded stream of their own, never the event
-schedule's, so they never move an event: the same seed runs the same events,
-at the same ticks, whatever the lamps do. A mood comes due after 45 to 120
-quiet seconds under Calm and 12 to 24 under Demo, and Off keeps the lamps
-steady. Quiet means the clock has a reading and nothing else is going on: no
-event or its cooldown, no duck, crow or spider, no notice and no ceiling
-opening. Calm makes half of the moods flickers and a quarter each outages and
-spotlights; Demo, there to show them off, makes it 30, 35 and 35 percent. Over
-an hour of Calm with the reading moving on every second, four seeds had 22 to
-30 moods each, one every two to three minutes, with the scene quiet 60 to 68
-percent of the time.
+**Setting.** **Lamps**, in Clock's Scenario Settings and in the live Clock
+Controls, is Lively by default. Steady keeps both lamps at rest whatever goes
+on, and an outage under way skips to its warm-up. Lively lamps act under every
+event profile, Off included, where they follow a player's duck. The setting is
+saved with the others. In Scenario Settings it sits between Date and Fonts; in
+Clock Controls the top row makes room for it between Profile and Fonts, its
+buttons narrowed so the profile still shows Demo whole, and Left and Right
+switch it, as they do Time and Date.
 
-A mood that comes due waits for a gap long enough to hold it: it starts only
-if it will end at least half a second before both the schedule's next event
-and the next minute's change, which brings a Digit Slide when one is ready.
-Anything that starts anyway (an event, a visit, a notice, or the profile
-switched to Off) takes the scene back. The lamp returns to steady from
-wherever its mood had it within half a second, and a dark bulb catches once
-on the way.
+| Clock Controls | Scenario Settings | Portrait |
+| --- | --- | --- |
+| ![Lamps Lively, selected, between the Demo profile and Fonts on the pause page's top row](screenshots/clock/lamps-800x480-live-controls.png) | ![Lamps Lively, selected, between Date and Fonts in the launcher's Clock settings](screenshots/clock/lamps-800x480-launcher-controls.png) | ![The 480×800 view, the top row's buttons narrower and Demo still whole](screenshots/clock/lamps-480x800-live-controls.png) |
+
+**Isolation.** The lamps draw from a seeded stream of their own, never the
+event schedule's, and only read the scene, so they never change it: the same
+seed runs the same events, visits and arena accounting at the same ticks, with
+every body where it would be, whether the lamps are Lively or Steady, and the
+same seed gives the same lamps.
+
+**In a run.** Over an hour of Demo with the reading moving on every second, at
+seeds 42, 7 and 1234, events filled 58 to 61 percent of the hour, and a lamp
+tracked something through 7 to 10 percent of event time. Each lamp rested 88
+to 94 percent of the hour. In each hour the lamps noticed 110 to 165 movers,
+began 275 to 381 tracks of about 1.2 seconds (a handoff or a change of mover
+begins a new one), handed 10 to 22 movers over, startled 18 to 26 times,
+presented 30 to 47 changes, fidgeted 53 to 63 times and dipped 2 to 6 times.
+Bulbs went out 6 to 10 times an hour. All but two of the 23 outages came of
+heat, every one of those to the eager lamp, after 9.6 to 18 seconds of
+tracking in the minute before; 11 of them came during events. Between events
+the lamps follow the duck and the spider. The right lamp presents most, since
+the minutes change every minute and the hours once an hour.
 
 **Drawing.** Both render adapters take the same bounded geometry. The head is
 a hood polygon and up to three discs (mount, glass and, above rest, the core);
-the bloom, the glow and the thrown light are translucent discs; a spotlight's
-beam is six nested fans clipped to the view and its pool eight discs. The beam
-and the thrown light sit behind the cells, like the ceiling's sunlight. The
-light on the cells is a warm copy of each lit cell, label or dark guide whose
-center is in the pool, on a layer of its own above the cells and labels and
-below visitors. It reads whatever the scene drew, so it follows any face. The
-resting lamps are 50 primitives, 22 more than the lamps before #621 (564 for
-the whole 23:58 face with the date at 800×480), and a spotlight added at most
-31 more at 800×480, 1024×768 and 480×800.
+the bloom, the glow and the thrown light are translucent discs; a narrowed
+beam is six nested fans clipped to the view and its pool eight discs. The
+beam, the pool and the thrown light sit behind the cells and over the floor,
+like the ceiling's sunlight. Whatever small thing the scene drew over the
+pool, a cell, a label, a dark guide, the duck, a coin, the spider, a bird or
+a fixture ball, as a polygon, disc or line, takes the pool's light in place:
+its colors move toward warm white by as much as the light at its middle
+gives. The mover the lamp follows shades what lies behind it as the lamp sees
+it, taking nearly half the light just past its edge and none from about its
+own length behind its middle, but it never shades itself. A thing that
+reaches more than about a third of the pool's radius from its middle takes
+less of the light, and one that reaches past half of it, like Meltdown's
+water, stays as the scene drew it, so nothing snaps into or out of the light
+as it grows. The light reads whatever the scene drew, so it follows any face,
+keeps each thing in its place in the drawing order and adds nothing to the
+frame. The resting lamps are 50 primitives, 22 more than the lamps before
+#621 (564 for the whole 23:58 face with the date at 800×480). A present adds
+15 more at 800×480, 1024×768 and 480×800, and a beam on a ball on the floor 9.
 
-**Diagnostics.** `clock state --json` carries a `lamps` block: the mood under
-way (`kind`, `lamp`, `tick` of `ticks`, the bulb's `brightness_milli` in
-thousandths of full light, 400 at rest and up to 1150 in a spotlight, and
-whether it is `yielding`), how many `flickers`, `outages` and `spotlights` the
-run has had, and `due_in_quiet_ticks`, the quiet ticks the next mood waits
-for: 0 once it is due and waiting for a gap, `null` during a mood and under
-Off. `spacewars-cli clock state` prints it on one line. Fixtures and captures
-start a mood with `ClockState::preview_lamp_mood`, which runs whatever the
-profile, as an event preview does. There is no menu control for the lamps
-yet.
+**On the cabinets.** On 2026-11-13 a Raspberry Pi 4 cabinet, sw-picade-2 at
+1024×768 over HDMI and drawing through the GPU scene, ran this code from
+`/tmp` with events Off, once with Lively lamps and once with Steady ones. Each
+pass sampled the idle face and then the duck, the spider and coins twice,
+every two seconds. Every sample of both passes held 60 frames a second, and
+the display flipped 60 pages a second in every window. In the 27 samples taken
+while a beam was narrowed onto a mover, the frame's work on the CPU took a
+median 0.94 ms, at most 3.1 ms, against 0.81 ms at the same points with Steady
+lamps, and drawing the scene 0.32 ms against 0.26 ms. The two passes showed
+different minutes, and the idle faces put 0.06 ms of the first difference and
+0.02 ms of the second down to the face itself. The headless benchmark,
+`benchmark-clock.sh` with the CPU raster at scale 1 and three 40-second runs a
+case, took 7.2, 7.5 and 7.5 ms a frame for the idle face, the duck and the
+spider at 1024×768, and 4.4, 4.6 and 4.8 ms at 800×480, at worst 9.6 ms at the
+95th percentile. A beam is narrowed for about a tenth of the duck's frames and
+13 to 29% of the spider's in those runs. No HyperPixel was measured live, so
+800×480 has only the headless numbers. The build measured also drew four discs
+of shadow behind a followed mover, which this code leaves out.
 
-The capture test draws the steady lamps, a spotlight resting on the nearest
-digit and partway through its sweep, and an outage with sparks through the
-production raster and vector adapters at 800×480, 1024×768 and 480×800. It
-checks that each mood ends on exactly the steady face, and, given a directory,
-writes the stills and every second frame of the 800×480 film:
+**Diagnostics.** `clock state --json` carries a `lamps` block. For `left` and
+`right` it gives the lamp's `temperament` (`eager` or `lazy`); its `state`
+(`rest`, `notice`, `track`, `search`, `startle`, `out` or `present`) and
+`state_ticks`; its `target`, the mover it notices, tracks or searches for, by
+`world`, `entity` and `role` as perception names it, or `null`; `aim_milli`,
+where its light points in thousandths of a view unit; `narrow_milli`, 0 at
+rest and 1000 for a full spotlight; `brightness_milli`, 400 at rest and 1150
+in a full spotlight; and its `drives`, `interest_milli`, `boredom_milli` and
+`heat_milli`, each acting at 1000. The block then counts the run's `notices`,
+`tracks`, `handoffs`, `startles`, `outages`, `presents`, `fidgets` and
+`dips`, and carries what the lamps perceive in `perceived`. These replace
+#621's mood fields, so the state's schema is 25. `spacewars-cli clock state`
+prints a `Lamps:` line with the setting and the counts; a line for each lamp
+with its temperament, state, target as `world:entity/role` and ticks in it,
+its aim, width and brightness, and its drives; and the `Lamps perceive:`
+line.
+
+Fixtures and captures start an outage, a startle, a present of the digits on
+a lamp's side, or rest with `ClockState::preview_lamp`, as an event preview
+does. Lively lamps carry it on; Steady ones calm it at the next step. A fixture ball rolled along the floor, from
+`ClockState::rolling_arena_ball`, gives the lamps something to follow.
+
+**Tests.** `lamps_tests` roll a fixture ball across the floor at two seeds,
+one with each temperament on the left. The lamp on the ball's side follows
+it within 0.75 seconds, its beam within 8 degrees of the ball as seen from
+the lamp's head once it has followed it for half a second; the ball passes to
+the other lamp at the middle; and both rest within 3 seconds of its leaving
+the room, or within 2 seconds of its stopping. Three minutes of Demo at seed
+12 give the same lamps for the same seed, keep Steady lamps at rest, and run
+the same events, visits, arena accounting and bodies, each where it would be,
+every tick with Lively lamps as with Steady ones; the lamps are never both
+out, and a bulb goes out of heat during an event after at least 10 seconds of
+tracking in the minute before, as this run has it. Resting lamps draw the same frame for ten seconds, and an outage
+darkens only its lamp and ends on the same rest. At three aspect ratios a
+present lights the cells in its pool, a ball rolled in from the right is
+followed by one lamp and then the other, every beam stays in view, the light
+only warms things in its pools, each in its place and as opaque as it was,
+and the lamps come back to the very same rest. A ball the left lamp follows
+is lit. The `lamps`
+state shows each lamp's activity, target and drives, and an older state reads
+as resting lamps. The ignored `what_an_hour_of_demo_looks_like` reports the
+hour above.
+
+The tests in `lamps::brain` feed the lamps percepts by hand: a lamp notices a
+mover on its side, follows it closely, holds it in its light only while it
+notices or tracks it, and rests after losing it; the eager
+lamp notices what the lazy one lets pass; a lamp takes up only movers that
+catch its eye on their own, whatever interest it has left; a lamp tires of a
+mover and notices it again ten seconds later; a mover crossing the middle
+passes between the lamps, unless the other lamp is tired of it; the lamps
+share only a mover that far outshines the rest; a hot bulb goes out, and
+never both; sparks fly from the tick a bulb goes dark, in one burst, and stop
+when it is calmed; a big knock dips the power at most once in 20 seconds; a
+knock near a lamp startles it, at most once a second; a lamp presents the
+digits that changed on its side; a resting lamp is exactly steady but for its
+fidgets; the beam moves under its limits and stops at the room's edge for a
+mover that runs out; Steady lamps rest; and the brain is seeded. The tests in
+`render::lamp` pin the light a steady scene's lamps give off at 40% of full,
+with full light as #621 drew it; the amber glass at rest; the hot core fading
+in above rest; a pool warming the small things drawn over it in place,
+whatever their shape, and leaving larger things, what lies under the pool and
+text as they are; the shadow of the mover a lamp follows, which shades what is
+behind the mover but not the mover; and a thing growing in a pool, which fades
+out of its light without a snap.
+
+The capture test draws the steady lamps, a ball the left lamp follows and
+hands to the right one, the right lamp presenting the minutes, and an outage
+with sparks at 800×480, 1024×768 and 480×800, through the production raster
+adapter, and checks each frame's export through the vector one for
+non-finite values. It checks that each ends on exactly the steady face and
+that the ball is handed over, and draws the Lamps control on both pages.
+Given a directory, it writes the stills, the controls and every second frame
+of the 800×480 film:
 
 ```sh
 SPACEWARS_LAMPS_ARTIFACTS=/tmp/clock-lamps \
@@ -263,28 +436,13 @@ cd /tmp/clock-lamps/film
 ffmpeg -framerate 30 -i frame-%04d.png -vf "scale=600:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96:stats_mode=full[p];[b][p]paletteuse=dither=none" -loop 0 ../lamps-800x480.gif
 ```
 
-`lamps_tests` cover Off holding the lamps steady; the wait for quiet and for
-a gap that holds the mood; moods bounded, seeded and back to steady, one lamp
-at a time; the return within half a second from anywhere in each mood; a
-preview running under Off where a drawn mood stops; moods only in quiet gaps
-of a Demo run, whose events are the same with or without extra spotlights;
-moods fitting between the events and minute changes of a clock whose reading
-moves on every second; steady lamps drawing the same frame for ten seconds,
-and an outage darkening only its lamp; the spotlight's light copying the cells
-it lands on, staying in view at three aspect ratios and sweeping away from its
-lamp; and an event under a spotlight taking the scene back. The tests in
-`render::lamp` pin the light a steady scene's lamps give off at 40% of full,
-with full light as #621 drew it; the amber glass at rest; and the hot core
-fading in above rest.
-
 #### What the lamps perceive (#630)
 
-Each tick, before they step, the lamps look at the scene. Nothing acts on
-what they see yet; the lamps' brain (#631) will choose what to light from it.
-Their perception names no event, visitor or resident, so whatever is a body
-is seen, including things added later. The lamps share one perception: what
-one lamp would see differs from the others' only by where it stands, which
-the brain can weigh from each lamp's position. They perceive:
+Each tick, before they act, the lamps look at the scene, and what they see is
+all they act on. Their perception names no event, visitor or resident, so
+whatever is a body is seen, including things added later. The lamps share one
+perception: what one lamp would see differs from the other's only by where it
+stands, which each lamp weighs from its own position. They perceive:
 
 - **Movers.** The six most salient bodies moving at a cell a second or more
   with any part in view. Salience is a body's speed in cells a second times
@@ -292,6 +450,11 @@ the brain can weigh from each lamp's position. They perceive:
   it starts moving, 37% more two seconds on, and fading from there. A pause
   of under five seconds is part of moving; a body still or slow for five
   seconds is new again when it next moves.
+- **Followed bodies.** The bodies the lamps notice, track or search for,
+  which they name to perception before it looks. Each is described as a mover
+  is, whatever its rank or speed, while any part of it is in view, so a lamp
+  keeps sight of a mover that stops or is outshone. The state shows them as
+  each lamp's `target`.
 - **Impacts.** The four strongest knocks in view. A knock is a body whose
   contacts changed its velocity by six cells a second or more in one step:
   the change in its velocity beyond gravity along the push of its contacts'
@@ -356,8 +519,9 @@ The tests in `lamps::perception` cover a fixture ball no lamp code names,
 perceived where it is and as it moves, as the diagnostics show it; the most
 salient movers first, a newcomer outranking movers long watched though it
 shares an id with one in another world, a crowd costing the bound, and
-bodies out of view beside or above it left out; salience by speed, size and
-novelty; a mover's age through a pause and after it stops; a dropped ball's
+bodies out of view beside or above it left out; a slow body the lamps follow
+described behind a crowd of faster ones, and not once out of view or gone;
+salience by speed, size and novelty; a mover's age through a pause and after it stops; a dropped ball's
 landing, placed where it meets the floor, with the floor's push as its
 strength; a light ball struck at rest by a heavy one, which hardly slows; a
 kinematic paddle knocking a ball and taking no knock itself; the four
@@ -366,8 +530,10 @@ script stops, in the air or rolling on the floor; no knock for a ball held on
 the floor against a pull, and only the floor's blow for a ball a script
 throws as it lands; the signals, among them a font change beside a blank
 slot and an event started over one of its kind; and six minutes of Demo with
-the lamps blind giving the same events, visits and arena accounting every
-tick and the same frame every second. An engine-rapier test pins
+the lamps blind giving the same events, visits, arena accounting and body
+motions every tick and the same frame every second, Steady lamps in both,
+since Lively ones act on what they see. The lamps tests run Lively lamps
+against Steady ones for the bodies the lamps follow. An engine-rapier test pins
 `body_contact_push`: a landing, a resting weight, a sliding box's friction,
 and nothing for a fixed, sleeping or unknown body.
 
@@ -1909,7 +2075,7 @@ admission waits for its existing visit to end. During a spider visit it cycles
 Color Cycle and Digit Slide, the events that keep the digits where they are,
 and a request for any other reports that the spider is visiting; another
 Spider admission waits for its visit to end, and the spider itself waits for a
-duck, a crow or an event it would not keep live. Preferences are unchanged. The Clock action protocol is version 12; `NextEvent`
+duck, a crow or an event it would not keep live. Preferences are unchanged. The Clock action protocol is version 14; `NextEvent`
 (kind 6) has no payload after the version prefix.
 Physical cabinet mappings are documented in [Picade controls](picade.md).
 
@@ -3272,7 +3438,7 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **24** and reports scenario-instance revision,
+`clock state` uses schema version **25** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`, `warning`, `exploding`), pause state, profile, schedule, current
@@ -3360,16 +3526,16 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 22 and
-older requests are rejected. The internal Clock action payload is version 12;
+after completion or cancellation. Use matching client/CLI builds: schema 24 and
+older requests are rejected. The internal Clock action payload is version 14;
 event ordinals 0–9 are unchanged; Cell Swap is 10. Configure contains a
-little-endian u16 switch mask (bits 0–13, reserved bits rejected),
+little-endian u16 switch mask (bits 0–15, one for each event),
 validated recipe and rain-amount bytes, a `show_date` byte (0/1),
 font ID, rotation (0/1) and nonempty four-bit font-pool bytes, a crow-water-tolerance
-byte (0 Varied, 1 Shy, 2 Hardy), and 1–32 message
+byte (0 Varied, 1 Shy, 2 Hardy), a lamps byte (0 Steady, 1 Lively), and 1–32 message
 bytes. Reading actions contain either three time bytes or those
-same bytes followed by a little-endian u16 year and u8 month/day. Version 1–11
-actions are rejected. Observation version 2 appends `show_date`, year/month/day
+same bytes followed by a little-endian u16 year and u8 month/day. Actions of
+any other version are rejected. Observation version 2 appends `show_date`, year/month/day
 to the existing time/format fields; an absent date is four zero bytes.
 
 The `arena` object reports the run's shared rigid arena. Its `accounting` gives
@@ -3396,7 +3562,7 @@ arena's counts, claims, run totals and last step, and `clock events` shows each
 event's refusal.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 24, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 25, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -3413,7 +3579,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 24, `event`
+tick. A raw `clock trigger` request must include schema version 25, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, `cell-swap`, `grass`, `slot-machine`, `spider`, `coins`, or `tanks`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 

@@ -116,6 +116,7 @@ fn create(
             marquee_message: settings.clock.marquee_message,
             rain_amount: settings.clock.rain_amount,
             crow_water_tolerance: settings.clock.crow_water_tolerance,
+            lamps: settings.clock.lamps,
         },
         seed,
     );
@@ -770,6 +771,8 @@ mod tests {
             ] {
                 let mut state = ClockScenario::init(
                     ClockConfig {
+                        // Steady lamps, which never change a frame on their own.
+                        lamps: engine_common::ClockLampMode::Steady,
                         aspect_ratio: viewport.aspect_ratio(),
                         duck_jump_profile: Some(profile),
                         duck_course_pattern: Some(pattern),

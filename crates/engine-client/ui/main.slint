@@ -753,6 +753,7 @@ export component MainWindow inherits Window {
     in-out property <bool> launcher-clock-duck-enabled: true;
     in-out property <bool> launcher-clock-crow-enabled: true;
     in-out property <string> launcher-clock-crow-water-tolerance: "Varied";
+    in-out property <string> launcher-clock-lamps: "Lively";
     in-out property <bool> launcher-clock-explosion-enabled: true;
     in-out property <bool> launcher-clock-aquarium-enabled: true;
     in-out property <bool> launcher-clock-marquee-enabled: true;
@@ -1428,20 +1429,26 @@ export component MainWindow inherits Window {
                 height: parent.height - 80px;
                 background: transparent;
 
+                // Time, the profile, the lamps and fonts, in the grid's type.
+                // The buttons are narrow, the more so on a narrow display, so
+                // the profile keeps room for its longest value, Demo. Each
+                // place takes one condition, so the layout audit measures it.
                 MenuButton {
                     x: 0px;
                     y: 0px;
-                    width: 104px;
+                    width: parent.width < 450px ? 64px : 88px;
                     height: 44px;
+                    text-size: parent.width < 450px ? 12px : 14px;
+                    text-padding: 6px;
                     text: "Time\n" + root.launcher-clock-time-format;
                     selected: root.ingame-clock-focus-index == 0;
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(0, 1); }
                 }
                 ChoiceRow {
-                    x: 112px;
+                    x: parent.width < 450px ? 72px : 96px;
                     y: 0px;
-                    width: parent.width - 224px;
+                    width: parent.width < 450px ? parent.width - 216px : parent.width - 288px;
                     height: 44px;
                     label: parent.width < 500px ? "" : "Profile";
                     label-fraction: parent.width < 500px ? 0 : 0.25;
@@ -1452,10 +1459,24 @@ export component MainWindow inherits Window {
                     next => { root.ingame-clock-adjust(1, 1); }
                 }
                 MenuButton {
-                    x: parent.width - 104px;
+                    x: parent.width < 450px ? parent.width - 136px : parent.width - 184px;
                     y: 0px;
-                    width: 104px;
+                    width: parent.width < 450px ? 64px : 88px;
                     height: 44px;
+                    text-size: parent.width < 450px ? 12px : 14px;
+                    text-padding: 6px;
+                    text: "Lamps\n" + root.launcher-clock-lamps;
+                    selected: root.ingame-clock-focus-index == 24;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(24, 1); }
+                }
+                MenuButton {
+                    x: parent.width < 450px ? parent.width - 64px : parent.width - 88px;
+                    y: 0px;
+                    width: parent.width < 450px ? 64px : 88px;
+                    height: 44px;
+                    text-size: parent.width < 450px ? 12px : 14px;
+                    text-padding: 6px;
                     text: "Fonts";
                     selected: root.ingame-clock-focus-index == 16;
                     enabled: !root.clock-controls-pending;
@@ -2457,20 +2478,34 @@ export component MainWindow inherits Window {
                             }
                         }
 
+                        // Date, the lamps and fonts share the row's other half.
                         MenuButton {
                             x: parent.width / 2 + 6px;
                             y: 52px;
-                            width: (parent.width - 36px) / 4;
+                            width: (parent.width - 44px) / 6;
                             height: 48px;
+                            text-size: parent.width < 500px ? 13px : 16px;
                             text: "Date\n" + (root.launcher-clock-show-date ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 12;
                             activated => { root.launcher-settings-focus-index = 12; root.ui-action(3); }
                         }
                         MenuButton {
-                            x: parent.width * 3 / 4 + 9px;
+                            x: parent.width / 2 + 14px + (parent.width - 44px) / 6;
                             y: 52px;
-                            width: (parent.width - 36px) / 4;
+                            width: (parent.width - 44px) / 6;
                             height: 48px;
+                            text-size: parent.width < 500px ? 13px : 16px;
+                            text-padding: 4px;
+                            text: "Lamps\n" + root.launcher-clock-lamps;
+                            selected: root.launcher-settings-focus-index == 23;
+                            activated => { root.launcher-settings-focus-index = 23; root.ui-action(3); }
+                        }
+                        MenuButton {
+                            x: parent.width / 2 + 22px + 2 * (parent.width - 44px) / 6;
+                            y: 52px;
+                            width: (parent.width - 44px) / 6;
+                            height: 48px;
+                            text-size: parent.width < 500px ? 13px : 16px;
                             text: "Fonts";
                             selected: root.launcher-settings-focus-index == 15;
                             activated => { root.clock-fonts-open(); }
@@ -2792,7 +2827,7 @@ export component MainWindow inherits Window {
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 21 : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 6 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 24 : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 6 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }

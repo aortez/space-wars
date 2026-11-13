@@ -78,6 +78,8 @@ fn cell_swap_renders_motion_rollover_and_controls_at_target_sizes() {
             (ClockFont::Serif, ClockCellSwapPattern::Shuffle),
         ] {
             let config = ClockConfig {
+                // Steady lamps, which never change a frame on their own.
+                lamps: engine_common::ClockLampMode::Steady,
                 aspect_ratio: viewport.aspect_ratio(),
                 event_profile: ClockEventProfile::Off,
                 time_format: ClockTimeFormat::TwelveHour,

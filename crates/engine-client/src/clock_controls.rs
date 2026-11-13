@@ -25,6 +25,7 @@ pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     window.set_launcher_clock_duck_enabled(settings.events.duck);
     window.set_launcher_clock_crow_enabled(settings.events.crow);
     window.set_launcher_clock_crow_water_tolerance(settings.crow_water_tolerance.label().into());
+    window.set_launcher_clock_lamps(settings.lamps.label().into());
     window.set_launcher_clock_explosion_enabled(settings.events.explosion);
     window.set_launcher_clock_aquarium_enabled(settings.events.aquarium);
     window.set_launcher_clock_marquee_enabled(settings.events.marquee);
@@ -155,6 +156,7 @@ pub(crate) fn log_settings_change(previous: ClockSettings, next: ClockSettings, 
         old_events = ?previous.events, new_events = ?next.events,
         old_rain = ?previous.rain_amount, new_rain = ?next.rain_amount,
         old_crow_water = ?previous.crow_water_tolerance, new_crow_water = ?next.crow_water_tolerance,
+        old_lamps = ?previous.lamps, new_lamps = ?next.lamps,
         old_format = ?previous.time_format, new_format = ?next.time_format,
         old_show_date = previous.show_date, new_show_date = next.show_date,
         old_marquee = ?previous.marquee_preset, new_marquee = ?next.marquee_preset,
@@ -186,6 +188,13 @@ fn adjusted_settings(mut settings: ClockSettings, index: i32, delta: i32) -> Opt
         21 => settings.events.spider = !settings.events.spider,
         22 => settings.events.coins = !settings.events.coins,
         23 => settings.events.tanks = !settings.events.tanks,
+        24 => {
+            let modes = engine_common::ClockLampMode::ALL;
+            let current = modes.iter().position(|mode| *mode == settings.lamps)?;
+            settings.lamps =
+                modes[ui_navigation::moved_selection(current as i32, modes.len() as i32, delta)
+                    as usize];
+        }
         0 => {
             settings.time_format = match settings.time_format {
                 ClockTimeFormat::TwelveHour => ClockTimeFormat::TwentyFourHour,
@@ -261,8 +270,8 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
         }
         UiAction::Left | UiAction::Right => {
             // Switches and the two actions hand the arrows to navigation.
-            // Selectors adjust, and so do Time and Date, whose rows the
-            // navigation table keeps them on.
+            // Selectors adjust, and so do Time, Date and Lamps, whose rows
+            // the navigation table keeps them on.
             if matches!(
                 index,
                 2 | 3 | 5 | 6 | 7 | 8 | 9 | 11 | 15 | 17 | 18 | 19 | 20 | 21 | 22 | 23
@@ -277,7 +286,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
                 );
             }
         }
-        UiAction::Confirm if index <= 4 || matches!(index, 7..=15 | 17..=23) => {
+        UiAction::Confirm if index <= 4 || matches!(index, 7..=15 | 17..=24) => {
             window.invoke_ingame_clock_adjust(index, 1)
         }
         UiAction::Confirm if index == 6 => window.invoke_ingame_clock_preview(),
@@ -292,6 +301,25 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
 mod tests {
     use super::*;
     use engine_common::ClockRainAmount;
+
+    #[test]
+    fn lamps_control_switches_only_the_lamps_both_ways() {
+        use engine_common::ClockLampMode;
+        let original = ClockSettings::default();
+        assert_eq!(original.lamps, ClockLampMode::Lively);
+        for delta in [1, -1] {
+            let steady = adjusted_settings(original, 24, delta).unwrap();
+            assert_eq!(steady.lamps, ClockLampMode::Steady);
+            assert_eq!(
+                ClockSettings {
+                    lamps: original.lamps,
+                    ..steady
+                },
+                original
+            );
+            assert_eq!(adjusted_settings(steady, 24, delta).unwrap(), original);
+        }
+    }
 
     #[test]
     fn date_control_changes_only_visibility_and_toggles_back() {

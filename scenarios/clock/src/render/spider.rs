@@ -18,7 +18,6 @@ const SILK: RenderColor = RenderColor::rgb(0.78, 0.82, 0.90);
 /// The dark of the hatch in the canopy, and the lit edge of its sides.
 const HATCH: RenderColor = RenderColor::rgb(0.012, 0.010, 0.008);
 const HATCH_EDGE: RenderColor = RenderColor::rgb(0.24, 0.19, 0.12);
-const LAYER: i32 = 8;
 
 /// The hatch in the canopy the spider comes and goes by: an opening as wide
 /// as the frame's, from the canopy's underside to the top of the view, with
@@ -57,7 +56,7 @@ pub(super) fn render(frame: &mut RenderFrame, state: &SpiderFixtureState) {
     let point = |p: Vec2| RenderPoint::new(p.x, p.y);
     if let Some(line) = spider.line {
         frame.push_primitive(
-            LAYER,
+            CREATURE_LAYER,
             RenderPrimitive::Line(RenderLine::new(
                 point(center),
                 point(line.anchor),
@@ -67,7 +66,7 @@ pub(super) fn render(frame: &mut RenderFrame, state: &SpiderFixtureState) {
     }
     if let Some(shot) = spider.shot {
         frame.push_primitive(
-            LAYER,
+            CREATURE_LAYER,
             RenderPrimitive::Line(RenderLine::new(
                 point(center),
                 point(shot.tip),
@@ -105,7 +104,7 @@ pub(super) fn render(frame: &mut RenderFrame, state: &SpiderFixtureState) {
             let foot = center + side * ((sign * spread + step) * r)
                 - up * (if hanging { 0.5 } else { 0.95 } * r);
             frame.push_primitive(
-                LAYER,
+                CREATURE_LAYER,
                 RenderPrimitive::Polygon(RenderPolygon {
                     points: vec![point(center), point(knee), point(foot)],
                     fill: None,
@@ -115,17 +114,17 @@ pub(super) fn render(frame: &mut RenderFrame, state: &SpiderFixtureState) {
         }
     }
     frame.push_primitive(
-        LAYER,
+        CREATURE_LAYER,
         RenderPrimitive::Circle(RenderCircle::filled(point(center), r, BODY)),
     );
     let head = center + side * (facing * 0.75 * r) + up * (0.1 * r);
     frame.push_primitive(
-        LAYER,
+        CREATURE_LAYER,
         RenderPrimitive::Circle(RenderCircle::filled(point(head), 0.5 * r, HEAD)),
     );
     for eye in [-1.0, 1.0] {
         frame.push_primitive(
-            LAYER,
+            CREATURE_LAYER,
             RenderPrimitive::Circle(RenderCircle::filled(
                 point(head + side * (facing * 0.22 * r) + up * (eye * 0.18 * r)),
                 (0.1 * r).max(0.5),

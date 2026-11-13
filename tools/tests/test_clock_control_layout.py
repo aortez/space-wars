@@ -42,6 +42,20 @@ class ClockControlLayoutTests(unittest.TestCase):
             self.assertEqual((rows['Recipe'][2], rows['Recipe'][3]), (230, width))
             self.assertEqual({item[4] for item in rows.values()}, {44})
 
+    def test_the_pause_page_measures_its_top_row_and_the_profile_shows_demo_whole(self):
+        # Lamps joined Time, Profile and Fonts on the top row. Every place
+        # there takes one condition, so the audit measures the row, and the
+        # profile keeps the 56px its value had on the 480x800 panel before
+        # Lamps came, where Demo, its longest value, shows whole; 40px cut
+        # it to "De".
+        lines = SLINT.read_text().split('\n')
+        [(start, end)] = [(start, end) for name, start, end in L.panels(lines) if name == 'ingame-clock']
+        for width in L.WIDTHS:
+            top = [item for item in L.boxes(lines, start, end, width) if item[2] == 0]
+            self.assertEqual([item[0] for item in top if item[6] == 'MenuButton'], ['Time', 'Lamps', 'Fonts'], width)
+            [profile] = [item for item in top if item[6] == 'ChoiceRow']
+            self.assertGreaterEqual(profile[3] * (1 - profile[7]) - 120, 56, width)
+
     def test_every_selector_keeps_room_for_its_value(self):
         report = L.audit_values(SLINT)
         self.assertEqual(sorted(report), ['ingame-clock'])

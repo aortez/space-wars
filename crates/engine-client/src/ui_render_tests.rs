@@ -574,6 +574,8 @@ fn clock_explosion_captures_warning_burst_reformation_and_controls_on_device_lay
             };
             let mut state = ClockScenario::init(
                 ClockConfig {
+                    // Steady lamps, which never change a frame on their own.
+                    lamps: engine_common::ClockLampMode::Steady,
                     fonts: ClockFontSettings {
                         selected: font,
                         ..Default::default()
@@ -644,6 +646,8 @@ fn clock_explosion_captures_warning_burst_reformation_and_controls_on_device_lay
             if name.ends_with("retargeted-recovered") {
                 let mut clean = ClockScenario::init(
                     ClockConfig {
+                        // Steady lamps, which never change a frame on their own.
+                        lamps: engine_common::ClockLampMode::Steady,
                         fonts: ClockFontSettings {
                             selected: font,
                             ..Default::default()

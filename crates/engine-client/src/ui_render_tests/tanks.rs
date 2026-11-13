@@ -68,6 +68,8 @@ fn tanks_render_both_adapters_and_controls_without_covering_the_reading() {
         window.set_size(PhysicalSize::new(width, height));
         let mut state = ClockScenario::init(
             ClockConfig {
+                // Steady lamps, which never change a frame on their own.
+                lamps: engine_common::ClockLampMode::Steady,
                 aspect_ratio: viewport.aspect_ratio(),
                 event_profile: ClockEventProfile::Off,
                 ..Default::default()

@@ -1002,6 +1002,10 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(adjusted.get(), None);
     key(&window, Key::DownArrow);
     key(&window, Key::DownArrow);
+    assert_eq!(window.get_ingame_clock_focus_index(), 24);
+    key(&window, Key::Return);
+    assert_eq!(adjusted.get(), Some((24, 1)));
+    key(&window, Key::DownArrow);
     assert_eq!(window.get_ingame_clock_focus_index(), 16);
     key(&window, Key::DownArrow);
     assert_eq!(window.get_ingame_clock_focus_index(), 13);
@@ -1063,8 +1067,10 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     adjusted.set(None);
     click(&window, 175.0, 110.0);
     assert_eq!(adjusted.get(), Some((0, 1)));
-    click(&window, 537.0, 110.0);
+    click(&window, 456.0, 110.0);
     assert_eq!(adjusted.get(), Some((1, 1)));
+    click(&window, 536.0, 110.0);
+    assert_eq!(adjusted.get(), Some((24, 1)));
     let fonts_opened = Rc::new(Cell::new(false));
     let opened = Rc::clone(&fonts_opened);
     window.on_clock_fonts_open(move || opened.set(true));

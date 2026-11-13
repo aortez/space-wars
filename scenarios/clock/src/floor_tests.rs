@@ -35,6 +35,11 @@ use engine_water::Boundary;
 use floor::{FloorManager, test_drain};
 
 fn ready(config: ClockConfig) -> ClockState {
+    // Steady lamps, which never change a frame on their own.
+    let config = ClockConfig {
+        lamps: engine_common::ClockLampMode::Steady,
+        ..config
+    };
     let mut state = ClockScenario::init(config, 0);
     assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
     ClockScenario::step(

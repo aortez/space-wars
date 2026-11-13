@@ -1,8 +1,9 @@
 //! What the lamps perceive: a body no lamp code names, where it is and how
-//! it moves; which movers stand out, and a bounded look at a crowd; a knock,
-//! on the body struck as on the one that strikes, where it lands and how
-//! hard, and none without a blow; what changes in the scene; that looking
-//! changes nothing; and what a look costs.
+//! it moves; which movers stand out, and a bounded look at a crowd; a body
+//! the lamps follow, whatever its rank or speed; a knock, on the body struck
+//! as on the one that strikes, where it lands and how hard, and none without
+//! a blow; what changes in the scene; that looking changes nothing; and what
+//! a look costs.
 
 use super::*;
 use crate::arena_fixture::FixtureBall;
@@ -302,6 +303,41 @@ fn a_mover_that_pauses_keeps_its_age_and_one_that_stops_is_new_again() {
     // Slow for the whole forgetting time, it stopped.
     assert_eq!(look(&slow, FORGET_TICKS), None);
     assert_eq!(look(&fast, 1), Some(0));
+}
+
+#[test]
+fn a_body_the_lamps_follow_stays_in_sight_whatever_its_rank_or_speed() {
+    // A slow ball, no mover, behind seven fast ones.
+    let crowd = balls(1, &[0.5, 9.0, 9.0, 9.0, 9.0, 9.0, 9.0, 9.0]);
+    let key = (0, BodyId::new(PhysicsId::new(1), BodyRole::PRIMARY));
+    let mut perception = Perception::default();
+    perception.perceive(&[Some(&crowd)], ROW, NOTHING);
+    assert!(perception.percepts().attended.is_empty());
+    // Followed by both lamps, it is described once, as a mover would be,
+    // and the movers are as they were.
+    perception.attend([Some(key), Some(key)]);
+    perception.perceive(&[Some(&crowd)], ROW, NOTHING);
+    let seen = perception.percepts();
+    assert_eq!(seen.attended.len(), 1, "{:?}", seen.attended);
+    let followed = seen.attended[0];
+    assert_eq!((followed.world, followed.body), key);
+    assert!(followed.position.length() < 1e-4, "{followed:?}");
+    assert!(
+        (followed.velocity - Vec2::new(0.5, 0.0)).length() < 1e-4,
+        "{followed:?}"
+    );
+    assert!((followed.size - 0.25).abs() < 1e-4, "{followed:?}");
+    assert_eq!(seen.movers.len(), MAX_MOVERS);
+    assert!(!entities(seen).contains(&(0, 1)), "{:?}", seen.movers);
+    // Out of view, or with its world gone, it is not.
+    let beside = View {
+        min: Vec2::new(0.5, -1.0),
+        ..ROW
+    };
+    perception.perceive(&[Some(&crowd)], beside, NOTHING);
+    assert!(perception.percepts().attended.is_empty());
+    perception.perceive(&[None], ROW, NOTHING);
+    assert!(perception.percepts().attended.is_empty());
 }
 
 #[test]
@@ -732,6 +768,11 @@ fn perception_is_bounded_and_the_scene_runs_the_same_without_it() {
     let mut seeing = clock(ClockEventProfile::Demo, 42);
     let mut blind = clock(ClockEventProfile::Demo, 42);
     blind.lamps.perception.blind = true;
+    // Steady lamps, so the frames compare: lively ones act on what they see.
+    // `lamps_tests` runs Lively lamps against Steady ones, which covers the
+    // bodies they follow.
+    seeing.config.lamps = engine_common::ClockLampMode::Steady;
+    blind.config.lamps = engine_common::ClockLampMode::Steady;
     let (mut moving, mut knocks) = (0, 0);
     for tick in 0..6 * 60 * 60 {
         ClockScenario::step(&mut seeing, &[], TICK);
@@ -755,6 +796,11 @@ fn perception_is_bounded_and_the_scene_runs_the_same_without_it() {
         let (seen, unseen) = (seeing.arena_state(), blind.arena_state());
         assert_eq!(seen.accounting, unseen.accounting, "tick {tick}");
         assert_eq!(seen.claims, unseen.claims, "tick {tick}");
+        let motions = |state: &ClockState| {
+            ClockState::scene_worlds(&state.arena, state.active_event.as_ref())
+                .map(|world| world.map(|world| world.motions().collect::<Vec<_>>()))
+        };
+        assert_eq!(motions(&seeing), motions(&blind), "tick {tick}");
         if tick % 60 == 0 {
             assert_eq!(
                 ClockScenario::render_frame(&seeing),

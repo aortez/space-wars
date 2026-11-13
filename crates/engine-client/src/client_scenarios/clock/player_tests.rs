@@ -13,6 +13,8 @@ mod takeover;
 fn scenario(viewport: Viewport) -> ClockClientScenario {
     let mut state = ClockScenario::init(
         ClockConfig {
+            // Steady lamps, which never change a frame on their own.
+            lamps: engine_common::ClockLampMode::Steady,
             aspect_ratio: viewport.aspect_ratio(),
             event_profile: ClockEventProfile::Off,
             ..Default::default()

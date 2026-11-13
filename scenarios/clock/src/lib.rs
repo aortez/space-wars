@@ -81,8 +81,9 @@ pub use digits::{
 
 use engine_common::{
     Action, ClockCrowWaterTolerance, ClockEventKind, ClockEventProfile, ClockEvents, ClockFont,
-    ClockFontPool, ClockFontSettings, ClockMarqueeMessage, ClockMarqueePreset, ClockRainAmount,
-    ClockSettings, ClockTimeFormat, Observation, RenderFrame, Scenario, StepResult, TickModel,
+    ClockFontPool, ClockFontSettings, ClockLampMode, ClockMarqueeMessage, ClockMarqueePreset,
+    ClockRainAmount, ClockSettings, ClockTimeFormat, Observation, RenderFrame, Scenario,
+    StepResult, TickModel,
 };
 pub use events::cell_swap::{CELL_SWAP_FADE_TICKS, CELL_SWAP_MAX_TICKS, CELL_SWAP_TICKS};
 pub use events::digit_slide::DIGIT_SLIDE_TICKS;
@@ -100,7 +101,7 @@ use layout::Layout;
 /// How long a spider's visit may go on past its budget on its way out.
 pub use spider::visit::EXIT_GRACE_TICKS as SPIDER_EXIT_GRACE_TICKS;
 
-pub const CLOCK_ACTION_VERSION: u16 = 13;
+pub const CLOCK_ACTION_VERSION: u16 = 14;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
@@ -114,7 +115,7 @@ pub const CLOCK_OBSERVATION_VERSION: u16 = 2;
 const DEFAULT_ASPECT_RATIO: f32 = 800.0 / 480.0;
 const MIN_ASPECT_RATIO: f32 = 0.25;
 const MAX_ASPECT_RATIO: f32 = 4.0;
-const MAX_CONFIGURE_BYTES: usize = 13 + engine_common::MAX_CLOCK_MESSAGE_BYTES;
+const MAX_CONFIGURE_BYTES: usize = 14 + engine_common::MAX_CLOCK_MESSAGE_BYTES;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ClockReading {
@@ -203,6 +204,7 @@ impl ClockAction {
             settings.fonts.pool.bits(),
         ]);
         payload.push(settings.crow_water_tolerance as u8);
+        payload.push(settings.lamps as u8);
         payload.extend_from_slice(settings.marquee_message.as_str().as_bytes());
         Action::scenario(CLOCK_ACTION_CONFIGURE, payload)
     }
@@ -268,7 +270,7 @@ impl ClockAction {
                 .into_iter()
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
-            (CLOCK_ACTION_CONFIGURE, 14..=MAX_CONFIGURE_BYTES)
+            (CLOCK_ACTION_CONFIGURE, 15..=MAX_CONFIGURE_BYTES)
                 if payload[8] <= 1 && payload[10] <= 1 =>
             {
                 Some(Self::Configure(ClockSettings {
@@ -310,8 +312,9 @@ impl ClockAction {
                     rain_amount: *ClockRainAmount::ALL.get(usize::from(payload[7]))?,
                     crow_water_tolerance: *ClockCrowWaterTolerance::ALL
                         .get(usize::from(payload[12]))?,
+                    lamps: *ClockLampMode::ALL.get(usize::from(payload[13]))?,
                     show_date: payload[8] != 0,
-                    marquee_message: std::str::from_utf8(&payload[13..]).ok()?.parse().ok()?,
+                    marquee_message: std::str::from_utf8(&payload[14..]).ok()?.parse().ok()?,
                 }))
             }
             _ => None,
@@ -435,6 +438,7 @@ pub struct ClockConfig {
     pub marquee_message: ClockMarqueeMessage,
     pub rain_amount: ClockRainAmount,
     pub crow_water_tolerance: ClockCrowWaterTolerance,
+    pub lamps: ClockLampMode,
 }
 
 impl Default for ClockConfig {
@@ -460,6 +464,7 @@ impl Default for ClockConfig {
             marquee_message: ClockMarqueeMessage::default(),
             rain_amount: ClockRainAmount::default(),
             crow_water_tolerance: ClockCrowWaterTolerance::default(),
+            lamps: ClockLampMode::default(),
         }
     }
 }
@@ -487,6 +492,7 @@ impl ClockConfig {
             marquee_message: self.marquee_message,
             rain_amount: self.rain_amount,
             crow_water_tolerance: self.crow_water_tolerance,
+            lamps: self.lamps,
         }
     }
 }
@@ -531,7 +537,7 @@ pub struct ClockState {
     spider_visit: Option<spider::visit::SpiderVisit>,
     spider_accounting: spider::SpiderAccounting,
     crow_visit: Option<crow::CrowVisit>,
-    // The corner lamps' moods, on their own seeded stream.
+    // The corner lamps' minds, on their own seeded stream.
     lamps: lamps::Lamps,
     player_duck_sequence: u64,
     player_seed: u64,
@@ -895,6 +901,7 @@ impl ClockState {
             marquee_message: self.config.marquee_message,
             rain_amount: self.config.rain_amount,
             crow_water_tolerance: self.config.crow_water_tolerance,
+            lamps: self.config.lamps,
         }
     }
 
@@ -915,6 +922,7 @@ impl ClockState {
         self.config.marquee_message = settings.marquee_message;
         self.config.rain_amount = settings.rain_amount;
         self.config.crow_water_tolerance = settings.crow_water_tolerance;
+        self.config.lamps = settings.lamps;
         self.sync_event_schedule();
         if let Some(reading) = self.reading {
             self.apply_reading(reading, false);
@@ -1116,6 +1124,12 @@ impl ClockState {
     /// the face and one over the drain.
     pub fn default_arena_fixture(&self) -> Vec<arena_fixture::FixtureBall> {
         arena_fixture::ArenaFixture::default_balls(Layout::new(self.aspect_ratio()))
+    }
+
+    /// A ball on the floor `from` cells in from the view's left edge, rolling
+    /// at `speed` cells a second, to the right when it is positive.
+    pub fn rolling_arena_ball(&self, from: f32, speed: f32) -> arena_fixture::FixtureBall {
+        arena_fixture::ArenaFixture::rolling(Layout::new(self.aspect_ratio()), from, speed)
     }
 
     /// Admits an arena fixture with `balls`, a resident that keeps the arena
@@ -1346,17 +1360,20 @@ impl ClockState {
         }
     }
     pub fn lamps_state(&self) -> engine_common::ClockLampsState {
-        self.lamps.state(self.config.event_profile)
+        self.lamps.state()
     }
 
-    /// Starts a lamp mood now, whatever the profile, as an event preview
-    /// would. It gives way to an event or visit that starts meanwhile.
-    pub fn preview_lamp_mood(
+    /// Starts `activity` on a lamp now, for previews and captures: an
+    /// outage, unless the other lamp is out, a startle, a present of the
+    /// digits on its side, or rest. The others need a mover, and do nothing
+    /// here. Lively lamps carry the activity on; Steady ones calm it at the
+    /// next step, as they calm everything.
+    pub fn preview_lamp(
         &mut self,
-        kind: engine_common::ClockLampMood,
+        activity: engine_common::ClockLampActivity,
         lamp: engine_common::ClockLampSide,
     ) {
-        self.lamps.preview(kind, lamp);
+        self.lamps.preview(activity, lamp);
     }
 
     pub fn crow_state(&self) -> Option<engine_common::ClockCrowState> {
@@ -1934,12 +1951,10 @@ impl ClockState {
             view,
             facts,
         );
-        let scene = lamps::Scene {
-            profile: self.config.event_profile,
-            quiet: self.lamps_quiet(),
-            next_event_in: self.lamps_gap(),
-        };
-        self.lamps.step(scene);
+        self.lamps.step(
+            Self::lamp_stage(&layout),
+            self.config.lamps == ClockLampMode::Lively,
+        );
     }
 
     /// Every physics world the scene simulates in: the arena's, where the
@@ -1972,37 +1987,15 @@ impl ClockState {
         (view, facts)
     }
 
-    /// Ticks until whatever would next cut a lamp's mood short: the
-    /// schedule's next event, or the next minute's change when a
-    /// time-change event would start with it. A reading's second only says
-    /// how many whole seconds are left, so count one fewer.
-    fn lamps_gap(&self) -> Option<u64> {
-        let scheduled = self
-            .schedule
-            .next_event_tick
-            .map(|at| at.saturating_sub(self.schedule.tick));
-        let minute = self
-            .schedule
-            .time_change_event()
-            .and(self.reading)
-            .map(|reading| u64::from(59 - reading.second().min(59)) * u64::from(FIXED_HZ));
-        match (scheduled, minute) {
-            (Some(scheduled), Some(minute)) => Some(scheduled.min(minute)),
-            (scheduled, minute) => scheduled.or(minute),
+    /// Where the lamps hang and what they light.
+    fn lamp_stage(layout: &Layout) -> lamps::Stage {
+        lamps::Stage {
+            heads: [lamps::head(0, layout), lamps::head(1, layout)],
+            min: engine_core::Vec2::new(layout.bounds_min.x, layout.bounds_min.y),
+            max: engine_core::Vec2::new(layout.bounds_max.x, layout.bounds_max.y),
+            pitch: layout.pitch,
+            face_origin: engine_core::Vec2::new(layout.face_origin.x, layout.face_origin.y),
         }
-    }
-
-    /// Whether a lamp may have a mood: the clock has a reading and nothing
-    /// else is going on, not even an event's cooldown or a notice.
-    fn lamps_quiet(&self) -> bool {
-        self.reading.is_some()
-            && self.active_event.is_none()
-            && self.schedule.lifecycle == EventLifecycle::Idle
-            && self.duck_visit.is_none()
-            && self.crow_visit.is_none()
-            && self.spider.is_none()
-            && self.event_notice.is_none()
-            && self.ceiling.phase == ceiling::Phase::Closed
     }
 
     fn update_crow(&mut self, advance: bool) {

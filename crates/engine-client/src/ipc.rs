@@ -1648,6 +1648,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             } else {
                 "Off".into()
             },
+            clock_lamps: window.get_launcher_clock_lamps().to_string(),
             clock_explosion_enabled: window.get_launcher_clock_explosion_enabled(),
             clock_aquarium_enabled: window.get_launcher_clock_aquarium_enabled(),
             clock_marquee_enabled: window.get_launcher_clock_marquee_enabled(),
