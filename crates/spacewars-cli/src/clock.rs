@@ -2,7 +2,7 @@ use super::{CliError, control_error, human_error, parse_timeout};
 use clap::Subcommand;
 use engine_common::{
     ClockArenaOwner, ClockArenaState, ClockArenaUnavailable, ClockDigitSurfaceState,
-    ClockSurfaceChangeKind, ClockSurfaceRetirement,
+    ClockLampPercepts, ClockSurfaceChangeKind, ClockSurfaceRetirement,
 };
 use spacewars_control::{
     ClockEventKind, ClockMarqueeMessage, ClockMessageRequest, ClockState, ClockStatePredicate,
@@ -338,6 +338,7 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 "Lamps: {mood}; flickers={} outages={} spotlights={}{due}",
                 lamps.flickers, lamps.outages, lamps.spotlights
             );
+            println!("{}", perceived_line(&lamps.perceived));
         }
         if let Some(crow) = &state.crow {
             println!(
@@ -697,6 +698,56 @@ fn print_arena(arena: &ClockArenaState) {
     }
 }
 
+/// What the lamps perceive this tick, on one line: how many bodies they
+/// looked at, the most salient mover, the strongest impact and what changed.
+/// A body is `world:entity/role`, its world 0 for the arena and 1 for an
+/// event's own.
+/// Positions and sizes are in thousandths of a view unit, and velocities in
+/// thousandths of one a second.
+fn perceived_line(seen: &ClockLampPercepts) -> String {
+    let mut line = format!(
+        "Lamps perceive: bodies={} movers={} impacts={}",
+        seen.bodies_visited,
+        seen.movers.len(),
+        seen.impacts.len()
+    );
+    if let Some(mover) = seen.movers.first() {
+        line += &format!(
+            "; top mover {}:{}/{} position={:?} velocity={:?} size={} age={} salience={}",
+            mover.world,
+            mover.entity,
+            mover.role,
+            mover.position_milli,
+            mover.velocity_milli,
+            mover.size_milli,
+            mover.age_ticks,
+            mover.salience_milli
+        );
+    }
+    if let Some(impact) = seen.impacts.first() {
+        line += &format!(
+            "; top impact {}:{}/{} position={:?} strength={}",
+            impact.world, impact.entity, impact.role, impact.position_milli, impact.strength_milli
+        );
+    }
+    if let Some(event) = seen.event.filter(|_| seen.event_began) {
+        line += &format!("; {} began", event.as_str());
+    }
+    if let Some(event) = seen.event_ended {
+        line += &format!("; {} ended", event.as_str());
+    }
+    if !seen.changed_digits.is_empty() {
+        line += &format!("; digits changed={:?}", seen.changed_digits);
+    }
+    if seen.ceiling_open {
+        line += "; ceiling open";
+    }
+    if let Some(day) = seen.time_of_day_milli {
+        line += &format!("; day={day}/1000");
+    }
+    line
+}
+
 fn print_digit_surfaces(surfaces: &ClockDigitSurfaceState) {
     let accounting = surfaces.accounting;
     let sources: Vec<_> = surfaces
@@ -798,6 +849,55 @@ mod tests {
     use super::*;
     use crate::{Args, Command};
     use clap::Parser;
+    use engine_common::{ClockLampImpact, ClockLampMover};
+
+    #[test]
+    fn the_perceive_line_names_the_top_mover_and_impact_and_what_changed() {
+        let mut seen = ClockLampPercepts {
+            bodies_visited: 3,
+            ..ClockLampPercepts::default()
+        };
+        assert_eq!(
+            perceived_line(&seen),
+            "Lamps perceive: bodies=3 movers=0 impacts=0"
+        );
+        seen.movers = vec![
+            ClockLampMover {
+                world: 1,
+                entity: 7,
+                role: 0,
+                position_milli: [-1500, 250],
+                velocity_milli: [4000, -10],
+                size_milli: 120,
+                age_ticks: 30,
+                salience_milli: 2600,
+            };
+            2
+        ];
+        seen.impacts = vec![ClockLampImpact {
+            world: 0,
+            entity: 9,
+            role: 1,
+            position_milli: [300, -2000],
+            strength_milli: 7500,
+        }];
+        seen.event = Some(ClockEventKind::Rain);
+        seen.event_began = true;
+        seen.changed_digits = vec![2, 3];
+        seen.ceiling_open = true;
+        seen.time_of_day_milli = Some(527);
+        assert_eq!(
+            perceived_line(&seen),
+            "Lamps perceive: bodies=3 movers=2 impacts=1; top mover 1:7/0 \
+             position=[-1500, 250] velocity=[4000, -10] size=120 age=30 salience=2600; \
+             top impact 0:9/1 position=[300, -2000] strength=7500; rain began; \
+             digits changed=[2, 3]; ceiling open; day=527/1000"
+        );
+        // An event under way that did not begin this tick goes unsaid.
+        seen.event_began = false;
+        seen.event_ended = Some(ClockEventKind::Duck);
+        assert!(perceived_line(&seen).contains("; duck ended; digits"));
+    }
 
     #[test]
     fn every_catalog_event_is_a_valid_cli_trigger_and_sliding_is_a_known_phase() {

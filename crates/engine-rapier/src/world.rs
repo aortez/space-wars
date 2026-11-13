@@ -482,6 +482,17 @@ pub struct ContactPoint {
     pub normal: Vec2,
 }
 
+/// What a body's contacts did to it in a step.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ContactPush {
+    /// The change their impulses, normal and friction, made to the body's
+    /// velocity.
+    pub velocity_change: Vec2,
+    /// Where the contact that pushed hardest touches the body, its normal
+    /// pointing from the body toward what it touches.
+    pub strongest: ContactPoint,
+}
+
 /// A live solver contact on another body, viewed from the querying collider.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SurfaceContact {
@@ -2055,6 +2066,58 @@ impl PhysicsWorld {
             }
         }
         points
+    }
+
+    /// What a dynamic body's contacts did to it in the last step: the change
+    /// their impulses, normal and friction, summed over the solver's
+    /// substeps, made to its velocity, and the contact that pushed hardest.
+    /// None for a body that is not dynamic, asleep, not in the world or not
+    /// pushed. Reads the narrow phase alone, so it works whether or not the
+    /// world collects contact events. A new contact reads exactly what it
+    /// gave. A lasting one also counts what its last substep gave in the step
+    /// before, as ordinary steps report it (see
+    /// `vendor/rapier2d/SPACEWARS_PATCH.md`).
+    pub fn body_contact_push(&self, id: BodyId) -> Option<ContactPush> {
+        let body = self
+            .body_handle(id)
+            .and_then(|handle| self.raw.bodies.get(handle))?;
+        if !body.is_dynamic() || body.is_sleeping() || body.mass() <= 0.0 {
+            return None;
+        }
+        let mut impulse = Vec2::ZERO;
+        let mut strongest: Option<(f32, ContactPoint)> = None;
+        for &handle in body.colliders() {
+            for pair in self.raw.contact_pairs_with(handle) {
+                let direction = if pair.collider1 == handle { 1.0 } else { -1.0 };
+                for manifold in &pair.manifolds {
+                    let normal = from_rapier(manifold.data.normal) * direction;
+                    // The solver pushes the body away from what it touches,
+                    // and drags it along the surface a quarter turn from that.
+                    let along = Vec2::new(normal.y, -normal.x);
+                    for solver in &manifold.data.solver_contacts {
+                        let Some(point) = manifold.points.get(solver.contact_id[0] as usize) else {
+                            continue;
+                        };
+                        let push =
+                            -normal * point.data.impulse + along * point.data.tangent_impulse.x;
+                        let pushed = push.length();
+                        if pushed == 0.0 {
+                            continue;
+                        }
+                        impulse += push;
+                        if strongest.is_none_or(|(most, _)| pushed > most) {
+                            let position = from_rapier(solver.point);
+                            strongest = Some((pushed, ContactPoint { position, normal }));
+                        }
+                    }
+                }
+            }
+        }
+        let (_, strongest) = strongest?;
+        Some(ContactPush {
+            velocity_change: impulse * (1.0 / body.mass()),
+            strongest,
+        })
     }
 
     /// Allocation-free, local contact traversal; no scan of the world's bodies

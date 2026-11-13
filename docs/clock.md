@@ -277,6 +277,100 @@ lamp; and an event under a spotlight taking the scene back. The tests in
 with full light as #621 drew it; the amber glass at rest; and the hot core
 fading in above rest.
 
+#### What the lamps perceive (#630)
+
+Each tick, before they step, the lamps look at the scene. Nothing acts on
+what they see yet; the lamps' brain (#631) will choose what to light from it.
+Their perception names no event, visitor or resident, so whatever is a body
+is seen, including things added later. The lamps share one perception: what
+one lamp would see differs from the others' only by where it stands, which
+the brain can weigh from each lamp's position. They perceive:
+
+- **Movers.** The six most salient bodies moving at a cell a second or more
+  with any part in view. Salience is a body's speed in cells a second times
+  its size in cells (half the longer side of its solid bounds), twice that as
+  it starts moving, 37% more two seconds on, and fading from there. A pause
+  of under five seconds is part of moving; a body still or slow for five
+  seconds is new again when it next moves.
+- **Impacts.** The four strongest knocks in view. A knock is a body whose
+  contacts changed its velocity by six cells a second or more in one step:
+  the change in its velocity beyond gravity along the push of its contacts'
+  impulses, normal and friction, and no more than that push. That counts the
+  body struck as well as the one that strikes. It leaves out a body slowed
+  without a blow, as by a script, and one its contacts only hold against
+  some other pull, which hardly moves. Kinematic and fixed bodies move as
+  they are told, so they are never knocked, though what they strike is. The
+  contact that pushed hardest places the impact.
+- **Signals.** The event under way and the ticks it began and ended, an
+  event started over another of its kind counting as a new one; the slots
+  whose digit changed, and every slot showing a digit when the font changes;
+  whether the ceiling is open; and the time of day from the reading. The
+  slots follow the reading, not the cells: during Falling a new minute flags
+  its slots while their cells lie on the floor.
+
+The lamps look at the arena's world, which holds the visits and residents,
+and at an event's own world while the event simulates apart from the arena:
+Falling's, Exploding digits' and Coins' before a player joins, Meltdown's
+water lab, and Rain's floats while its duck is in the water. A body is known
+by its world's place in that list and by its id, since two worlds may use the
+same ids. When a player joins, the arena adopts the event's world, and the
+lamps take its bodies for new ones. The crow and the magpie are not bodies
+yet (#633), and neither are Aquarium's fish, the water, Tanks' shells, which
+the duel casts as rays, or Meltdown's melting cells unless a duck's visit
+shares the arena, so the lamps do not see them.
+
+Perception only reads. #630 proposed sensor colliders and contact events.
+Reading the worlds instead adds nothing to them, applies no forces and claims
+nothing, so the scene runs the same whether the lamps look or not, and the
+arena need not collect contact events. `PhysicsWorld::body_contact_push`
+reads what a body's contacts did in the last step from the narrow phase: the
+change their impulses made to its velocity, and the contact that pushed
+hardest. A lasting contact also counts what its last substep gave in the step
+before, as rapier reports it; for a body resting under its weight that is a
+quarter more than the weight, far below a knock. Normal impulses alone are
+not enough: in a heap of Tanks' dirt, friction carries much of each grain's
+load, and without it the grains at the bottom read as knocked tick after
+tick.
+
+A look visits at most 512 bodies across the worlds; the arena holds at most
+255, or 335 under Tanks. On the development workstation (`--profile ci`), the
+ignored test `what_a_look_costs` timed a look at 512 moving bodies, all in
+view, at about 52 µs. In events the 99th percentile was about 10 µs for
+Tanks, with up to 92 bodies, 8 µs for Exploding digits and for Coins, and
+4 µs for Falling. Over ten minutes of Demo at seed 42 the lamps saw at most
+76 bodies, movers on 22% of ticks, and 314 impacts.
+
+**Diagnostics.** The `lamps` block of `clock state --json` carries what the
+lamps perceive in `perceived`: `movers`, each with `world` (0 for the arena,
+1 for an event's own), `entity`, `role`, `position_milli` and
+`velocity_milli` (thousandths of a view unit, and of one a second),
+`size_milli`, `age_ticks` and `salience_milli`; `impacts`, each with `world`,
+`entity`, `role`, `position_milli` and `strength_milli` (thousandths of a
+cell a second); and `event`, `event_began`, `event_ended`,
+`changed_digits`, `ceiling_open`, `time_of_day_milli` (thousandths of the
+day, truncated) and `bodies_visited`. `spacewars-cli clock state` prints a
+`Lamps perceive:` line with the counts, the top mover and impact as
+`world:entity/role`, and what changed.
+
+The tests in `lamps::perception` cover a fixture ball no lamp code names,
+perceived where it is and as it moves, as the diagnostics show it; the most
+salient movers first, a newcomer outranking movers long watched though it
+shares an id with one in another world, a crowd costing the bound, and
+bodies out of view beside or above it left out; salience by speed, size and
+novelty; a mover's age through a pause and after it stops; a dropped ball's
+landing, placed where it meets the floor, with the floor's push as its
+strength; a light ball struck at rest by a heavy one, which hardly slows; a
+kinematic paddle knocking a ball and taking no knock itself; the four
+strongest of six landings, and none out of view; no knock for a body a
+script stops, in the air or rolling on the floor; no knock for a ball held on
+the floor against a pull, and only the floor's blow for a ball a script
+throws as it lands; the signals, among them a font change beside a blank
+slot and an event started over one of its kind; and six minutes of Demo with
+the lamps blind giving the same events, visits and arena accounting every
+tick and the same frame every second. An engine-rapier test pins
+`body_contact_push`: a landing, a resting weight, a sliding box's friction,
+and nothing for a fixed, sleeping or unknown body.
+
 ## Clock fonts
 
 Open **Fonts** from Clock settings or the live Clock controls. The picker has

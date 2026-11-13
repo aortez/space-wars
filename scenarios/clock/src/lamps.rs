@@ -6,6 +6,8 @@
 //! an event. A mood starts only in a gap long enough to hold it before the next
 //! scheduled event, and it gives way within half a second to anything that
 //! starts anyway: an event, a visit, a notice or a profile switched to Off.
+//! Each tick the lamps also perceive the scene: the bodies moving in view,
+//! the knocks bodies take and what changed (see `perception`).
 
 use engine_common::{
     ClockEventProfile, ClockLampMood, ClockLampMoodState, ClockLampSide, ClockLampsState,
@@ -14,6 +16,9 @@ use engine_core::Vec2;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use crate::{FIXED_HZ, layout::DIGIT_ORIGINS};
+
+mod perception;
+pub(crate) use perception::{Facts, View};
 
 /// Quiet seconds between moods, by profile. Off keeps the lamps steady.
 const CALM_WAIT_SECONDS: [u32; 2] = [45, 120];
@@ -285,6 +290,7 @@ pub(crate) struct Lamps {
     pending: Option<Mood>,
     mood: Option<Mood>,
     started: [u32; ClockLampMood::ALL.len()],
+    perception: perception::Perception,
 }
 
 impl Lamps {
@@ -298,6 +304,7 @@ impl Lamps {
             pending: None,
             mood: None,
             started: [0; ClockLampMood::ALL.len()],
+            perception: perception::Perception::default(),
         }
     }
 
@@ -380,6 +387,18 @@ impl Lamps {
         self.mood = Some(mood);
     }
 
+    /// Looks at the bodies of the scene's physics worlds inside `view`, and
+    /// at the scene, before the lamps step. Each world keeps its place in
+    /// `worlds`, empty while it is gone.
+    pub fn perceive(
+        &mut self,
+        worlds: &[Option<&engine_rapier::world::PhysicsWorld>],
+        view: View,
+        facts: Facts,
+    ) {
+        self.perception.perceive(worlds, view, facts);
+    }
+
     pub fn state(&self, profile: ClockEventProfile) -> ClockLampsState {
         ClockLampsState {
             mood: self.mood.as_ref().map(|mood| ClockLampMoodState {
@@ -403,6 +422,7 @@ impl Lamps {
                 .then(|| wait_ticks(profile, self.wait))
                 .flatten()
                 .map(|due| due.saturating_sub(self.quiet)),
+            perceived: self.perception.percepts().state(),
         }
     }
 }
