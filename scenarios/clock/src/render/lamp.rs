@@ -1,13 +1,12 @@
-//! The two corner lamps: a small brass head where the rails meet, a warm
-//! bulb, the glow it spreads around its corner and the softer light it
-//! throws down into the room. At rest a lamp gives 40% of its full light,
-//! its bulb an amber glow without the hot core. A mood dims or darkens all
-//! of these, or gathers the thrown light into a spotlight's beam, which lays
-//! a pool of light on the face and brightens the cells inside it, lit or
-//! not.
+//! The two corner lamps: a small brass head where the rails meet, a warm bulb,
+//! the glow it spreads around its corner and the softer light it throws down
+//! into the room. A lamp rests at `REST_BRIGHTNESS` of its full light, its bulb
+//! an amber glow without the hot core. A mood dims or darkens all of these, or
+//! gathers the thrown light into a spotlight's beam, which lays a pool of light
+//! on the face and brightens the cells inside it, lit or not.
 
 use super::*;
-use crate::lamps::{Look, REST};
+use crate::lamps::{Look, REST_BRIGHTNESS};
 use crate::presentation::Bounds;
 use std::f32::consts::{FRAC_PI_2, PI};
 
@@ -87,7 +86,8 @@ impl Light {
             spread: mix(OPEN_SPREAD, (radius * 0.85 / distance).atan()),
             reach: mix(CAMERA_HEIGHT * THROW_REACH, distance + radius * 0.2),
             beam: brightness * narrow,
-            // The light drawn into the beam leaves the corner dimmer.
+            // The beam draws on the glow around the corner, which rises
+            // less than the bulb as the beam narrows.
             halo: brightness * (1.0 - 0.6 * narrow),
             pool: (narrow > 0.0).then_some(Pool {
                 center: target,
@@ -393,7 +393,7 @@ fn head(frame: &mut RenderFrame, light: &Light, layout: Layout) {
         )),
     );
     // The hot core shows only above rest, and fully at full light.
-    let core = ((light.brightness - REST) / (1.0 - REST)).min(1.0);
+    let core = ((light.brightness - REST_BRIGHTNESS) / (1.0 - REST_BRIGHTNESS)).min(1.0);
     if core > 0.0 {
         frame.push_primitive(
             LAMP_LAYER,
@@ -413,10 +413,14 @@ fn glass(brightness: f32) -> RenderColor {
     const AMBER: [f32; 3] = [0.86, 0.50, 0.20];
     const WARM: [f32; 3] = [1.0, 0.80, 0.46];
     let brightness = brightness.clamp(0.0, 1.0);
-    let (from, to, t) = if brightness < REST {
-        (DARK, AMBER, brightness / REST)
+    let (from, to, t) = if brightness < REST_BRIGHTNESS {
+        (DARK, AMBER, brightness / REST_BRIGHTNESS)
     } else {
-        (AMBER, WARM, (brightness - REST) / (1.0 - REST))
+        (
+            AMBER,
+            WARM,
+            (brightness - REST_BRIGHTNESS) / (1.0 - REST_BRIGHTNESS),
+        )
     };
     let channel = |i: usize| from[i] * (1.0 - t) + to[i] * t;
     RenderColor::rgb(channel(0), channel(1), channel(2))

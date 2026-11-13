@@ -187,10 +187,10 @@ outages dim it from rest; a spotlight brightens it past full:
   digits, holds and widens back out, seven seconds in all. The beam lays a
   pool of warm light on the wall behind the face; the cells inside the pool
   brighten toward warm white, and the dark guides of unlit cells show in it.
-  As the beam narrows, the bulb brightens from rest to a little past full and
-  its hot core shows. Most of the extra light goes into the beam, so the
-  corner's glow rises only a little: 15% above rest while the light is in the
-  beam, and a third above rest at most as the beam narrows and widens.
+  As the beam narrows, the bulb brightens from rest to a little past full: its
+  hot core fades in and its bloom nearly triples. The glow around the corner
+  rises less, since the beam draws on it: 15% above rest while the beam holds,
+  and 36% at most as it narrows and widens.
 
 | Steady | Spotlight on the nearest digit |
 | --- | --- |
@@ -235,25 +235,26 @@ and the thrown light sit behind the cells, like the ceiling's sunlight. The
 light on the cells is a warm copy of each lit cell, label or dark guide whose
 center is in the pool, on a layer of its own above the cells and labels and
 below visitors. It reads whatever the scene drew, so it follows any face. The
-resting lamps are 50 primitives, 22 more than the lamps before #621 (563 for
+resting lamps are 50 primitives, 22 more than the lamps before #621 (564 for
 the whole 23:58 face with the date at 800×480), and a spotlight added at most
 31 more at 800×480, 1024×768 and 480×800.
 
 **Diagnostics.** `clock state --json` carries a `lamps` block: the mood under
-way (`kind`, `lamp`, `tick` of `ticks`, the bulb's `brightness_milli`, 400 at
-rest and 1000 at full, and whether it is `yielding`), how many `flickers`,
-`outages` and `spotlights` the run has had, and `due_in_quiet_ticks`, the quiet
-ticks the next mood waits for: 0 once it is due and waiting for a gap, `null`
-during a mood and under Off. `spacewars-cli clock state` prints it on one line.
-Fixtures and captures start a mood with `ClockState::preview_lamp_mood`, which
-runs whatever the profile, as an event preview does. There is no menu control
-for the lamps yet.
+way (`kind`, `lamp`, `tick` of `ticks`, the bulb's `brightness_milli` in
+thousandths of full light, 400 at rest and up to 1150 in a spotlight, and
+whether it is `yielding`), how many `flickers`, `outages` and `spotlights` the
+run has had, and `due_in_quiet_ticks`, the quiet ticks the next mood waits
+for: 0 once it is due and waiting for a gap, `null` during a mood and under
+Off. `spacewars-cli clock state` prints it on one line. Fixtures and captures
+start a mood with `ClockState::preview_lamp_mood`, which runs whatever the
+profile, as an event preview does. There is no menu control for the lamps
+yet.
 
-The capture test draws the steady lamps, a spotlight at rest and partway
-through its sweep, and an outage with sparks through the production raster and
-vector adapters at 800×480, 1024×768 and 480×800. It checks that each mood ends on
-exactly the steady face, and, given a directory, writes the stills and every
-second frame of the 800×480 film:
+The capture test draws the steady lamps, a spotlight resting on the nearest
+digit and partway through its sweep, and an outage with sparks through the
+production raster and vector adapters at 800×480, 1024×768 and 480×800. It
+checks that each mood ends on exactly the steady face, and, given a directory,
+writes the stills and every second frame of the 800×480 film:
 
 ```sh
 SPACEWARS_LAMPS_ARTIFACTS=/tmp/clock-lamps \
@@ -272,8 +273,9 @@ moves on every second; steady lamps drawing the same frame for ten seconds,
 and an outage darkening only its lamp; the spotlight's light copying the cells
 it lands on, staying in view at three aspect ratios and sweeping away from its
 lamp; and an event under a spotlight taking the scene back. The tests in
-`render::lamp` pin a resting lamp's light at 40% of its full light, with full
-light as #621 drew it, and show the hot core only above rest.
+`render::lamp` pin the light a steady scene's lamps give off at 40% of full,
+with full light as #621 drew it; the amber glass at rest; and the hot core
+fading in above rest.
 
 ## Clock fonts
 

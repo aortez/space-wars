@@ -1,9 +1,9 @@
-//! The two lamps in the upper corners of the frame, and their moods. At rest a
-//! lamp gives 40% of its full light. Now and then, while the scene is quiet,
-//! one lamp flickers, goes out for a few seconds, or narrows its light into a
-//! spotlight that sweeps across the reading. The lamps draw from a seeded
-//! stream of their own, never the event schedule's, so they never move an
-//! event. A mood starts only in a gap long enough to hold it before the next
+//! The two lamps in the upper corners of the frame, and their moods. A lamp
+//! rests at `REST_BRIGHTNESS` of its full light. Now and then, while the scene
+//! is quiet, one lamp flickers, goes out for a few seconds, or narrows its
+//! light into a spotlight that sweeps across the reading. The lamps draw from a
+//! seeded stream of their own, never the event schedule's, so they never move
+//! an event. A mood starts only in a gap long enough to hold it before the next
 //! scheduled event, and it gives way within half a second to anything that
 //! starts anyway: an event, a visit, a notice or a profile switched to Off.
 
@@ -32,9 +32,10 @@ const SPOT_HOLD: u32 = 60;
 const SPOT_WIDEN: u32 = 84;
 pub(crate) const SPOTLIGHT_TICKS: u32 =
     SPOT_NARROW + SPOT_REST + SPOT_SWEEP + SPOT_HOLD + SPOT_WIDEN;
-/// At rest a lamp gives this fraction of its full light (#629). Flickers and
-/// outages dim it from here, and a spotlight brightens it past full.
-pub(crate) const REST: f32 = 0.4;
+/// At rest a lamp gives this fraction of its full light. Flickers and outages
+/// dim it from here, and a spotlight brightens it past full. The plant-light
+/// calibration (#634) may tune it.
+pub(crate) const REST_BRIGHTNESS: f32 = 0.4;
 /// A spotlight at its narrowest runs a little past full.
 const SPOT_PEAK: f32 = 1.15;
 /// A bulb coming back from an outage warms up from this fraction of its
@@ -46,7 +47,7 @@ pub(crate) const SPARK_TICKS: u32 = 24;
 /// How a lamp looks this tick.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Look {
-    /// The bulb's brightness: 1 is full, `REST` is steady and 0 is out.
+    /// The bulb's brightness: 1 is full, `REST_BRIGHTNESS` is steady and 0 is out.
     pub brightness: f32,
     /// 0 is the lamp's steady wash of light, 1 a full spotlight.
     pub narrow: f32,
@@ -57,7 +58,7 @@ pub(crate) struct Look {
 
 impl Look {
     pub const STEADY: Self = Self {
-        brightness: REST,
+        brightness: REST_BRIGHTNESS,
         narrow: 0.0,
         target: Vec2::ZERO,
     };
@@ -186,13 +187,13 @@ impl Mood {
                 let (narrow, target) = self.beam(tick);
                 Look {
                     // From rest to past full as the beam narrows.
-                    brightness: REST * (1.0 - narrow) + SPOT_PEAK * narrow,
+                    brightness: REST_BRIGHTNESS * (1.0 - narrow) + SPOT_PEAK * narrow,
                     narrow,
                     target,
                 }
             }
             ClockLampMood::Flicker | ClockLampMood::Outage => Look {
-                brightness: REST * self.level(tick),
+                brightness: REST_BRIGHTNESS * self.level(tick),
                 ..Look::STEADY
             },
         }
@@ -250,16 +251,17 @@ impl Mood {
 /// catches once before it warms up, as an outage's does.
 fn giving_way(from: Look, t: f32) -> Look {
     let t = t.clamp(0.0, 1.0);
-    let brightness = if from.brightness < 0.5 * REST {
-        REST * if t < 0.25 {
+    let brightness = if from.brightness < 0.5 * REST_BRIGHTNESS {
+        let level = if t < 0.25 {
             0.75
         } else if t < 0.4 {
             0.15
         } else {
             WARM_UP_FROM + (1.0 - WARM_UP_FROM) * (t - 0.4) / 0.6
-        }
+        };
+        REST_BRIGHTNESS * level
     } else {
-        from.brightness + (REST - from.brightness) * ease(t)
+        from.brightness + (REST_BRIGHTNESS - from.brightness) * ease(t)
     };
     Look {
         brightness,
