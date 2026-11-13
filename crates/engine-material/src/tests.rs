@@ -1595,3 +1595,37 @@ fn bending_and_axial_work_stay_separate_with_measured_or_inferred_motion() {
         }
     }
 }
+
+#[test]
+fn splits_never_hold_more_than_the_whole_and_keep_its_integrity() {
+    // Before the larger part took the remainder, four in ten of these splits
+    // gained up to 1.4e-7 of capacity from rounded part volumes.
+    let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+    let mut unit = || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        (state >> 40) as f32 / (1_u64 << 24) as f32
+    };
+    let materials = [ARMOR, HULL, SHELL, WOOD, SOFT_TISSUE, ROCK];
+    let mut exact = 0;
+    for i in 0..20_000 {
+        let material = materials[i % materials.len()];
+        let volume = 0.01 + 100.0 * unit();
+        let fraction = 0.001 + 0.998 * unit();
+        let capacity = Region::new(material, volume).unwrap().capacity();
+        let share = if i % 10 == 0 { 1.0 } else { f64::from(unit()) };
+        let whole = Region::with_remaining(material, volume, f64::from(capacity) * share).unwrap();
+        let (part, rest) = whole.split(fraction).unwrap();
+        let held = part.remaining_precise() + rest.remaining_precise();
+        assert!(held <= whole.remaining_precise(), "{i}: {held} > {whole:?}");
+        let ulp = f64::from(f32::EPSILON) * f64::from(capacity);
+        assert!(whole.remaining_precise() - held <= 2.0 * ulp, "{i}");
+        let integrity = |r: &Region| r.remaining_precise() / f64::from(r.capacity());
+        for piece in [&part, &rest] {
+            assert!((integrity(piece) - integrity(&whole)).abs() <= 4.0 * f64::from(f32::EPSILON));
+        }
+        exact += usize::from(held == whole.remaining_precise());
+    }
+    assert!(exact > 17_000, "{exact}");
+}

@@ -269,7 +269,8 @@ these non-impact records.
 `Region::new` starts at full capacity; `with_remaining` restores bounded saved
 state. `absorb` is the only lowering operation. `repair` requires explicit host
 authorization. `split` partitions volume, capacity and existing damage at the
-same integrity. Normalized health remains `100 * remaining / capacity`.
+same integrity, and the parts never hold more than the whole. Normalized health
+remains `100 * remaining / capacity`.
 
 Remaining capacity is accumulated in `f64`, including repair and split
 calculations, so small per-tick charges survive subtraction from large balances.
@@ -338,7 +339,8 @@ bodies' motion with a persistent failure observation. Its separate
 [paired-collapse API](material-support-failure.md#two-finite-material-layers)
 commits exhaustion of either finite layer, dissipates both elastic stores and
 preserves surviving capacity while both bodies coast. Other paths retain their
-current failure refusals.
+current failure refusals. The [region split](material-region-split.md) divides
+a registered region, or moves it to another body, with its damage.
 Transfer between older loading modes, general connection
 loads and broader geometry remain future work.
 

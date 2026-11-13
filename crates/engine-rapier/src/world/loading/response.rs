@@ -14,6 +14,7 @@ pub mod flat_arrival;
 mod geometry;
 pub mod gravity;
 pub mod line_arrival;
+pub mod split;
 use energy::EnergyCheck;
 use geometry::Footprint;
 
@@ -92,6 +93,17 @@ struct StoredRegion {
 }
 
 impl StoredRegion {
+    fn new(region: &Region, section: Section) -> Self {
+        let m = region.material();
+        Self {
+            parameters: [m.density, m.stiffness, m.strength, m.toughness, m.damping],
+            brittle: m.mode == engine_material::FailureMode::Brittle,
+            volume: region.volume(),
+            remaining: region.remaining_precise(),
+            thickness: section.thickness,
+            depth: section.depth,
+        }
+    }
     fn region(&self) -> Result<Region, engine_material::MaterialError> {
         let [density, stiffness, strength, toughness, damping] = self.parameters;
         Region::with_remaining(
@@ -687,18 +699,9 @@ impl PhysicsWorld {
         if response.materials.contains_key(&token) {
             return Err(LoadingError::MaterialExists);
         }
-        let m = region.material();
-        response.materials.insert(
-            token,
-            StoredRegion {
-                parameters: [m.density, m.stiffness, m.strength, m.toughness, m.damping],
-                brittle: m.mode == engine_material::FailureMode::Brittle,
-                volume: region.volume(),
-                remaining: region.remaining_precise(),
-                thickness: section.thickness,
-                depth: section.depth,
-            },
-        );
+        response
+            .materials
+            .insert(token, StoredRegion::new(&region, section));
         loading.invalidate_gravity(gravity::Invalidation::ExternalEdit);
         Ok(())
     }

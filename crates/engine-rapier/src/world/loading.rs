@@ -176,6 +176,8 @@ pub enum LoadingError {
     ResponseDisabled,
     MaterialExists,
     InvalidMaterial,
+    /// A contact episode involves the region, so it cannot be split or moved.
+    RegionInContact,
 }
 
 impl std::fmt::Display for LoadingError {
@@ -310,6 +312,33 @@ impl LoadingState {
         self.regions
             .get(&token.id)
             .is_some_and(|r| r.token == token)
+    }
+
+    /// The token a new region `id` would receive, for an edit that adds
+    /// `growth` regions in all. Nothing changes until [`Self::admit`].
+    fn next_token(&self, id: RegionId, growth: usize) -> Result<RegionToken, LoadingError> {
+        if self.regions.contains_key(&id) {
+            return Err(LoadingError::RegionExists);
+        }
+        if self.regions.len() + growth > self.config.max_regions {
+            return Err(LoadingError::Capacity);
+        }
+        if self.next_region.checked_add(1).is_none() {
+            return Err(LoadingError::IdentityExhausted);
+        }
+        Ok(RegionToken {
+            id,
+            incarnation: self.next_region,
+        })
+    }
+
+    fn admit(&mut self, token: RegionToken, body: BodyId) {
+        self.next_region = token.incarnation + 1;
+        self.regions.insert(token.id, RegionEntry { token, body });
+    }
+
+    fn in_contact(&self, token: RegionToken) -> bool {
+        self.episodes.keys().flatten().any(|s| s.region == token)
     }
 
     fn retire(&mut self, token: RegionToken) -> bool {
@@ -703,22 +732,8 @@ impl PhysicsWorld {
             return Err(LoadingError::UnknownBody);
         }
         let state = self.loading.as_mut().ok_or(LoadingError::Disabled)?;
-        if state.regions.contains_key(&id) {
-            return Err(LoadingError::RegionExists);
-        }
-        if state.regions.len() == state.config.max_regions {
-            return Err(LoadingError::Capacity);
-        }
-        let next = state
-            .next_region
-            .checked_add(1)
-            .ok_or(LoadingError::IdentityExhausted)?;
-        let token = RegionToken {
-            id,
-            incarnation: state.next_region,
-        };
-        state.next_region = next;
-        state.regions.insert(id, RegionEntry { token, body });
+        let token = state.next_token(id, 1)?;
+        state.admit(token, body);
         state.invalidate_gravity(response::gravity::Invalidation::ExternalEdit);
         Ok(token)
     }

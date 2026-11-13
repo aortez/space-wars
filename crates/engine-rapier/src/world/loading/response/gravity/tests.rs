@@ -426,6 +426,34 @@ fn gravity_state_edit_and_restore_never_rearms_the_history() {
 }
 
 #[test]
+fn region_splits_and_transfers_end_the_run_like_other_edits() {
+    for transfer in [false, true] {
+        let mut w = world();
+        enroll(&mut w, GravitySettling::Refuse);
+        let original = history(&w).clone();
+        let support = w.loading.as_ref().unwrap().bindings[&collider(2)].region;
+        let id = RegionId {
+            entity: body(2).entity,
+            part: 1,
+        };
+        if transfer {
+            w.transfer_loading_region(support, id, body(2)).unwrap();
+        } else {
+            let piece = split::RegionPiece {
+                id,
+                body: body(2),
+                fraction: 0.5,
+                section: Section::new(1.0, 0.5),
+                colliders: Vec::new(),
+            };
+            w.split_loading_region(support, Section::new(1.0, 0.5), &piece)
+                .unwrap();
+        }
+        invalidated(&w, &original, Invalidation::ExternalEdit);
+    }
+}
+
+#[test]
 fn gravity_state_noops_failures_and_queries_preserve_enrollment() {
     let mut w = world();
     enroll(&mut w, GravitySettling::Refuse);
