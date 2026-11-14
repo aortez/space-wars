@@ -25,7 +25,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Material Lab: impact, compression and rebound in slow motion. Starts paused. Up/down chooses a control; Space or gamepad bottom face activates. Run/Pause, Single step, Restart case and Next case control playback. Release load, Apply light load and Apply heavy load change the force without advancing time; then Run or Single step to observe the response. The Load, release & return case pauses after yielding and separation to guide these changes. Wood strikes wood and Wood meets armor are free two-body collisions: both bodies recoil, each material shows its own deformation, damage and capacity, one ledger accounts for the shared energy, and the load controls do not apply. Support gives way uses a smaller wood layer under a fixed load, pauses when it collapses, and resumes into free fall with the failure retained. Save pauses and replaces one persistent slot; Load restores paused, including load history. Saves survive restarting the application. Each run has a bounded observation window. Esc/Start opens host pause; R restarts the lab. Displacement is magnified 20x; displayed time and work are physical values.",
+    controls_help: "Material Lab: impact, compression and rebound in slow motion. Starts paused. Up/down chooses a control; Space or gamepad bottom face activates. Run/Pause, Single step, Restart case and Next case control playback. Release load, Apply light load and Apply heavy load change the force without advancing time; then Run or Single step to observe the response. The Load, release & return case pauses after yielding and separation to guide these changes. Wood strikes wood and Wood meets armor are free two-body collisions: both bodies recoil, each material shows its own deformation, damage and capacity, one ledger accounts for the shared energy, and the load controls do not apply. Support gives way uses a smaller wood layer under a fixed load, pauses when it collapses, and resumes into free fall with the failure retained. Wood pair gives way uses a smaller layer on body A, pauses when it fails, and resumes with both bodies coasting; body B retains its capacity and damage, and the shared ledger includes both elastic releases. Save pauses and replaces one persistent slot; Load restores paused, including load history. Saves survive restarting the application. Each run has a bounded observation window. Esc/Start opens host pause; R restarts the lab. Displacement is magnified 20x; displayed time and work are physical values.",
     create,
 };
 const COMMAND_KIND: u32 = 1;
@@ -166,7 +166,7 @@ impl ClientScenario for MaterialLabClientScenario {
     fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult {
         self.poll();
         let was_stopped = self.state.stopped.is_some();
-        let was_collapsed = self.state.failure().is_some();
+        let was_collapsed = self.state.collapsed();
         let mut acted = false;
         for action in actions {
             if let Action::Scenario {
@@ -191,8 +191,11 @@ impl ClientScenario for MaterialLabClientScenario {
         }
         if !was_stopped && let Some(reason) = &self.state.stopped {
             self.message = reason.clone();
-        } else if !was_collapsed && self.state.failure().is_some() {
-            self.message = "Support collapsed. Paused; Run continues the fall.".into();
+        } else if !was_collapsed
+            && self.state.collapsed()
+            && let Some(hint) = self.state.guidance()
+        {
+            self.message = hint.into();
         }
         StepResult::default()
     }

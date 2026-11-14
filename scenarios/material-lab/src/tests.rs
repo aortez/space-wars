@@ -1,4 +1,152 @@
 use super::*;
+
+#[test]
+fn paired_collapse_pauses_then_coasts_with_surviving_capacity_and_one_energy_ledger() {
+    let mut s = MaterialLabState::new(Case::PairFailure);
+    s.paused = false;
+    let start = s.pair().unwrap();
+    assert_eq!(start.bodies.each_ref().map(|b| b.capacity), [30.0, 1200.0]);
+    assert!(
+        start
+            .bodies
+            .iter()
+            .all(|b| b.remaining == b.capacity && !b.failed)
+    );
+    let mut boundary = None;
+    while s.stopped.is_none() {
+        s.advance();
+        // Drawing every state runs the collapse view without a display.
+        render::frame(&s);
+        let pair = s.pair().unwrap();
+        assert!((pair.accounted_energy() - pair.initial_energy).abs() < 1e-8);
+        assert!((pair.total(|b| b.momentum) - start.total(|b| b.momentum)).abs() < 1e-3);
+        if let Some(failure) = s.paired_failure() {
+            if boundary.is_none() {
+                assert!(s.paused && s.stopped.is_none());
+                assert_eq!(s.phase(), Phase::Collapsed);
+                assert_eq!(pair.bodies.each_ref().map(|b| b.failed), [true, false]);
+                assert_eq!(pair.bodies[0].remaining, 0.0);
+                assert_eq!(pair.bodies[0].damage_work, 30.0);
+                assert!(pair.bodies[1].remaining > 1100.0 && pair.bodies[1].damage_work > 0.0);
+                assert!(failure.layers.iter().all(|l| l.released_elastic > 0.0));
+                assert_eq!(pair.collapse_loss, failure.dissipated());
+                let bytes = s.snapshot_bytes().unwrap();
+                assert_eq!(&bytes[..8], PAIR_FAILURE_SAVE_MAGIC);
+                for load in [Load::Released, Load::Light, Load::Heavy] {
+                    assert!(s.set_load(load).is_err());
+                    assert_eq!(s.snapshot_bytes().unwrap(), bytes);
+                }
+                boundary = Some((s.steps, failure.clone(), pair.clone()));
+                s = restored(&s);
+                assert_eq!(s.paired_failure(), Some(failure.clone()));
+                s.paused = false;
+            }
+            let (_, first, bodies) = boundary.as_ref().unwrap();
+            assert_eq!(&failure, first);
+            assert_eq!(s.paused, s.stopped.is_some());
+            for i in 0..2 {
+                let (now, then) = (&pair.bodies[i], &bodies.bodies[i]);
+                assert_eq!(
+                    (
+                        now.velocity,
+                        now.permanent_set,
+                        now.damage_work,
+                        now.remaining,
+                        now.viscous_loss,
+                        now.deformation
+                    ),
+                    (
+                        then.velocity,
+                        then.permanent_set,
+                        then.damage_work,
+                        then.remaining,
+                        then.viscous_loss,
+                        then.deformation
+                    )
+                );
+                assert_eq!(now.elastic_energy, 0.0);
+            }
+        }
+    }
+    assert!(
+        s.stopped.as_ref().unwrap().starts_with("Run complete"),
+        "{}",
+        s.diagnostics()
+    );
+    let (step, failure, at_failure) = boundary.unwrap();
+    assert!(s.steps > step + 32);
+    assert_eq!((s.impacts, s.separations), (1, 0));
+    assert_eq!(
+        s.events
+            .iter()
+            .map(|e| e.label.as_str())
+            .collect::<Vec<_>>(),
+        ["Impact", "Support", "Contact ended", "Collapse"]
+    );
+    for i in 0..2 {
+        assert!(s.pair().unwrap().bodies[i].position > at_failure.bodies[i].position + 0.01);
+    }
+    assert_eq!(restored(&s).paired_failure(), Some(failure));
+}
+
+#[test]
+fn paired_collapse_saves_require_their_own_case_envelope_and_complete_history() {
+    let mut s = MaterialLabState::new(Case::PairFailure);
+    for steps in [0, 1, 75, 76, 192] {
+        for _ in s.steps..steps {
+            s.advance();
+        }
+        assert_eq!(s.steps, steps);
+        let bytes = s.snapshot_bytes().unwrap();
+        assert_eq!(&bytes[..8], PAIR_FAILURE_SAVE_MAGIC);
+        assert_eq!(restored(&s).pair(), s.pair());
+        for magic in [
+            SAVE_MAGIC,
+            LOAD_SAVE_MAGIC,
+            PAIR_SAVE_MAGIC,
+            FAILURE_SAVE_MAGIC,
+        ] {
+            let mut bad = bytes.clone();
+            bad[..8].copy_from_slice(magic);
+            assert!(MaterialLabState::from_snapshot_bytes(&bad).is_err());
+        }
+        let changes: &[fn(&mut Save)] = &[
+            |s| s.case = Case::WoodWood,
+            |s| s.steps += 1,
+            |s| s.impacts += 1,
+            |s| {
+                s.events.push(Event {
+                    time: 0.0,
+                    label: "Collapse".into(),
+                    episode: 1,
+                })
+            },
+            |s| s.stopped = Some("Run complete".into()),
+        ];
+        for change in changes {
+            let mut save: Save = codec().deserialize(&bytes[8..]).unwrap();
+            change(&mut save);
+            let mut bad = PAIR_FAILURE_SAVE_MAGIC.to_vec();
+            bad.extend(codec().serialize(&save).unwrap());
+            assert!(MaterialLabState::from_snapshot_bytes(&bad).is_err());
+        }
+    }
+    for case in [Case::WoodWood, Case::SupportFailure] {
+        let mut old = MaterialLabState::new(case);
+        old.advance();
+        let mut bytes = old.snapshot_bytes().unwrap();
+        bytes[..8].copy_from_slice(PAIR_FAILURE_SAVE_MAGIC);
+        assert!(MaterialLabState::from_snapshot_bytes(&bytes).is_err());
+    }
+    assert_eq!(
+        codec().serialize(&Case::SupportFailure).unwrap(),
+        7_u32.to_le_bytes()
+    );
+    assert_eq!(
+        codec().serialize(&Case::PairFailure).unwrap(),
+        8_u32.to_le_bytes()
+    );
+}
 #[test]
 fn collapsed_support_keeps_its_failure_and_damage_while_the_platen_falls() {
     let mut s = MaterialLabState::new(Case::SupportFailure);

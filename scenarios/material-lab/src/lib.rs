@@ -8,6 +8,7 @@ use engine_rapier::world::{
     loading::response::compression::CompressionRejection,
     loading::response::dynamic_compression::{
         CompressionFailure, DynamicCompressionSummary, MAX_DYNAMIC_COMPRESSION_LOAD_CHANGES,
+        PairedCompressionFailure,
     },
     loading::{EpisodeTransition, RegionToken},
 };
@@ -30,6 +31,7 @@ const SAVE_MAGIC: &[u8; 8] = b"MATLAB01";
 const LOAD_SAVE_MAGIC: &[u8; 8] = b"MATLAB02";
 const PAIR_SAVE_MAGIC: &[u8; 8] = b"MATLAB03";
 const FAILURE_SAVE_MAGIC: &[u8; 8] = b"MATLAB04";
+const PAIR_FAILURE_SAVE_MAGIC: &[u8; 8] = b"MATLAB05";
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Case {
@@ -43,17 +45,20 @@ pub enum Case {
     WoodWood,
     WoodArmor,
     SupportFailure,
+    PairFailure,
 }
 /// Initial condition of one free body along the +x contact normal.
 #[derive(Clone, Copy)]
 pub(crate) struct BodySetup {
     pub material: Material,
+    /// Represented material volume; body mass is specified independently.
+    pub volume: f32,
     pub mass: f32,
     pub position: f32,
     pub velocity: f32,
 }
 impl Case {
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::Elastic,
         Self::PlasticReturn,
         Self::Support,
@@ -62,6 +67,7 @@ impl Case {
         Self::WoodWood,
         Self::WoodArmor,
         Self::SupportFailure,
+        Self::PairFailure,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -73,6 +79,7 @@ impl Case {
             Self::WoodWood => "Wood strikes wood",
             Self::WoodArmor => "Wood meets armor",
             Self::SupportFailure => "Support gives way",
+            Self::PairFailure => "Wood pair gives way",
         }
     }
     /// The two free bodies of a paired collision, incoming body first. Both
@@ -80,6 +87,7 @@ impl Case {
     pub(crate) fn free_pair(self) -> Option<[BodySetup; 2]> {
         let body = |material, mass, position, velocity| BodySetup {
             material,
+            volume: 20.0,
             mass,
             position,
             velocity,
@@ -97,6 +105,13 @@ impl Case {
                 body(WOOD, 80.0, -0.5 - 1.0 / 32.0, 2.0),
                 body(ARMOR, 80.0, 0.5 + 1.0 / 32.0, -2.0),
             ]),
+            Self::PairFailure => Some([
+                BodySetup {
+                    volume: 0.5,
+                    ..body(WOOD, 20.0, -0.5 - 1.0 / 16.0, 6.0)
+                },
+                body(WOOD, 40.0, 0.5, 0.0),
+            ]),
             _ => None,
         }
     }
@@ -110,6 +125,7 @@ impl Case {
             Self::WoodWood => (0.0, 1.0 / 16.0, 352),
             Self::WoodArmor => (0.0, 1.0 / 16.0, 512),
             Self::SupportFailure => (8000.0, 1.0 / 64.0, 144),
+            Self::PairFailure => (0.0, 1.0 / 16.0, 192),
         }
     }
     pub fn next(self) -> Self {
@@ -218,12 +234,18 @@ impl MaterialLabState {
     pub fn capacity(&self) -> f64 {
         let region = self.case.free_pair().map_or_else(
             || scene::support_region(self.case),
-            |pair| scene::region(pair[1].material),
+            |pair| scene::pair_region(pair[1]),
         );
         f64::from(region.capacity())
     }
     pub fn failure(&self) -> Option<CompressionFailure> {
         self.world.material_compression_failure()
+    }
+    pub fn paired_failure(&self) -> Option<PairedCompressionFailure> {
+        self.world.material_paired_compression_failure()
+    }
+    pub fn collapsed(&self) -> bool {
+        self.failure().is_some() || self.paired_failure().is_some()
     }
     pub fn weight(&self) -> f32 {
         -self.world.gravity().y * 20.0
@@ -266,6 +288,13 @@ impl MaterialLabState {
         Ok(())
     }
     pub fn guidance(&self) -> Option<&'static str> {
+        if self.case == Case::PairFailure && self.stopped.is_none() {
+            return Some(if self.collapsed() {
+                "Wood A has failed. Run to watch both bodies coast."
+            } else {
+                "Run until wood A fails; the lab will pause."
+            });
+        }
         if self.case == Case::SupportFailure && self.stopped.is_none() {
             return Some(if self.failure().is_some() {
                 "Support has collapsed. Run to watch the platen fall."
@@ -291,7 +320,7 @@ impl MaterialLabState {
         )
     }
     pub fn phase(&self) -> Phase {
-        if self.failure().is_some() {
+        if self.collapsed() {
             return Phase::Collapsed;
         }
         let s = self.summary();
@@ -321,6 +350,8 @@ impl MaterialLabState {
         let at = self.summary().elapsed;
         let result = if self.case == Case::SupportFailure {
             self.world.step_material_collapsing_support(PHYSICS_DT)
+        } else if self.case == Case::PairFailure {
+            self.world.step_material_collapsing_pair(PHYSICS_DT)
         } else {
             self.world.step_material_dynamic_compression(PHYSICS_DT)
         };
@@ -400,7 +431,8 @@ impl MaterialLabState {
             "stopped": self.stopped, "weight": self.weight(),
             "gravity_impulse": self.gravity_impulse(), "load_changes": self.load_changes,
             "guidance": self.guidance(), "pair": self.pair(),
-            "capacity": self.capacity(), "failure": self.failure() })
+            "capacity": self.capacity(), "failure": self.failure(),
+            "paired_failure": self.paired_failure() })
     }
     pub fn snapshot_bytes(&self) -> Result<Vec<u8>, String> {
         let save = Save {
@@ -414,7 +446,9 @@ impl MaterialLabState {
         };
         // Fixed-load cases have no command list in their save envelope.
         let plain = self.load_changes.is_empty() && self.case != Case::LoadRelease;
-        let mut bytes = if self.case == Case::SupportFailure {
+        let mut bytes = if self.case == Case::PairFailure {
+            PAIR_FAILURE_SAVE_MAGIC
+        } else if self.case == Case::SupportFailure {
             FAILURE_SAVE_MAGIC
         } else if self.case.free_pair().is_some() {
             PAIR_SAVE_MAGIC
@@ -443,6 +477,7 @@ impl MaterialLabState {
         let (save, changes): (Save, Vec<LoadChange>) = if bytes.starts_with(SAVE_MAGIC)
             || bytes.starts_with(PAIR_SAVE_MAGIC)
             || bytes.starts_with(FAILURE_SAVE_MAGIC)
+            || bytes.starts_with(PAIR_FAILURE_SAVE_MAGIC)
         {
             let save: Save = codec()
                 .deserialize(&bytes[8..])

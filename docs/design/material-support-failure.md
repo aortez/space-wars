@@ -174,7 +174,8 @@ trajectories, total and relative energy, momentum, one-time failure, exact repla
 safe contacts and identical histories across geometry/public-step partitions.
 Native tests cover pending contact ownership, corrupt or missing boundary motion,
 removal, output/motion limits, stale policy changes and frozen fixed-collapse saves.
-The current Material Lab collapse demonstration remains the fixed-support case.
+Material Lab demonstrates fixed-support collapse and a two-material pair; a
+moving rigid platen over one material remains a subsequent Lab case.
 
 Paired-failure tests compare either wood layer and simultaneous wood-layer
 exhaustion with the continuous capacity crossing at equal and unequal masses
@@ -183,5 +184,6 @@ reference. Tests close each material's work and both motion balances, preserve
 the surviving capacity, and check both coasting trajectories and exact replay.
 Geometry/public-call partitions, all quarter turns, shared motion, safe separation,
 corrupt dispositions, output/motion limits and frozen v20 material bytes are
-covered. Moving and paired collapse are native engine APIs; their Lab cases
-remain subsequent work.
+covered. Material Lab's [Wood pair gives way](material-lab.md#paired-collapse)
+pauses when A fails, shows B's remaining capacity and both elastic releases,
+then lets both bodies coast through a bounded observation window.
