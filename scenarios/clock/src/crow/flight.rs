@@ -1,12 +1,55 @@
 //! Small arcade flight controller: bounded lateral steering, gravity/drag and
-//! lift on each wing downstroke. It owns no collision world or random stream.
+//! lift on each wing downstroke. It owns no collision world or random stream:
+//! it steers a bird's body by the velocity it gives it for the next step, and
+//! the step moves the body.
 use crate::layout::Layout;
 use engine_core::Vec2;
 
 #[cfg(test)]
 mod tests;
 
-const DT: f32 = 1.0 / 60.0;
+pub(crate) const DT: f32 = 1.0 / 60.0;
+/// The pull a bird flies against, which its controller brings: the world's
+/// gravity does not act on a bird's body.
+pub(crate) fn gravity(layout: Layout) -> f32 {
+    layout.pitch * 10.0
+}
+
+/// How high a hop's arc rises over the line between its ends, in pitches.
+const HOP_HEIGHT: f32 = 0.9;
+/// How much faster than its arc a hop brings the body back onto it, in
+/// pitches a second. Held back by something in the way, the legs push at the
+/// arc's own pace and this much more instead of flinging it, and once free
+/// the body catches up no faster.
+const HOP_CATCH_UP: f32 = 2.0;
+
+/// The velocity that carries a bird along a hop from `from` to `to` over
+/// `duration` ticks, `tick` ticks in, with its feet at `position`: the arc's
+/// own motion to its next tick, and a bounded pull back onto the arc if the
+/// body is off it. Nothing in the way, the body follows the arc exactly.
+pub(crate) fn hop(
+    from: Vec2,
+    to: Vec2,
+    tick: u64,
+    duration: u64,
+    position: Vec2,
+    layout: Layout,
+) -> Vec2 {
+    let arc = |tick: u64| {
+        let t = (tick as f32 / duration as f32).min(1.0);
+        from * (1.0 - t) + to * t + Vec2::new(0.0, layout.pitch * HOP_HEIGHT * 4.0 * t * (1.0 - t))
+    };
+    let along = (arc(tick + 1) - arc(tick)) / DT;
+    let back = (arc(tick) - position) / DT;
+    let most = layout.pitch * HOP_CATCH_UP;
+    let back = if back.length() > most {
+        back * (most / back.length())
+    } else {
+        back
+    };
+    along + back
+}
+
 const RAISE_TICKS: u32 = 3;
 const DOWN_TICKS: u32 = 6;
 const RECOVER_TICKS: u32 = 9;
@@ -81,17 +124,26 @@ impl Flight {
         self.wing = 0.0;
     }
 
-    /// True only on a slow, downward crossing of the intended foot support.
-    pub fn step(
+    /// Whether a bird whose feet are down on its spot has landed: on the
+    /// last leg of its flight, and slow enough to stand.
+    pub fn touchdown(&self, layout: Layout) -> bool {
+        self.leg == Leg::Land
+            && self.velocity.y >= -layout.pitch * 2.5
+            && self.velocity.x.abs() <= layout.pitch * 0.6
+    }
+
+    /// Steers from `position` toward `target`, by the leg of the flight it is
+    /// on: the wingbeat and the velocity the body takes into the next step.
+    pub fn steer(
         &mut self,
-        position: &mut Vec2,
+        position: Vec2,
         target: Vec2,
         cruise: f32,
         layout: Layout,
         leaving: bool,
-    ) -> bool {
+    ) {
         let scale = layout.pitch;
-        let gravity = scale * 10.0;
+        let gravity = gravity(layout);
         let width = layout.bounds_max.x - layout.bounds_min.x;
         let haste = self.haste;
         let speed = (width * 0.55).max(scale * 9.0) * haste;
@@ -120,6 +172,11 @@ impl Flight {
         // Forward motion supports some weight while gliding, but never all of it.
         let glide = gravity * 0.55 * (self.velocity.x.abs() / speed).min(1.0);
         let drag = self.velocity.y * 0.9;
+        // The body's remaining headroom bounds a climb near the upper frame,
+        // the speed from which it can still stop below it.
+        let headroom =
+            (layout.bounds_max.y - layout.frame_width - scale * 1.6 - position.y).max(0.0);
+        let safe_speed = (2.0 * gravity * 0.45 * headroom).sqrt();
         if self.stroke.is_none() {
             // Start a deliberate stroke only when the glide can no longer
             // carry the desired motion. Leave room for the resulting rise.
@@ -131,11 +188,7 @@ impl Flight {
                 let minimum = scale * if landing { 1.0 } else { 2.8 };
                 let impulse = (desired_y - self.velocity.y + (gravity - glide) * 0.15 + extra)
                     .clamp(minimum, scale * 8.0 * haste);
-                // The body's remaining headroom bounds a stroke even during
-                // a strong climb or an interrupted hop near the upper frame.
-                let headroom =
-                    (layout.bounds_max.y - layout.frame_width - scale * 1.6 - position.y).max(0.0);
-                let safe_speed = (2.0 * gravity * 0.45 * headroom).sqrt();
+                // It bounds a stroke even during a strong climb.
                 let impulse = impulse.min((safe_speed - self.velocity.y).max(0.0));
                 if impulse > scale * 0.1 {
                     self.stroke = Some(Stroke {
@@ -149,23 +202,9 @@ impl Flight {
         let kick = self.advance_wings();
         self.velocity.x += acceleration_x * DT;
         self.velocity.y += kick + (glide - gravity - drag) * DT;
-        let previous = *position;
-        *position += self.velocity * DT;
-        let contact = self.leg == Leg::Land
-            && previous.y >= target.y
-            && position.y <= target.y
-            && (position.x - target.x).abs() <= layout.pitch * 0.35;
-        if !contact {
-            return false;
-        }
-        position.y = target.y;
-        if self.velocity.y >= -scale * 2.5 && self.velocity.x.abs() <= scale * 0.6 {
-            return true;
-        }
-        // A hard touchdown cannot pass through its intended digit. Absorb most
-        // of the impact, then let the controller settle before declaring a perch.
-        self.velocity.y *= -0.15;
-        false
+        // Whatever carries the body up faster than that, an interrupted
+        // hop's spring or a push, the spread wings brake.
+        self.velocity.y = self.velocity.y.min(safe_speed);
     }
 
     fn advance_wings(&mut self) -> f32 {

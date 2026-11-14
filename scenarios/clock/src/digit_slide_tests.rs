@@ -257,9 +257,12 @@ fn previews_replacements_resize_and_repeats_are_bounded_and_deterministic() {
             assert_eq!((state.body_count(), state.collider_count()), (0, 0));
         }
         for kind in ClockEventKind::ALL {
-            // Isolate each replacing-event pair. A duck is now an independent
-            // visit which must survive an appearance event, then be retired.
+            // Isolate each replacing-event pair. A duck, a crow or the spider
+            // is an independent visit which must survive an appearance event,
+            // then be retired.
             state.finish_duck_visit();
+            state.finish_crow_visit();
+            state.remove_spider();
             ClockScenario::step(
                 &mut state,
                 &[
@@ -268,7 +271,29 @@ fn previews_replacements_resize_and_repeats_are_bounded_and_deterministic() {
                 ],
                 Duration::ZERO,
             );
-            assert_eq!((state.body_count(), state.collider_count()), (0, 0));
+            assert_eq!(state.crow_state().is_some(), kind == ClockEventKind::Crow);
+            assert_eq!(
+                state.spider_state().is_some(),
+                kind == ClockEventKind::Spider
+            );
+            if matches!(kind, ClockEventKind::Crow | ClockEventKind::Spider) {
+                // Its bodies are the arena's, and nothing else is left.
+                assert_eq!(
+                    (state.body_count(), state.collider_count()),
+                    state
+                        .arena
+                        .world()
+                        .map(|world| (world.body_count(), world.collider_count()))
+                        .unwrap(),
+                    "{kind:?}"
+                );
+            } else {
+                assert_eq!(
+                    (state.body_count(), state.collider_count()),
+                    (0, 0),
+                    "{kind:?}"
+                );
+            }
             assert!(state.meltdown_state().is_none() && state.marquee_state().is_none());
             assert_eq!(state.duck_state().is_some(), kind == ClockEventKind::Duck);
         }

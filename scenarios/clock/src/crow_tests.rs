@@ -138,6 +138,12 @@ fn tick(state: &mut ClockState) {
     ClockScenario::step(state, &[], Duration::from_millis(16));
 }
 
+/// How far a crow's feet may be inside what holds them, in pitches. Standing,
+/// the solver holds them within its allowed error. Coming down, they sink in
+/// by at most one step's travel before the solver lifts them out, which at
+/// the speeds a crow lands at is well under a twentieth of a cell.
+const SINK: f32 = 0.05;
+
 fn wait_perched(state: &mut ClockState) {
     for _ in 0..8 * 60 {
         if state
@@ -151,8 +157,12 @@ fn wait_perched(state: &mut ClockState) {
     panic!("crow did not land: {:?}", state.crow_state());
 }
 
+/// A crow's visit replays exactly, hops and departs at every supported
+/// aspect. While it visits, the arena holds the crow's claim and nothing else:
+/// its body, its perches and the floor kept under it. In flight the body
+/// moves as fast as its velocity says, and it goes with the crow.
 #[test]
-fn crow_visits_replay_hop_and_depart_with_no_physics_at_all_supported_aspects() {
+fn crow_visits_replay_hop_and_depart_as_bodies_at_all_supported_aspects() {
     for aspect in [0.25, 0.6, 0.75, 1024.0 / 768.0, 800.0 / 480.0, 4.0] {
         let mut visits_with_hops = 0;
         for seed in 0..8 {
@@ -160,14 +170,28 @@ fn crow_visits_replay_hop_and_depart_with_no_physics_at_all_supported_aspects() 
             let mut b = fixture(aspect, seed);
             let mut saw_perch = false;
             let mut saw_hop = false;
+            let mut flights = 0;
             for t in 0..=crow::CROW_TICKS {
                 assert_eq!(a.crow_state(), b.crow_state());
                 assert_eq!(
                     a.crow_visit.as_ref().map(|c| c.flight),
                     b.crow_visit.as_ref().map(|c| c.flight)
                 );
-                assert_eq!((a.body_count(), a.collider_count()), (0, 0));
                 assert_eq!(a.floor_mode(), engine_common::ClockFloorMode::Closed);
+                if let Some(visit) = &a.crow_visit {
+                    assert_eq!(a.arena.owners(), [arena::Owner::Crow]);
+                    let world = a.arena.world().expect("the crow's claim keeps a world");
+                    assert!(world.body_ids().any(|id| id == crow::body::CROW.id()));
+                    let perches = visit.perch_count();
+                    let floor = a.arena.state().floor.bodies;
+                    assert_eq!(a.body_count(), 1 + perches + floor);
+                    assert!(
+                        t == 0 || (perches > 0 && floor > 0),
+                        "tick {t}: {perches} perches, {floor} floor"
+                    );
+                } else {
+                    assert_eq!((a.body_count(), a.collider_count()), (0, 0));
+                }
                 if let Some(crow) = a.crow_state() {
                     saw_perch |= crow.phase == crow::Phase::Perched;
                     saw_hop |= crow.hops > 0;
@@ -186,10 +210,36 @@ fn crow_visits_replay_hop_and_depart_with_no_physics_at_all_supported_aspects() 
                         );
                     }
                 }
+                let flying = a.crow_state().is_some_and(|crow| {
+                    matches!(
+                        crow.phase,
+                        crow::Phase::Entering | crow::Phase::Flying | crow::Phase::Leaving
+                    )
+                });
+                let before = a.crow_visit.as_ref().map(|crow| crow.position);
                 tick(&mut a);
                 tick(&mut b);
+                // In the air, touching nothing, the step moves the body by
+                // the velocity it ends the step with.
+                if let (true, Some(before), Some(world)) = (flying, before, a.arena.world())
+                    && let Some(motion) = world.motion(crow::body::CROW.id())
+                    && world.body_contact_push(crow::body::CROW.id()).is_none()
+                {
+                    let moved = (motion.position - before) * FIXED_HZ as f32;
+                    assert!(
+                        (moved - motion.linear_velocity).length()
+                            < Layout::new(aspect).pitch * 0.01,
+                        "aspect={aspect} seed={seed} tick {t}: moved at {moved:?}, flying at {:?}",
+                        motion.linear_velocity
+                    );
+                    flights += 1;
+                }
             }
             assert!(saw_perch, "aspect={aspect} seed={seed}");
+            assert!(
+                flights > 60,
+                "aspect={aspect} seed={seed}: {flights} ticks in flight"
+            );
             visits_with_hops += usize::from(saw_hop);
             assert!(a.crow_state().is_none());
         }
@@ -304,8 +354,12 @@ fn crow_perch_tracks_real_cells_and_reacts_to_reading_changes_without_advancing_
                 .flatten()
         })
         .unwrap();
+    // On the cell's top, as the solver holds it there.
+    let feet = before.position_milli[1] as f32 / 1000.0;
     assert!(
-        (before.position_milli[1] as f32 / 1000.0 - support.y - layout.pitch * 0.4).abs() < 0.002
+        (feet - support.y - layout.pitch * 0.4).abs() < layout.pitch * 0.002,
+        "{} pitches off the cell's top",
+        (feet - support.y - layout.pitch * 0.4) / layout.pitch
     );
     for reading in [(5, 55), (2, 22), (1, 11)] {
         ClockScenario::step(
@@ -381,7 +435,12 @@ fn crow_admission_and_departure_preserve_rain_material_and_duck_visit() {
     assert_eq!(state.rain_state(), rain);
     assert_eq!(state.player_duck_state(), duck);
     assert_eq!(state.phase_tick(), phase_tick);
-    assert_eq!((state.body_count(), state.collider_count()), counts);
+    // The crow brings its own body into the duck's arena and nothing else;
+    // its perches come with the next step.
+    assert_eq!(
+        (state.body_count(), state.collider_count()),
+        (counts.0 + 1, counts.1 + 1)
+    );
     let crow = state.crow_state();
     ClockScenario::step(
         &mut state,
@@ -393,6 +452,7 @@ fn crow_admission_and_departure_preserve_rain_material_and_duck_visit() {
     assert_eq!(state.rain_state(), rain);
     assert_eq!(state.player_duck_state(), duck);
     assert_eq!(state.phase_tick(), phase_tick);
+    assert_eq!((state.body_count(), state.collider_count()), counts);
 }
 
 #[test]
@@ -465,11 +525,11 @@ fn crow_flight_lands_and_clears_the_frame_across_fonts_and_layouts() {
                                 visit.flight
                             );
                         }
-                        assert!(p.y >= layout.floor_y);
+                        assert!(p.y >= layout.floor_y - layout.pitch * SINK);
                         for segment in state.segments().iter().filter(|s| s.lit) {
                             for cell in segment.cells() {
                                 let center = layout.cell_center(segment.id, cell);
-                                let half = layout.pitch * 0.4 - 0.001;
+                                let half = layout.pitch * (0.4 - SINK);
                                 assert!(
                                     (p.x - center.x).abs() >= half
                                         || (p.y - center.y).abs() >= half,
@@ -485,7 +545,7 @@ fn crow_flight_lands_and_clears_the_frame_across_fonts_and_layouts() {
                         }
                         if visit.phase == crow::Phase::Pecking {
                             visited_ground = true;
-                            assert_eq!(p.y, layout.floor_y);
+                            assert!((p.y - layout.floor_y).abs() < layout.pitch * SINK);
                         }
                         if visit.phase == crow::Phase::Leaving {
                             assert!(
@@ -573,7 +633,6 @@ fn crow_avoids_wet_landings_in_real_rain_without_changing_the_water() {
                             let env = crow::Environment {
                                 water: Some(&rain.water),
                                 ground_available: false,
-                                panels: rain.responsive_floor(),
                             };
                             assert!(
                                 !env.wet_feet(

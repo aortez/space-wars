@@ -103,6 +103,7 @@ fn coins_render_the_turn_cascade_pile_return_and_controls_at_target_sizes() {
             "{coins:?}"
         );
         let mut phases = BTreeSet::new();
+        let mut shot = BTreeSet::new();
         let mut films = 0;
         let mut recovered_at = None;
         // The whole event and a second of the recovered face.
@@ -141,6 +142,9 @@ fn coins_render_the_turn_cascade_pile_return_and_controls_at_target_sizes() {
                 (Some("reforming"), 45) => Some("reforming"),
                 _ => None,
             };
+            // The bird lands again after a hop, and its still is the first
+            // landing: each still is taken once.
+            let still = still.filter(|name| shot.insert(*name));
             let film = width == 800 && output.is_some() && tick % 3 == 0;
             if still.is_some() || film || tick % 60 == 0 {
                 let frame = ClockScenario::render_frame(&state);

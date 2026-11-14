@@ -1291,11 +1291,13 @@ impl ClockState {
     /// The owners that would hold the arena once `kind` started, if it needs
     /// the arena at all. A visit claims it, and so does an event that shares
     /// a visit's arena. Starting an event finishes the one it replaces first,
-    /// which takes a vacant arena's terrain with it.
+    /// which takes a vacant arena's terrain with it. The crow replaces no
+    /// event: it comes beside the one under way, and the terrain stays.
     fn arena_owners_for_event(&self, kind: ClockEventKind) -> Option<Vec<arena::Owner>> {
         let adding = match kind {
             ClockEventKind::Duck => vec![arena::Owner::Visit],
             ClockEventKind::Spider => vec![arena::Owner::Spider],
+            ClockEventKind::Crow => vec![arena::Owner::Crow],
             ClockEventKind::Tanks => vec![arena::Owner::Event(kind)],
             ClockEventKind::Aquarium
             | ClockEventKind::Explosion
@@ -1312,8 +1314,10 @@ impl ClockState {
             .arena_owners()
             .into_iter()
             .filter(|owner| match owner {
-                arena::Owner::Event(_) => false,
-                arena::Owner::Visit => self.duck_visit.is_some(),
+                // The event a preview would replace, and the vacant terrain
+                // it takes with it. The crow comes beside them instead.
+                arena::Owner::Event(_) => kind == ClockEventKind::Crow,
+                arena::Owner::Visit => self.duck_visit.is_some() || kind == ClockEventKind::Crow,
                 _ => true,
             })
             .collect();
@@ -1460,8 +1464,10 @@ impl ClockState {
             || kind == ClockEventKind::Grass && self.ceiling.phase != ceiling::Phase::Closed
     }
 
+    /// The crow leaves the arena with its perches.
     fn finish_crow_visit(&mut self) {
         if self.crow_visit.take().is_some() {
+            self.arena.release(arena::Owner::Crow);
             self.schedule.retire(ClockEventKind::Crow);
             self.sync_event_schedule();
         }
@@ -1636,14 +1642,31 @@ impl ClockState {
         self.event_notice = None;
         if kind == ClockEventKind::Crow {
             let seed = self.schedule.admit_resident(kind);
-            self.crow_visit = Some(crow::CrowVisit::new(
-                Layout::new(self.aspect_ratio()),
-                seed,
-                self.schedule.event_id,
-                self.config.crow_water_tolerance,
-                &self.segments,
-                self.event_kind(),
-            ));
+            let layout = Layout::new(self.aspect_ratio());
+            let mut owners = self.arena_owners();
+            owners.push(arena::Owner::Crow);
+            match self.arena.admit(&owners) {
+                Ok(()) => {
+                    let visit = crow::CrowVisit::new(
+                        layout,
+                        seed,
+                        self.schedule.event_id,
+                        self.config.crow_water_tolerance,
+                        &self.segments,
+                        self.event_kind(),
+                    );
+                    visit.enter(self.arena.claim_resident(arena::Owner::Crow, layout));
+                    self.crow_visit = Some(visit);
+                }
+                Err(unavailable) => {
+                    // Nothing of the crow stays, and the reuse delay runs as
+                    // after a visit.
+                    self.event_notice = Some((
+                        unavailable.notice(),
+                        self.schedule.tick + 2 * u64::from(FIXED_HZ),
+                    ));
+                }
+            }
             self.sync_event_schedule();
             return;
         }
@@ -1913,6 +1936,19 @@ impl ClockState {
         self.arena
             .bind_floor(self.active_event.as_ref(), self.floor.geometry(fitted));
         self.arena.bind_settings(fitted);
+        // The crow's perches take the face as the step will find it, and its
+        // body the velocity it chose after the last step.
+        if let Some(crow) = &mut self.crow_visit {
+            let world = self
+                .arena
+                .held_mut(arena::Owner::Crow)
+                .expect("the crow's claim keeps a world");
+            crow.drive(
+                world,
+                &self.segments,
+                self.active_event.as_ref().map(ActiveEvent::kind),
+            );
+        }
         // The arena's one rigid step this tick, whoever holds it.
         self.arena.step(events::duck::DT);
         if let Some(spider) = &mut self.spider {
@@ -2001,15 +2037,6 @@ impl ClockState {
     fn update_crow(&mut self, advance: bool) {
         let kind = self.event_kind();
         let environment = crow::Environment {
-            panels: match &self.active_event {
-                Some(ActiveEvent::Aquarium(event)) => Some(&event.floor),
-                Some(ActiveEvent::Rain(rain)) => rain.responsive_floor(),
-                Some(ActiveEvent::Meltdown(melt)) => melt.floor.as_ref(),
-                _ => self
-                    .duck_visit
-                    .as_ref()
-                    .and_then(|duck| duck.terrain.responsive_floor()),
-            },
             water: match &self.active_event {
                 Some(ActiveEvent::Aquarium(event)) => Some(&event.water),
                 Some(ActiveEvent::Rain(rain)) => Some(&rain.water),
@@ -2026,7 +2053,11 @@ impl ClockState {
         };
         if let Some(crow) = &mut self.crow_visit {
             if advance {
-                if crow.step(&self.segments, kind, environment) {
+                let world = self
+                    .arena
+                    .held(arena::Owner::Crow)
+                    .expect("the crow's claim keeps a world");
+                if crow.step(&self.segments, kind, environment, world) {
                     self.finish_crow_visit();
                 }
             } else {
