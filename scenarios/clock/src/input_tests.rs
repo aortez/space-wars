@@ -184,6 +184,18 @@ fn replacing_each_live_event_recovers_its_resources_and_keeps_the_latest_time() 
                 state.body_count(),
                 state.arena.world().unwrap().body_count()
             );
+        } else if kind == ClockEventKind::Crow {
+            // The crow is a body in the arena, with its perches and the
+            // floor kept under it.
+            assert!(
+                state.crow_state().is_some(),
+                "next event preserves the visit"
+            );
+            assert_eq!(state.arena.owners(), [arena::Owner::Crow]);
+            assert_eq!(
+                state.body_count(),
+                state.arena.world().unwrap().body_count()
+            );
         } else {
             assert_eq!((state.body_count(), state.collider_count()), (0, 0));
         }

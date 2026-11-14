@@ -42,8 +42,8 @@ use engine_common::{
 };
 use engine_core::Vec2;
 use engine_rapier::world::{
-    BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
-    PhysicsStepMetrics, PhysicsWorld, PhysicsWorldConfig,
+    BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, CollisionGroups,
+    PhysicsId, PhysicsStepMetrics, PhysicsWorld, PhysicsWorldConfig,
 };
 
 use crate::{
@@ -83,6 +83,10 @@ pub(crate) enum Owner {
     /// it climbs and a proxy for each digit cell it may hold. It comes and
     /// goes like a visit, and a resize cancels it.
     Spider,
+    /// The crow: a temporary actor with its body and a perch on top of each
+    /// digit column it may land on. It comes and goes like a visit, and a
+    /// resize ends it.
+    Crow,
 }
 
 impl Owner {
@@ -95,7 +99,20 @@ impl Owner {
     /// An owner that rests on the floor, so the arena keeps a floor under it
     /// while no visit's terrain is one. Soil is fixed in place and needs none.
     fn rests(self) -> bool {
+        matches!(self, Self::Fixture(_) | Self::Spider | Self::Crow)
+    }
+
+    /// An owner whose bodies fall at Clock's own gravity, whoever set the
+    /// world's. The crow is not one: its wings and legs carry its weight, and
+    /// its controller brings the pull it flies against.
+    fn weighed(self) -> bool {
         matches!(self, Self::Fixture(_) | Self::Spider)
+    }
+
+    /// An owner that brings no world of its own, so the world keeps the
+    /// settings it would be built with while only such owners hold it.
+    fn worldless(self) -> bool {
+        self.resident() || matches!(self, Self::Spider | Self::Crow)
     }
 
     /// Whether the entity `id` is one of this owner's.
@@ -124,10 +141,15 @@ impl Owner {
                 count(&ids::canonical::AQUARIUM_DIGITS) + count(&ids::canonical::AQUARIUM_LINER),
                 MAX_DIGIT_SOLIDS + count(&ids::canonical::AQUARIUM_LINER),
             ),
-            // Coins is the same batch with round pieces, so it has the same room.
-            Self::Event(ClockEventKind::Explosion | ClockEventKind::Coins) => {
+            Self::Event(ClockEventKind::Explosion) => {
                 Population::new(MAX_EXPLOSION_CELLS, MAX_EXPLOSION_CELLS)
             }
+            // Coins is the same batch with round pieces, and the magpie that
+            // comes for them.
+            Self::Event(ClockEventKind::Coins) => Population::new(
+                MAX_EXPLOSION_CELLS + count(&ids::canonical::MAGPIE),
+                MAX_EXPLOSION_CELLS + count(&ids::canonical::MAGPIE),
+            ),
             // A bar for each lit segment and one for each of the two meridiem
             // letters, with a collider for each of their cells.
             Self::Event(ClockEventKind::Falling) => Population::new(
@@ -152,6 +174,11 @@ impl Owner {
                     joints: 1,
                 }
             }
+            // Its body and its perches, each with one collider.
+            Self::Crow => {
+                let bodies = count(&ids::canonical::CROW) + count(&ids::canonical::CROW_PERCHES);
+                Population::new(bodies, bodies)
+            }
         }
     }
 
@@ -171,7 +198,7 @@ impl Owner {
             ],
             Self::Event(ClockEventKind::Aquarium) => &[AQUARIUM_LINER, AQUARIUM_DIGITS],
             Self::Event(ClockEventKind::Explosion) => &[EXPLOSION_CELLS],
-            Self::Event(ClockEventKind::Coins) => &[COIN_CELLS],
+            Self::Event(ClockEventKind::Coins) => &[COIN_CELLS, MAGPIE],
             Self::Event(ClockEventKind::Tanks) => &[TANKS],
             Self::Event(ClockEventKind::Falling) => &[FALLING_SEGMENTS, FALLING_LETTERS],
             Self::Event(ClockEventKind::Meltdown) => &[MELTDOWN_CELLS],
@@ -179,6 +206,7 @@ impl Owner {
             Self::Soil => &[SOIL],
             Self::Fixture(index) => &FIXTURE_OWNER_BALLS[index as usize],
             Self::Spider => &[SPIDER, SPIDER_FRAME, SPIDER_SURFACES],
+            Self::Crow => &[CROW, CROW_PERCHES],
         }
     }
 }
@@ -191,6 +219,7 @@ impl From<Owner> for ClockArenaOwner {
             Owner::Soil => Self::Soil,
             Owner::Fixture(index) => Self::Fixture { index },
             Owner::Spider => Self::Spider,
+            Owner::Crow => Self::Crow,
         }
     }
 }
@@ -220,15 +249,18 @@ const LARGEST_EVENT: Population = {
 };
 
 /// The most bodies, colliders and joints the arena holds at once: a visit
-/// and the largest event sharing its arena, with soil and one arena fixture,
-/// and the spider's line. The spider takes no more room than the largest
-/// event, so beside a visit and the residents it fits where an event would,
-/// and it never shares the arena with an event that has bodies, because the
-/// two together do not. Everything Clock ships fits, so only residents beyond
+/// and the largest event sharing its arena, with the crow, soil and one arena
+/// fixture, and the spider's line. The spider takes no more room than the
+/// largest event, so beside a visit and the residents it fits where an event
+/// would, and it never shares the arena with an event that has bodies,
+/// because the two together do not. The crow can still be in the air when an
+/// event that takes its perches starts, so its room is kept for it, as
+/// [`admits`] says. Everything Clock ships fits, so only residents beyond
 /// those make the arena refuse a claim.
 pub const ARENA_CAPACITY: Population = Owner::Visit
     .budget()
     .plus(LARGEST_EVENT)
+    .plus(Owner::Crow.budget())
     .plus(Owner::Soil.budget())
     .plus(Owner::Fixture(0).budget())
     .plus(Population {
@@ -238,8 +270,8 @@ pub const ARENA_CAPACITY: Population = Owner::Visit
     });
 
 // Tanks has a separate reservation for chunked terrain and cannot share a
-// visit or spider. Its larger collider allowance must not relax admissions
-// for the existing visitor/event combinations.
+// visit, the spider or the crow. Its larger collider allowance must not relax
+// admissions for the existing visitor/event combinations.
 const TANKS_CAPACITY: Population = crate::events::tanks::POPULATION
     .plus(FLOOR_BUDGET)
     .plus(Owner::Soil.budget())
@@ -263,8 +295,8 @@ const _: () = assert!(
 pub const MAX_RESIDENT_CLAIMS: usize = 4;
 
 /// The most owners that hold the arena at once: a visit, one event sharing
-/// its arena or the spider, and the residents.
-pub const MAX_ARENA_CLAIMS: usize = 2 + MAX_RESIDENT_CLAIMS;
+/// its arena or the spider, the crow, and the residents.
+pub const MAX_ARENA_CLAIMS: usize = 3 + MAX_RESIDENT_CLAIMS;
 
 const _: () = assert!(
     FLOOR_BUDGET
@@ -276,9 +308,12 @@ const _: () = assert!(
 /// may hold, and budgets that together fit its capacity, with the floor kept
 /// under resting residents while no visit's terrain is one. Soil's claim is
 /// reserved for the whole run, so it counts whether or not the soil holds the
-/// arena yet, and soil is never refused. Changes nothing.
+/// arena yet, and soil is never refused. Outside the duel the crow's room,
+/// and the floor kept under it, is reserved the same way: the crow takes no
+/// room that another claim counts on, and is never refused for room. Changes
+/// nothing.
 pub(crate) fn admits(owners: &[Owner]) -> Result<(), Unavailable> {
-    let mut held: Vec<Owner> = Vec::with_capacity(owners.len() + 1);
+    let mut held: Vec<Owner> = Vec::with_capacity(owners.len() + 2);
     for owner in owners.iter().copied().chain([Owner::Soil]) {
         if !held.contains(&owner) {
             held.push(owner);
@@ -292,6 +327,17 @@ pub(crate) fn admits(owners: &[Owner]) -> Result<(), Unavailable> {
     if held.iter().filter(|owner| owner.resident()).count() > MAX_RESIDENT_CLAIMS {
         return Err(Unavailable::Residents);
     }
+    let tanks = held.contains(&Owner::Event(ClockEventKind::Tanks));
+    if tanks
+        && (held.contains(&Owner::Visit)
+            || held.contains(&Owner::Spider)
+            || held.contains(&Owner::Crow))
+    {
+        return Err(Unavailable::Capacity);
+    }
+    if !tanks && !held.contains(&Owner::Crow) {
+        held.push(Owner::Crow);
+    }
     let floor = held.iter().any(|owner| owner.rests()) && !held.contains(&Owner::Visit);
     let floor = if floor {
         FLOOR_BUDGET
@@ -301,11 +347,6 @@ pub(crate) fn admits(owners: &[Owner]) -> Result<(), Unavailable> {
     let need = held
         .iter()
         .fold(floor, |need, owner| need.plus(owner.budget()));
-    if held.contains(&Owner::Event(ClockEventKind::Tanks))
-        && (held.contains(&Owner::Visit) || held.contains(&Owner::Spider))
-    {
-        return Err(Unavailable::Capacity);
-    }
     if need.within(capacity(&held)) {
         Ok(())
     } else {
@@ -381,6 +422,18 @@ pub(crate) const MECHANICS_GRAVITY: f32 = 400.0;
 pub(crate) fn mechanics_config(layout: Layout) -> PhysicsWorldConfig {
     world_config(Vec2::new(0.0, -MECHANICS_GRAVITY), layout.pitch)
 }
+
+/// The collision group the birds belong to, and nothing else does.
+const BIRDS: u32 = 1 << 1;
+
+/// A bird, the crow or the magpie: it meets everything there is but the
+/// frame.
+pub(crate) const BIRD: CollisionGroups = CollisionGroups::new(BIRDS, u32::MAX);
+
+/// What stands for the edges of the view: the walls at its sides and the
+/// frame the spider climbs. It holds in view whatever meets it but the
+/// birds, which come and go over the frame from beyond it.
+pub(crate) const FRAME: CollisionGroups = CollisionGroups::new(u32::MAX, !BIRDS);
 
 fn remove_floor(world: &mut PhysicsWorld) {
     for id in ids::canonical::ARENA_FLOOR {
@@ -807,20 +860,17 @@ impl ClockArena {
         }
     }
 
-    /// While only residents and the spider hold the arena, its world has the
-    /// settings they would build it with: Clock's own gravity, and the length
-    /// scale of `layout`, the one they last fitted. A visit that entered set
-    /// its own for as long as it held the arena. The run calls this once per
-    /// tick that moves time, just before the arena's step.
+    /// While only residents, the spider and the crow hold the arena, its
+    /// world has the settings they would build it with: Clock's own gravity,
+    /// and the length scale of `layout`, the one they last fitted. A visit
+    /// that entered set its own for as long as it held the arena. The run
+    /// calls this once per tick that moves time, just before the arena's
+    /// step.
     pub fn bind_settings(&mut self, layout: Layout) {
         let Some(world) = &mut self.world else {
             return;
         };
-        if self
-            .owners
-            .iter()
-            .all(|owner| owner.resident() || *owner == Owner::Spider)
-        {
+        if self.owners.iter().all(|owner| owner.worldless()) {
             let config = mechanics_config(layout);
             assert!(world.set_gravity(config.gravity) && world.set_length_unit(config.length_unit));
         }
@@ -836,9 +886,9 @@ impl ClockArena {
 
     /// The arena's one rigid step this tick, whoever holds it, residents with
     /// nobody else included. Nothing else steps the arena's world. A visit
-    /// brings its own gravity for as long as it holds the arena, so resting
-    /// residents first rescale theirs whenever the world's has changed, and
-    /// fall at Clock's own throughout.
+    /// brings its own gravity for as long as it holds the arena, so the
+    /// bodies of weighed owners first rescale theirs whenever the world's has
+    /// changed, and fall at Clock's own throughout.
     pub fn queue_drives(&mut self, drives: Vec<engine_rapier::world::SurfaceDrive>) {
         self.surface_drives.extend(drives);
     }
@@ -855,7 +905,7 @@ impl ClockArena {
                 .filter(|body| {
                     self.owners
                         .iter()
-                        .any(|owner| owner.rests() && owner.declares(body.entity.value()))
+                        .any(|owner| owner.weighed() && owner.declares(body.entity.value()))
                 })
                 .collect();
             for body in bodies {
@@ -1303,6 +1353,12 @@ pub(crate) mod ids {
         /// index.
         pub(crate) const SPIDER_SURFACES: Range<u64> =
             8100..8100 + crate::spider::MAX_PROXIES as u64;
+        /// The crow's body.
+        pub(crate) const CROW: Range<u64> = 8501..8502;
+        /// The crow's perches, one on top of each digit column, by column.
+        pub(crate) const CROW_PERCHES: Range<u64> = 8510..8510 + crate::crow::PERCH_COLUMNS as u64;
+        /// The magpie's body, which comes for the coins.
+        pub(crate) const MAGPIE: Range<u64> = 8601..8602;
         /// The duel, its monotonic material allocator and reserved conversion tail.
         pub(crate) const TANKS: Range<u64> = 20_000..60_000;
         /// Retained soil, the one resident today that outlives its admitting
@@ -1377,6 +1433,9 @@ pub(crate) mod ids {
             ("SPIDER", SPIDER),
             ("SPIDER_FRAME", SPIDER_FRAME),
             ("SPIDER_SURFACES", SPIDER_SURFACES),
+            ("CROW", CROW),
+            ("CROW_PERCHES", CROW_PERCHES),
+            ("MAGPIE", MAGPIE),
             ("SOIL", SOIL),
             ("TEST_OBSTACLES", TEST_OBSTACLES),
         ];

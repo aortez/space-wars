@@ -1,8 +1,65 @@
 use super::*;
-use crate::{ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState};
+use crate::{
+    ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState,
+    arena::{ids::canonical::ARENA_FLOOR, mechanics_config},
+    floor::responsive::ResponsiveFloor,
+};
 use engine_common::{ClockEventProfile, Scenario};
+use engine_rapier::world::{
+    BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
+};
 use engine_water::{Boundary, Parcel, PoolSpec, WaterConfig, WaterWorld};
 use std::time::Duration;
+
+/// A world for a crow taken out of its run: its body where the test put the
+/// crow, its perches, and a floor across the view, flat or the panels given.
+struct Rig {
+    world: PhysicsWorld,
+}
+
+impl Rig {
+    fn new(crow: &CrowVisit, panels: Option<&ResponsiveFloor>) -> Self {
+        let layout = crow.layout;
+        let mut world = PhysicsWorld::new(mechanics_config(layout));
+        match panels {
+            Some(panels) => panels.insert_panels_at(&mut world, ARENA_FLOOR.start),
+            None => {
+                let entity = PhysicsId::new(ARENA_FLOOR.start);
+                let half = Vec2::new(
+                    (layout.bounds_max.x - layout.bounds_min.x) * 0.5,
+                    layout.pitch,
+                );
+                assert!(world.insert_body(
+                    BodyId::new(entity, BodyRole::PRIMARY),
+                    BodySpec {
+                        kind: BodyKind::Fixed,
+                        position: Vec2::new(0.0, layout.floor_y - half.y),
+                        ..BodySpec::default()
+                    },
+                    &[ColliderSpec::cuboid(
+                        ColliderId::new(entity, ColliderRole::PRIMARY, 0),
+                        half.x,
+                        half.y,
+                    )],
+                ));
+            }
+        }
+        crow.enter(&mut world);
+        Self { world }
+    }
+
+    /// One tick of the crow's, around a step of its world.
+    fn step(
+        &mut self,
+        crow: &mut CrowVisit,
+        segments: &[SegmentState],
+        env: Environment<'_>,
+    ) -> bool {
+        crow.drive(&mut self.world, segments, None);
+        self.world.step(flight::DT);
+        crow.step(segments, None, env, &self.world)
+    }
+}
 
 #[test]
 fn hardy_crows_finish_hops_through_rain_puddles_on_digit_tops() {
@@ -124,7 +181,6 @@ fn fixture() -> (ClockState, CrowVisit, Environment<'static>) {
     let env = Environment {
         ground_available: true,
         water: None,
-        panels: None,
     };
     let feet = env.ground_spots(crow.layout, crow.water_tolerance)[0].unwrap();
     crow.target = Some(Target::Ground(feet));
@@ -210,7 +266,8 @@ fn hardy_hops_between_puddled_digit_tops_while_shy_leaves() {
         crow.phase = Phase::Perched;
         crow.duration = 1;
         crow.ground_attempted = true;
-        crow.step(&state.segments, None, wet);
+        let mut rig = Rig::new(&crow, None);
+        rig.step(&mut crow, &state.segments, wet);
         if kind == ClockCrowWaterTolerance::Shy {
             assert_eq!(crow.phase, Phase::Leaving);
             assert_eq!(crow.wet_departures, 1);
@@ -219,10 +276,12 @@ fn hardy_hops_between_puddled_digit_tops_while_shy_leaves() {
             let destination = crow.target.unwrap();
             assert_ne!(destination.key(), Some(start.key));
             for _ in 0..28 {
-                crow.step(&state.segments, None, wet);
+                rig.step(&mut crow, &state.segments, wet);
             }
             assert_eq!(crow.phase, Phase::Perched);
-            assert_eq!(crow.position, destination.feet());
+            // On the perch, as the solver holds it there.
+            let rest = crow.position - destination.feet();
+            assert!(rest.length() < crow.layout.pitch * 0.02, "{rest:?}");
             assert_eq!(crow.hops, 1);
             assert_eq!(crow.wet_departures, 0);
         }
@@ -246,7 +305,7 @@ fn hardy_crow_accepts_shallow_puddles_but_still_leaves_deep_water_or_lost_suppor
                 wet.ground_spots(crow.layout, crow.water_tolerance)[0].is_none(),
                 should_leave
             );
-            crow.step(&state.segments, None, wet);
+            Rig::new(&crow, None).step(&mut crow, &state.segments, wet);
             assert_eq!(crow.phase == Phase::Leaving, should_leave);
             assert_eq!(crow.wet_departures, u32::from(should_leave));
             if !should_leave {
@@ -297,8 +356,9 @@ fn hardy_crow_tolerates_ten_times_the_spray_but_eventually_gets_soaked() {
             wet.ground_spots(crow.layout, crow.water_tolerance)[0].is_some(),
             kind == ClockCrowWaterTolerance::Hardy
         );
+        let mut rig = Rig::new(&crow, None);
         for tick in 1..=181 {
-            crow.step(&state.segments, None, wet);
+            rig.step(&mut crow, &state.segments, wet);
             if crow.phase == Phase::Leaving {
                 departure_ticks.push(tick);
                 assert_eq!(crow.wet_departures, 1);
@@ -319,8 +379,9 @@ fn hardy_crow_tolerates_ten_times_the_spray_but_eventually_gets_soaked() {
 #[test]
 fn dry_ground_pecks_then_departs_but_a_puddle_rejects_that_landing_spot() {
     let (state, mut crow, env) = fixture();
+    let mut rig = Rig::new(&crow, None);
     for _ in 0..PECK_TICKS {
-        assert!(!crow.step(&state.segments, None, env));
+        assert!(!rig.step(&mut crow, &state.segments, env));
     }
     assert_eq!(crow.pecks, 2);
     assert_eq!(crow.phase, Phase::Leaving);
@@ -328,7 +389,7 @@ fn dry_ground_pecks_then_departs_but_a_puddle_rejects_that_landing_spot() {
     assert!(crow.flight.velocity.y > 0.0);
     let mut finished = false;
     for _ in 0..EXIT_TICKS {
-        if crow.step(&state.segments, None, env) {
+        if rig.step(&mut crow, &state.segments, env) {
             finished = true;
             break;
         }
@@ -396,6 +457,78 @@ fn ground_excursion_is_an_occasional_seeded_choice_and_is_not_retried() {
     eprintln!("{selected} ground choices / 1000 eligible visits");
 }
 
+/// A crow is a body like any other: a ball thrown at it as it perches
+/// knocks it off its spot, which counts as an escape, and it takes to the air
+/// and finds a perch again, climbing back up through the cells it fell
+/// beside.
+#[test]
+fn a_ball_thrown_at_a_perched_crow_knocks_it_off() {
+    let (state, original, env) = fixture();
+    let env = Environment {
+        ground_available: false,
+        ..env
+    };
+    let layout = original.layout;
+    let pitch = layout.pitch;
+    let candidates = perches(layout, &state.segments, None);
+    // A perch with no cell as tall within a few pitches on its left, so that
+    // a ball thrown along the digit tops from there meets the crow first.
+    let perch = candidates
+        .iter()
+        .flatten()
+        .find(|p| {
+            candidates.iter().flatten().all(|q| {
+                q.feet.x >= p.feet.x
+                    || q.feet.x < p.feet.x - pitch * 3.0
+                    || q.feet.y < p.feet.y - pitch * 0.25
+            })
+        })
+        .copied()
+        .expect("a perch open on its left");
+    let mut crow = original;
+    crow.target = Some(Target::Digit(perch));
+    crow.position = perch.feet;
+    crow.to = perch.feet;
+    crow.phase = Phase::Perched;
+    crow.phase_tick = 0;
+    crow.duration = 600;
+    crow.flight = Flight::default();
+    let mut rig = Rig::new(&crow, None);
+    for _ in 0..10 {
+        rig.step(&mut crow, &state.segments, env);
+    }
+    assert_eq!((crow.phase, crow.escapes), (Phase::Perched, 0));
+    let entity = PhysicsId::new(1 << 40);
+    assert!(rig.world.insert_body(
+        BodyId::new(entity, BodyRole::PRIMARY),
+        BodySpec {
+            position: perch.feet + Vec2::new(-pitch * 2.0, pitch * body::RADIUS_PITCH),
+            linear_velocity: Vec2::new(pitch * 15.0, 0.0),
+            gravity_scale: 0.0,
+            ..BodySpec::default()
+        },
+        &[ColliderSpec::ball(
+            ColliderId::new(entity, ColliderRole::PRIMARY, 0),
+            pitch * 0.5,
+        )],
+    ));
+    let knocked = (0..60).find(|_| {
+        rig.step(&mut crow, &state.segments, env);
+        crow.escapes > 0
+    });
+    assert!(knocked.is_some(), "the ball did not knock the crow off");
+    assert_eq!(crow.phase, Phase::Flying);
+    assert!((crow.position - perch.feet).length() > pitch * 0.5);
+    assert!(
+        (0..8 * 60).any(|_| {
+            rig.step(&mut crow, &state.segments, env);
+            crow.phase == Phase::Perched
+        }),
+        "the crow found no perch again: {:?}",
+        crow.diagnostics()
+    );
+}
+
 #[test]
 fn pooled_water_interrupts_pecking_and_launches_once() {
     let (state, mut crow, env) = fixture();
@@ -405,13 +538,17 @@ fn pooled_water_interrupts_pecking_and_launches_once() {
         ..env
     };
     let feet = crow.position;
-    crow.step(&state.segments, None, wet);
+    let mut rig = Rig::new(&crow, None);
+    rig.step(&mut crow, &state.segments, wet);
     assert_eq!(crow.phase, Phase::Leaving);
     assert_eq!(crow.wet_departures, 1);
+    // The legs push off, and the next step lifts the body.
+    assert!(crow.flight.velocity.y > 0.0);
+    rig.step(&mut crow, &state.segments, wet);
     assert!(crow.position.y > feet.y);
     assert_eq!(crow.pecks, 0);
     for _ in 0..30 {
-        crow.step(&state.segments, None, wet);
+        rig.step(&mut crow, &state.segments, wet);
     }
     assert_eq!(crow.wet_departures, 1);
 }
@@ -427,9 +564,16 @@ fn a_new_puddle_aborts_a_last_moment_descent_without_passing_through_the_floor()
         water: Some(&water),
         ..env
     };
-    crow.step(&state.segments, None, wet);
-    assert!(matches!(crow.target, Some(Target::Digit(_))));
-    assert!(crow.position.y >= crow.layout.floor_y);
+    let mut rig = Rig::new(&crow, None);
+    for _ in 0..3 {
+        rig.step(&mut crow, &state.segments, wet);
+        assert!(matches!(crow.target, Some(Target::Digit(_))));
+        assert!(
+            crow.position.y >= crow.layout.floor_y - crow.layout.pitch * 0.02,
+            "{}",
+            (crow.layout.floor_y - crow.position.y) / crow.layout.pitch
+        );
+    }
     assert_eq!(crow.ground_visits, 0);
     assert_eq!(crow.pecks, 0);
 }
@@ -452,7 +596,8 @@ fn brief_spray_dries_but_sustained_local_spray_makes_the_crow_leave() {
         water: Some(&water),
         ..env
     };
-    crow.step(&state.segments, None, wet);
+    let mut rig = Rig::new(&crow, None);
+    rig.step(&mut crow, &state.segments, wet);
     assert!(crow.wetness > 0.0 && crow.wetness < 1.0);
     assert_eq!(crow.phase, Phase::Pecking);
     let frozen = crow.diagnostics();
@@ -461,11 +606,11 @@ fn brief_spray_dries_but_sustained_local_spray_makes_the_crow_leave() {
     }
     assert_eq!(crow.diagnostics(), frozen);
     for _ in 0..12 {
-        crow.step(&state.segments, None, env);
+        rig.step(&mut crow, &state.segments, env);
     }
     assert_eq!(crow.wetness, 0.0);
     for _ in 0..20 {
-        crow.step(&state.segments, None, wet);
+        rig.step(&mut crow, &state.segments, wet);
     }
     assert_eq!(crow.phase, Phase::Leaving);
     assert_eq!(crow.wet_departures, 1);
@@ -511,27 +656,35 @@ fn withdrawing_floor_support_interrupts_pecking_without_advancing_on_pause() {
 
 #[test]
 fn opening_panels_still_catch_an_aborted_descent_at_the_real_surface() {
-    use crate::floor::responsive::{FloorShape, ResponsiveFloor};
+    use crate::floor::responsive::FloorShape;
     let (state, mut crow, env) = fixture();
     let mut panels = ResponsiveFloor::new(FloorShape::clock(crow.layout), 0.0);
     panels.opening = 0.1;
     let env = Environment {
         ground_available: false,
-        panels: Some(&panels),
         ..env
     };
-    let height = env.floor_support(crow.position.x, crow.layout).unwrap();
+    // Where the panels' surface is, beside the drain they open over.
+    let surface = |x: f32| {
+        (f64::from(x.abs()) > panels.opening * panels.shape.max_gap)
+            .then(|| panels.shape.surface_y(f64::from(x), panels.opening) as f32)
+    };
+    let height = surface(crow.position.x).unwrap();
     assert!(height < crow.layout.floor_y);
-    assert!(
-        env.floor_support(0.0, crow.layout).is_none(),
-        "the open drain has no support"
-    );
+    assert!(surface(0.0).is_none(), "the open drain has no support");
     crow.phase = Phase::Flying;
     crow.position.y = height + 0.01;
     crow.flight.velocity.y = -crow.layout.pitch * 6.0;
-    crow.step(&state.segments, None, env);
+    let mut rig = Rig::new(&crow, Some(&panels));
+    rig.step(&mut crow, &state.segments, env);
     assert!(matches!(crow.target, Some(Target::Digit(_))));
-    assert_eq!(crow.position.y, height);
+    // The panel holds the feet where it is, below the closed floor, and the
+    // legs push off from there.
+    assert!(
+        (crow.position.y - height).abs() < crow.layout.pitch * 0.02,
+        "{}",
+        (crow.position.y - height) / crow.layout.pitch
+    );
     assert!(crow.flight.velocity.y > 0.0);
     assert_eq!(crow.pecks, 0);
 }

@@ -1,5 +1,19 @@
 use super::*;
 
+/// Free flight with nothing in the way: the body moves by the velocity the
+/// controller gives it, as the world's step moves it.
+fn fly(
+    flight: &mut Flight,
+    position: &mut Vec2,
+    target: Vec2,
+    cruise: f32,
+    layout: Layout,
+    leaving: bool,
+) {
+    flight.steer(*position, target, cruise, layout, leaving);
+    *position += flight.velocity * DT;
+}
+
 #[test]
 fn downstrokes_accelerate_upward_and_recovery_loses_lift() {
     let layout = Layout::new(4.0 / 3.0);
@@ -8,44 +22,30 @@ fn downstrokes_accelerate_upward_and_recovery_loses_lift() {
     flight.retarget(position, true, layout);
     let initial = flight.velocity.y;
     for _ in 0..RAISE_TICKS + DOWN_TICKS {
-        flight.step(&mut position, Vec2::new(0.0, 100.0), 100.0, layout, false);
+        fly(
+            &mut flight,
+            &mut position,
+            Vec2::new(0.0, 100.0),
+            100.0,
+            layout,
+            false,
+        );
     }
     let downstroke = flight.velocity.y;
     assert!(downstroke > initial + layout.pitch * 2.0);
     assert!(flight.wing < -0.9);
     for _ in 0..RECOVER_TICKS {
-        flight.step(&mut position, Vec2::new(0.0, 100.0), 100.0, layout, false);
+        fly(
+            &mut flight,
+            &mut position,
+            Vec2::new(0.0, 100.0),
+            100.0,
+            layout,
+            false,
+        );
     }
     assert!(flight.velocity.y < downstroke - layout.pitch);
     assert_eq!(flight.wing, 0.0);
-}
-
-#[test]
-fn hard_touchdown_cannot_tunnel_through_the_intended_perch() {
-    let layout = Layout::new(4.0 / 3.0);
-    let mut position = Vec2::new(0.0, 0.01);
-    let mut flight = Flight {
-        velocity: Vec2::new(0.0, -layout.pitch * 8.0),
-        leg: Leg::Land,
-        stroke: Some(Stroke {
-            tick: STROKE_TICKS - 1,
-            impulse: 0.0,
-            amplitude: 0.0,
-        }),
-        ..Default::default()
-    };
-    assert!(!flight.step(&mut position, Vec2::ZERO, 100.0, layout, false));
-    assert_eq!(position.y, 0.0);
-    assert!(flight.velocity.y >= 0.0);
-    let mut landed = false;
-    for _ in 0..120 {
-        landed = flight.step(&mut position, Vec2::ZERO, 100.0, layout, false);
-        assert!(position.y >= 0.0);
-        if landed {
-            break;
-        }
-    }
-    assert!(landed);
 }
 
 #[test]
@@ -55,7 +55,14 @@ fn airborne_retarget_preserves_momentum_and_stroke_phase() {
     let mut position = Vec2::new(-100.0, 20.0);
     flight.retarget(position, true, layout);
     for _ in 0..43 {
-        flight.step(&mut position, Vec2::new(100.0, 0.0), 80.0, layout, false);
+        fly(
+            &mut flight,
+            &mut position,
+            Vec2::new(100.0, 0.0),
+            80.0,
+            layout,
+            false,
+        );
     }
     let before = flight;
     flight.retarget(position, false, layout);
@@ -79,7 +86,8 @@ fn cruising_has_visible_rises_and_unpowered_gliding_gaps() {
     let mut powered_ticks = 0;
     for tick in 0..600 {
         let was_gliding = flight.stroke.is_none();
-        flight.step(
+        fly(
+            &mut flight,
             &mut position,
             Vec2::new(10_000.0, cruise),
             cruise,
@@ -134,14 +142,16 @@ fn landing_brakes_with_a_smaller_visible_stroke_than_a_climb() {
         ..landing
     };
     for _ in 0..RAISE_TICKS {
-        landing.step(
+        fly(
+            &mut landing,
             &mut landing_position,
             Vec2::ZERO,
             layout.pitch * 5.2,
             layout,
             false,
         );
-        climbing.step(
+        fly(
+            &mut climbing,
             &mut climbing_position,
             Vec2::ZERO,
             layout.pitch * 5.2,

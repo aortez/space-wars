@@ -477,10 +477,12 @@ Falling's, Exploding digits' and Coins' before a player joins, Meltdown's
 water lab, and Rain's floats while its duck is in the water. A body is known
 by its world's place in that list and by its id, since two worlds may use the
 same ids. When a player joins, the arena adopts the event's world, and the
-lamps take its bodies for new ones. The crow and the magpie are not bodies
-yet (#633), and neither are Aquarium's fish, the water, Tanks' shells, which
-the duel casts as rays, or Meltdown's melting cells unless a duck's visit
-shares the arena, so the lamps do not see them.
+lamps take its bodies for new ones. The crow and the magpie are bodies
+(#633), the crow in the arena's world and the magpie in the world the coins
+lie in, so the lamps see them as they see anything else that moves.
+Aquarium's fish, the water, Tanks' shells, which the duel casts as rays, and
+Meltdown's melting cells unless a duck's visit shares the arena are not
+bodies, so the lamps do not see them.
 
 Perception only reads. #630 proposed sensor colliders and contact events.
 Reading the worlds instead adds nothing to them, applies no forces and claims
@@ -528,8 +530,10 @@ kinematic paddle knocking a ball and taking no knock itself; the four
 strongest of six landings, and none out of view; no knock for a body a
 script stops, in the air or rolling on the floor; no knock for a ball held on
 the floor against a pull, and only the floor's blow for a ball a script
-throws as it lands; the signals, among them a font change beside a blank
-slot and an event started over one of its kind; and six minutes of Demo with
+throws as it lands; the crow seen flying in the arena's world and the magpie
+in the coins' own, where their bodies are; the signals, among them a font
+change beside a blank slot and an event started over one of its kind; and six
+minutes of Demo with
 the lamps blind giving the same events, visits, arena accounting and body
 motions every tick and the same frame every second, Steady lamps in both,
 since Lively ones act on what they see. The lamps tests run Lively lamps
@@ -925,17 +929,17 @@ Enable **Coins** in scenario settings, select it in **Clock Controls →
 Preview & Resume**, or use Next Event. It joins the periodic mix like
 Explosion, with the same 45-second reuse delay, and it is Explosion's batch
 made of round pieces (`events::explosion::Debris`): the same cells, the same
-cap of **239** (Classic at most 119), the same room in the run's arena and the
-same return. Only the launch, the shape and the drawing differ, so the arena's
-capacity and its capacity demonstrations do not move. What Coins adds is a
-guest: once the coins lie still, a magpie comes for them, and the coins it
-carries off are the return's shortfall.
+cap of **239** (Classic at most 119) and the same return. Only the launch, the
+shape and the drawing differ. Its room in the run's arena is Explosion's and
+one body more, the magpie's, so the arena's capacity demonstrations do not
+move. What Coins adds is a guest: once the coins lie still, a magpie comes for
+them, and the coins it carries off are the return's shortfall.
 
 | Phase | Ticks | What happens |
 | --- | --- | --- |
 | `minting` | 36 | Each lit cell and AM/PM pixel turns about its vertical axis where it stands: the cell's face until it is edge-on, a gold coin from then on. The dim anchors stay put. |
 | `cascading` | 240 | The coins drop as round rigid bodies with a little seeded sideways jitter, so a column does not land as one stack, land dead and pile on the floor. |
-| `gathering` | 1380 | The coins lie where they landed, live bodies still, and the magpie makes its trips: in from its home side, down beside the heap, a hop up to the top coin, the coin into its beak and out of view with it. Three or four coins go this way. |
+| `gathering` | 1380 | The coins lie where they landed, live bodies still, and the magpie makes its trips: in from its home side, down beside the heap or onto it, a hop toward the top coin while its beak reaches none, a coin into its beak and out of view with it. Three or four coins go this way. |
 | `reforming` | 90 | The pieces that remain fly home by Explosion's reassembly, squaring up from discs into cells on the way, a replacement for each coin the magpie kept grows from the nearest coin that remains, and the ordinary face takes over once they have arrived. |
 
 The drain stays open, as it does for Falling and Explosion: a coin that rolls
@@ -962,34 +966,46 @@ its coins are still falling when the return begins, exactly as Explosion's
 debris is there. `coins_tests::coins_come_to_rest_before_they_fly_home` holds
 these with half a second to spare.
 
-The magpie is the crow's kind of visitor: a drawn bird on the crow's flight
-controller (`events::explosion::magpie`), never a rigid body, that reacts to
-the pile as it actually lies. It is quicker than the crow, at one and a half
-times the controller's pace, since nothing between the frame and the pile is
-in its way, and it flies low, four and a half pitches over the floor. Each
-visit has a home side, chosen by its seed, that the bird comes from and
-carries its coins to. A trip goes: in from home to the floor beside the heap,
-on the nearest level stretch of what holds a foot there, which is the batch's
-own floor clear of the drain, or beside a duck the course the coins fell
-onto, the top of a platform or the floor between, never over its pit; the
-coin it has picked is one of the highest lying in view with such a stretch
-beside it; a seeded look of a quarter to three quarters of a second; a hop
-up to stand next to the coin; forty ticks with its head down, the coin
-leaving the pile for its beak twenty-two ticks in; and out toward home with
-the coin, which is gone with it once the bird is out of view. A coin that is
-kicked, rolls off or goes down the drain between being chosen and being
-reached is given up for another, from wherever the bird is, and whatever is
-under the bird holds its feet up wherever they come down: a descent cut
-short that way keeps its momentum, but the floor, or the platform under it,
-catches the feet and the wings start again from there. The bird starts a
-trip only while the gathering has room for it, estimated from
-the crossing distances at its cruising speed plus a measured overhead, so it
-is away before the return begins and is never cut off in the air; inside
-the last two and a half seconds it leaves whatever it was doing, and it would
-keep flying through the return if it had to. Measured with seeds 1 to 12 at
-4:3, 800×480, 480×800, 4:1 and 3:4, a trip takes **270 to 414 ticks**, the
-bird carries off **three or four coins**, and it is out of view **1.4 to 3.8
-seconds** before the coins fly home.
+The magpie is the crow's kind of visitor: a bird on the crow's flight
+controller (`events::explosion::magpie`) that reacts to the pile as it
+actually lies. While it is in view it is a body in the world the coins lie
+in, the batch's own or the arena it shares with a duck (#633), the same disc
+as the crow's. The controller sets the body's velocity before each step and
+the world moves it, so the bird sets down on whatever holds it up, pushes the
+coins it meets and is pushed by them, and passes over the walls at the view's
+edges, which hold only the coins in. It is quicker than the crow, at one and
+a half times the controller's pace, since nothing between the frame and the
+pile is in its way, and it flies low, four and a half pitches over the floor.
+Each visit has a home side, chosen by its seed, that the bird comes from and
+carries its coins to. A trip goes: in from home toward the floor beside the
+heap, on the nearest level stretch of what holds a foot there, which is the
+batch's own floor clear of the drain, or beside a duck the course the coins
+fell onto, the top of a platform or the floor between, never over its pit;
+the coin it has picked is one of the highest lying in view with such a
+stretch beside it; down onto whatever holds it up near there, the floor, a
+platform, the heap itself or the duck's door at the edge of the view; a
+seeded look of a quarter to three quarters of a second; up to three hops
+toward the coin while its beak cannot reach one,
+each ending where something holds the bird up, or after twice a hop's time;
+forty ticks with its head down, the coin leaving the pile for its beak
+twenty-two ticks in; and out toward home with the coin, which is gone with
+it once the bird is out of view. Standing up on a heap, the bird is often
+held higher than the coin it came for, so it takes that coin if its beak
+reaches it, and otherwise the nearest coin its beak does. A hop that
+something holds back pushes it at the hop's own pace and a little more,
+instead of flinging it, and a bird moved off its coin before its beak closes
+finds its feet again and reaches for what is in front of it. A coin that is
+kicked, rolls off or goes down the
+drain between being chosen and being reached is given up for another, from
+wherever the bird is. The bird starts a trip only while the gathering has
+room for it, estimated from the crossing distances at its cruising speed plus
+a measured overhead, and it carries off at most four coins; inside the last
+two and a half seconds it leaves whatever it was doing, and it would keep
+flying through the return if it had to. Measured with seeds 1 to 12 at 4:3,
+800×480, 480×800, 4:1 and 3:4, a trip takes **211 to 504 ticks**, the bird
+carries off **three or four coins**, giving up one trip of 224, where it
+stood on the coin it came for, and it is out of view **1.8 to 7.9 seconds**
+before the coins fly home.
 
 A taken coin leaves the world the tick it leaves the pile, so nothing can
 kick it any more, and its surface retires as `taken`, a reason of its own in
@@ -1084,14 +1100,16 @@ room its value needs:
 six aspect ratios in both formats, the settle measurement above, the return
 from where the pieces lie at full opacity with the replacements grown from
 nothing, the shared arena's lifecycle and a real coin-duck contact. For the
-magpie they cover its trips at every device layout (three or four coins, no
-body, the coin in its beak drawn there, away before the return), a coin that
+magpie they cover its trips at every device layout (three or four coins, a
+body in the coins' world while in view that moves in the air as its velocity
+says, the coin in its beak drawn there, away before the return), a coin that
 leaves the pile being chosen again, a gathering cut short by a resize or a
 replacing preview with a coin in the beak, coins taken out of the shared
 arena, the bird never below the floor through a retarget on the way down, and
-its landings on a player's course set down on what is there, never over the
-pit or inside a platform. The reassembly they share keeps its tests under
-Explosion.
+its landings on a player's course held up by what is there, judged from
+where the course, the coins and the duck's door lie and not from the bird's
+contacts, never over the pit or inside a platform. The reassembly they share
+keeps its tests under Explosion.
 
 The event and its return were the first half of
 [#581](https://github.com/aortez/space-wars/issues/581); the magpie is the
@@ -1121,7 +1139,8 @@ one-resident admission limit prevent lingering or accumulating birds.
 
 Flight uses a small Clock-local motion controller: gravity, drag, bounded lateral
 steering and lift during visible wing downstrokes, with gliding gaps between
-strokes. Strong strokes have a larger wing sweep; landing uses softer strokes.
+strokes. It sets the velocity of the crow's body before each step, and the
+arena's world moves it. Strong strokes have a larger wing sweep; landing uses softer strokes.
 It climbs above the face,
 crosses, then brakes onto its chosen digit. Landing depends on position and speed;
 travel no longer takes a fixed 100 ticks. Cruising height follows the digit size,
@@ -1145,14 +1164,27 @@ falling water without consuming it or adding collisions. Rain's presence alone
 does not make the bird flee. See the [ground and water study](design/crow-ground-water.md)
 for the behavior rules, paired simulation checks, and native preview.
 
-The crow adds no Rapier bodies, general collision shapes, fluid displacement or
-duck collisions. Swept foot contact checks the intended perch and surviving digit
-tops, including interrupted approaches. It works with at most 24 exposed perches.
-Seeded choices and fixed-tick motion
-replay exactly, including wing phase. The 22-second visit includes up to five
-seconds for departure; a failed eight-second approach also prompts departure.
-Moving-obstacle avoidance, physical reactions to other actors and player control
-remain future work. See the [flight study](design/crow-flight.md) for the motion
+While it visits, the crow is a body in the run's arena (#633): a disc as wide
+as a lit cell whose bottom is its feet, held upright, that holds the arena's
+`crow` claim. Its controller brings the pull it flies against, so neither the
+world's gravity nor a visit's acts on it. It brings a fixed perch on top of
+each of the at most 24 exposed digit columns, placed where the face draws
+that column's top lit cell before each step and solid for whatever meets it,
+as that cell would be, though it holds the crow only from above: a crow
+beside or under it, knocked off its spot or under a cell the face has just
+lit, flies up through it as through the column's other cells. The floor
+under it is the one the arena keeps, or a visit's course. It lands when its
+feet are down on its spot and something
+holds it up. It meets the duck, the fixture's balls and the panels as bodies,
+and a push that knocks it off its spot counts as an escape. It passes
+over the walls at the view's edges, which hold everything else in view, and
+it displaces no water. Its room in the arena is kept for it, so it comes
+beside a full arena and no other claim is refused because it is about. The
+duel refuses it, and like the spider it is refused while the residents do not
+fit the view ([arena](#sharing-the-runs-physics-arena)). Seeded choices and fixed-tick
+motion replay exactly, including wing phase. The 22-second visit includes up
+to five seconds for departure; a failed eight-second approach also prompts
+departure. Moving-obstacle avoidance and player control remain future work. See the [flight study](design/crow-flight.md) for the motion
 model, comparison gallery and reproduction steps.
 
 `clock state` exposes `crow` separately from the timed `event_kind`: visit ID,
@@ -3027,7 +3059,9 @@ Its module comment states the rules, and `arena_contract.rs` holds them:
   one event at a time shares it beside a visit: Aquarium, Explosion, Coins,
   Falling or Meltdown. The spider claims it for its stay, with its body, its line, the
   frame it climbs and a proxy for each digit cell
-  ([below](#the-spider-on-the-digits)). Residents keep it for the rest of the
+  ([below](#the-spider-on-the-digits)). The crow claims it for its visit, with
+  its body and a perch on top of each exposed digit column
+  ([above](#crow-visitor)). Residents keep it for the rest of the
   run: retained soil, and the development arena fixtures. The first claim
   builds the world and the last to let go takes it away. Each owner's bodies
   take identities from its own ranges in `arena::ids::canonical`, and an owner
@@ -3035,16 +3069,22 @@ Its module comment states the rules, and `arena_contract.rs` holds them:
   scale while it holds the arena, and the residents' own return once it has
   gone.
 - **Claims are bounded.** Each owner declares a budget of bodies, colliders
-  and joints. The arena holds at most **255 bodies / 288 colliders** and one
-  joint, the spider's line: a visit, the largest event, soil and one fixture
-  together, so everything Clock ships fits. The spider takes no more room than
-  the largest event, so beside a visit and the residents it fits where an
-  event would, and it never shares the arena with an event that has bodies.
-  At most **6** owners hold it at once, and at most **4** of them are
+  and joints. The arena holds at most **281 bodies / 313 colliders** and one
+  joint, the spider's line: a visit, the largest event, the crow, soil and one
+  fixture together, so everything Clock ships fits. The spider takes no more
+  room than the largest event, so beside a visit and the residents it fits
+  where an event would, and it never shares the arena with an event that has
+  bodies. The crow's room, and the floor kept under it, is reserved whether
+  it is there or not, as soil's is, so it never takes room another claim
+  counts on and only the duel refuses it.
+  At most **7** owners hold it at once, and at most **4** of them are
   residents, soil included. A claim beyond those is refused before anything
-  changes, as `residents` or `capacity`. So is a visit, an event or a spider
-  that uses the floor while the residents do not fit the view, as
-  `layout-incompatible`. Debug builds audit every step: each body belongs to
+  changes, as `residents` or `capacity`. So is a visit, an event, the spider
+  or the crow that uses the floor while the residents do not fit the view, as
+  `layout-incompatible`. The walls at the view's edges and the spider's frame
+  hold everything in view but the birds, which are in a collision group of
+  their own (`arena::BIRD`) that the frame (`arena::FRAME`) filters out, so
+  they come and go over it. Debug builds audit every step: each body belongs to
   exactly one owner holding the arena, or to the floor kept under whoever
   rests on it, and no owner exceeds its budget, joints included.
 - **Residents rest on real support.** Soil is fixed in place. A fixture's
@@ -3102,7 +3142,7 @@ At rest, the two owners hold the arena with all five balls asleep on the closed
 floor (timings vary by machine):
 
 ```text
-Arena: 2 claims, 2 residents (at most 6 and 4); 6 bodies, 6 colliders, 0 joints (at most 255, 288, 1); floor 1 bodies
+Arena: 2 claims, 2 residents (at most 7 and 4); 6 bodies, 6 colliders, 0 joints (at most 281, 313, 1); floor 1 bodies
 Arena claims: fixture 0 3/4 bodies, 3/4 colliders; fixture 1 2/4 bodies, 2/4 colliders
 Arena run: 1 worlds, 183 steps; granted=2 released=0 refused=0; layout incompatible=false, last remap=None
 Arena step: 3 us (collision detection 2 us, solver 0 us); bodies active=0 sleeping=5; pairs candidate=5 contact=5, contacts=5, CCD substeps=1
@@ -3115,7 +3155,7 @@ has no room for this`, and `clock events` shows `blocked by arena=capacity` for
 Meltdown, Explosion, Coins and Aquarium:
 
 ```text
-Arena: 3 claims, 2 residents (at most 6 and 4); 10 bodies, 10 colliders, 0 joints (at most 255, 288, 1); floor 0 bodies
+Arena: 3 claims, 2 residents (at most 7 and 4); 10 bodies, 10 colliders, 0 joints (at most 281, 313, 1); floor 0 bodies
 Arena claims: fixture 0 3/4 bodies, 3/4 colliders; fixture 1 2/4 bodies, 2/4 colliders; visit 5/11 bodies, 5/11 colliders
 ```
 
@@ -3438,7 +3478,7 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **25** and reports scenario-instance revision,
+`clock state` uses schema version **26** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`, `warning`, `exploding`), pause state, profile, schedule, current
@@ -3526,7 +3566,7 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 24 and
+after completion or cancellation. Use matching client/CLI builds: schema 25 and
 older requests are rejected. The internal Clock action payload is version 14;
 event ordinals 0–9 are unchanged; Cell Swap is 10. Configure contains a
 little-endian u16 switch mask (bits 0–15, one for each event),
@@ -3546,8 +3586,8 @@ colliders and joints in its world, and over the run the claims `granted`,
 `refused` counts the previews, player joins and fixtures the arena turned away.
 The schedule leaves out events the arena would refuse, and `clock trigger` fails
 one before it reaches the arena, so neither counts. `claims` lists each owner in
-the order it claimed the arena (`visit`, `event` with its kind, `soil`, or
-`fixture` with its index), whether it is a resident, and its bodies and colliders
+the order it claimed the arena (`visit`, `event` with its kind, `soil`,
+`fixture` with its index, `spider` or `crow`), whether it is a resident, and its bodies and colliders
 beside its budget. `floor` counts the floor the arena keeps under resting
 residents while no visit's terrain is one; the claims and the floor together
 account for everything in the world. `last_step` is the arena's last step: wall,
@@ -3562,7 +3602,7 @@ arena's counts, claims, run totals and last step, and `clock events` shows each
 event's refusal.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 25, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 26, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -3579,7 +3619,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 25, `event`
+tick. A raw `clock trigger` request must include schema version 26, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, `cell-swap`, `grass`, `slot-machine`, `spider`, `coins`, or `tanks`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 
