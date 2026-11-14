@@ -100,7 +100,9 @@ The local launcher includes the following scenarios and presets:
   two free-pair collisions (wood on wood, wood on armor) show both bodies'
   recoil, each material's deformation, damage and capacity, and one shared
   energy ledger. Collapse cases pause at failure, then let a platen fall or
-  both free bodies coast while preserving the surviving layer's capacity.
+  both free bodies coast while preserving the surviving layer's capacity. A
+  split case cuts struck wood onto a fragment, rebuilds the rest on a new body
+  and strikes it again, and each part keeps its share of the damage.
   Pause, single step and exact save/load replay.
   Enable **Show all scenarios** in the launcher. See [Material Lab](docs/design/material-lab.md).
 - **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with

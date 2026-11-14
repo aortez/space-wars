@@ -48,7 +48,7 @@ fn snapshot(h: &mut FunctionalHarness, predicate: impl Fn(&Value) -> bool) -> Va
     }
 }
 fn physics(v: &Value) -> Value {
-    json!({"case":v["case"],"steps":v["steps"],"summary":v["summary"],"remaining":v["remaining"],"events":v["events"],"impacts":v["impacts"],"separations":v["separations"],"weight":v["weight"],"gravity_impulse":v["gravity_impulse"],"load_changes":v["load_changes"],"pair":v["pair"],"capacity":v["capacity"],"failure":v["failure"],"paired_failure":v["paired_failure"]})
+    json!({"case":v["case"],"steps":v["steps"],"summary":v["summary"],"remaining":v["remaining"],"events":v["events"],"impacts":v["impacts"],"separations":v["separations"],"weight":v["weight"],"gravity_impulse":v["gravity_impulse"],"load_changes":v["load_changes"],"pair":v["pair"],"capacity":v["capacity"],"failure":v["failure"],"paired_failure":v["paired_failure"],"split":v["split"]})
 }
 fn launch(h: &mut FunctionalHarness, mut s: UiState, renderer: &str) -> UiState {
     s = h.activate_until_scenario("material-lab", s);
@@ -477,5 +477,109 @@ fn material_lab_pairs_and_collapse_step_save_load_and_both_renderers() {
             1
         );
         h.capture_screenshot("support-fallen-raster.png");
+    });
+}
+fn block(v: &Value, name: &str, field: &str) -> f64 {
+    v["split"][name][field].as_f64().unwrap()
+}
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn material_lab_split_and_rebuild_keep_damage_across_both_renderers() {
+    run_functional_test_with_seed("material-lab-region-split", "winit-femtovg", 42, |h| {
+        let ready = h.wait_until_ready();
+        let mut s = launch(h, ready, "vector");
+        let mut control = snapshot(h, |v| v["paused"] == true)["control"]
+            .as_u64()
+            .unwrap();
+        let mut case = scenario_material_lab::Case::default();
+        while case != scenario_material_lab::Case::RegionSplit {
+            choose(h, &mut s, &mut control, 3);
+            case = case.next();
+            // Diagnostics are cached; observe each transition before choosing again.
+            snapshot(h, |v| v["case"] == case.name() && v["steps"] == 0);
+        }
+        let initial = snapshot(h, |v| v["case"] == "Wood split & rebuilt");
+        assert_eq!(block(&initial, "wood", "remaining"), 1200.0);
+        assert!(initial["split"]["fragment"].is_null());
+        h.capture_screenshot("region-split-initial-vector.png");
+        // Run pauses once the strike has charged the wood and left it.
+        choose(h, &mut s, &mut control, 0);
+        let struck = snapshot(h, |v| {
+            v["split"]["stage"] == "Struck" && v["paused"] == true
+        });
+        let first = struck["split"]["charges"][0].as_f64().unwrap();
+        assert_eq!(block(&struck, "wood", "remaining"), 1200.0 - first);
+        assert!(
+            struck["storage_status"]
+                .as_str()
+                .unwrap()
+                .contains("split the back quarter")
+        );
+        h.capture_screenshot("region-split-struck-vector.png");
+        // Run again splits the back quarter off onto a fragment.
+        choose(h, &mut s, &mut control, 0);
+        let split = snapshot(h, |v| v["split"]["stage"] == "Split" && v["paused"] == true);
+        let before = split["split"]["before_split"].as_f64().unwrap();
+        let kept = block(&split, "wood", "remaining");
+        let fragment = block(&split, "fragment", "remaining");
+        assert!(kept + fragment <= before && before - (kept + fragment) < 1e-9);
+        assert_eq!(block(&split, "wood", "capacity"), 900.0);
+        assert_eq!(block(&split, "fragment", "capacity"), 300.0);
+        h.capture_screenshot("region-split-split-vector.png");
+        choose(h, &mut s, &mut control, 4);
+        let saved = snapshot(h, |v| {
+            v["storage_status"].as_str().unwrap().starts_with("Saved")
+        });
+        assert_eq!(physics(&saved), physics(&split));
+        // A single step rebuilds the wood on a replacement body.
+        choose(h, &mut s, &mut control, 1);
+        let rebuilt = snapshot(h, |v| v["split"]["stage"] == "Rebuilt");
+        assert_eq!(rebuilt["split"]["wood"]["body"], 4);
+        assert_eq!(block(&rebuilt, "wood", "remaining"), kept);
+        h.pause_guarded(&s);
+        let host_pause = h.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::PauseMain),
+                ..Default::default()
+            },
+            TRANSITION_TIMEOUT,
+        );
+        h.activate_guarded("pause.return-to-launcher", &host_pause);
+        let ready = h.wait_until_ready();
+        s = launch(h, ready, "raster");
+        control = snapshot(h, |_| true)["control"].as_u64().unwrap();
+        choose(h, &mut s, &mut control, 5);
+        let loaded = snapshot(h, |v| {
+            v["storage_status"].as_str().unwrap().starts_with("Loaded")
+        });
+        assert_eq!(physics(&loaded), physics(&saved));
+        assert_eq!(loaded["paused"], true);
+        h.capture_screenshot("region-split-loaded-raster.png");
+        choose(h, &mut s, &mut control, 6);
+        let refused = snapshot(h, |v| {
+            v["storage_status"]
+                .as_str()
+                .unwrap()
+                .starts_with("The split case")
+        });
+        assert_eq!(physics(&refused), physics(&saved));
+        // The restored run repeats the rebuild exactly.
+        choose(h, &mut s, &mut control, 1);
+        assert_eq!(
+            physics(&snapshot(h, |v| v["steps"] == rebuilt["steps"])),
+            physics(&rebuilt)
+        );
+        choose(h, &mut s, &mut control, 0);
+        let end = snapshot(h, |v| v["stopped"].is_string());
+        assert!(end["stopped"].as_str().unwrap().starts_with("Run complete"));
+        assert_eq!(end["storage_status"], end["stopped"]);
+        let second = end["split"]["charges"][1].as_f64().unwrap();
+        assert!((block(&end, "wood", "remaining") - (kept - second)).abs() < 1e-9);
+        assert_eq!(block(&end, "fragment", "remaining"), fragment);
+        h.capture_screenshot("region-split-complete-raster.png");
+        choose(h, &mut s, &mut control, 2);
+        let restarted = snapshot(h, |v| v["steps"] == 0);
+        assert_eq!(physics(&restarted), physics(&initial));
+        assert_eq!(restarted["paused"], true);
     });
 }

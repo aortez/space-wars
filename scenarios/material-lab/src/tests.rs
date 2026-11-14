@@ -207,7 +207,7 @@ fn collapsed_support_keeps_its_failure_and_damage_while_the_platen_falls() {
 fn qualified_cases_finish_with_expected_material_behavior() {
     for case in Case::ALL
         .into_iter()
-        .filter(|c| *c != Case::LoadRelease && c.free_pair().is_none())
+        .filter(|c| ![Case::LoadRelease, Case::RegionSplit].contains(c) && c.free_pair().is_none())
     {
         let mut s = MaterialLabState::new(case);
         for _ in 0..case.parameters().2 {
@@ -605,4 +605,203 @@ fn free_pair_saves_keep_their_own_layout_and_refuse_load_commands() {
     for cut in [8, bytes.len() - 1] {
         assert!(MaterialLabState::from_snapshot_bytes(&bytes[..cut]).is_err());
     }
+}
+
+#[test]
+fn split_case_divides_the_damaged_wood_and_keeps_its_balance_through_the_rebuild() {
+    let mut s = MaterialLabState::new(Case::RegionSplit);
+    let start = s.split().unwrap();
+    assert_eq!(start.wood.remaining, 1200.0);
+    assert_eq!(start.wood.capacity, 1200.0);
+    assert!(start.fragment.is_none());
+    let mut pauses = Vec::new();
+    let mut reference = None;
+    s.paused = false;
+    while s.stopped.is_none() {
+        s.advance();
+        // Drawing every state runs the split view without a display.
+        render::frame(&s);
+        let split = s.split().unwrap();
+        if !s.paused || s.stopped.is_some() {
+            continue;
+        }
+        pauses.push((s.steps, split.stage));
+        match split.stage {
+            Stage::Struck => {
+                assert_eq!(s.phase(), Phase::Separated);
+                assert_eq!(split.charges.len(), 1);
+                assert_eq!(split.wood.remaining, 1200.0 - split.charges[0]);
+                // About a fifth of the whole wood.
+                assert!((240.0..260.0).contains(&split.charges[0]), "{split:?}");
+            }
+            Stage::Split => {
+                let before = split.before_split.unwrap();
+                let [kept, piece] = split.parts.unwrap();
+                let fragment = split.fragment.as_ref().unwrap();
+                assert_eq!((split.wood.volume, split.wood.capacity), (15.0, 900.0));
+                assert_eq!((fragment.volume, fragment.capacity), (5.0, 300.0));
+                assert_eq!((kept, piece), (split.wood.remaining, fragment.remaining));
+                // The parts share the balance at its integrity and never hold more.
+                assert!(kept + piece <= before && before - (kept + piece) < 1e-9);
+                for integrity in [kept / 900.0, piece / 300.0] {
+                    assert!((integrity - before / 1200.0).abs() < 1e-6);
+                }
+                assert_eq!((split.wood.left, split.wood.right), (0.0, 0.75));
+                assert_eq!((fragment.left, fragment.right), (1.0, 1.25));
+                // A copy that skips the rebuild is the second strike's reference.
+                let mut world = s.world.clone();
+                split::relaunch(&mut world);
+                reference = Some((world, s.materials[1].unwrap()));
+            }
+            Stage::Rebuilt => {
+                assert_eq!(split.wood.body, 4);
+                assert_eq!(split.wood.remaining, split.parts.unwrap()[0]);
+                assert_eq!(split.moved, Some(split.wood.remaining));
+            }
+            Stage::Strike | Stage::Restrike => panic!("unexpected pause: {split:?}"),
+        }
+        let bytes = s.snapshot_bytes().unwrap();
+        assert_eq!(&bytes[..8], SPLIT_SAVE_MAGIC);
+        for load in [Load::Released, Load::Light, Load::Heavy] {
+            assert!(s.set_load(load).is_err());
+        }
+        assert_eq!(s.snapshot_bytes().unwrap(), bytes);
+        s = restored(&s);
+        s.paused = false;
+    }
+    assert!(s.stopped.as_ref().unwrap().starts_with("Run complete"));
+    assert_eq!(s.steps, Case::RegionSplit.parameters().2);
+    assert_eq!(
+        pauses,
+        [
+            (86, Stage::Struck),
+            (87, Stage::Split),
+            (88, Stage::Rebuilt)
+        ]
+    );
+    assert_eq!((s.impacts, s.separations), (2, 2));
+    assert_eq!(
+        s.events
+            .iter()
+            .map(|e| e.label.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "Impact",
+            "Separation",
+            "Split",
+            "Rebuilt",
+            "Impact",
+            "Separation"
+        ]
+    );
+    let split = s.split().unwrap();
+    assert_eq!(split.stage, Stage::Restrike);
+    assert_eq!(split.charges.len(), 2);
+    assert!((split.wood.remaining - (split.moved.unwrap() - split.charges[1])).abs() < 1e-9);
+    // The fragment was never struck.
+    assert_eq!(
+        split.fragment.as_ref().unwrap().remaining,
+        split.parts.unwrap()[1]
+    );
+    // The same strike leaves the wood that skipped the rebuild exactly where it
+    // leaves the rebuilt wood.
+    let (mut world, wood) = reference.unwrap();
+    for _ in 89..=s.steps {
+        world.step(PHYSICS_DT);
+    }
+    assert_eq!(
+        world.loading_material_remaining(wood),
+        Some(split.wood.remaining)
+    );
+}
+
+#[test]
+fn split_case_saves_keep_their_own_layout_and_replay_every_edit() {
+    let mut s = MaterialLabState::new(Case::RegionSplit);
+    for steps in [0, 1, 17, 86, 87, 88, 89, 105, 174] {
+        // A stopped run no longer steps, so an early stop fails here.
+        while s.steps < steps && s.stopped.is_none() {
+            s.advance();
+        }
+        assert_eq!(s.steps, steps, "{:?}", s.stopped);
+        let bytes = s.snapshot_bytes().unwrap();
+        assert_eq!(&bytes[..8], SPLIT_SAVE_MAGIC);
+        // The native snapshot keeps the response-enabled v3 layout through every edit.
+        let world = s.world.snapshot_bytes().unwrap();
+        assert_eq!(u32::from_le_bytes(world[..4].try_into().unwrap()), 3);
+        let mut loaded = restored(&s);
+        assert_eq!(loaded.split(), s.split());
+        assert_eq!(loaded.events, s.events);
+        for magic in [
+            SAVE_MAGIC,
+            LOAD_SAVE_MAGIC,
+            PAIR_SAVE_MAGIC,
+            FAILURE_SAVE_MAGIC,
+            PAIR_FAILURE_SAVE_MAGIC,
+        ] {
+            let mut bad = bytes.clone();
+            bad[..8].copy_from_slice(magic);
+            assert!(MaterialLabState::from_snapshot_bytes(&bad).is_err());
+        }
+        let changes: &[fn(&mut Save)] = &[
+            |s| s.case = Case::WoodWood,
+            |s| s.steps += 1,
+            |s| s.impacts += 1,
+            |s| {
+                s.events.push(Event {
+                    time: 0.0,
+                    label: "Split".into(),
+                    episode: 1,
+                })
+            },
+            |s| s.stopped = Some("Run complete".into()),
+        ];
+        for change in changes {
+            let mut save: Save = codec().deserialize(&bytes[8..]).unwrap();
+            change(&mut save);
+            let mut bad = SPLIT_SAVE_MAGIC.to_vec();
+            bad.extend(codec().serialize(&save).unwrap());
+            assert!(MaterialLabState::from_snapshot_bytes(&bad).is_err());
+        }
+        // A restored run continues exactly, through the next edit.
+        loaded.advance();
+        s.advance();
+        assert_eq!(
+            loaded.snapshot_bytes().unwrap(),
+            s.snapshot_bytes().unwrap()
+        );
+    }
+    for case in [Case::WoodWood, Case::PairFailure] {
+        let mut old = MaterialLabState::new(case);
+        old.advance();
+        let mut bytes = old.snapshot_bytes().unwrap();
+        bytes[..8].copy_from_slice(SPLIT_SAVE_MAGIC);
+        assert!(MaterialLabState::from_snapshot_bytes(&bytes).is_err());
+    }
+    assert_eq!(
+        codec().serialize(&Case::RegionSplit).unwrap(),
+        9_u32.to_le_bytes()
+    );
+}
+
+#[test]
+fn split_case_stops_at_a_refused_response_and_keeps_its_last_valid_world() {
+    let mut s = MaterialLabState::new(Case::RegionSplit);
+    // A slower striker meets a speculative contact before it touches.
+    s.world
+        .set_velocity(scene::body(0), engine_core::Vec2::X * 5.0, 0.0, true);
+    let mut last = s.world.snapshot_bytes().unwrap();
+    while s.stopped.is_none() {
+        last = s.world.snapshot_bytes().unwrap();
+        s.advance();
+    }
+    assert!(
+        s.stopped.as_ref().unwrap().contains("SpeculativeArrival"),
+        "{:?}",
+        s.stopped
+    );
+    assert!(s.paused);
+    assert_eq!(s.world.snapshot_bytes().unwrap(), last);
+    assert_eq!(s.split().unwrap().wood.remaining, 1200.0);
+    assert_eq!(s.impacts, 0);
 }

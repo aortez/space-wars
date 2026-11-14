@@ -5,6 +5,7 @@ use engine_common::{
 };
 use engine_rapier::world::loading::response::dynamic_compression::DynamicCompressionSummary;
 mod pair;
+mod split;
 const INK: C = C::rgb(0.78, 0.86, 0.92);
 const CYAN: C = C::rgb(0.22, 0.82, 0.92);
 const AMBER: C = C::rgb(1.0, 0.66, 0.24);
@@ -46,7 +47,9 @@ pub fn frame(s: &MaterialLabState) -> RenderFrame {
         &mut f,
         -17.0,
         10.3,
-        if s.case == Case::PairFailure {
+        if s.case == Case::RegionSplit {
+            "MATERIAL LAB  /  REGION SPLIT"
+        } else if s.case == Case::PairFailure {
             "MATERIAL LAB  /  PAIRED COLLAPSE"
         } else if pair.is_some() {
             "MATERIAL LAB  /  PAIRED COLLISION"
@@ -67,12 +70,14 @@ pub fn frame(s: &MaterialLabState) -> RenderFrame {
             "{}  |  {}  |  t = {:.5} s",
             if s.paused { "Paused" } else { "Slow motion" },
             s.phase().label(),
-            a.elapsed
+            s.elapsed()
         ),
         15.0,
         INK,
     );
-    if let Some(pair) = &pair {
+    if let Some(split) = &s.split() {
+        split::draw(&mut f, s, split);
+    } else if let Some(pair) = &pair {
         pair::draw(&mut f, s, pair);
     } else {
         platen(&mut f, s, &a);

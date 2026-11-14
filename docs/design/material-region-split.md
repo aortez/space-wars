@@ -90,5 +90,6 @@ described under Balance.
 
 Splitting or moving a region in contact, connection loads and automatic
 fracture on failure remain future work; hosts keep debris admission. The engine
-records no lineage between a region and its pieces. A Material Lab case will
-follow.
+records no lineage between a region and its pieces.
+[Material Lab's split case](material-lab.md#split-and-rebuild) shows a split
+onto a fragment, a rebuild and a second strike in both renderers.

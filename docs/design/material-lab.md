@@ -1,9 +1,11 @@
-# Material Lab: loading, recovery and collapse (#327, #328)
+# Material Lab: loading, recovery, collapse and splits (#327, #328)
 
 `material-lab` is the first application scenario using the bounded native
 [impact-to-support path](material-impact-support.md), its
 [changing-load extension](material-changing-load.md) and the
-[paired-material path](material-paired-compression.md). Select **Show all scenarios**
+[paired-material path](material-paired-compression.md). One case instead uses
+ordinary steps with the [native response](material-native-response.md) to show
+a [region split](material-region-split.md). Select **Show all scenarios**
 in the launcher, choose **Material Lab**, then start. Direct launch:
 
 ```sh
@@ -21,8 +23,8 @@ come from the physical history.
 
 Next case walks the five load-controlled platen cases, the two
 [free-pair collisions](#free-pair-collisions), then the
-[collapsing support](#collapsing-support) and [paired collapse](#paired-collapse),
-for nine cases in total.
+[collapsing support](#collapsing-support), [paired collapse](#paired-collapse)
+and [split and rebuild](#split-and-rebuild), for ten cases in total.
 
 ## Platen cases and playback
 
@@ -176,6 +178,50 @@ fragment motion. Save/Load and Single step preserve the failure, both materials
 and exact continuation before and after collapse. The load controls remain
 unavailable for a free pair; Restart restores both layers to full capacity.
 
+## Split and rebuild
+
+**Wood split & rebuilt** shows that splitting struck wood, moving it to another
+body and striking it again all keep its damage. A split or transfer ends a
+bounded run for good, like [other external edits](material-region-split.md#refusals-and-runs),
+so this case steps the world normally with the opt-in native response.
+
+A free armor striker of mass 2 approaches a fixed wood block, volume 20 and
+capacity 1200, at speed 16 from 1/16 away. Each step moves it 1/256, farther
+than the solver's contact prediction distance, so it touches the wood exactly
+at step 16. A slower striker would meet a speculative contact first, which the
+response refuses while the solver brakes the striker. The strike is one impulse
+at first touch: it charges the wood 251.29, and the striker leaves at 2.058.
+The contact ends after capture's 1/60 s separation grace, and the lab pauses at
+step 86 (0.02099609375 s) with 948.71 left.
+
+Each Run then makes one edit at the start of the next step and pauses again:
+
+1. **Split.** The back quarter of the volume goes to a fragment, a new fixed
+   body set 0.25 behind the wood. The wood keeps 711.53 of its new capacity of
+   900 and the fragment holds 237.18 of 300, together exactly the 948.71: both
+   parts keep the integrity the strike left. The wood's collider shrinks to its
+   front three quarters, so its struck face stays where it was. Each part's
+   section deforms only as deep as the part reaches behind that face: 0.75 and
+   0.25.
+2. **Rebuild.** The kept wood moves to a replacement body of the same shape,
+   body 4. The lab binds the new collider and only then removes body 2, whose
+   removal would otherwise retire the region with its balance. The balance stays
+   711.53.
+3. **Strike again.** The striker returns to its start and is launched again.
+   The second strike charges the damaged wood 251.21 and leaves 460.32. The run
+   completes at step 174 (0.04248046875 s), when that contact ends. The fragment
+   keeps its 237.18 throughout.
+
+The schematic magnifies the striker's motion 20x and draws the wood and the
+fragment to scale. One column per block gives its body, velocity, volume,
+capacity and capacity left, with a bar for each block's remaining share of its
+own capacity. **Wood balance** lists where the wood's capacity went: each
+strike, the split's two parts and their sum, and the move. Contact history
+records the split and the rebuild beside the contacts, and the status line names
+the next edit at each pause. The load controls refuse with a message. Pause,
+Single step and Save/Load work at every stage; Restart returns to the undamaged
+wood.
+
 ## Save slot
 
 Save pauses the run and replaces `material-lab.bin` in the application's actual
@@ -208,8 +254,11 @@ layout's cases. Fixed-support collapse uses `MATLAB04`, with the same bounded fi
 and no command list; its native history becomes v21 on enrollment. Wrong versions,
 impossible/no-op commands, reordered histories and mismatched physics refuse.
 Paired collapse uses `MATLAB05`, again with those bounded fields and no command
-list; its native history becomes v23 on enrollment. Existing case tags and lab
-envelopes retain their layouts. Native saves retain their v1–v23 compatibility.
+list; its native history becomes v23 on enrollment. Split and rebuild uses
+`MATLAB06` with the same fields and no command list: its edits happen at fixed
+steps, so the replay repeats them. Its native snapshot keeps the
+response-enabled v3 layout throughout. Existing case tags and lab envelopes
+retain their layouts. Native saves retain their v1–v23 compatibility.
 
 ## Evidence and limits
 
@@ -243,9 +292,24 @@ a single step exactly, checks load refusal and coasting to completion, and
 restarts to full capacity. It is in the full UI suite; PR smoke selection is
 unchanged.
 
-This is a bounded two-body demonstration. It does not enable material response
-for existing gameplay, add fracture/topology consequences, or broaden the native
-solver's geometry or connection-loading support. The two explicit collapse cases
-demonstrate bounded #328 failure consequences; other cases keep their refusal on
-exhaustion. A moving rigid platen over one material, severing and debris remain
-later Lab slices. #327 remains open.
+The split-case scenario test draws every state. At each pause it checks the
+wood's charge, the parts' volumes, capacities and integrities, their sum against
+the split balance, the colliders' extents and the moved balance. It then checks
+the events and completion. A copy of the world that skips the rebuild takes the
+same second strike and is left with exactly the rebuilt wood's balance. A
+striker launched at 5 meets a speculative contact, and the refusal stops the run
+with the last valid world. Save tests cover every edit boundary, exact
+continuation through each edit, the `MATLAB06` layout, wrong envelopes and
+forged history. A client test follows the status through each edit and saves and
+restores between the split and the rebuild. The public UI workflow splits in the
+vector renderer, saves, rebuilds, restores in the raster renderer, repeats the
+rebuild exactly, checks load refusal, runs the second strike to completion and
+restarts. It is in the full UI suite.
+
+These are bounded demonstrations with two or three bodies. They do not enable
+material response for existing gameplay, add fracture/topology consequences, or
+broaden the native solver's geometry or connection-loading support. The two
+explicit collapse cases demonstrate bounded #328 failure consequences; other
+cases keep their refusal on exhaustion. The split case's fragment is cut by the
+lab, not by a failure. A moving rigid platen over one material, and severing
+and debris after failure, remain later Lab slices. #327 remains open.

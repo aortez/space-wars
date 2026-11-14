@@ -1,5 +1,5 @@
-//! A bounded, slow-motion application of native material loading, unloading and
-//! paired collisions and support collapse.
+//! A bounded, slow-motion application of native material loading, unloading,
+//! paired collisions, support collapse and region splits.
 use bincode::Options;
 use engine_common::{Action, Observation, RenderFrame, Scenario, StepResult, TickModel};
 use engine_material::{ARMOR, Material, WOOD};
@@ -17,8 +17,10 @@ use std::time::Duration;
 mod pair;
 mod render;
 mod scene;
+mod split;
 pub use pair::{Pair, PairBody};
 pub use render::controls as render_controls;
+pub use split::{Split, SplitBlock, Stage};
 #[cfg(test)]
 mod tests;
 
@@ -32,6 +34,7 @@ const LOAD_SAVE_MAGIC: &[u8; 8] = b"MATLAB02";
 const PAIR_SAVE_MAGIC: &[u8; 8] = b"MATLAB03";
 const FAILURE_SAVE_MAGIC: &[u8; 8] = b"MATLAB04";
 const PAIR_FAILURE_SAVE_MAGIC: &[u8; 8] = b"MATLAB05";
+const SPLIT_SAVE_MAGIC: &[u8; 8] = b"MATLAB06";
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Case {
@@ -46,6 +49,7 @@ pub enum Case {
     WoodArmor,
     SupportFailure,
     PairFailure,
+    RegionSplit,
 }
 /// Initial condition of one free body along the +x contact normal.
 #[derive(Clone, Copy)]
@@ -58,7 +62,7 @@ pub(crate) struct BodySetup {
     pub velocity: f32,
 }
 impl Case {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Elastic,
         Self::PlasticReturn,
         Self::Support,
@@ -68,6 +72,7 @@ impl Case {
         Self::WoodArmor,
         Self::SupportFailure,
         Self::PairFailure,
+        Self::RegionSplit,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -80,6 +85,7 @@ impl Case {
             Self::WoodArmor => "Wood meets armor",
             Self::SupportFailure => "Support gives way",
             Self::PairFailure => "Wood pair gives way",
+            Self::RegionSplit => "Wood split & rebuilt",
         }
     }
     /// The two free bodies of a paired collision, incoming body first. Both
@@ -126,6 +132,7 @@ impl Case {
             Self::WoodArmor => (0.0, 1.0 / 16.0, 512),
             Self::SupportFailure => (8000.0, 1.0 / 64.0, 144),
             Self::PairFailure => (0.0, 1.0 / 16.0, 192),
+            Self::RegionSplit => (0.0, split::GAP, 174),
         }
     }
     pub fn next(self) -> Self {
@@ -191,6 +198,7 @@ pub struct Event {
 pub struct MaterialLabState {
     world: PhysicsWorld,
     /// In body order; the ideal rigid platen of a fixed-support case has none.
+    /// The split case's wood token changes when its region moves.
     materials: [Option<RegionToken>; 2],
     pub case: Case,
     pub paused: bool,
@@ -200,6 +208,7 @@ pub struct MaterialLabState {
     pub events: Vec<Event>,
     pub stopped: Option<String>,
     load_changes: Vec<LoadChange>,
+    progress: split::Progress,
 }
 impl MaterialLabState {
     pub fn new(case: Case) -> Self {
@@ -215,6 +224,7 @@ impl MaterialLabState {
             events: Vec::new(),
             stopped: None,
             load_changes: Vec::new(),
+            progress: Default::default(),
         }
     }
     pub fn summary(&self) -> DynamicCompressionSummary {
@@ -232,6 +242,9 @@ impl MaterialLabState {
             .unwrap()
     }
     pub fn capacity(&self) -> f64 {
+        if self.case == Case::RegionSplit {
+            return self.split_capacity();
+        }
         let region = self.case.free_pair().map_or_else(
             || scene::support_region(self.case),
             |pair| scene::pair_region(pair[1]),
@@ -246,6 +259,14 @@ impl MaterialLabState {
     }
     pub fn collapsed(&self) -> bool {
         self.failure().is_some() || self.paired_failure().is_some()
+    }
+    /// Physical time of the run. The split case keeps no bounded-run summary.
+    pub fn elapsed(&self) -> f64 {
+        if self.case == Case::RegionSplit {
+            f64::from(self.steps) * f64::from(PHYSICS_DT)
+        } else {
+            self.summary().elapsed
+        }
     }
     pub fn weight(&self) -> f32 {
         -self.world.gravity().y * 20.0
@@ -262,6 +283,9 @@ impl MaterialLabState {
         }
         if self.case.free_pair().is_some() {
             return Err("A free pair takes no external load. Choose a platen case.".into());
+        }
+        if self.case == Case::RegionSplit {
+            return Err("The split case takes no external load. Choose a platen case.".into());
         }
         if self.stopped.is_some() {
             return Err("Run ended. Restart the case to change its load.".into());
@@ -288,6 +312,9 @@ impl MaterialLabState {
         Ok(())
     }
     pub fn guidance(&self) -> Option<&'static str> {
+        if self.case == Case::RegionSplit {
+            return self.stopped.is_none().then(|| self.split_guidance());
+        }
         if self.case == Case::PairFailure && self.stopped.is_none() {
             return Some(if self.collapsed() {
                 "Wood A has failed. Run to watch both bodies coast."
@@ -320,6 +347,17 @@ impl MaterialLabState {
         )
     }
     pub fn phase(&self) -> Phase {
+        if self.case == Case::RegionSplit {
+            // A strike is one impulse; its contact stays open until the
+            // separation grace ends.
+            return if self.impacts > self.separations {
+                Phase::Rebound
+            } else if self.world.motion(scene::body(0)).unwrap().linear_velocity.x > 0.0 {
+                Phase::Approach
+            } else {
+                Phase::Separated
+            };
+        }
         if self.collapsed() {
             return Phase::Collapsed;
         }
@@ -346,6 +384,9 @@ impl MaterialLabState {
     pub fn advance(&mut self) {
         if self.stopped.is_some() {
             return;
+        }
+        if self.case == Case::RegionSplit {
+            return self.advance_split();
         }
         let at = self.summary().elapsed;
         let result = if self.case == Case::SupportFailure {
@@ -427,12 +468,13 @@ impl MaterialLabState {
     pub fn diagnostics(&self) -> serde_json::Value {
         serde_json::json!({ "case": self.case.name(), "paused": self.paused, "steps": self.steps,
             "impacts": self.impacts, "separations": self.separations, "phase": self.phase(),
-            "summary": self.summary(), "remaining": self.remaining(), "events": self.events,
+            "summary": (self.case != Case::RegionSplit).then(|| self.summary()),
+            "remaining": self.remaining(), "events": self.events,
             "stopped": self.stopped, "weight": self.weight(),
             "gravity_impulse": self.gravity_impulse(), "load_changes": self.load_changes,
             "guidance": self.guidance(), "pair": self.pair(),
             "capacity": self.capacity(), "failure": self.failure(),
-            "paired_failure": self.paired_failure() })
+            "paired_failure": self.paired_failure(), "split": self.split() })
     }
     pub fn snapshot_bytes(&self) -> Result<Vec<u8>, String> {
         let save = Save {
@@ -446,7 +488,9 @@ impl MaterialLabState {
         };
         // Fixed-load cases have no command list in their save envelope.
         let plain = self.load_changes.is_empty() && self.case != Case::LoadRelease;
-        let mut bytes = if self.case == Case::PairFailure {
+        let mut bytes = if self.case == Case::RegionSplit {
+            SPLIT_SAVE_MAGIC
+        } else if self.case == Case::PairFailure {
             PAIR_FAILURE_SAVE_MAGIC
         } else if self.case == Case::SupportFailure {
             FAILURE_SAVE_MAGIC
@@ -478,6 +522,7 @@ impl MaterialLabState {
             || bytes.starts_with(PAIR_SAVE_MAGIC)
             || bytes.starts_with(FAILURE_SAVE_MAGIC)
             || bytes.starts_with(PAIR_FAILURE_SAVE_MAGIC)
+            || bytes.starts_with(SPLIT_SAVE_MAGIC)
         {
             let save: Save = codec()
                 .deserialize(&bytes[8..])
