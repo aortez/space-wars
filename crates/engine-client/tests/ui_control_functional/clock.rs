@@ -710,7 +710,23 @@ fn crow_trigger_pause_settings_and_restart_preserve_the_resident_contract() {
         let admitted = harness.require_clock("crow admission", result);
         let visit_id = admitted.crow.unwrap().visit_id;
         assert_eq!(admitted.event_kind, None);
-        assert_eq!((admitted.body_count, admitted.collider_count), (0, 0));
+        // The crow is a body in the arena, with a perch for each column it
+        // may land on and the floor the arena keeps under it. Its claim alone
+        // holds the arena, and its body and perches have a collider each.
+        let arena = admitted.arena.as_ref().expect("Clock publishes its arena");
+        let [crow] = arena.claims.as_slice() else {
+            panic!("the crow's claim alone holds the arena: {:?}", arena.claims);
+        };
+        assert_eq!(crow.owner, engine_common::ClockArenaOwner::Crow);
+        assert!(crow.population.bodies >= 1, "the crow's body: {crow:?}");
+        assert_eq!(crow.population.colliders, crow.population.bodies);
+        assert_eq!(
+            (admitted.body_count, admitted.collider_count),
+            (
+                crow.population.bodies + arena.floor.bodies,
+                crow.population.colliders + arena.floor.colliders
+            )
+        );
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
         let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
         let paused = harness.clock_state();
@@ -739,6 +755,7 @@ fn crow_trigger_pause_settings_and_restart_preserve_the_resident_contract() {
         let restarted = harness.clock_state();
         assert_ne!(restarted.scenario_revision, initial.scenario_revision);
         assert!(restarted.crow.is_none());
+        assert_eq!((restarted.body_count, restarted.collider_count), (0, 0));
         assert_eq!(restarted.settings, configured.settings);
         let saved: engine_common::Settings = toml::from_str(
             &fs::read_to_string(harness.run_path().join("config/settings.toml")).unwrap(),

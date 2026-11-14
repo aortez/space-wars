@@ -1,16 +1,24 @@
 //! The guest that gathers the coins: a magpie on the crow's flight
-//! controller. It is drawn, never a body. It picks a coin off the top of the
-//! pile as the pile actually lies, lands on the floor beside it, hops up to
-//! stand next to it, takes it in its beak and carries it out of view, home,
-//! and comes back for another while the batch's time allows. The coins it
-//! keeps are the return's shortfall, which the reassembly grows replacements
-//! for. One seeded stream decides the home side, the looks and the ties.
+//! controller, with a body in the world the coins lie in while it is in view.
+//! It picks a coin off the top of the pile as the pile actually lies, lands
+//! on what holds its feet beside it, hops up to stand next to it, takes it in
+//! its beak and carries it out of view, home, and comes back for another
+//! while the batch's time allows. The coin it takes leaves the world, and is
+//! drawn in its beak. The coins it keeps are the return's shortfall, which
+//! the reassembly grows replacements for. One seeded stream decides the home
+//! side, the looks and the ties.
 use engine_common::{ClockMagpiePhase as Phase, ClockMagpieState};
 use engine_core::Vec2;
+use engine_rapier::world::PhysicsWorld;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::Cell;
-use crate::{crow::Flight, events::duck::ArenaTerrain, floor::DrainGeometry, layout::Layout};
+use crate::{
+    crow::{Flight, body::MAGPIE},
+    events::duck::ArenaTerrain,
+    floor::DrainGeometry,
+    layout::Layout,
+};
 
 /// What holds a foot on the floor the coins lie on: the batch's own floor
 /// with its drain, or the terrain of the visit whose arena the coins fell
@@ -45,16 +53,30 @@ const EXIT_TICKS: u64 = 4 * 60;
 /// A magpie is quicker than the crow: this much, on the crow's controller.
 const HASTE: f32 = 1.5;
 /// What a trip costs beyond crossing at cruising speed: braking and coming
-/// down at the coin, the look, the hop, the take and climbing out. Measured
-/// at 230 to 290 ticks over the crossings (`coins_tests`); the rest is
-/// margin, so the bird is never still here when the return begins.
+/// down at the coin, the look, any hops, the take and climbing out. Measured
+/// at 178 to 441 ticks over the crossings, 211 at the median, with seeds 1
+/// to 12 at five layouts. A trip that runs longer than this allows is cut
+/// short at `EXIT_RESERVE`.
 const TRIP_OVERHEAD_TICKS: u64 = 330;
 /// Inside this much of the end the bird leaves, whatever it was doing.
 const EXIT_RESERVE: u64 = 150;
 const HOP_TICKS: u64 = 28;
+/// How long the bird finds its feet after a hop, before it reaches for the
+/// coin or hops again.
+const SETTLE_TICKS: u64 = 6;
+/// The fastest a hop comes down, in pitches a second.
+const HOP_DESCENT: f32 = 4.0;
+/// The hops a bird makes for one coin before it gives the trip up.
+const MAX_HOPS: u8 = 3;
+/// The most coins the bird carries off in one gathering.
+const MAX_TRIPS: u32 = 4;
 const TAKE_TICKS: u64 = 40;
 /// The tick of the take at which the coin leaves the pile for the beak.
 const TAKE_AT: u64 = 22;
+/// Where the beak's tip is with the head down, in pitches from the feet,
+/// facing right, and how far beyond a coin's edge it reaches.
+const BEAK: Vec2 = Vec2::new(0.945, 0.105);
+const REACH_PITCH: f32 = 0.35;
 
 /// The coin the bird is after, and where it lay when chosen: a coin that
 /// has moved since, or left the view, is chosen again.
@@ -66,6 +88,8 @@ struct Target {
     side: f32,
     /// Where it sets down for it: on what holds a foot beside the heap.
     landing: Vec2,
+    /// The hops it has made for this coin.
+    hops: u8,
 }
 
 pub(crate) struct Magpie {
@@ -178,6 +202,7 @@ impl Magpie {
                     position: cell.position,
                     side,
                     landing,
+                    hops: 0,
                 });
             }
         }
@@ -211,16 +236,99 @@ impl Magpie {
     }
 
     /// Standing next to the coin, with the beak over it: on the heap if the
-    /// coin is up on one, else on what is under the feet there.
+    /// coin is up on one, else on what is under the feet there. On the side
+    /// the bird came from, unless nothing would hold a foot there, as over
+    /// the drain or a pit, and something would on the other. Always inside
+    /// the frame, whose walls hold the coins in view but not the bird.
     fn beside(&self, target: Target, cell: &Cell, support: Support<'_>) -> Vec2 {
         let layout = self.layout;
-        let x = cell.position.x + target.side * layout.pitch * 0.8;
-        let ground = support.at(x).unwrap_or(layout.floor_y);
-        Vec2::new(x, (cell.position.y - cell.side * 0.5).max(ground))
+        let bottom = cell.position.y - cell.side * 0.5;
+        let margin = layout.frame_width + layout.pitch * 0.9;
+        let x = |side: f32| {
+            (cell.position.x + side * layout.pitch * 0.8)
+                .clamp(layout.bounds_min.x + margin, layout.bounds_max.x - margin)
+        };
+        let spot = |side: f32| {
+            support
+                .at(x(side))
+                .map(|ground| Vec2::new(x(side), bottom.max(ground)))
+        };
+        spot(target.side)
+            .or_else(|| spot(-target.side))
+            .unwrap_or_else(|| Vec2::new(x(target.side), bottom.max(layout.floor_y)))
     }
 
     fn grounded(&self) -> bool {
         matches!(self.phase, Phase::Landed | Phase::Taking)
+    }
+
+    /// How far beyond `cell`'s edge the beak's tip is, with the head down,
+    /// from where the bird stands now, facing it.
+    fn beak_gap(&self, cell: &Cell) -> f32 {
+        let facing = if cell.position.x >= self.position.x {
+            1.0
+        } else {
+            -1.0
+        };
+        let beak = self.position + Vec2::new(BEAK.x * facing, BEAK.y) * self.layout.pitch;
+        (cell.position - beak).length() - cell.side * 0.5
+    }
+
+    /// Whether the beak reaches `cell` from where the bird stands now.
+    fn reaches(&self, cell: &Cell) -> bool {
+        self.beak_gap(cell) <= self.layout.pitch * REACH_PITCH
+    }
+
+    /// What the bird takes from where it stands: the coin it came for if it
+    /// reaches it, else the nearest other coin it does. Standing up on a
+    /// heap, its feet are on coins higher than the one it came for, and the
+    /// ones in front of its beak are there to take.
+    fn within_reach(&self, cells: &[Cell]) -> Option<usize> {
+        if let Some(target) = self.target
+            && self.reaches(&cells[target.index])
+        {
+            return Some(target.index);
+        }
+        cells
+            .iter()
+            .enumerate()
+            .filter(|(_, cell)| self.available(cell) && self.reaches(cell))
+            .min_by(|(_, a), (_, b)| self.beak_gap(a).total_cmp(&self.beak_gap(b)))
+            .map(|(index, _)| index)
+    }
+
+    /// The bird finds its feet where it is, briefly, before it reaches for a
+    /// coin or hops again.
+    fn settle(&mut self) {
+        self.to = self.position;
+        self.phase = Phase::Landed;
+        self.phase_tick = 0;
+        self.duration = SETTLE_TICKS;
+        self.stand();
+    }
+
+    /// Standing keeps the bird's weight on its feet, and whatever holds them
+    /// takes it.
+    fn stand(&mut self) {
+        self.flight.velocity.y -=
+            crate::crow::flight::gravity(self.layout) * crate::crow::flight::DT;
+    }
+
+    /// A hop is a short arc to the spot beside the coin: the legs and a
+    /// flick of the wings carry the body along it, unless something is in
+    /// the way. It comes down no faster than `HOP_DESCENT` pitches a second,
+    /// so the bird settles onto a heap instead of knocking it about.
+    fn hop(&mut self) {
+        let mut velocity = crate::crow::flight::hop(
+            self.from,
+            self.to,
+            self.phase_tick,
+            self.duration,
+            self.position,
+            self.layout,
+        );
+        velocity.y = velocity.y.max(-self.layout.pitch * HOP_DESCENT);
+        self.flight.velocity = velocity;
     }
 
     fn travel(&mut self, to: Vec2, phase: Phase) {
@@ -294,7 +402,8 @@ impl Magpie {
 
     /// What a trip for `target` takes, from entering to being gone, at the
     /// controller's cruising speed: a trip the budget cannot hold is not
-    /// started, so the bird is away before the return and never cut off.
+    /// started. One that runs long is cut short at `EXIT_RESERVE`, which
+    /// leaves the bird the reserve and the return to fly out of view.
     fn trip_ticks(&self, target: Target, cell: &Cell, support: Support<'_>) -> u64 {
         let layout = self.layout;
         let width = layout.bounds_max.x - layout.bounds_min.x;
@@ -309,37 +418,75 @@ impl Magpie {
         ((approach + exit) / speed * 60.0) as u64 + TRIP_OVERHEAD_TICKS
     }
 
-    /// Lands at `to`: the feet set down there and the bird looks about for a
+    /// Lands where the feet are down: the bird looks about there for a
     /// seeded moment before it moves on.
     fn land(&mut self) {
-        self.position = self.to;
+        self.to = self.position;
         self.flight = Flight::hasty(HASTE);
         self.phase = Phase::Landed;
         self.phase_tick = 0;
         self.duration = self.rng.random_range(15..=45);
     }
 
-    /// One tick, given the batch's cells as they lie, how many ticks of
-    /// gathering remain and what holds a foot on the floor they lie on.
+    /// One tick before the step of the world the coins lie in, given the
+    /// batch's cells as they lie, how many ticks of gathering remain, what
+    /// holds a foot on the floor they lie on, and that world. The bird enters
+    /// it when a trip starts and leaves it when the bird is out of view.
     /// Returns the index of a coin the bird has just taken in its beak, which
     /// the caller takes out of the world.
-    pub fn step(&mut self, cells: &[Cell], remaining: u64, support: Support<'_>) -> Option<usize> {
+    pub fn step(
+        &mut self,
+        cells: &[Cell],
+        remaining: u64,
+        support: Support<'_>,
+        world: Option<&mut PhysicsWorld>,
+    ) -> Option<usize> {
         if self.phase == Phase::Away {
             if self.done {
                 return None;
             }
             self.position = self.home();
             self.flight = Flight::hasty(HASTE);
-            match self.choose(cells, support) {
-                Some(target)
-                    if remaining >= self.trip_ticks(target, &cells[target.index], support) =>
+            match (self.choose(cells, support), world) {
+                (Some(target), Some(world))
+                    if self.trips < MAX_TRIPS
+                        && remaining >= self.trip_ticks(target, &cells[target.index], support) =>
                 {
                     self.pursue(target, cells, support);
+                    MAGPIE.insert(world, self.position, self.flight.velocity, self.layout);
                 }
                 _ => self.done = true,
             }
             return None;
         }
+        let Some(world) = world else {
+            // The world went with the coins: so did the bird.
+            self.phase = Phase::Away;
+            self.carrying = None;
+            return None;
+        };
+        if let Some((position, velocity)) = MAGPIE.motion(world) {
+            self.position = position;
+            self.flight.velocity = velocity;
+        }
+        let footing = MAGPIE.footing(world, self.layout);
+        let taken = self.act(cells, remaining, support, footing);
+        if self.phase == Phase::Away {
+            MAGPIE.remove(world);
+        } else {
+            MAGPIE.drive(world, self.flight.velocity);
+        }
+        taken
+    }
+
+    /// The bird's decisions this tick, from where the last step left it.
+    fn act(
+        &mut self,
+        cells: &[Cell],
+        remaining: u64,
+        support: Support<'_>,
+        footing: bool,
+    ) -> Option<usize> {
         self.phase_tick += 1;
         if self.phase != Phase::Leaving && remaining <= EXIT_RESERVE {
             if self.carrying.is_some() {
@@ -366,78 +513,87 @@ impl Magpie {
         match self.phase {
             Phase::Away => unreachable!("handled above"),
             Phase::Entering | Phase::Flying => {
+                // What holds the feet decides the touchdown, not the
+                // controller: near the spot it is the landing, a little off
+                // the mark or not, on the floor, a coin or a platform's edge.
+                if footing {
+                    if (self.position.x - self.to.x).abs() <= layout.pitch * 1.5 {
+                        self.land();
+                        return None;
+                    }
+                    // A descent cut short by a retarget keeps its downward
+                    // momentum. Whatever is under the feet holds them up
+                    // wherever they are, and the wings start again from
+                    // there.
+                    self.flight.retarget(self.position, true, layout);
+                }
                 let cruise = self.cruise();
                 self.flight
-                    .step(&mut self.position, self.to, cruise, layout, false);
-                // What is under the feet decides the touchdown, not the
-                // controller: near the spot it is the landing, a little off
-                // the mark or not, and on a platform's edge or the floor
-                // below it as much as on the spot itself.
-                let mut landed = false;
-                if let Some(ground) = support.at(self.position.x)
-                    && self.position.y <= ground
-                {
-                    if (self.position.x - self.to.x).abs() <= layout.pitch * 1.5 {
-                        self.to = Vec2::new(self.position.x, ground);
-                        landed = true;
-                    } else {
-                        // A descent cut short by a retarget keeps its
-                        // downward momentum. Whatever is under the feet holds
-                        // them up wherever they are, and the wings start
-                        // again from there.
-                        self.position.y = ground;
-                        self.flight.retarget(self.position, true, layout);
-                    }
-                }
+                    .steer(self.position, self.to, cruise, layout, false);
                 if self.flight.velocity.x.abs() > layout.pitch * 0.2 {
                     self.facing_right = self.flight.velocity.x > 0.0;
                 }
-                if landed {
-                    self.land();
-                } else if self.phase_tick >= self.duration {
+                if self.phase_tick >= self.duration {
                     self.abandon();
                 }
             }
             Phase::Landed => {
                 if self.phase_tick >= self.duration {
-                    match self.target {
-                        Some(target) => {
-                            let beside = self.beside(target, &cells[target.index], support);
-                            self.travel(beside, Phase::Hopping);
-                        }
-                        None => self.abandon(),
-                    }
-                }
-            }
-            Phase::Hopping => {
-                let t = (self.phase_tick as f32 / self.duration as f32).min(1.0);
-                self.position = self.from * (1.0 - t)
-                    + self.to * t
-                    + Vec2::new(0.0, layout.pitch * 0.9 * 4.0 * t * (1.0 - t));
-                if self.phase_tick >= self.duration {
-                    self.position = self.to;
-                    match self.target {
-                        Some(target) if self.available(&cells[target.index]) => {
-                            self.facing_right = cells[target.index].position.x >= self.position.x;
+                    match (self.within_reach(cells), self.target) {
+                        (Some(index), Some(target)) => {
+                            let cell = &cells[index];
+                            self.target = Some(Target {
+                                index,
+                                position: cell.position,
+                                ..target
+                            });
+                            self.facing_right = cell.position.x >= self.position.x;
                             self.phase = Phase::Taking;
                             self.phase_tick = 0;
                             self.duration = TAKE_TICKS;
                         }
+                        (None, Some(mut target)) if target.hops < MAX_HOPS => {
+                            target.hops += 1;
+                            self.target = Some(target);
+                            let beside = self.beside(target, &cells[target.index], support);
+                            self.travel(beside, Phase::Hopping);
+                            self.hop();
+                            return None;
+                        }
                         _ => {
-                            self.phase = Phase::Landed;
-                            match self.choose(cells, support) {
-                                Some(target) => self.pursue(target, cells, support),
-                                None => self.abandon(),
-                            }
+                            self.abandon();
+                            return None;
                         }
                     }
+                }
+                self.stand();
+            }
+            Phase::Hopping => {
+                if self.phase_tick < self.duration {
+                    self.hop();
+                } else if footing || self.phase_tick >= self.duration * 2 {
+                    // The bird finds its feet where the hop ends, beside the
+                    // coin unless something was in the way.
+                    self.settle();
+                } else {
+                    // Its weight takes it down onto whatever will hold it.
+                    self.stand();
                 }
             }
             Phase::Taking => {
                 if self.phase_tick == TAKE_AT
-                    && let Some(target) = self.target.take()
+                    && let Some(target) = self.target
                 {
+                    if !self.reaches(&cells[target.index]) {
+                        // Something moved the bird off the coin before its
+                        // beak closed on it. It finds its feet where it is
+                        // and reaches again for what is in front of it.
+                        self.settle();
+                        return None;
+                    }
+                    self.target = None;
                     self.carrying = Some(cells[target.index].side);
+                    self.stand();
                     return Some(target.index);
                 }
                 if self.phase_tick >= self.duration {
@@ -446,19 +602,18 @@ impl Magpie {
                     } else {
                         self.abandon();
                     }
+                } else {
+                    self.stand();
                 }
             }
             Phase::Leaving => {
-                let cruise = self.cruise();
-                self.flight
-                    .step(&mut self.position, self.to, cruise, layout, true);
                 // Leaving from a descent, the feet are held up the same way.
-                if let Some(ground) = support.at(self.position.x)
-                    && self.position.y < ground
-                {
-                    self.position.y = ground;
+                if footing {
                     self.flight.retarget(self.position, true, layout);
                 }
+                let cruise = self.cruise();
+                self.flight
+                    .steer(self.position, self.to, cruise, layout, true);
                 if self.flight.velocity.x.abs() > layout.pitch * 0.2 {
                     self.facing_right = self.flight.velocity.x > 0.0;
                 }

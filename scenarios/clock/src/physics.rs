@@ -88,6 +88,14 @@ impl FallingWorld {
             } else {
                 canonical::FALLING_WALLS.start + (index - 2) as u64
             });
+            let mut collider = ColliderSpec::cuboid(
+                ColliderId::new(entity, ColliderRole::PRIMARY, 0),
+                (max.x - min.x) * 0.5,
+                (max.y - min.y) * 0.5,
+            );
+            if index >= 2 {
+                collider.collision_groups = crate::arena::FRAME;
+            }
             assert!(world.insert_body(
                 BodyId::new(entity, BodyRole::PRIMARY),
                 BodySpec {
@@ -95,11 +103,7 @@ impl FallingWorld {
                     position: (min + max) * 0.5,
                     ..BodySpec::default()
                 },
-                &[ColliderSpec::cuboid(
-                    ColliderId::new(entity, ColliderRole::PRIMARY, 0),
-                    (max.x - min.x) * 0.5,
-                    (max.y - min.y) * 0.5
-                )],
+                &[collider],
             ));
         }
         world

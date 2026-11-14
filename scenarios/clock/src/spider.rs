@@ -447,6 +447,12 @@ impl SpiderFixture {
         for part in FramePart::ALL {
             let (min, max) = part.rect(layout);
             let entity = part.entity();
+            let mut collider = ColliderSpec::cuboid(
+                ColliderId::new(entity, ColliderRole::PRIMARY, 0),
+                (max.x - min.x) * 0.5,
+                (max.y - min.y) * 0.5,
+            );
+            collider.collision_groups = crate::arena::FRAME;
             assert!(world.insert_body(
                 BodyId::new(entity, BodyRole::PRIMARY),
                 BodySpec {
@@ -454,11 +460,7 @@ impl SpiderFixture {
                     position: (min + max) * 0.5,
                     ..BodySpec::default()
                 },
-                &[ColliderSpec::cuboid(
-                    ColliderId::new(entity, ColliderRole::PRIMARY, 0),
-                    (max.x - min.x) * 0.5,
-                    (max.y - min.y) * 0.5,
-                )],
+                &[collider],
             ));
         }
         let mut fixture = Self {

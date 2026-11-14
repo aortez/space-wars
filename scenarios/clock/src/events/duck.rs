@@ -413,6 +413,7 @@ impl DuckEvent {
             height * 0.5,
         );
         wall.friction = 0.0;
+        wall.collision_groups = crate::arena::FRAME;
         assert!(world.insert_body(
             id,
             BodySpec {

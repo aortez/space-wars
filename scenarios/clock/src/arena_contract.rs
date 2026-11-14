@@ -20,9 +20,11 @@
 //! and the fixture moves on exactly as it would have alone. A visit, an event
 //! or a resident the arena has no room for is refused before anything
 //! changes, so the residents and everyone else holding the arena stay as they
-//! were. Debug builds audit every step: each body belongs to exactly one
-//! owner holding the arena, within its budget, and the world's identities
-//! name live objects one to one.
+//! were. The crow's room is kept for it, so it comes beside a full arena and
+//! no claim is refused because it is about, the duel apart. Debug builds
+//! audit every step: each body belongs to exactly one owner holding the
+//! arena, within its budget, and the world's identities name live objects
+//! one to one.
 //!
 //! A resize still finishes visits and events, but the residents stay in the
 //! same world. A ball beyond a narrower view comes in just far enough to lie
@@ -39,7 +41,10 @@ use crate::{
     ARENA_CAPACITY, ArenaAccounting, ClockAction, ClockConfig, ClockReading, ClockScenario,
     ClockState, EVENT_CATALOG, MAX_ARENA_CLAIMS, MAX_RESIDENT_CLAIMS, Population, Remap,
     Unavailable,
-    arena::{Owner, ids::canonical::ARENA_FLOOR},
+    arena::{
+        Owner,
+        ids::canonical::{ARENA_FLOOR, CROW, CROW_PERCHES},
+    },
     arena_fixture::{ArenaFixture, FixtureBall, FixtureBallState, FixtureStart},
     events::{COOLDOWN_TICKS, EventLifecycle, EventPhase, duck::arena::CourseGeometry},
     layout::Layout,
@@ -968,6 +973,106 @@ fn arena_contract_holds_no_more_residents_than_its_limit() {
     assert_eq!(state.arena_accounting().residents, MAX_RESIDENT_CLAIMS);
 }
 
+/// The crow holds the arena as a visit does. Beside a duck's visit and two
+/// fixtures it still comes, into room kept for it, and its being there
+/// changes no other claim's admission. When an event with no perches for it
+/// starts, it leaves, taking its claim and its bodies with it while the event
+/// goes on. Only the duel, which takes the arena whole, refuses it and is
+/// refused by it.
+#[test]
+fn arena_contract_the_crow_comes_and_goes_in_room_of_its_own() {
+    let mut state = plain();
+    state.admit_soil();
+    let fixture = state.default_arena_fixture();
+    assert_eq!(state.admit_arena_fixture(&fixture), Ok(0));
+    assert_eq!(state.admit_arena_fixture(&second_fixture()), Ok(1));
+    keep(&mut state, 60, "two fixtures and soil");
+    state.preview_event(ClockEventKind::Duck);
+    keep(&mut state, 1, "the visit claiming the arena");
+    let blocked = |state: &ClockState| {
+        ClockEventKind::ALL
+            .map(|kind| (kind, state.event_blocked_by_arena(kind)))
+            .to_vec()
+    };
+    let before = blocked(&state);
+    assert!(before.contains(&(ClockEventKind::Meltdown, Some(Unavailable::Capacity))));
+    assert!(before.contains(&(ClockEventKind::Crow, None)));
+    let refused = state.arena_accounting().refused;
+    ClockScenario::step(
+        &mut state,
+        &[ClockAction::preview_event(ClockEventKind::Crow)],
+        Duration::ZERO,
+    );
+    assert!(state.crow_state().is_some());
+    keep(&mut state, 30, "the crow beside the visit");
+    assert_eq!(
+        state.arena.owners(),
+        [
+            Owner::Fixture(0),
+            Owner::Fixture(1),
+            Owner::Soil,
+            Owner::Visit,
+            Owner::Crow
+        ]
+    );
+    assert_eq!(blocked(&state), before);
+    assert_eq!(state.arena_accounting().refused, refused);
+
+    // With the second fixture gone Meltdown shares the visit's arena with
+    // the crow, which has no perch in it and leaves.
+    assert!(state.remove_arena_fixture(1));
+    state.preview_event(ClockEventKind::Meltdown);
+    assert!(state.arena.holds(Owner::Event(ClockEventKind::Meltdown)));
+    assert!(state.arena.holds(Owner::Crow));
+    let crow = |state: &ClockState| {
+        state
+            .arena
+            .world()
+            .unwrap()
+            .body_ids()
+            .filter(|id| {
+                CROW.contains(&id.entity.value()) || CROW_PERCHES.contains(&id.entity.value())
+            })
+            .count()
+    };
+    let mut ticks = 0;
+    while state.crow_state().is_some() {
+        keep(&mut state, 1, "the crow leaving Meltdown");
+        ticks += 1;
+        assert!(ticks < 10 * 60, "the crow is gone");
+        if state.crow_state().is_some() {
+            assert_eq!(crow(&state), 1, "its body alone, with no perch to land on");
+        }
+    }
+    assert!(!state.arena.holds(Owner::Crow));
+    assert!(state.arena.holds(Owner::Event(ClockEventKind::Meltdown)));
+    assert_eq!(crow(&state), 0, "the crow took its bodies with it");
+    keep(&mut state, 30, "Meltdown after the crow");
+
+    // The duel takes the arena whole.
+    let mut state = plain();
+    state.preview_event(ClockEventKind::Crow);
+    keep(&mut state, 1, "the crow alone");
+    assert_eq!(
+        state.event_blocked_by_arena(ClockEventKind::Tanks),
+        Some(Unavailable::Capacity)
+    );
+    state.finish_crow_visit();
+    assert!(state.arena.owners().is_empty());
+    state.preview_event(ClockEventKind::Tanks);
+    assert_eq!(state.event_kind(), Some(ClockEventKind::Tanks));
+    assert_eq!(
+        state.event_blocked_by_arena(ClockEventKind::Crow),
+        Some(Unavailable::Capacity)
+    );
+    state.preview_event(ClockEventKind::Crow);
+    assert!(state.crow_state().is_none());
+    assert_eq!(
+        state.event_notice.map(|(notice, _)| notice),
+        Some("Tanks is using the arena")
+    );
+}
+
 /// A view 480 wide, narrower than the ordinary 800, so that balls resting
 /// beyond 240 to either side lie outside it.
 const NARROW: f32 = 1.0;
@@ -1089,10 +1194,12 @@ fn arena_contract_keeps_its_world_when_the_fixture_cannot_come_in_as_it_is() {
     assert_eq!(floor_reach(&state), Some((-400.0, 400.0)));
     assert_eq!(balls(&state).len(), 3);
 
-    // Nothing that uses the floor starts meanwhile, nor the spider, which
-    // is refused while the residents do not fit the view.
+    // Nothing that uses the floor starts meanwhile, nor the spider or the
+    // crow, which rest on the arena's floor and are refused while the
+    // residents do not fit the view.
     for kind in ClockEventKind::ALL {
-        let refused = EVENT_CATALOG[kind as usize].uses_floor() || kind == ClockEventKind::Spider;
+        let refused = EVENT_CATALOG[kind as usize].uses_floor()
+            || matches!(kind, ClockEventKind::Spider | ClockEventKind::Crow);
         assert_eq!(
             state.event_blocked_by_arena(kind),
             refused.then_some(Unavailable::LayoutIncompatible),

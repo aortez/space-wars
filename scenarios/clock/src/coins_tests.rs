@@ -6,6 +6,7 @@
 //! tests there; one shared-arena pass and one duck contact here prove the
 //! batch reaches the run's arena as Coins.
 use super::*;
+use crate::crow::body::MAGPIE;
 use engine_common::{ClockFloorMode, ClockFont, ClockFontSettings, ClockMagpiePhase};
 use engine_core::Vec2;
 use engine_rapier::world::{BodyId, BodyRole, ColliderId, ColliderRole, PhysicsId};
@@ -18,6 +19,50 @@ use events::explosion::{
 const GATHERING_AT: u64 = WARNING_TICKS + CASCADE_TICKS;
 /// The return, once the gathering is up.
 const REFORMING_AT: u64 = GATHERING_AT + GATHERING_TICKS;
+
+/// The world the coins lie in, the batch's own or the arena it shares, if
+/// the coins are still in one.
+fn coins_world(state: &ClockState) -> Option<&engine_rapier::world::PhysicsWorld> {
+    state
+        .active_event
+        .as_ref()
+        .and_then(ActiveEvent::own_world)
+        .or_else(|| state.arena.world())
+}
+
+/// Whether something holds the bird up where its feet are, judged from where
+/// things lie and not from the bird's contacts: its feet are on the course's
+/// top or on top of another body, such as the duck's door at the edge of the
+/// view, or its body rests on a coin lying under it.
+fn held_up(state: &ClockState, course: Support<'_>, feet: Vec2, layout: Layout) -> bool {
+    let near = layout.pitch * 0.05;
+    let radius = layout.pitch * crate::crow::body::RADIUS_PITCH;
+    let body = feet + Vec2::new(0.0, radius);
+    let on_course = course
+        .at(feet.x)
+        .is_some_and(|top| (feet.y - top).abs() < near);
+    let on_coin = cells(state).iter().any(|cell| {
+        !cell.taken
+            && cell.position.y < body.y
+            && (cell.position - body).length() < radius + cell.side * 0.5 + near
+    });
+    let on_body = coins_world(state).is_some_and(|world| {
+        world.body_ids().filter(|id| *id != MAGPIE.id()).any(|id| {
+            world.body_solid_bounds(id).is_some_and(|(min, max)| {
+                (feet.y - max.y).abs() < near && feet.x > min.x - radius && feet.x < max.x + radius
+            })
+        })
+    });
+    on_course || on_coin || on_body
+}
+
+/// Whether the magpie is in view, and so a body in the coins' world.
+fn bird_in_view(state: &ClockState) -> bool {
+    state
+        .coins_state()
+        .and_then(|coins| coins.magpie)
+        .is_some_and(|bird| bird.phase != ClockMagpiePhase::Away)
+}
 
 fn ready(aspect: f32, seed: u64, format: ClockTimeFormat) -> ClockState {
     let mut state = ClockScenario::init(
@@ -163,14 +208,16 @@ fn seeded_cascades_replay_and_finish_with_bounded_physics_at_every_aspect() {
                     assert_eq!(cells(&a), cells(&b), "aspect={aspect} seed={seed} tick={t}");
                     assert_eq!(a.coins_state(), b.coins_state());
                     let taken = a.coins_state().unwrap().taken as usize;
+                    let bird = usize::from(bird_in_view(&a));
                     let expected = if t < WARNING_TICKS {
                         (EventPhase::Minting, 4)
                     } else if t < GATHERING_AT {
                         (EventPhase::Cascading, count + 4)
                     } else if t < REFORMING_AT {
                         // The magpie takes its coins out of the world as it
-                        // takes them out of the pile.
-                        (EventPhase::Gathering, count + 4 - taken)
+                        // takes them out of the pile, and is a body in it
+                        // while it is in view.
+                        (EventPhase::Gathering, count + 4 - taken + bird)
                     } else {
                         (EventPhase::Reforming, 0)
                     };
@@ -471,9 +518,12 @@ fn bird_primitives(state: &ClockState) -> (usize, usize) {
 /// device layout, taking a coin off the top of the pile each time and
 /// carrying it out of view, and is away before the return begins. Each coin
 /// it keeps leaves the world when it leaves the pile, its surface retires as
-/// taken, and the return grows a replacement for it from the pile.
+/// taken, and the return grows a replacement for it from the pile. In view
+/// the bird is a body in the coins' world, which in the air moves as fast as
+/// its velocity says.
 #[test]
 fn the_magpie_takes_three_or_four_coins_and_is_gone_before_the_return() {
+    let mut phases = std::collections::BTreeSet::new();
     for (aspect, seed) in [
         (4.0 / 3.0, 1),
         (800.0 / 480.0, 2),
@@ -497,19 +547,26 @@ fn the_magpie_takes_three_or_four_coins_and_is_gone_before_the_return() {
             ticks(&mut state, 1);
         }
         assert_eq!(state.event_phase(), Some(EventPhase::Gathering));
-        let mut phases = std::collections::BTreeSet::new();
         let mut last_seen = 0;
         let mut carried_frames = 0;
         let mut trip_lengths = Vec::new();
         let mut trip_started = None;
+        let mut flights = 0;
         for tick in 0..GATHERING_TICKS {
             let coins = state.coins_state().unwrap();
             let bird = coins.magpie.unwrap();
             phases.insert(bird.phase);
+            let in_view = bird.phase != ClockMagpiePhase::Away;
             assert_eq!(
                 state.body_count(),
-                count + 4 - coins.taken as usize,
-                "{context} tick {tick}: a taken coin has left the world, and the bird has no body"
+                count + 4 - coins.taken as usize + usize::from(in_view),
+                "{context} tick {tick}: a taken coin has left the world, and the bird in view is a body in it"
+            );
+            assert_eq!(
+                coins_world(&state)
+                    .is_some_and(|world| world.body_ids().any(|id| id == MAGPIE.id())),
+                in_view,
+                "{context} tick {tick}"
             );
             assert_eq!(
                 coins.live_cells as usize,
@@ -553,8 +610,30 @@ fn the_magpie_takes_three_or_four_coins_and_is_gone_before_the_return() {
                 trip_lengths.push(tick - started);
             }
             carried_frames += usize::from(bird.carrying);
+            let flying = matches!(
+                bird.phase,
+                ClockMagpiePhase::Entering | ClockMagpiePhase::Flying | ClockMagpiePhase::Leaving
+            );
+            let before = coins_world(&state)
+                .and_then(|world| world.motion(MAGPIE.id()))
+                .map(|motion| motion.position);
             ticks(&mut state, 1);
+            // In the air, touching nothing, the step moves the body by the
+            // velocity it ends the step with.
+            if let (true, Some(before), Some(world)) = (flying, before, coins_world(&state))
+                && let Some(motion) = world.motion(MAGPIE.id())
+                && world.body_contact_push(MAGPIE.id()).is_none()
+            {
+                let moved = (motion.position - before) * FIXED_HZ as f32;
+                assert!(
+                    (moved - motion.linear_velocity).length() < layout.pitch * 0.01,
+                    "{context} tick {tick}: moved at {moved:?}, flying at {:?}",
+                    motion.linear_velocity
+                );
+                flights += 1;
+            }
         }
+        assert!(flights > 120, "{context}: {flights} ticks in flight");
         let coins = state.coins_state().unwrap();
         let bird = coins.magpie.unwrap();
         assert_eq!(
@@ -578,15 +657,6 @@ fn the_magpie_takes_three_or_four_coins_and_is_gone_before_the_return() {
             "{context}: the bird is out of view when the coins fly home"
         );
         assert!(carried_frames > 60, "{context}");
-        for phase in [
-            ClockMagpiePhase::Entering,
-            ClockMagpiePhase::Landed,
-            ClockMagpiePhase::Hopping,
-            ClockMagpiePhase::Taking,
-            ClockMagpiePhase::Leaving,
-        ] {
-            assert!(phases.contains(&phase), "{context}: no {phase:?}");
-        }
         println!(
             "magpie: {context} count={count} taken={} trips of {:?} ticks, gone after tick {last_seen} of {GATHERING_TICKS}",
             coins.taken, trip_lengths
@@ -607,6 +677,17 @@ fn the_magpie_takes_three_or_four_coins_and_is_gone_before_the_return() {
             u64::from(coins.taken),
             "{context}"
         );
+    }
+    // A bird that sets down within reach of its coin takes it without a
+    // hop, so the layouts between them show every phase.
+    for phase in [
+        ClockMagpiePhase::Entering,
+        ClockMagpiePhase::Landed,
+        ClockMagpiePhase::Hopping,
+        ClockMagpiePhase::Taking,
+        ClockMagpiePhase::Leaving,
+    ] {
+        assert!(phases.contains(&phase), "no {phase:?}");
     }
 }
 
@@ -745,10 +826,15 @@ fn the_magpie_takes_coins_out_of_the_shared_arena() {
     while state.event_phase() == Some(EventPhase::Gathering) {
         let coins = state.coins_state().unwrap();
         assert!(coins.shared_arena);
-        assert_eq!(state.body_count(), base.0 + count - coins.taken as usize);
+        // The bird is a body in the arena while it is in view.
+        let bird = usize::from(bird_in_view(&state));
+        assert_eq!(
+            state.body_count(),
+            base.0 + count - coins.taken as usize + bird
+        );
         assert_eq!(
             state.collider_count(),
-            base.1 + count - coins.taken as usize
+            base.1 + count - coins.taken as usize + bird
         );
         assert!(
             state
@@ -833,7 +919,12 @@ fn the_magpie_lands_on_the_course_it_shares_with_a_duck() {
         assert!(state.coins_state().unwrap().shared_arena);
         ticks(&mut state, GATHERING_AT);
         let mut landings = 0;
+        // A landing the bird has not yet been seen held up after, with the
+        // tick and the feet it landed with.
+        let mut unheld: Option<(u64, Vec2)> = None;
+        let mut tick = 0;
         while state.event_phase() == Some(EventPhase::Gathering) {
+            tick += 1;
             let bird = magpie(&state);
             let feet = feet(&state);
             let terrain = state
@@ -856,12 +947,20 @@ fn the_magpie_lands_on_the_course_it_shares_with_a_duck() {
                 }
                 if bird.phase == ClockMagpiePhase::Landed && bird.phase_tick == 0 {
                     landings += 1;
-                    let top = support.at(feet.x);
-                    assert!(
-                        top.is_some_and(|top| (feet.y - top).abs() < 0.01),
-                        "seed {seed}: landed at {feet:?} with {top:?} under the feet"
-                    );
+                    unheld = Some((tick, feet));
                 }
+            }
+            // It sets down on what is there, the course or the coins lying
+            // on it, never over the pit: what it lands on holds it up within
+            // the few ticks it takes to settle from the touchdown's bounce.
+            if unheld.is_some() && held_up(&state, support, feet, layout) {
+                unheld = None;
+            }
+            if let Some((landed, at)) = unheld {
+                assert!(
+                    tick - landed <= 10,
+                    "seed {seed}: landed at {at:?} with nothing under the feet"
+                );
             }
             ticks(&mut state, 1);
         }

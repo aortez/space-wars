@@ -26,6 +26,8 @@ fixed simulation tick, seeded decisions, and native renderer.
 - A last-moment abandoned descent still respects the surviving floor, including
   the actual tilted panel surface and its open drain gap.
   Ground trips add no Rapier bodies, colliders, food actors, or physics world.
+  (Since #633 the crow itself is a body in the run's arena; see
+  [Crow visitor](../clock.md#crow-visitor).)
 
 ## Water response
 

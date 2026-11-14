@@ -226,6 +226,10 @@ pub struct BodySpec {
     pub gravity_scale: f32,
     pub can_sleep: bool,
     pub ccd_enabled: bool,
+    /// How far ahead along its motion the body's contacts are predicted,
+    /// so that it stops at a surface it reaches within a step instead of
+    /// sinking into it first. Zero predicts none.
+    pub soft_ccd_prediction: f32,
     pub additional_solver_iterations: usize,
 }
 
@@ -243,6 +247,7 @@ impl Default for BodySpec {
             gravity_scale: 1.0,
             can_sleep: true,
             ccd_enabled: false,
+            soft_ccd_prediction: 0.0,
             additional_solver_iterations: 0,
         }
     }
@@ -1231,6 +1236,21 @@ impl PhysicsWorld {
         }
         collider.set_shape(SharedShape::cuboid(half.x, half.y));
         collider.set_translation_wrt_parent(to_rapier(local_position));
+        self.invalidate_gravity(GravityInvalidation::ExternalEdit);
+        true
+    }
+
+    /// Changes what a collider meets: `groups` take the place of its
+    /// collision groups, and the next step makes and drops its contacts by
+    /// them. False for a collider the world does not have.
+    pub fn set_collision_groups(&mut self, id: ColliderId, groups: CollisionGroups) -> bool {
+        let Some(handle) = self.collider_handle(id) else {
+            return false;
+        };
+        let Some(collider) = self.raw.colliders.get_mut(handle) else {
+            return false;
+        };
+        collider.set_collision_groups(groups.to_rapier());
         self.invalidate_gravity(GravityInvalidation::ExternalEdit);
         true
     }
@@ -3511,6 +3531,7 @@ fn build_body(id: BodyId, spec: BodySpec) -> RigidBody {
         .gravity_scale(spec.gravity_scale)
         .can_sleep(spec.can_sleep)
         .ccd_enabled(spec.ccd_enabled)
+        .soft_ccd_prediction(spec.soft_ccd_prediction)
         .additional_solver_iterations(spec.additional_solver_iterations)
         .user_data(encode_body(id))
         .build()

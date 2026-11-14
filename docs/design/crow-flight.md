@@ -6,6 +6,12 @@ the same seeded perch selection, nearby-hop priority, hop parabola, perch waits,
 support invalidation, resident admission and 22-second visit limit remain.
 Food, pecking, ground visits and water interactions are later work.
 
+Since #633 the controller steers a body in the run's arena instead: it sets
+the crow's velocity before each step and the world moves it, against real
+perches, the floor and whatever else is there. The study below describes the
+slice as it was built; [Crow visitor](../clock.md#crow-visitor) describes the
+crow today.
+
 ## Motion and boundaries
 
 `scenarios/clock/src/crow/flight.rs` owns a small fixed-size state: velocity,

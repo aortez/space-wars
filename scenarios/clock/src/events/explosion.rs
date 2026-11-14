@@ -442,8 +442,24 @@ impl ExplosionEvent {
             (Debris::Coins, EventPhase::Gathering) => self.tick >= GATHERING_TICKS,
             _ => false,
         };
+        // The batch's world, and the terrain of the visit whose arena the
+        // coins lie in, whether its character is still there or not.
+        let standalone = matches!(self.mechanics, Mechanics::Standalone(_));
+        let (mut world, terrain) = match &mut self.mechanics {
+            Mechanics::Standalone(world) => (world.as_deref_mut(), None),
+            Mechanics::Shared => match visit {
+                Some(duck) => (arena.world_mut(), Some(&duck.terrain)),
+                None if arena.vacant.is_some() => {
+                    let (terrain, world) = arena.vacant_with_world().expect("vacant terrain");
+                    (Some(world), Some(&*terrain))
+                }
+                None => (arena.world_mut(), None),
+            },
+        };
+        debug_assert!(standalone || world.is_some(), "a leased arena");
         // The guest acts on the pile as it lies, and keeps going through the
-        // return so that it is never cut off in the air.
+        // return, so that a bird leaving at the reserve has until the event
+        // ends to fly out of view.
         let taken = match &mut self.guest {
             Some(guest) if matches!(self.phase, EventPhase::Gathering | EventPhase::Reforming) => {
                 let remaining = if self.phase == EventPhase::Gathering {
@@ -452,24 +468,14 @@ impl ExplosionEvent {
                     0
                 };
                 // What the bird sets down on: the batch's own floor with its
-                // drain, or the terrain of the visit whose arena the coins lie
-                // in, whether its character is still there or not.
+                // drain, or the visit's terrain.
                 let support = match self.drain {
                     Some(drain) => Support::Drain(drain),
-                    None => Support::Terrain(
-                        visit
-                            .map(|duck| &duck.terrain)
-                            .or(arena.vacant.as_ref())
-                            .expect("one shared arena owner"),
-                    ),
+                    None => Support::Terrain(terrain.expect("one shared arena owner")),
                 };
-                guest.step(&self.cells, remaining, support)
+                guest.step(&self.cells, remaining, support, world.as_deref_mut())
             }
             _ => None,
-        };
-        let world = match &mut self.mechanics {
-            Mechanics::Standalone(world) => world.as_deref_mut(),
-            Mechanics::Shared => Some(arena.world_mut().expect("leased arena")),
         };
         debug_assert!(
             taken.is_none() || world.is_some(),
@@ -543,7 +549,11 @@ impl ExplosionEvent {
             self.phase = EventPhase::Gathering;
             self.tick = 0;
         } else if reform {
-            if let Mechanics::Standalone(world) = &mut self.mechanics {
+            // The batch's own world goes with the pile, unless the magpie is
+            // still flying in it: it goes when the bird does.
+            if let Mechanics::Standalone(world) = &mut self.mechanics
+                && !self.guest.as_ref().is_some_and(Magpie::in_view)
+            {
                 *world = None;
             }
             // What the magpie kept is the return's shortfall: the batch is
@@ -555,6 +565,12 @@ impl ExplosionEvent {
             self.phase = EventPhase::Reforming;
             self.tick = 0;
             digits::apply_snapshot(segments, display);
+        } else if self.phase == EventPhase::Reforming
+            && let Mechanics::Standalone(world) = &mut self.mechanics
+            && world.is_some()
+            && !self.guest.as_ref().is_some_and(Magpie::in_view)
+        {
+            *world = None;
         }
         self.phase == EventPhase::Reforming && self.tick >= REFORMING_TICKS
     }
@@ -793,6 +809,9 @@ impl ExplosionEvent {
     }
     pub fn release(&mut self, player: Option<&mut DuckEvent>, arena: &mut ClockArena) {
         if let Mechanics::Shared = self.mechanics {
+            if let Some(world) = arena.world_mut() {
+                crate::crow::body::MAGPIE.remove(world);
+            }
             if self.live_bodies {
                 Self::remove_bodies(
                     self.debris,

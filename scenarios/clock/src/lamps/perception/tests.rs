@@ -659,6 +659,52 @@ fn a_body_held_against_a_pull_takes_no_knock_and_a_thrown_one_only_its_blow() {
     assert!((impacts[0].strength - blow).abs() < 1e-3, "{impacts:?}");
 }
 
+/// The birds are bodies in the scene's worlds, so the lamps see them as
+/// they see anything else that moves, with no lamp code naming them: the
+/// crow in the arena's world, and the magpie in the coins' own.
+#[test]
+fn the_lamps_see_the_birds_fly() {
+    use crate::crow::body::{CROW, MAGPIE, RADIUS_PITCH};
+    for (kind, bird, world) in [
+        (ClockEventKind::Crow, CROW, 0),
+        (ClockEventKind::Coins, MAGPIE, 1),
+    ] {
+        let mut state = clock(ClockEventProfile::Off, 7);
+        let middle = Vec2::new(0.0, Layout::new(state.aspect_ratio()).pitch * RADIUS_PITCH);
+        ClockScenario::step(
+            &mut state,
+            &[ClockAction::preview_event(kind)],
+            Duration::ZERO,
+        );
+        let mut seen = 0;
+        for _ in 0..30 * FIXED_HZ {
+            ClockScenario::step(&mut state, &[], TICK);
+            let Some(mover) = percepts(&state)
+                .movers
+                .iter()
+                .find(|mover| mover.body == bird.id())
+            else {
+                continue;
+            };
+            let worlds = ClockState::scene_worlds(&state.arena, state.active_event.as_ref());
+            let motion = worlds[world]
+                .and_then(|world| world.motion(bird.id()))
+                .expect("the bird's body");
+            assert_eq!(mover.world, world, "{kind:?}");
+            assert!(
+                (mover.position - (motion.position + middle)).length() < 1e-3,
+                "{kind:?}: {mover:?} {motion:?}"
+            );
+            assert!(
+                (mover.velocity - motion.linear_velocity).length() < 1e-3,
+                "{kind:?}: {mover:?} {motion:?}"
+            );
+            seen += 1;
+        }
+        assert!(seen > 60, "{kind:?}: seen for {seen} ticks");
+    }
+}
+
 #[test]
 fn the_lamps_perceive_what_changes_in_the_scene() {
     let mut state = clock(ClockEventProfile::Off, 7);

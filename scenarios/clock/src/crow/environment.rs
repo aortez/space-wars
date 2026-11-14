@@ -1,6 +1,6 @@
 //! Read-only water sensing and two clear approaches beside the digit face.
 use super::WaterTolerance;
-use crate::{floor::responsive::ResponsiveFloor, layout::Layout};
+use crate::layout::Layout;
 use engine_core::Vec2;
 use engine_water::WaterWorld;
 
@@ -9,23 +9,9 @@ pub(crate) struct Environment<'a> {
     pub water: Option<&'a WaterWorld>,
     /// Only the ordinary floor or fully closed rain panels support this slice.
     pub ground_available: bool,
-    /// Even an ineligible moving panel remains a real foot-contact surface.
-    pub panels: Option<&'a ResponsiveFloor>,
 }
 
 impl Environment<'_> {
-    pub fn floor_support(self, x: f32, layout: Layout) -> Option<f32> {
-        if x < layout.bounds_min.x || x > layout.bounds_max.x {
-            return None;
-        }
-        if let Some(panels) = self.panels {
-            (f64::from(x.abs()) > panels.opening * panels.shape.max_gap)
-                .then(|| panels.shape.surface_y(f64::from(x), panels.opening) as f32)
-        } else {
-            self.ground_available.then_some(layout.floor_y)
-        }
-    }
-
     /// Detect pooled water above this visitor's tolerated depth at either foot.
     pub fn wet_feet(self, feet: Vec2, layout: Layout, tolerance: WaterTolerance) -> bool {
         self.water.is_some_and(|water| {

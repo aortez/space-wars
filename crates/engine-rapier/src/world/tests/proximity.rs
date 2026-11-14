@@ -245,3 +245,48 @@ fn a_body_s_contacts_push_and_drag_it_by_their_impulses_over_its_mass() {
         "{push:?} {change:?}"
     );
 }
+
+/// What a collider meets is what its groups say, and changing them changes
+/// its contacts from the next step: a floor that stops meeting a ball resting
+/// on it lets the ball fall through.
+#[test]
+fn changed_collision_groups_take_effect_at_the_next_step() {
+    let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+        gravity: Vec2::new(0.0, -10.0),
+        ..PhysicsWorldConfig::default()
+    });
+    assert!(world.insert_body(
+        body(1),
+        BodySpec {
+            kind: BodyKind::Fixed,
+            ..BodySpec::default()
+        },
+        &[ColliderSpec::cuboid(collider(1), 10.0, 1.0)],
+    ));
+    let mut ball = ColliderSpec::ball(collider(2), 0.5);
+    ball.collision_groups = CollisionGroups::new(1, u32::MAX);
+    assert!(world.insert_body(
+        body(2),
+        BodySpec {
+            position: Vec2::new(0.0, 1.6),
+            can_sleep: false,
+            ..BodySpec::default()
+        },
+        &[ball],
+    ));
+    for _ in 0..60 {
+        world.step(DT);
+    }
+    let resting = world.motion(body(2)).unwrap().position;
+    assert!((resting.y - 1.5).abs() < 0.05, "{resting:?}");
+    assert!(world.body_contact_push(body(2)).is_some());
+    assert!(world.set_collision_groups(collider(1), CollisionGroups::new(u32::MAX, !1)));
+    world.step(DT);
+    assert_eq!(world.body_contact_push(body(2)), None);
+    for _ in 0..30 {
+        world.step(DT);
+    }
+    let fallen = world.motion(body(2)).unwrap().position;
+    assert!(fallen.y < resting.y - 1.0, "{fallen:?}");
+    assert!(!world.set_collision_groups(collider(99), CollisionGroups::ALL));
+}

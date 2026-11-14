@@ -67,6 +67,8 @@ pub enum ClockArenaOwner {
     Fixture { index: u8 },
     /// The spider, a temporary actor that climbs the digits and the frame.
     Spider,
+    /// The crow, a temporary actor that perches on the digits.
+    Crow,
 }
 
 /// Why the arena could not take a claim or start an event. Nothing changed:
