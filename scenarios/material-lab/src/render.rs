@@ -46,7 +46,9 @@ pub fn frame(s: &MaterialLabState) -> RenderFrame {
         &mut f,
         -17.0,
         10.3,
-        if pair.is_some() {
+        if s.case == Case::PairFailure {
+            "MATERIAL LAB  /  PAIRED COLLAPSE"
+        } else if pair.is_some() {
             "MATERIAL LAB  /  PAIRED COLLISION"
         } else if s.case == Case::SupportFailure {
             "MATERIAL LAB  /  SUPPORT FAILURE"

@@ -157,8 +157,8 @@ handoff, not all of #327.
 ## Application demonstration
 
 The [Material Lab](material-lab.md) hosts five load-controlled falling-platen cases,
-including a guided load/release/return, plus two free-pair collisions and an
-opt-in [collapsing support](material-support-failure.md). It provides slow playback,
+including a guided load/release/return, plus two free-pair collisions and
+opt-in [fixed-support and paired collapse](material-support-failure.md). It provides slow playback,
 pause, single step and a persistent save slot that replays load history. It uses
 this native path and its [changing-load extension](material-changing-load.md)
 within their physical and numerical restrictions.

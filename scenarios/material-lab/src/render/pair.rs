@@ -22,6 +22,7 @@ const MOTION: C = C::rgb(0.224, 0.529, 0.898);
 const DAMAGE: C = C::rgb(0.851, 0.349, 0.149);
 const ELASTIC: C = C::rgb(0.098, 0.62, 0.439);
 const VISCOUS: C = C::rgb(0.788, 0.522, 0.0);
+const COLLAPSE: C = C::rgb(0.68, 0.45, 0.72);
 
 pub fn draw(f: &mut RenderFrame, s: &MaterialLabState, pair: &Pair) {
     // Arrows are scaled to the fastest body at the start of the case.
@@ -44,7 +45,9 @@ pub fn draw(f: &mut RenderFrame, s: &MaterialLabState, pair: &Pair) {
     );
     table(f, pair);
     ledger(f, pair);
-    history(f, s, 4.5, -2.0);
+    // A collapse adds a ledger row, so the history moves down one row.
+    let shift = if pair.collapse_loss > 0.0 { ROW } else { 0.0 };
+    history(f, s, 4.5, -2.0 - shift);
 }
 
 /// One body, shortened by its own layer's deformation at the contact face.
@@ -64,7 +67,9 @@ fn block(f: &mut RenderFrame, index: usize, body: &PairBody, fastest: f32) {
         BOTTOM,
         width,
         HEIGHT,
-        if wood {
+        if body.failed {
+            C::rgb(0.19, 0.17, 0.15)
+        } else if wood {
             C::rgb(0.36, 0.24, 0.13)
         } else {
             C::rgb(0.27, 0.33, 0.41)
@@ -79,12 +84,17 @@ fn block(f: &mut RenderFrame, index: usize, body: &PairBody, fastest: f32) {
                 y,
                 face + inward * 0.1,
                 y,
-                C::rgb(0.55, 0.38, 0.21),
+                if body.failed {
+                    C::rgb(0.32, 0.26, 0.2)
+                } else {
+                    C::rgb(0.55, 0.38, 0.21)
+                },
             );
         }
     }
     // Drawn first: the face shows through only while elastic compression
-    // holds it away from both marks.
+    // holds it away from both marks. It stays cyan after a failure because
+    // amber is the permanent set.
     line(f, face, BOTTOM, face, BOTTOM + HEIGHT, CYAN);
     line(
         f,
@@ -155,9 +165,14 @@ fn table(f: &mut RenderFrame, pair: &Pair) {
             f,
             COLUMNS[i],
             ROW,
-            format!("{}  {}", ["A", "B"][i], body.material),
+            format!(
+                "{}  {}{}",
+                ["A", "B"][i],
+                body.material,
+                if body.failed { " / failed" } else { "" }
+            ),
             13.0,
-            CYAN,
+            if body.failed { AMBER } else { CYAN },
         );
         // Each body's remaining share of its own capacity, under its figure.
         let y = -(rows.len() as f32) * ROW - 0.45;
@@ -184,15 +199,18 @@ fn table(f: &mut RenderFrame, pair: &Pair) {
 fn ledger(f: &mut RenderFrame, pair: &Pair) {
     const X: f32 = 4.5;
     const WIDTH: f32 = 12.5;
-    let parts = [
+    let mut parts = vec![
         ("Motion", MOTION, pair.total(|b| b.kinetic_energy)),
         ("Damage work", DAMAGE, pair.total(|b| b.damage_work)),
         ("Elastic energy", ELASTIC, pair.total(|b| b.elastic_energy)),
         ("Viscous loss", VISCOUS, pair.total(|b| b.viscous_loss)),
     ];
+    if pair.collapse_loss > 0.0 {
+        parts.push(("Collapse loss", COLLAPSE, pair.collapse_loss));
+    }
     text(f, X, 5.8, "SHARED ENERGY", 13.0, CYAN);
     let mut left = X;
-    for (i, (label, color, energy)) in parts.into_iter().enumerate() {
+    for (i, &(label, color, energy)) in parts.iter().enumerate() {
         let width = WIDTH * (energy / pair.initial_energy) as f32;
         if width > GAP {
             rect(f, left + 0.5 * GAP, 4.65, width - GAP, 0.3, color);

@@ -12,7 +12,8 @@ pub struct PairBody {
     pub momentum: f64,
     pub kinetic_energy: f64,
     /// Present compression of the layer: its permanent set plus any elastic
-    /// part. A separated layer keeps only the permanent set.
+    /// part. A separated layer keeps only the permanent set; collapsed layers
+    /// retain their boundary deformation even though their elastic store is gone.
     pub deformation: f64,
     pub permanent_set: f64,
     pub elastic_energy: f64,
@@ -20,6 +21,7 @@ pub struct PairBody {
     pub viscous_loss: f64,
     pub remaining: f64,
     pub capacity: f64,
+    pub failed: bool,
 }
 
 /// Both bodies, incoming body first, and the energy ledger they share.
@@ -30,6 +32,8 @@ pub struct Pair {
     pub initial_energy: f64,
     /// The solver's retained energy and capacity-charge defects. Never damage.
     pub numerical_defect: f64,
+    /// Both elastic releases and any excess plastic work at contact collapse.
+    pub collapse_loss: f64,
 }
 impl Pair {
     pub fn total(&self, value: impl Fn(&PairBody) -> f64) -> f64 {
@@ -40,6 +44,7 @@ impl Pair {
     pub fn accounted_energy(&self) -> f64 {
         self.total(|b| b.kinetic_energy + b.elastic_energy + b.damage_work + b.viscous_loss)
             + self.numerical_defect
+            + self.collapse_loss
     }
 }
 
@@ -53,6 +58,7 @@ impl MaterialLabState {
         let setup = self.case.free_pair()?;
         // The history exists from the first step; an untouched pair is undeformed.
         let layers = self.world.material_paired_compression_summary();
+        let failure = self.paired_failure();
         let bodies = [0, 1].map(|i| {
             let id = scene::body(i as u64);
             let mass = self.world.body_mass(id).unwrap();
@@ -75,7 +81,8 @@ impl MaterialLabState {
                     .world
                     .loading_material_remaining(self.materials[i].unwrap())
                     .unwrap(),
-                capacity: f64::from(scene::region(setup[i].material).capacity()),
+                capacity: f64::from(scene::pair_region(setup[i]).capacity()),
+                failed: failure.as_ref().is_some_and(|f| f.layers[i].failed),
             }
         });
         Some(Pair {
@@ -86,6 +93,7 @@ impl MaterialLabState {
                     .world
                     .material_moving_support_summary()
                     .map_or(0.0, |m| m.errors[0]),
+            collapse_loss: failure.as_ref().map_or(0.0, |f| f.dissipated()),
         })
     }
 }

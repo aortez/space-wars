@@ -48,7 +48,7 @@ fn snapshot(h: &mut FunctionalHarness, predicate: impl Fn(&Value) -> bool) -> Va
     }
 }
 fn physics(v: &Value) -> Value {
-    json!({"case":v["case"],"steps":v["steps"],"summary":v["summary"],"remaining":v["remaining"],"events":v["events"],"impacts":v["impacts"],"separations":v["separations"],"weight":v["weight"],"gravity_impulse":v["gravity_impulse"],"load_changes":v["load_changes"],"pair":v["pair"],"capacity":v["capacity"],"failure":v["failure"]})
+    json!({"case":v["case"],"steps":v["steps"],"summary":v["summary"],"remaining":v["remaining"],"events":v["events"],"impacts":v["impacts"],"separations":v["separations"],"weight":v["weight"],"gravity_impulse":v["gravity_impulse"],"load_changes":v["load_changes"],"pair":v["pair"],"capacity":v["capacity"],"failure":v["failure"],"paired_failure":v["paired_failure"]})
 }
 fn launch(h: &mut FunctionalHarness, mut s: UiState, renderer: &str) -> UiState {
     s = h.activate_until_scenario("material-lab", s);
@@ -207,6 +207,123 @@ fn material_lab_pause_save_load_and_both_renderers() {
 }
 fn body(v: &Value, index: usize, field: &str) -> f64 {
     v["pair"]["bodies"][index][field].as_f64().unwrap()
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn material_lab_paired_collapse_preserves_survivor_and_replays_in_both_renderers() {
+    run_functional_test_with_seed("material-lab-paired-collapse", "winit-femtovg", 42, |h| {
+        let ready = h.wait_until_ready();
+        let mut s = launch(h, ready, "vector");
+        let mut control = snapshot(h, |v| v["paused"] == true)["control"]
+            .as_u64()
+            .unwrap();
+        let mut case = scenario_material_lab::Case::default();
+        while case != scenario_material_lab::Case::PairFailure {
+            choose(h, &mut s, &mut control, 3);
+            case = case.next();
+            // Diagnostics are cached; observe each transition before choosing again.
+            snapshot(h, |v| v["case"] == case.name() && v["steps"] == 0);
+        }
+        let initial = snapshot(h, |v| v["case"] == "Wood pair gives way");
+        assert_eq!(initial["steps"], 0);
+        assert!(initial["paired_failure"].is_null());
+        assert_eq!(body(&initial, 0, "remaining"), 30.0);
+        assert_eq!(body(&initial, 1, "remaining"), 1200.0);
+        h.capture_screenshot("paired-collapse-initial-vector.png");
+        choose(h, &mut s, &mut control, 0);
+        let collapsed = snapshot(h, |v| v["phase"] == "Collapsed" && v["paused"] == true);
+        assert!(collapsed["stopped"].is_null());
+        assert!(
+            collapsed["storage_status"]
+                .as_str()
+                .unwrap()
+                .contains("both bodies coast")
+        );
+        assert_eq!(collapsed["pair"]["bodies"][0]["failed"], true);
+        assert_eq!(collapsed["pair"]["bodies"][1]["failed"], false);
+        assert_eq!(body(&collapsed, 0, "remaining"), 0.0);
+        assert!(body(&collapsed, 1, "remaining") > 1100.0);
+        assert!(body(&collapsed, 1, "damage_work") > 0.0);
+        for i in 0..2 {
+            assert_eq!(body(&collapsed, i, "elastic_energy"), 0.0);
+            assert!(
+                collapsed["paired_failure"]["layers"][i]["released_elastic"]
+                    .as_f64()
+                    .unwrap()
+                    > 0.0
+            );
+        }
+        h.capture_screenshot("paired-collapse-paused-vector.png");
+        choose(h, &mut s, &mut control, 4);
+        let saved = snapshot(h, |v| {
+            v["storage_status"].as_str().unwrap().starts_with("Saved")
+        });
+        assert_eq!(physics(&saved), physics(&collapsed));
+        choose(h, &mut s, &mut control, 1);
+        let next = snapshot(h, |v| {
+            v["steps"].as_u64() == Some(saved["steps"].as_u64().unwrap() + 1)
+        });
+        h.pause_guarded(&s);
+        let host_pause = h.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::PauseMain),
+                ..Default::default()
+            },
+            TRANSITION_TIMEOUT,
+        );
+        h.activate_guarded("pause.return-to-launcher", &host_pause);
+        let ready = h.wait_until_ready();
+        s = launch(h, ready, "raster");
+        control = snapshot(h, |_| true)["control"].as_u64().unwrap();
+        choose(h, &mut s, &mut control, 5);
+        let loaded = snapshot(h, |v| {
+            v["storage_status"].as_str().unwrap().starts_with("Loaded")
+        });
+        assert_eq!(physics(&loaded), physics(&saved));
+        assert_eq!(loaded["paused"], true);
+        h.capture_screenshot("paired-collapse-loaded-raster.png");
+        choose(h, &mut s, &mut control, 8);
+        let refused = snapshot(h, |v| {
+            v["storage_status"]
+                .as_str()
+                .unwrap()
+                .starts_with("A free pair")
+        });
+        assert_eq!(physics(&refused), physics(&saved));
+        choose(h, &mut s, &mut control, 1);
+        assert_eq!(
+            physics(&snapshot(h, |v| v["steps"] == next["steps"])),
+            physics(&next)
+        );
+        choose(h, &mut s, &mut control, 0);
+        let end = snapshot(h, |v| v["stopped"].is_string());
+        assert!(end["stopped"].as_str().unwrap().starts_with("Run complete"));
+        assert_eq!(end["storage_status"], end["stopped"]);
+        assert_eq!(end["paired_failure"], collapsed["paired_failure"]);
+        assert_eq!(
+            end["pair"]["collapse_loss"],
+            collapsed["pair"]["collapse_loss"]
+        );
+        for i in 0..2 {
+            for field in [
+                "velocity",
+                "damage_work",
+                "remaining",
+                "permanent_set",
+                "deformation",
+            ] {
+                assert_eq!(body(&end, i, field), body(&collapsed, i, field));
+            }
+            assert!(body(&end, i, "position") > body(&collapsed, i, "position") + 0.01);
+        }
+        assert_eq!(end["events"], collapsed["events"]);
+        h.capture_screenshot("paired-collapse-coasted-raster.png");
+        choose(h, &mut s, &mut control, 2);
+        let restarted = snapshot(h, |v| v["steps"] == 0);
+        assert_eq!(physics(&restarted), physics(&initial));
+        assert_eq!(restarted["paused"], true);
+    });
 }
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]

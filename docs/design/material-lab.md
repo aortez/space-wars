@@ -1,4 +1,4 @@
-# Material Lab: loading, recovery and paired collisions (#327)
+# Material Lab: loading, recovery and collapse (#327, #328)
 
 `material-lab` is the first application scenario using the bounded native
 [impact-to-support path](material-impact-support.md), its
@@ -21,7 +21,8 @@ come from the physical history.
 
 Next case walks the five load-controlled platen cases, the two
 [free-pair collisions](#free-pair-collisions), then the
-[collapsing support](#collapsing-support).
+[collapsing support](#collapsing-support) and [paired collapse](#paired-collapse),
+for nine cases in total.
 
 ## Platen cases and playback
 
@@ -147,6 +148,34 @@ through its envelope. Permanent set, damage and the failure observation stay
 fixed. Pause, Single step and Save/Load work before and after collapse. The three
 load controls refuse with a message because this mode uses constant gravity.
 
+## Paired collapse
+
+**Wood pair gives way** uses the same initial motion as Wood strikes wood:
+mass-20 body A approaches mass-40 body B at speed 6 from a gap of 1/16. Both
+layers start undamaged. A has represented volume 0.5 and capacity 30; B retains
+volume 20 and capacity 1200. Both keep section/deformation depth 1. The case
+uses the native [paired-collapse policy](material-support-failure.md#two-finite-material-layers).
+
+The lab pauses at step 76 (0.0185546875 s), when A exhausts its capacity.
+The phase reads Collapsed, A is dimmed and labelled failed, and contact history
+records Contact ended and Collapse. B retains 1168.54 capacity after 31.46 of
+damage work. Both layers keep their boundary deformation and permanent set;
+neither takes further damage. B remains intact even though the shared contact
+path no longer carries force.
+
+The shared energy ledger adds **Collapse loss**: 45 of released elastic storage
+from each layer, plus about 1.46 of plastic work beyond A's final charge. The
+total is about 91.46. B's elastic release counts even though B does not fail.
+This dissipation adds no impulse and consumes no further surviving capacity.
+
+Run resumes with A coasting at about +3.942 and B at +1.029. Their schematic
+envelopes overlap as they move through the failed contact. The run completes at
+step 192 (0.046875 s), after about 28 ms of coasting, inside the native motion
+window and numerical allowances. It does not extend those limits or demonstrate
+fragment motion. Save/Load and Single step preserve the failure, both materials
+and exact continuation before and after collapse. The load controls remain
+unavailable for a free pair; Restart restores both layers to full capacity.
+
 ## Save slot
 
 Save pauses the run and replaces `material-lab.bin` in the application's actual
@@ -175,10 +204,12 @@ its command list is bounded to 32 entries and replay must reproduce the complete
 saved envelope. The two free-pair cases use `MATLAB03`: the `MATLAB01` fields
 with no command list. Their native snapshot becomes v20 on the first physical
 step, when the paired history is enrolled. No layout accepts another
-layout's cases. The collapse case uses `MATLAB04`, with the same bounded fields
+layout's cases. Fixed-support collapse uses `MATLAB04`, with the same bounded fields
 and no command list; its native history becomes v21 on enrollment. Wrong versions,
 impossible/no-op commands, reordered histories and mismatched physics refuse.
-Native saves retain their v1–v21 compatibility.
+Paired collapse uses `MATLAB05`, again with those bounded fields and no command
+list; its native history becomes v23 on enrollment. Existing case tags and lab
+envelopes retain their layouts. Native saves retain their v1–v23 compatibility.
 
 ## Evidence and limits
 
@@ -203,10 +234,18 @@ collapsed support, repeats a single step exactly, and checks the continued fall
 with the same failure and damage. Scenario tests verify the collapse ledger,
 automatic pause, completion, terminal replay and envelope restrictions.
 
+The paired-collapse scenario test closes the shared ledger on every step and
+checks the survivor, both unchanged coast velocities and frozen material state.
+Save tests cover pre-contact, pre-failure, collapsed and terminal checkpoints,
+wrong envelopes and forged display history. Its public UI workflow saves at the
+automatic pause in the vector renderer, restores in the raster renderer, repeats
+a single step exactly, checks load refusal and coasting to completion, and
+restarts to full capacity. It is in the full UI suite; PR smoke selection is
+unchanged.
+
 This is a bounded two-body demonstration. It does not enable material response
 for existing gameplay, add fracture/topology consequences, or broaden the native
-solver's geometry or connection-loading support. The explicit collapse case is
-the first #328 failure consequence; other cases keep their refusal on exhaustion.
-Native moving and paired collapse are available through the
-[failure APIs](material-support-failure.md); their Lab cases, severing and debris
-remain later slices. #327 remains open.
+solver's geometry or connection-loading support. The two explicit collapse cases
+demonstrate bounded #328 failure consequences; other cases keep their refusal on
+exhaustion. A moving rigid platen over one material, severing and debris remain
+later Lab slices. #327 remains open.
