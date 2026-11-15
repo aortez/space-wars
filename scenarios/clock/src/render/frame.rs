@@ -11,8 +11,8 @@ use engine_common::{RenderCircle, RenderLine};
 #[cfg(test)]
 mod tests;
 
-const FRAME_LAYER: i32 = 10;
-const DOOR_LAYER: i32 = 12;
+pub(super) const FRAME_LAYER: i32 = 10;
+pub(super) const DOOR_LAYER: i32 = 12;
 const SHADOW_LAYER: i32 = 9;
 
 impl DoorPanel {

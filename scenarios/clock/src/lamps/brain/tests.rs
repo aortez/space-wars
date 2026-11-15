@@ -5,7 +5,8 @@
 //! mover crossing the middle passes between the lamps, unless the other is
 //! tired of it; the lamps share only a mover that far outshines the rest; a
 //! hot bulb goes out, and never both; sparks fly as a bulb goes dark; a big
-//! knock dips the power; a knock near a lamp startles it; a lamp presents
+//! knock dips the power; every lightning strike dips it too, and one near a
+//! lamp takes that lamp out; a knock near a lamp startles it; a lamp presents
 //! the digits that changed on its side; a resting lamp is exactly steady but
 //! for its fidgets; the beam moves under its limits and stays in the room;
 //! Steady lamps rest; and the brain is seeded.
@@ -609,6 +610,67 @@ fn a_big_knock_dips_both_lamps_and_takes_out_a_hot_bulb() {
         true,
     );
     assert_eq!(brain.counts().dips, 2);
+}
+
+/// A lightning bolt struck this tick, from `top` down to `ground`.
+fn lightning(top: Vec2, ground: Vec2) -> Percepts {
+    Percepts {
+        signals: Signals {
+            bolt: Some([top, ground]),
+            ..Signals::default()
+        },
+        ..Percepts::default()
+    }
+}
+
+#[test]
+fn every_strike_dips_both_lamps_and_one_near_a_lamp_takes_that_lamp_out_but_never_both() {
+    let stage = stage();
+    let layout = Layout::new(800.0 / 480.0);
+    let down = |x: f32| lightning(Vec2::new(x, layout.canopy_y), Vec2::new(x, layout.floor_y));
+    // A strike in the middle of the room dips both lamps, every time, with
+    // no rest between, and leaves them lit.
+    let (mut brain, mut rng) = seeded(5);
+    for strike in 1..=3 {
+        brain.step(&mut rng, &down(0.0), stage, true);
+        assert_eq!(brain.counts().dips, strike);
+        for lamp in 0..2 {
+            assert_ne!(brain.activity(lamp), Activity::Out);
+            assert!(brain.lamps[lamp].look.brightness < 0.5 * REST_BRIGHTNESS);
+        }
+        for _ in 0..DIP_TICKS {
+            brain.step(&mut rng, &Percepts::default(), stage, true);
+        }
+        for lamp in 0..2 {
+            assert_eq!(brain.lamps[lamp].look, Look::STEADY);
+        }
+    }
+    assert_eq!(brain.counts().outages, 0);
+    // One a cell into the room from a lamp takes that lamp out. Another by
+    // the other lamp while it is out leaves the other lit.
+    for lamp in 0..2 {
+        let (mut brain, mut rng) = seeded(5);
+        let inward = if lamp == 0 { 1.0 } else { -1.0 };
+        let near = |lamp: usize| down(stage.heads[lamp].x + inward * stage.pitch);
+        brain.step(&mut rng, &near(lamp), stage, true);
+        assert_eq!(brain.activity(lamp), Activity::Out);
+        assert_ne!(brain.activity(1 - lamp), Activity::Out);
+        let inward = -inward;
+        let far = down(stage.heads[1 - lamp].x + inward * stage.pitch);
+        brain.step(&mut rng, &far, stage, true);
+        assert_ne!(brain.activity(1 - lamp), Activity::Out);
+        assert_eq!(brain.counts().outages, 1);
+    }
+    // Steady lamps rest through a strike.
+    let (mut brain, mut rng) = seeded(5);
+    brain.step(
+        &mut rng,
+        &down(stage.heads[0].x + stage.pitch),
+        stage,
+        false,
+    );
+    assert_eq!(brain.counts().dips, 0);
+    assert_eq!(brain.lamps[0].look, Look::STEADY);
 }
 
 #[test]

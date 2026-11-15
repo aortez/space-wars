@@ -24,6 +24,7 @@ mod frame;
 mod glow;
 pub(crate) mod grass_inspection;
 mod lamp;
+pub(crate) mod lightning;
 mod magpie;
 mod marquee;
 mod meltdown;
@@ -92,6 +93,10 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     // A spotlight warms whatever small things the scene drew over its pool,
     // whichever way it drew them.
     lamp::illuminate(&mut frame, state, Layout::new(state.aspect_ratio()));
+    // A lightning flash lights the room, the spotlights' pools with it.
+    if let Some(crate::events::ActiveEvent::Rain(rain)) = &state.active_event {
+        lightning::flash(&mut frame, rain.flash());
+    }
     frame
 }
 

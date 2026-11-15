@@ -7,8 +7,9 @@
 //! steer it: interest in what it sees, boredom with what it follows and the
 //! heat of its bulb, which builds while it burns bright and cools at rest. A
 //! bulb that gets too hot sputters out, and a knock big enough dips the power
-//! to both lamps, which takes a hot bulb out too. One lamp is eager and the
-//! other lazy, as the run's seed decides.
+//! to both lamps, which takes a hot bulb out too. So does every lightning
+//! strike, and one that comes down near a lamp takes that lamp out. One lamp
+//! is eager and the other lazy, as the run's seed decides.
 //!
 //! The lamps share the work. Neither follows the mover the other has unless
 //! that mover is by far the most salient in view; a mover that crosses the
@@ -107,6 +108,9 @@ const BIG_KNOCK: f32 = 30.0;
 const DIP_TICKS: u32 = 16;
 const DIP_REST: u64 = 20 * FIXED_HZ as u64;
 const DIP_HEAT: f32 = 0.7;
+/// A lightning strike this near a lamp's head, as a fraction of the room's
+/// height, takes the lamp out.
+const BOLT_NEAR: f32 = 0.09;
 /// Seconds at full spotlight that bring a cold bulb to going out. At rest a
 /// bulb sheds nearly two thirds of its heat every `COOL_SECONDS`, so only
 /// long bright work takes it out; an outage cools it four times as fast.
@@ -850,30 +854,20 @@ impl Brain {
         }
     }
 
-    /// Knocks: a big one dips the power to both lamps and takes a hot bulb
-    /// out, and one near a lamp startles it.
+    /// Knocks and lightning: a big knock dips the power to both lamps and
+    /// takes a hot bulb out, and one near a lamp startles it. Every strike
+    /// dips the power too, and takes out a lamp it comes down near.
     fn react(&mut self, rng: &mut StdRng, percepts: &Percepts, stage: &Stage) {
+        if let Some(bolt) = percepts.signals.bolt {
+            self.strike(rng, bolt, stage);
+        }
         let Some(strongest) = percepts.impacts.first() else {
             return;
         };
         if strongest.strength >= BIG_KNOCK
             && self.dipped_at.is_none_or(|at| self.tick >= at + DIP_REST)
         {
-            self.dipped_at = Some(self.tick);
-            self.counts.dips += 1;
-            for lamp in &mut self.lamps {
-                if lamp.activity != Activity::Out {
-                    lamp.dip = Some(0);
-                }
-            }
-            // The hotter bulb goes, if it is hot enough and the other is lit.
-            let hotter = usize::from(self.lamps[1].heat > self.lamps[0].heat);
-            if self.lamps[hotter].heat >= DIP_HEAT
-                && self.lamps[hotter].activity != Activity::Out
-                && self.lamps[1 - hotter].activity != Activity::Out
-            {
-                self.lamps[hotter].go_out(rng, &mut self.counts);
-            }
+            self.dip(rng);
         }
         // A knock near a lamp startles it, a flare that fades or a quick
         // flicker; one farther off has to be as much stronger.
@@ -907,6 +901,44 @@ impl Brain {
             lamp.startle = Some(Startle { tick: 0, flare });
             lamp.startled_at = Some(self.tick);
             self.counts.startles += 1;
+        }
+    }
+
+    /// Dips the power to both lamps, and takes the hotter bulb out if it is
+    /// hot enough and the other is lit.
+    fn dip(&mut self, rng: &mut StdRng) {
+        self.dipped_at = Some(self.tick);
+        self.counts.dips += 1;
+        for lamp in &mut self.lamps {
+            if lamp.activity != Activity::Out {
+                lamp.dip = Some(0);
+            }
+        }
+        let hotter = usize::from(self.lamps[1].heat > self.lamps[0].heat);
+        if self.lamps[hotter].heat >= DIP_HEAT
+            && self.lamps[hotter].activity != Activity::Out
+            && self.lamps[1 - hotter].activity != Activity::Out
+        {
+            self.lamps[hotter].go_out(rng, &mut self.counts);
+        }
+    }
+
+    /// A lightning strike from `top` down to `ground` dips the power, and
+    /// takes out the lamp it came down within `BOLT_NEAR` of, while the other
+    /// is lit.
+    fn strike(&mut self, rng: &mut StdRng, [top, ground]: [Vec2; 2], stage: &Stage) {
+        self.dip(rng);
+        let near = BOLT_NEAR * (stage.max.y - stage.min.y);
+        let distance = |lamp: usize| {
+            let head = stage.heads[lamp];
+            head.distance_to(Vec2::closest_point_on_segment(head, top, ground))
+        };
+        let nearer = usize::from(distance(1) < distance(0));
+        if distance(nearer) <= near
+            && self.lamps[nearer].activity != Activity::Out
+            && self.lamps[1 - nearer].activity != Activity::Out
+        {
+            self.lamps[nearer].go_out(rng, &mut self.counts);
         }
     }
 

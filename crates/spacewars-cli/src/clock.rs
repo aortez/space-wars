@@ -402,6 +402,9 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 rain.source_limited_ticks,
                 rain.water_limited_ticks
             );
+            if rain.strikes_planned > 0 {
+                println!("{}", lightning_line(&rain));
+            }
         }
         if let Some(material) = state.meltdown {
             // Older hosts omit these fields and only have uniform full-size cells.
@@ -725,6 +728,32 @@ fn lamp_line(side: &str, lamp: &ClockLampBrainState) -> String {
     )
 }
 
+/// Rain's lightning: how many of its planned strikes have struck, this tick's
+/// flash, and the latest strike, its points in world units.
+fn lightning_line(rain: &engine_common::ClockRainState) -> String {
+    let mut line = format!(
+        "Lightning: struck {} of {}; flash={}/1000",
+        rain.strikes, rain.strikes_planned, rain.flash_milli
+    );
+    if let Some(strike) = rain.last_strike {
+        let point =
+            |[x, y]: [i32; 2]| format!("[{:.1}, {:.1}]", x as f64 / 1000.0, y as f64 / 1000.0);
+        let target = match strike.target {
+            engine_common::ClockStrikeTarget::Digit => "a digit",
+            engine_common::ClockStrikeTarget::Water => "the water",
+            engine_common::ClockStrikeTarget::Floor => "the floor",
+        };
+        line += &format!(
+            "; last at tick {}, {} strokes, struck {target} from {} to {}",
+            strike.tick,
+            strike.strokes,
+            point(strike.top_milli),
+            point(strike.ground_milli)
+        );
+    }
+    line
+}
+
 /// What the lamps perceive this tick, on one line: how many bodies they
 /// looked at, the most salient mover, the strongest impact and what changed.
 /// A body is `world:entity/role`, its world 0 for the arena and 1 for an
@@ -771,6 +800,9 @@ fn perceived_line(seen: &ClockLampPercepts) -> String {
     }
     if let Some(day) = seen.time_of_day_milli {
         line += &format!("; day={day}/1000");
+    }
+    if let Some([top, ground]) = seen.bolt_milli {
+        line += &format!("; lightning from {top:?} to {ground:?}");
     }
     line
 }
@@ -962,17 +994,51 @@ mod tests {
         seen.changed_digits = vec![2, 3];
         seen.ceiling_open = true;
         seen.time_of_day_milli = Some(527);
+        seen.bolt_milli = Some([[-120_000, 201_600], [-95_500, 105_600]]);
         assert_eq!(
             perceived_line(&seen),
             "Lamps perceive: bodies=3 movers=2 impacts=1; top mover 1:7/0 \
              position=[-1500, 250] velocity=[4000, -10] size=120 age=30 salience=2600; \
              top impact 0:9/1 position=[300, -2000] strength=7500; rain began; \
-             digits changed=[2, 3]; ceiling open; day=527/1000"
+             digits changed=[2, 3]; ceiling open; day=527/1000; \
+             lightning from [-120000, 201600] to [-95500, 105600]"
         );
         // An event under way that did not begin this tick goes unsaid.
         seen.event_began = false;
         seen.event_ended = Some(ClockEventKind::Duck);
         assert!(perceived_line(&seen).contains("; duck ended; digits"));
+    }
+
+    #[test]
+    fn the_lightning_line_counts_strikes_and_places_the_last_one() {
+        let state: engine_common::ClockRainState = serde_json::from_value(serde_json::json!({
+            "seed": 7, "amount": "heavy", "requested_microunits": 0,
+            "scheduled_microunits": 0, "injected_microunits": 0, "pooled_microunits": 0,
+            "in_flight_microunits": 0, "drained_microunits": 0, "reclaimed_microunits": 0,
+            "parcels": 0, "source_limited_ticks": 0, "water_limited_ticks": 0,
+            "entry_depth_milli": 0, "required_depth_milli": 0, "duck_phase": "waiting",
+            "duck_spawns": 0, "duck_position_milli": null, "duck_velocity_milli": null,
+            "duck_angle_milli": null, "submerged_milli": 0, "door_open_milli": 0,
+            "strikes_planned": 4, "strikes": 2, "flash_milli": 720,
+            "last_strike": {"tick": 640, "strokes": 3, "top_milli": [-120000, 201600],
+                "ground_milli": [-95500, 105600], "target": "digit"}
+        }))
+        .unwrap();
+        assert_eq!(
+            lightning_line(&state),
+            "Lightning: struck 2 of 4; flash=720/1000; last at tick 640, 3 strokes, \
+             struck a digit from [-120.0, 201.6] to [-95.5, 105.6]"
+        );
+        let before = engine_common::ClockRainState {
+            strikes: 0,
+            last_strike: None,
+            flash_milli: 0,
+            ..state
+        };
+        assert_eq!(
+            lightning_line(&before),
+            "Lightning: struck 0 of 4; flash=0/1000"
+        );
     }
 
     #[test]
