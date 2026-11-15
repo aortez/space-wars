@@ -1,5 +1,5 @@
 //! Two free bodies: a schematic, each body's own readouts and the shared energy ledger.
-use super::{AMBER, CYAN, INK, history, line, rect, text};
+use super::{AMBER, CYAN, INK, ROW, history, line, rect, text};
 use crate::{MaterialLabState, Pair, PairBody};
 use engine_common::{RenderColor as C, RenderFrame};
 
@@ -13,8 +13,6 @@ const HEIGHT: f32 = 2.4;
 /// Background between touching fills. The raster path covers every pixel a
 /// fill touches, so this leaves a visible gap there too.
 const GAP: f32 = 0.15;
-/// Line pitch of the readouts, as in the platen layout.
-const ROW: f32 = 0.75;
 const TRACK: C = C::rgb(0.2, 0.23, 0.27);
 // One hue per part of the energy split, in a fixed order whose neighbors stay
 // distinct on this background for color-blind readers.
@@ -174,8 +172,9 @@ fn table(f: &mut RenderFrame, pair: &Pair) {
             13.0,
             if body.failed { AMBER } else { CYAN },
         );
-        // Each body's remaining share of its own capacity, under its figure.
-        let y = -(rows.len() as f32) * ROW - 0.45;
+        // Each body's remaining share of its own capacity, under its figures
+        // with room for text that keeps its pixel size on a small screen.
+        let y = -(rows.len() as f32) * ROW - 0.6;
         rect(f, COLUMNS[i], y, 4.4, 0.25, TRACK);
         rect(
             f,
