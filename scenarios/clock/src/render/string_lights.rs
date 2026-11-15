@@ -1,7 +1,7 @@
 //! The Christmas theme's string of lights (#460): colored bulbs on a green
-//! wire, hung in swags along the canopy's underside from one side rail to
-//! the other. It is frame art only, sized by the frame's rails rather than
-//! the face, and it never moves. Nothing here is a body, a surface or a
+//! wire, hung in swags along the wall just under the canopy from one side
+//! rail to the other. It is wall art only, sized by the frame's rails rather
+//! than the face, and it never moves. Nothing here is a body, a surface or a
 //! light source, so no plant grows by it and the lamps never see it.
 
 use super::*;
@@ -10,9 +10,10 @@ use std::f32::consts::TAU;
 #[cfg(test)]
 mod tests;
 
-/// Over the face and the water, under the bolt, the creatures and the frame,
-/// so the room's own activity always shows in front of it.
-pub(super) const LIGHTS_LAYER: i32 = 6;
+/// On the wall, drawn just after it, so everything in the room shows in front
+/// of the string: the face, the creatures, the water, the bolt and the frame.
+/// The lightning's flash lights the wall's layer, and the string with it.
+pub(super) const LIGHTS_LAYER: i32 = BACKGROUND_LAYER;
 
 /// A swag's width and depth, in frame widths.
 const SWAG_WIDTH: f32 = 7.0;
@@ -20,6 +21,9 @@ const SWAG_SAG: f32 = 1.4;
 /// The most swags a very wide room gets, which bounds the bulbs.
 pub(super) const MAX_SWAGS: usize = 16;
 pub(super) const BULBS_PER_SWAG: usize = 3;
+/// How far under the canopy the string is pinned to the wall, in frame
+/// widths, and never less than a clip's width.
+const PIN_DROP: f32 = 0.35;
 /// Straight pieces in each swag's curve.
 const WIRE_PIECES: usize = 8;
 const WIRE_HALF: f32 = 0.07;
@@ -46,14 +50,17 @@ pub(super) const BULB_COLORS: [RenderColor; 4] = [
     RenderColor::rgb(0.28, 0.50, 1.0),
 ];
 
-/// Where the string hangs: its hooks along the canopy, and each bulb's
-/// center, both decided by the room's width alone.
+/// Where the string hangs: its pins along the wall and each bulb's center,
+/// both decided by the room's width alone.
 pub(super) struct Hang {
-    pub hooks: Vec<Vec2>,
+    pub pins: Vec<Vec2>,
     pub sag: f32,
     pub bulbs: Vec<Vec2>,
 }
 
+/// The string is tied to each side rail and pinned to the wall between swags,
+/// a little under the canopy. It never moves, and it never hangs from the
+/// canopy, where the spider's hatch and the ceiling's openings come and go.
 pub(super) fn hang(layout: Layout) -> Hang {
     let unit = layout.frame_width;
     let left = layout.bounds_min.x + unit;
@@ -63,11 +70,12 @@ pub(super) fn hang(layout: Layout) -> Hang {
         .clamp(2.0, MAX_SWAGS as f32) as usize;
     let width = (right - left) / swags as f32;
     let sag = unit * SWAG_SAG;
-    let hooks: Vec<Vec2> = (0..=swags)
-        .map(|i| Vec2::new(left + width * i as f32, layout.canopy_y))
+    let y = layout.canopy_y - (unit * PIN_DROP).max(clip_radius(layout) * 2.0);
+    let pins: Vec<Vec2> = (0..=swags)
+        .map(|i| Vec2::new(left + width * i as f32, y))
         .collect();
     let drop = Vec2::new(0.0, -unit * (SOCKET_HEIGHT + BULB_HALF_HEIGHT));
-    let bulbs = hooks
+    let bulbs = pins
         .windows(2)
         .flat_map(|pair| {
             (0..BULBS_PER_SWAG).map(move |i| {
@@ -76,12 +84,17 @@ pub(super) fn hang(layout: Layout) -> Hang {
             })
         })
         .collect();
-    Hang { hooks, sag, bulbs }
+    Hang { pins, sag, bulbs }
 }
 
 /// Half the wire's width, never thinner than a pixel at the smallest scale.
 pub(super) fn wire_half(layout: Layout) -> f32 {
     (layout.frame_width * WIRE_HALF).max(0.5)
+}
+
+/// A clip pinning the string between swags is twice the wire's width.
+fn clip_radius(layout: Layout) -> f32 {
+    wire_half(layout) * 2.0
 }
 
 /// The point `t` of the way along the swag from `from` to `to`.
@@ -92,7 +105,7 @@ fn wire_at(from: Vec2, to: Vec2, sag: f32, t: f32) -> Vec2 {
 pub(super) fn render(frame: &mut RenderFrame, layout: Layout) {
     let unit = layout.frame_width;
     let hang = hang(layout);
-    for pair in hang.hooks.windows(2) {
+    for pair in hang.pins.windows(2) {
         let path: Vec<Vec2> = (0..=WIRE_PIECES)
             .map(|i| wire_at(pair[0], pair[1], hang.sag, i as f32 / WIRE_PIECES as f32))
             .collect();
@@ -101,6 +114,17 @@ pub(super) fn render(frame: &mut RenderFrame, layout: Layout) {
             RenderPrimitive::Polygon(RenderPolygon::filled(
                 strip(&path, wire_half(layout)),
                 WIRE_COLOR,
+            )),
+        );
+    }
+    // A clip pins it between swags. Its ends are tied to the rails.
+    for &pin in &hang.pins[1..hang.pins.len() - 1] {
+        frame.push_primitive(
+            LIGHTS_LAYER,
+            RenderPrimitive::Circle(RenderCircle::filled(
+                point(pin),
+                clip_radius(layout),
+                SOCKET_COLOR,
             )),
         );
     }

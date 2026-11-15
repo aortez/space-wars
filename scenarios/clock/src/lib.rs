@@ -1089,20 +1089,32 @@ impl ClockState {
             .as_ref()
             .map_or(self.schedule.lifecycle_tick, ActiveEvent::phase_tick)
     }
-    /// The digits' colors now: the theme's, unless an event runs. Events
-    /// still draw the Normal face until they follow the theme (#457).
+    /// The digits' colors now: the theme's, unless an event draws its own
+    /// face.
     pub fn palette(&self) -> DigitPalette {
-        self.active_event
-            .as_ref()
-            .map_or_else(|| self.appearance().digits, ActiveEvent::palette)
+        match &self.active_event {
+            Some(event) if event.draws_own_face() => event.palette(),
+            _ => self.appearance().digits,
+        }
     }
     /// The look the Clock wears now (#455): the chosen theme at the latest
     /// reading.
     pub fn theme(&self) -> ClockTheme {
         theme::resolve(self.config.theme, self.reading)
     }
+    /// What the Clock draws now: its theme's look, except that an event that
+    /// draws its own face shows the Normal digits, AM/PM mark and date line
+    /// under the theme's decoration, until events follow the theme (#457).
     pub(crate) fn appearance(&self) -> theme::Appearance {
-        theme::Appearance::of(self.theme())
+        let theme = theme::Appearance::of(self.theme());
+        match &self.active_event {
+            Some(event) if event.draws_own_face() => theme::Appearance {
+                digits: theme::Appearance::NORMAL.digits,
+                label: theme::Appearance::NORMAL.label,
+                ..theme
+            },
+            _ => theme,
+        }
     }
     pub fn event_enabled(&self, kind: ClockEventKind) -> bool {
         self.config.events.enabled(kind)

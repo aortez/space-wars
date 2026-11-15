@@ -54,7 +54,7 @@ fn bolt_pixels(pixels: &slint::SharedPixelBuffer<slint::Rgb8Pixel>) -> usize {
 }
 
 #[test]
-fn a_strike_flashes_the_room_and_draws_its_bolt_in_both_render_paths_then_leaves_no_trace() {
+fn a_strike_flashes_the_room_and_draws_its_bolt_then_leaves_no_trace() {
     for viewport in [
         Viewport::new(800.0, 480.0),
         Viewport::new(1024.0, 768.0),
@@ -94,7 +94,7 @@ fn a_strike_flashes_the_room_and_draws_its_bolt_in_both_render_paths_then_leaves
             bolt_pixels(&dark)
         );
         save(&dark, &format!("lightning-{size}-before.png"));
-        // Every frame of the strike, the same in both render paths.
+        // Every frame of the strike, saved for review.
         for age in 0..48 {
             if age > 0 {
                 stormy.step(&[], TICK);

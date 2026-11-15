@@ -55,7 +55,7 @@ fn near(pixels: &slint::SharedPixelBuffer<slint::Rgb8Pixel>, color: [u8; 3], sla
 }
 
 #[test]
-fn christmas_dresses_the_face_and_hangs_its_lights_the_same_in_both_render_paths() {
+fn christmas_dresses_the_face_and_lights_its_bulbs_in_the_rasters_pixels() {
     let day = ClockTimeFormat::TwentyFourHour;
     for viewport in VIEWPORTS {
         let size = format!("{}x{}", viewport.width, viewport.height);
@@ -73,6 +73,11 @@ fn christmas_dresses_the_face_and_hangs_its_lights_the_same_in_both_render_paths
         assert_eq!(near(&christmas, cyan, 24), 0, "{size}");
         assert!(near(&christmas, warm, 24) > 500, "{size}");
         assert_eq!(near(&normal, warm, 24), 0, "{size}");
+        // A bulb of every color lights up, and Normal has none.
+        for bulb in [[255, 51, 41], [255, 184, 56], [56, 224, 87], [71, 128, 255]] {
+            assert!(near(&christmas, bulb, 24) > 100, "{size} {bulb:?}");
+            assert_eq!(near(&normal, bulb, 24), 0, "{size} {bulb:?}");
+        }
         // The PM mark turns holly red.
         let (_, twelve) = render(
             &face(

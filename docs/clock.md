@@ -797,7 +797,7 @@ Actual device screenshots from that release build:
 A theme is the look the Clock wears. **Normal** is the cyan face the Clock has
 always had. **Christmas** (#460) makes the digits warm white over pine-dark
 cells, turns the date line and the AM/PM mark holly red, and hangs a string of
-colored lights in swags along the canopy's underside. The wall, the floor, the
+colored lights in swags just under the canopy. The wall, the floor, the
 frame's wood, the lamps and everything in the room keep their own colors.
 
 Which theme shows comes from a choice and the latest reading. **Auto** wears a
@@ -813,15 +813,22 @@ reading's theme, and no missed night is made up.
 
 A theme is presentation only. It takes no event slot, draws none of the
 scheduler's random numbers, and leaves the residents, the visitors and the
-physics as they are. The string of lights is frame art: it is no body, no
+physics as they are. The string of lights is wall art: it is no body, no
 surface and no light source, so no plant grows by it and the lamps never see
-it. It draws on layer 6, over the face and the water and under the bolt, the
-creatures and the frame, so the room's activity always shows in front of it.
-It hangs from hooks on the canopy, between the side rails, in swags about
-seven rail widths wide and 1.4 deep, with three bulbs to a swag, red, gold,
-green and blue in turn. A room gets 2 to 16 swags, so the string draws at most
-16 wires and 48 bulbs. Each bulb is a three-step glow, a socket, the bulb and
-its hot core, so the string adds at most 304 primitives.
+it. It draws on the wall's layer, right after the wall, so everything in the
+room shows in front of it: the face, the creatures, the water, the bolt and
+the frame. A lightning flash lights its wire, clips, sockets and bulbs with
+the wall, and leaves their glow alone.
+
+The string runs from one side rail to the other just under the canopy. It is
+tied to each rail and pinned to the wall between swags by small clips, so it
+never moves. Nothing of it touches the canopy, so neither the spider's hatch
+nor the ceiling's openings, which come and go there, ever leave it hanging
+from a hole. Its swags are about seven rail widths wide and 1.4 deep, with
+three bulbs to a swag, red, gold, green and blue in turn. A room gets 2 to 16
+swags, so the string draws at most 16 wires, 15 clips and 48 bulbs. Each bulb
+is a three-step glow, a socket, the bulb and its hot core, so the string adds
+at most 319 primitives.
 
 | Normal | Christmas |
 | --- | --- |
@@ -832,27 +839,49 @@ the [480×800 portrait](screenshots/clock/theme-480x800-christmas.png).
 
 **Not yet.** There is no Theme setting, so ordinary Clock keeps Normal. Only
 fixtures, through `ClockConfig::theme`, or the client's
-`SPACEWARS_CLOCK_THEME=christmas` (or `auto`) choose a theme. Events still
-draw the Normal face while they run, and Auto trusts whatever time the host
-gives. Next come `--:--` for unknown time (#257), events and a short fade
-between themes (#457), and the setting with its Auto default (#458, #461).
-Halloween's look (#456) and its October nights wait until next year.
+`SPACEWARS_CLOCK_THEME=christmas` (or `auto`) choose a theme. While an event
+runs, the face, its AM/PM mark and the date line are Normal's, under the
+string, which stays up. The minute's Digit Slide only moves the face, so it
+keeps the theme's colors. Auto trusts whatever time the host gives. Next come
+`--:--` for unknown time (#257), events and a short fade between themes (#457),
+and the setting with its Auto default (#458, #461). Halloween's look (#456) and
+its October nights wait until next year.
 
-**Cost.** At 800×480 the string adds 209 primitives to the idle face's 472:
-11 wires and 33 bulbs. Building the frame takes about 7 µs more (29 against
-22 µs), and rasterizing it 0.09 ms more (0.97 against 0.88 ms, 10%), each the
-median of 200 frames on the development machine. At 1024×768 it adds 152
-primitives and 0.13 ms (1.67 against 1.54 ms), and at 480×800 114 primitives
-and 0.05 ms (0.94 against 0.89 ms). The bulbs' glows are most of it. No cabinet
-has run it yet.
+**Cost.** At 800×480 the string adds 219 primitives to the idle face's 472: 11
+wires, 10 clips and 33 bulbs. Building the frame takes about 7.5 µs more (19.5
+against 12.0 µs), and rasterizing it 0.10 ms more (0.97 against 0.88 ms, 11%),
+each the median of 200 frames on the development machine. At 1024×768 it adds
+159 primitives and 0.13 ms (1.67 against 1.54 ms), and at 480×800 119
+primitives and 0.05 ms (0.94 against 0.89 ms). The bulbs' glows are most of it.
+
+The string adds the same primitives to every frame of every event, and about
+the same raster time. In one seeded run, Rain's worst frame, the heaviest of
+any event but Tanks, goes from 1679 to 1898 primitives at 800×480 (1.23 against
+1.13 ms) and from 1642 to 1801 at 1024×768 (2.01 against 1.88 ms). That passes
+the 1800 this page gives as the Clock's frame ceiling, which only
+`presentation::tests::all_recipes_are_bounded_deterministic_clipped_and_restore_the_exact_face`
+holds a frame to; Tanks passes it in Normal at every aspect. No cabinet has run
+the theme yet, and #462 checks the devices.
 
 The tests are `theme::tests` (December's boundaries, the new year, undated and
 absent readings, the fixed choices and the IDs), `render::string_lights::tests`
-(the string's place under the canopy and clear of the face at seven aspects and
-both time formats, its bounds and bulb colors, a theme changing only colors,
-and the string coming down with the night) and the day-before cases in
-`calendar_tests`. In the client, `theme_tests` draws Normal, Christmas and a
-12-hour Christmas the same through both render paths, and
+and the day-before cases in `calendar_tests`. The string's tests hold:
+
+- its place from rail to rail under the canopy, clear of the face, at seven
+  aspects and both time formats;
+- that nothing of it reaches the canopy, and the hatch nothing below it, across
+  241 aspects;
+- its bounds and its bulbs' colors;
+- a theme changing only the face's colors, on a wall that is otherwise the
+  same;
+- Clock Spin's cells passing in front of it, and a flash lighting it;
+- the minute's slide keeping the theme's face;
+- Falling, Color Cycle, Meltdown and Explosion drawing Normal's face under it;
+- the duck, the spider and the crow keeping the theme's face;
+- the string coming down with the night.
+
+In the client, `theme_tests` rasterizes Normal, Christmas and a 12-hour
+Christmas and finds every bulb color only in Christmas, and
 `ui_render_tests::clock_themes_dress_the_date_line_through_native_text_overlay`
 draws each theme's 12-hour face with its date line in real Slint text, red only
 in Christmas. Set `SPACEWARS_CLOCK_ARTIFACTS` to save their pictures; the ones

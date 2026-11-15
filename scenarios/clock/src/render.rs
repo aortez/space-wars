@@ -69,7 +69,9 @@ const COVER_WITHER_SECONDS: f32 = 45.0;
 /// Columns per cover strip, which bounds the primitives one floor can add.
 const COVER_RUN_COLUMNS: usize = 24;
 const INACTIVE_CELL_COLOR: RenderColor = DigitPalette::NORMAL.unlit;
-/// The Normal theme's label color, for text that keeps it whatever the theme.
+/// The Normal theme's label color. Notices keep it whatever the theme, and
+/// events draw their own AM/PM pieces in it until they follow the theme
+/// (#457).
 const LABEL_COLOR: RenderColor = crate::theme::Appearance::NORMAL.label;
 
 const COLON_X_UNITS: f32 = 14.5;
