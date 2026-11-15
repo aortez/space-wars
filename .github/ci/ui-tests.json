@@ -21,8 +21,6 @@
     "compact_hud::compact_hud_renders_with_bottom_instruments_in_both_backends",
     "controllers::controllers_are_reachable_from_launcher_and_pause_without_resuming",
     "device_info::device_info_is_shared_read_only_scrollable_and_returns_to_its_parent",
-    "garden_lab::garden_lab_pause_step_and_renderers_smoke",
-    "material_lab::material_lab_pause_save_load_and_both_renderers",
     "kiosk_health_challenges_run_on_the_live_ui_thread",
     "launcher_can_run_the_classic_spacewars_menu_lifecycle",
     "launcher_can_run_the_clock_menu_lifecycle",
@@ -109,23 +107,31 @@
     },
     {
       "test": "garden_lab::garden_lab_controls_lifecycle_and_both_renderers",
-      "reason": "Exhaustive growth, shade, cutting and physiology transitions (about 13 minutes); pause/step/reset/rendering smoke stays on PRs."
+      "reason": "Exhaustive growth, shade, cutting and physiology transitions (about 13 minutes); Garden Lab's headless scenario and client tests stay on PRs."
     },
     {
       "test": "garden_lab::garden_lab_moss_surfaces_light_motion_and_support_loss_in_both_renderers",
-      "reason": "Moss placement, dim-room comparison, rock turning, breakage, removal and paid regrowth in both renderers; Garden Lab pause/step/reset/rendering smoke stays on PRs."
+      "reason": "Moss placement, dim-room comparison, rock turning, breakage, removal and paid regrowth in both renderers; Garden Lab's headless scenario and client tests stay on PRs."
+    },
+    {
+      "test": "garden_lab::garden_lab_pause_step_and_renderers_smoke",
+      "reason": "Launcher extra used for development; its 16-second smoke left PRs with Material Lab's to bring PR UI back under five minutes. Garden Lab's headless scenario and client tests stay on PRs."
     },
     {
       "test": "material_lab::material_lab_pairs_and_collapse_step_save_load_and_both_renderers",
-      "reason": "Two free-pair cases and a collapsing support run to completion, with both renderers and saved histories; the shorter Material Lab pause, step, save/load and renderer workflow stays on PRs."
+      "reason": "Two free-pair cases and a collapsing support run to completion, with both renderers and saved histories; Material Lab's headless scenario and client tests stay on PRs."
     },
     {
       "test": "material_lab::material_lab_paired_collapse_preserves_survivor_and_replays_in_both_renderers",
-      "reason": "Paired collapse, surviving material capacity, coasting and cross-renderer replay; shared Material Lab playback and storage smoke stays on PRs."
+      "reason": "Paired collapse, surviving material capacity, coasting and cross-renderer replay; Material Lab's headless scenario and client tests stay on PRs."
+    },
+    {
+      "test": "material_lab::material_lab_pause_save_load_and_both_renderers",
+      "reason": "Launcher extra used for development; at about 34 seconds it was the slowest PR case and took PR UI past five minutes. Material Lab's headless scenario and client tests stay on PRs."
     },
     {
       "test": "material_lab::material_lab_split_and_rebuild_keep_damage_across_both_renderers",
-      "reason": "Region split, rebuild and second strike on the native response path, with cross-renderer save/load replay; shared Material Lab playback and storage smoke stays on PRs."
+      "reason": "Region split, rebuild and second strike on the native response path, with cross-renderer save/load replay; Material Lab's headless scenario and client tests stay on PRs."
     },
     {
       "test": "pizza::pizza_event_completes_without_queuing_busy_requests",

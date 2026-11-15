@@ -78,15 +78,19 @@ The PR selection covers:
 - normal Spacewars and its scoreboard/rematches, Classic, Pizza, Clock and Scorched
   Earth, plus representative terrain, combat, travel and expedition workflows;
 - both rendering paths and HUD/performance integration;
-- short Garden Lab pause/step/reset/rendering, one complete marquee preview with
-  settings persistence and recovery, automatic Clock launch/disable, and planetary
-  tank driving/pause/rendering, alongside the existing shorter Clock event cases.
+- one complete marquee preview with settings persistence and recovery, automatic
+  Clock launch/disable, and planetary tank driving/pause/rendering, alongside the
+  existing shorter Clock event cases.
 
-The **33 full-only cases** retain all their original assertions. They cover the
-long Garden Lab physiology sequence and its moss surface workflow, the Material Lab
-free-pair collisions and support collapse, repeated marquee recipes, complete tank
-fixture/player-choice matrices, autostart repetition/relaunch, complete rain/duck/
-Demo/match lifecycles, and additional variants of shared scenario lifecycle tests.
+The **37 full-only cases** retain all their original assertions. They cover all
+of Garden Lab and Material Lab, launcher extras used for development: their
+short smoke workflows, Garden Lab's long physiology sequence and moss surfaces,
+and Material Lab's free-pair collisions, collapses and region split. Both labs'
+headless scenario and client tests still run on PRs; see
+[the 2026-11-14 change](#labs-leave-the-pr-selection-2026-11-14). The others
+cover repeated marquee recipes, complete tank fixture/player-choice matrices,
+autostart repetition/relaunch, complete rain/duck/Demo/match lifecycles, and
+additional variants of shared scenario lifecycle tests.
 The two full-only Clock ceiling workflows retain the 300-second sunlight hold,
 slow closing and five-minute aftermath in vector and raster modes; the existing
 Grass smoke cases retain bounded admission and ownership controls. Two additional
@@ -482,3 +486,25 @@ ordinary harness tests also pass. Clock's full ordinary unit suite passes
 596 tests (10 opt-in stress tests remain ignored), and the OTA automation plus
 image-identity/build-provenance suites pass 150 Python tests. `cargo fmt --all
 -- --check` and `git diff --check` pass. The complete Pi image build was not rerun.
+
+## Labs leave the PR selection (2026-11-14)
+
+By November the PR selection had grown to 49 cases. PR UI execution took
+311–327 s on every PR checked from #558 onward, which added the Material Lab
+smoke; the five PRs merged just before it stayed under 300 s.
+[Run 43671840046](https://github.com/aortez/space-wars/actions/runs/43671840046)
+(#644) took 325.02 s, by launcher category:
+
+| PR UI cases | Count | Time |
+|---|---:|---:|
+| Main games: Clock, Spacewars, Scorched Earth and Pizza | 22 | 174.4s |
+| Shared launcher, settings, controllers and kiosk | 14 | 57.9s |
+| Launcher extras: labs and playtests | 13 | 91.1s |
+
+Material Lab's smoke was the slowest case at 34.4 s, and Garden Lab's took
+15.6 s. Both labs are launcher extras used for development, so both smoke
+workflows moved to full-only; the other 47 cases took 273.3 s of that run. The
+comprehensive nightly runs both with the labs' other UI workflows, so a change
+that breaks either lab's UI surfaces there rather than on its PR. The 11 other
+extras take 2–9 s each and stay on PRs, where they also exercise both renderers
+on other kinds of scenes.
