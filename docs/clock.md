@@ -608,9 +608,9 @@ and draw a seam. Along a lit stretch the light barely changes at 800×480, from
 753 near the wall to 722 at the face's shadow, so it is drawn as one level
 there; on a 4.0 face it falls from 753 to 488 toward the face. At 12:34 at
 800×480 the lit floor's top is drawn at 0.375, in 66 polygons; at 0.25, where
-the digits stripe the floor, a frame takes up to 177. At night the lamps give
-the floor 3% of their day's light, about 23, too little to draw, so the floor
-shows none of it.
+the digits stripe the floor, a frame takes up to 177. At night resting lamps
+give the floor 3% of their day's light, about 23, too little to draw, so the
+floor shows none of it.
 Each living plant is drawn by the light it was last given, on the scale the
 eye reads, its cube root, from 55% of its color in no light to all of it in
 full sun. A plant grown since its last biology tick and a dead one keep their
