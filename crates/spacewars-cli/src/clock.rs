@@ -241,7 +241,7 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         println!("{}", state.to_json().map_err(human_error)?);
     } else {
         println!(
-            "Clock: {} / {} / {} / {} (instance {}, event {}, phase tick {}, paused={})\nTime: {:?}; target digits: {:?}\nPhysics: {} bodies, {} colliders; simulation tick {}, next event {:?}; can trigger={}",
+            "Clock: {} / {} / {} / {} (instance {}, event {}, phase tick {}, paused={})\nTime: {}; target digits: {:?}\nPhysics: {} bodies, {} colliders; simulation tick {}, next event {:?}; can trigger={}",
             state.profile,
             state.lifecycle,
             state.event_kind.map_or("none", ClockEventKind::as_str),
@@ -250,7 +250,11 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
             state.event_id,
             state.phase_tick,
             state.paused,
-            state.reading,
+            if state.time_unknown {
+                "unknown, showing --:--".to_owned()
+            } else {
+                format!("{:?}", state.reading)
+            },
             state.display_digits,
             state.body_count,
             state.collider_count,

@@ -76,7 +76,8 @@ fn rain_is_visible_in_both_render_paths_and_leaves_the_clock_face_readable() {
         assert!(!preserves_face(&missing_digit, &normal));
         let mut scenario = ClockClientScenario {
             state,
-            last_emitted_reading: Cell::new(None),
+            time: super::TimeSource::Host,
+            last_emitted: Cell::new(None),
             benchmark: None,
         };
         let mut renderer = crate::raster::RasterRenderer::new();

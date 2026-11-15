@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 mod client;
 mod clock;
+pub mod device_time;
 mod health;
 mod input;
 pub mod install;

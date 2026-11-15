@@ -35,6 +35,11 @@ mod player_tests;
 mod rain_tests;
 #[cfg(test)]
 mod theme_tests;
+mod time_source;
+#[cfg(test)]
+mod unknown_time_tests;
+
+pub(crate) use time_source::TimeSource;
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "clock",
@@ -55,17 +60,50 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
 
 pub(crate) struct ClockClientScenario {
     pub(crate) state: ClockState,
-    last_emitted_reading: Cell<Option<ClockReading>>,
+    /// Whether the host's time may be shown.
+    time: TimeSource,
+    last_emitted: Cell<Option<ClockTime>>,
     benchmark: Option<benchmark::Driver>,
 }
 
+/// What the Clock is told of the time on one tick.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ClockTime {
+    Reading(ClockReading),
+    /// The time's source can't vouch for the host's time.
+    Unknown,
+}
+
+impl ClockTime {
+    /// The host's time, if its source vouches for it.
+    fn now(source: &TimeSource) -> Self {
+        if source.usable() {
+            Self::Reading(local_clock_reading())
+        } else {
+            Self::Unknown
+        }
+    }
+
+    fn action(self) -> Action {
+        match self {
+            Self::Reading(reading) => ClockAction::set_reading(reading),
+            Self::Unknown => ClockAction::set_time_unknown(),
+        }
+    }
+}
+
 impl ClockClientScenario {
-    fn actions_for_reading(&self, reading: ClockReading) -> Vec<Action> {
-        if self.last_emitted_reading.replace(Some(reading)) == Some(reading) {
+    /// Tells the Clock the time, unless it already has it.
+    fn actions_for(&self, time: ClockTime) -> Vec<Action> {
+        if self.last_emitted.replace(Some(time)) == Some(time) {
             Vec::new()
         } else {
-            vec![ClockAction::set_reading(reading)]
+            vec![time.action()]
         }
+    }
+
+    fn actions_for_now(&self) -> Vec<Action> {
+        self.actions_for(ClockTime::now(&self.time))
     }
 }
 
@@ -80,10 +118,23 @@ fn create(
         let (state, driver) = benchmark::Driver::new(config.clock, seed, viewport.aspect_ratio());
         return Ok(Box::new(ClockClientScenario {
             state,
-            last_emitted_reading: Cell::new(None),
+            time: TimeSource::Host,
+            last_emitted: Cell::new(None),
             benchmark: Some(driver),
         }));
     }
+    let time = TimeSource::from_override(std::env::var("SPACEWARS_CLOCK_TIME").ok().as_deref());
+    Ok(Box::new(live(seed, settings, viewport, time)))
+}
+
+/// A Clock that shows only the time its source vouches for, from its first
+/// frame on, so a kiosk without one never flashes the host's clock.
+fn live(
+    seed: u64,
+    settings: &Settings,
+    viewport: Viewport,
+    time: TimeSource,
+) -> ClockClientScenario {
     let grass_fixture = std::env::var("SPACEWARS_CLOCK_GRASS_FIXTURE").unwrap_or_default();
     let mut state = ClockScenario::init(
         ClockConfig {
@@ -133,17 +184,14 @@ fn create(
     if grass_fixture == "shortage-v1" {
         state.set_plant_conditions(0, [0; 2]);
     }
-    let reading = local_clock_reading();
-    ClockScenario::step(
-        &mut state,
-        &[ClockAction::set_reading(reading)],
-        Duration::ZERO,
-    );
-    Ok(Box::new(ClockClientScenario {
+    let now = ClockTime::now(&time);
+    ClockScenario::step(&mut state, &[now.action()], Duration::ZERO);
+    ClockClientScenario {
         state,
-        last_emitted_reading: Cell::new(Some(reading)),
+        time,
+        last_emitted: Cell::new(Some(now)),
         benchmark: None,
-    }))
+    }
 }
 
 fn duck_jump_profile(value: Option<&str>) -> Option<engine_common::ClockDuckJumpProfile> {
@@ -203,7 +251,7 @@ impl ClientScenario for ClockClientScenario {
         if self.benchmark.is_some() {
             return Vec::new();
         }
-        let mut actions = self.actions_for_reading(local_clock_reading());
+        let mut actions = self.actions_for_now();
         if next_event {
             actions.push(ClockAction::next_event());
         } else if let Some(player) = player_duck {
@@ -305,7 +353,13 @@ impl ClientScenario for ClockClientScenario {
                 .state
                 .reading()
                 .map(|reading| [reading.hour(), reading.minute(), reading.second()]),
-            display_digits: self.state.display().digits,
+            // The dashes of an unknown time aren't digits.
+            display_digits: self
+                .state
+                .display()
+                .digits
+                .map(|digit| digit.filter(|digit| *digit != scenario_clock::DASH)),
+            time_unknown: self.state.time_unknown(),
             date: self
                 .state
                 .reading()
@@ -322,19 +376,19 @@ impl ClientScenario for ClockClientScenario {
     fn trigger_clock_event(&mut self, event: engine_common::ClockEventKind) {
         // Synchronize wall time at the client edge, including immediately after
         // a pause, before choosing which lit bars to release.
-        let mut actions = self.actions_for_reading(local_clock_reading());
+        let mut actions = self.actions_for_now();
         actions.push(ClockAction::trigger_event(event));
         ClockScenario::step(&mut self.state, &actions, Duration::ZERO);
     }
 
     fn configure_clock(&mut self, settings: engine_common::ClockSettings) {
-        let mut actions = self.actions_for_reading(local_clock_reading());
+        let mut actions = self.actions_for_now();
         actions.push(ClockAction::configure(settings));
         ClockScenario::step(&mut self.state, &actions, Duration::ZERO);
     }
 
     fn preview_clock_event(&mut self, event: engine_common::ClockEventKind) {
-        let mut actions = self.actions_for_reading(local_clock_reading());
+        let mut actions = self.actions_for_now();
         actions.push(ClockAction::preview_event(event));
         ClockScenario::step(&mut self.state, &actions, Duration::ZERO);
     }
@@ -453,10 +507,10 @@ mod tests {
             .unwrap();
         let first = ClockReading::new(10, 20, 30).unwrap();
         let second = ClockReading::new(10, 20, 31).unwrap();
-        scenario.last_emitted_reading.set(Some(first));
-        assert!(scenario.actions_for_reading(first).is_empty());
+        scenario.last_emitted.set(Some(ClockTime::Reading(first)));
+        assert!(scenario.actions_for(ClockTime::Reading(first)).is_empty());
 
-        let actions = scenario.actions_for_reading(second);
+        let actions = scenario.actions_for(ClockTime::Reading(second));
         assert_eq!(actions.len(), 1);
         assert_eq!(
             ClockAction::decode(&actions[0]),
@@ -464,9 +518,9 @@ mod tests {
         );
         let today = second.with_date(ClockDate::new(2026, 9, 25).unwrap());
         let tomorrow = second.with_date(ClockDate::new(2026, 9, 26).unwrap());
-        assert_eq!(scenario.actions_for_reading(today).len(), 1);
-        assert!(scenario.actions_for_reading(today).is_empty());
-        assert_eq!(scenario.actions_for_reading(tomorrow).len(), 1);
+        assert_eq!(scenario.actions_for(ClockTime::Reading(today)).len(), 1);
+        assert!(scenario.actions_for(ClockTime::Reading(today)).is_empty());
+        assert_eq!(scenario.actions_for(ClockTime::Reading(tomorrow)).len(), 1);
     }
 
     #[test]
@@ -573,10 +627,11 @@ mod tests {
             let normal = ClockScenario::render_frame(&reference);
             let mut scenario = ClockClientScenario {
                 state,
-                last_emitted_reading: Cell::new(Some(from)),
+                time: TimeSource::Host,
+                last_emitted: Cell::new(Some(ClockTime::Reading(from))),
                 benchmark: None,
             };
-            let actions = scenario.actions_for_reading(to);
+            let actions = scenario.actions_for(ClockTime::Reading(to));
             scenario.step(&actions, Duration::from_nanos(16_666_667));
             assert_eq!(
                 scenario
@@ -693,7 +748,8 @@ mod tests {
                 );
                 let mut scenario = ClockClientScenario {
                     state,
-                    last_emitted_reading: Cell::new(None),
+                    time: TimeSource::Host,
+                    last_emitted: Cell::new(None),
                     benchmark: None,
                 };
                 let mut renderer = crate::raster::RasterRenderer::new();
@@ -819,7 +875,8 @@ mod tests {
                 );
                 let mut scenario = ClockClientScenario {
                     state,
-                    last_emitted_reading: Cell::new(None),
+                    time: TimeSource::Host,
+                    last_emitted: Cell::new(None),
                     benchmark: None,
                 };
                 let mut renderer = crate::raster::RasterRenderer::new();
@@ -1045,7 +1102,8 @@ mod tests {
             );
             let scenario = ClockClientScenario {
                 state,
-                last_emitted_reading: Cell::new(None),
+                time: TimeSource::Host,
+                last_emitted: Cell::new(None),
                 benchmark: None,
             };
             let frames = scenario.render_frames(RenderBackend::Raster, viewport);
@@ -1183,7 +1241,8 @@ mod tests {
             );
             let mut scenario = ClockClientScenario {
                 state,
-                last_emitted_reading: Cell::new(None),
+                time: TimeSource::Host,
+                last_emitted: Cell::new(None),
                 benchmark: None,
             };
             let mut renderer = crate::raster::RasterRenderer::new();

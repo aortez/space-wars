@@ -37,7 +37,8 @@ fn centered_clock_and_wooden_floor_render_across_formats_and_layouts() {
             );
             let mut scenario = ClockClientScenario {
                 state,
-                last_emitted_reading: Cell::new(None),
+                time: super::TimeSource::Host,
+                last_emitted: Cell::new(None),
                 benchmark: None,
             };
             let normal = ClockScenario::render_frame(&scenario.state);

@@ -43,7 +43,8 @@ fn meridiem_events_reach_both_render_paths_and_recover_latest_time_pixels() {
                 let normal = ClockScenario::render_frame(&reference);
                 let mut scenario = ClockClientScenario {
                     state,
-                    last_emitted_reading: Cell::new(None),
+                    time: super::TimeSource::Host,
+                    last_emitted: Cell::new(None),
                     benchmark: None,
                 };
                 let mut renderer = crate::raster::RasterRenderer::new();

@@ -57,6 +57,8 @@ mod rain;
 mod render;
 pub mod spider;
 mod theme;
+#[cfg(test)]
+mod unknown_time_tests;
 pub mod water_fixture;
 
 use rand::{Rng, SeedableRng, rngs::StdRng};
@@ -78,7 +80,7 @@ pub use digit_surfaces::{
     SurfaceId, SurfaceSource,
 };
 pub use digits::{
-    DIGIT_SLOT_COUNT, DisplaySnapshot, GridCell, Reformation, SegmentId, SegmentKind,
+    DASH, DIGIT_SLOT_COUNT, DisplaySnapshot, GridCell, Reformation, SegmentId, SegmentKind,
     SegmentRepresentation, SegmentState,
 };
 
@@ -112,6 +114,7 @@ pub const CLOCK_ACTION_PREVIEW_EVENT: u32 = 5;
 pub const CLOCK_ACTION_NEXT_EVENT: u32 = 6;
 pub const CLOCK_ACTION_TOGGLE_PLAYER_DUCK: u32 = 7;
 pub const CLOCK_ACTION_PLAYER_DUCK_INPUT: u32 = 8;
+pub const CLOCK_ACTION_SET_TIME_UNKNOWN: u32 = 9;
 pub use player::ClockDuckInput;
 pub const CLOCK_OBSERVATION_VERSION: u16 = 2;
 
@@ -167,6 +170,9 @@ impl ClockReading {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ClockAction {
     SetReading(ClockReading),
+    /// The time's source can't vouch for the host's time. The face shows
+    /// `--:--` until the next reading.
+    SetTimeUnknown,
     TriggerEvent(ClockEventKind),
     Configure(ClockSettings),
     PreviewEvent(ClockEventKind),
@@ -236,6 +242,13 @@ impl ClockAction {
         Action::scenario(CLOCK_ACTION_SET_READING, payload)
     }
 
+    pub fn set_time_unknown() -> Action {
+        Action::scenario(
+            CLOCK_ACTION_SET_TIME_UNKNOWN,
+            CLOCK_ACTION_VERSION.to_le_bytes().to_vec(),
+        )
+    }
+
     pub fn decode(action: &Action) -> Option<Self> {
         let Action::Scenario { kind, payload } = action else {
             return None;
@@ -252,6 +265,7 @@ impl ClockAction {
                 ClockDuckInput::decode(&payload[2..]).map(Self::PlayerDuckInput)
             }
             (CLOCK_ACTION_NEXT_EVENT, 2) => Some(Self::NextEvent),
+            (CLOCK_ACTION_SET_TIME_UNKNOWN, 2) => Some(Self::SetTimeUnknown),
             (CLOCK_ACTION_SET_READING, 5) => {
                 ClockReading::new(payload[2], payload[3], payload[4]).map(Self::SetReading)
             }
@@ -519,6 +533,10 @@ impl ClockConfig {
 pub struct ClockState {
     config: ClockConfig,
     reading: Option<ClockReading>,
+    /// The time's source said it can't be trusted, and no reading has come
+    /// since. The face shows `--:--`, no reading or date is kept, and nothing
+    /// new starts until a reading arrives.
+    time_unknown: bool,
     date_label: Option<String>,
     display: DisplaySnapshot,
     segments: Vec<SegmentState>,
@@ -947,11 +965,19 @@ impl ClockState {
         self.sync_event_schedule();
         if let Some(reading) = self.reading {
             self.apply_reading(reading, false);
+        } else if self.time_unknown {
+            // With no reading to carry it, a new font reaches `--:--` here.
+            self.apply_pending_font();
         }
     }
 
     pub fn reading(&self) -> Option<ClockReading> {
         self.reading
+    }
+
+    /// Whether the face shows `--:--` because the time can't be trusted.
+    pub fn time_unknown(&self) -> bool {
+        self.time_unknown
     }
 
     pub fn date_label(&self) -> Option<&str> {
@@ -1557,6 +1583,8 @@ impl ClockState {
     fn trigger_event(&mut self, kind: ClockEventKind) {
         if self.can_trigger_event() && !self.event_blocked(kind) {
             self.start_event(kind);
+        } else if self.time_unknown {
+            self.refuse_while_time_unknown();
         } else if kind == ClockEventKind::Tanks {
             let notice = self.event_blocked_by_arena(kind).map_or(
                 "Tanks is waiting for the current visitor or event",
@@ -1566,8 +1594,23 @@ impl ClockState {
         }
     }
 
+    /// Why nothing starts while the face shows `--:--`.
+    const TIME_UNKNOWN_NOTICE: &'static str = "Events wait until the clock knows the time";
+
+    /// Says why a request did nothing, if the time is unknown.
+    fn refuse_while_time_unknown(&mut self) {
+        if self.time_unknown {
+            self.event_notice = Some((
+                Self::TIME_UNKNOWN_NOTICE,
+                self.schedule.tick + 2 * u64::from(FIXED_HZ),
+            ));
+        }
+    }
+
     fn preview_event(&mut self, kind: ClockEventKind) {
-        if self.reading.is_some() {
+        if self.reading.is_none() {
+            self.refuse_while_time_unknown();
+        } else {
             if self.event_blocked_by_tanks(kind) {
                 self.event_notice = Some(("Tanks is using the arena", self.schedule.tick + 120));
                 return;
@@ -1629,6 +1672,7 @@ impl ClockState {
     fn next_event(&mut self) {
         self.cancel_ceiling();
         if self.reading.is_none() {
+            self.refuse_while_time_unknown();
             return;
         }
         let kinds = ClockEventKind::ALL;
@@ -2272,6 +2316,42 @@ impl ClockState {
             self.date_label = reading.date.map(ClockDate::label);
         }
         self.reading = Some(reading);
+        if std::mem::take(&mut self.time_unknown) {
+            self.schedule.restart_wait();
+        }
+        self.show(next, minute_changed);
+        if slide && let Some(kind) = self.schedule.time_change_event() {
+            self.start_event_from(kind, Some(previous), false);
+        }
+    }
+
+    /// The time's source can't vouch for the time. The face changes to
+    /// `--:--` the way it follows any new reading, so an event in flight runs
+    /// its course and settles on the dashes, and the date and AM/PM go with
+    /// the digits. Saying so again changes nothing.
+    fn forget_time(&mut self) {
+        if self.time_unknown {
+            return;
+        }
+        self.time_unknown = true;
+        self.reading = None;
+        self.date_label = None;
+        let next = DisplaySnapshot::unknown(self.display.font);
+        let changed = self.display.digits != next.digits;
+        self.show(next, changed);
+        // The explosion's warning, which the coins call minting, holds the old
+        // time whole before any of it moves. Nothing is in flight to bring
+        // home, so the event ends here and the dashes show at once.
+        if matches!(
+            self.event_phase(),
+            Some(EventPhase::Warning | EventPhase::Minting)
+        ) {
+            self.finish_event();
+        }
+    }
+
+    /// Puts a new target on the face and hands it to the event in flight.
+    fn show(&mut self, next: DisplaySnapshot, minute_changed: bool) {
         self.display = next;
         self.apply_pending_font();
         // A second changed target supersedes a slide instead of letting old
@@ -2309,9 +2389,6 @@ impl ClockState {
         }
         if let Some(ActiveEvent::Meltdown(event)) = &mut self.active_event {
             event.synchronize(&self.segments, &mut self.surfaces);
-        }
-        if slide && let Some(kind) = self.schedule.time_change_event() {
-            self.start_event_from(kind, Some(previous), false);
         }
     }
 }
@@ -2354,6 +2431,7 @@ impl Scenario for ClockScenario {
         let mut state = ClockState {
             config: config.normalized(),
             reading: None,
+            time_unknown: false,
             date_label: None,
             display: DisplaySnapshot::unsynchronized(),
             segments: digits::create_segments(),
@@ -2398,6 +2476,7 @@ impl Scenario for ClockScenario {
         for action in actions.iter().filter_map(ClockAction::decode) {
             match action {
                 ClockAction::SetReading(reading) => state.apply_reading(reading, !dt.is_zero()),
+                ClockAction::SetTimeUnknown => state.forget_time(),
                 ClockAction::TriggerEvent(kind) => state.trigger_event(kind),
                 ClockAction::Configure(settings) => state.configure(settings),
                 ClockAction::PreviewEvent(kind) => state.preview_event(kind),

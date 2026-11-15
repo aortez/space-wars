@@ -117,6 +117,7 @@ impl ClockState {
 
     pub(super) fn toggle_player_duck(&mut self, player: u8) {
         if self.reading.is_none() {
+            self.refuse_while_time_unknown();
             return;
         }
         if self.event_kind() == Some(ClockEventKind::Tanks) {

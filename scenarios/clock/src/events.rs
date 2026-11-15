@@ -851,6 +851,15 @@ impl EventSchedule {
         }
     }
 
+    /// Starts a fresh wait when the time comes back after being unknown, so
+    /// the deadline that passed while the clock waited doesn't fire the moment
+    /// the face returns. A running event or its cooldown keeps its own course.
+    pub fn restart_wait(&mut self) {
+        if self.lifecycle == EventLifecycle::Idle && !self.preserve_periodic_deadline {
+            self.schedule_next();
+        }
+    }
+
     pub fn due_event(&mut self, synchronized: bool) -> Option<ClockEventKind> {
         if !synchronized
             || self.lifecycle != EventLifecycle::Idle
