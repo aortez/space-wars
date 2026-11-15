@@ -345,8 +345,10 @@ preserves surviving capacity while both bodies coast. Other paths retain their
 current failure refusals. The [region split](material-region-split.md) divides
 a registered region, or moves it to another body, with its damage.
 [Connection loads](material-connection-loads.md) charge welds between bodies
-each step and sever them on exhaustion. Transfer between older loading modes
-and broader geometry remain future work.
+each step and sever them on exhaustion, and
+[tissue integrity](material-tissue.md) keeps a region for each plant tissue,
+apart from its biological health. Transfer between older loading modes and
+broader geometry remain future work.
 
 ## Evidence
 

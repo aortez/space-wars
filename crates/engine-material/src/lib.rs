@@ -20,6 +20,7 @@ mod reference;
 mod region;
 pub mod shared_impact;
 mod sustained;
+mod tissue;
 
 #[cfg(test)]
 mod tests;
@@ -35,6 +36,9 @@ pub use material::{FailureMode, Material};
 pub use reference::{ALL_REFERENCE, ARMOR, HULL, ROCK, SHELL, SOFT_TISSUE, WOOD};
 pub use region::{Connection, Region};
 pub use sustained::{CRUSH_TIME_CONSTANT, ConnectionLoad, SustainedLoad, connection, sustained};
+pub use tissue::{
+    TissueError, TissueIntegrity, TissueMaterial, TissueRecord, TissueSave, TissueTable,
+};
 
 /// Identity of the law implemented here. Records carry it beside each
 /// material's parameter identity so evidence names its configuration.
