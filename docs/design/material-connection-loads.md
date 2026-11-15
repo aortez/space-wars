@@ -148,6 +148,9 @@ fixed trunk. Its beam is the branch's own square section over its length.
   body, transfers before and after the host removes a severed record, and the
   host's own cut.
 
+Material Lab's [Branch gives way](material-lab.md#branch-gives-way) case runs
+one weld through a safe load, an overload and its severing in both renderers.
+
 ## Limits
 
 - **No shear:** the law does not model shear, so `shear` is reported but

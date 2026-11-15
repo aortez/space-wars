@@ -1,5 +1,5 @@
 use super::*;
-use scenario_material_lab::YIELD_CHECKPOINT_STEP;
+use scenario_material_lab::{BRANCH_CHECKPOINT_STEP, YIELD_CHECKPOINT_STEP};
 use spacewars_control::{InputButton, InputPressRequest};
 fn press(h: &mut FunctionalHarness, s: &mut UiState, b: InputButton) {
     *s = h
@@ -48,7 +48,7 @@ fn snapshot(h: &mut FunctionalHarness, predicate: impl Fn(&Value) -> bool) -> Va
     }
 }
 fn physics(v: &Value) -> Value {
-    json!({"case":v["case"],"steps":v["steps"],"summary":v["summary"],"remaining":v["remaining"],"events":v["events"],"impacts":v["impacts"],"separations":v["separations"],"weight":v["weight"],"gravity_impulse":v["gravity_impulse"],"load_changes":v["load_changes"],"pair":v["pair"],"capacity":v["capacity"],"failure":v["failure"],"paired_failure":v["paired_failure"],"split":v["split"]})
+    json!({"case":v["case"],"steps":v["steps"],"summary":v["summary"],"remaining":v["remaining"],"events":v["events"],"impacts":v["impacts"],"separations":v["separations"],"weight":v["weight"],"gravity_impulse":v["gravity_impulse"],"load_changes":v["load_changes"],"pair":v["pair"],"capacity":v["capacity"],"failure":v["failure"],"paired_failure":v["paired_failure"],"split":v["split"],"branch":v["branch"]})
 }
 fn launch(h: &mut FunctionalHarness, mut s: UiState, renderer: &str) -> UiState {
     s = h.activate_until_scenario("material-lab", s);
@@ -577,6 +577,114 @@ fn material_lab_split_and_rebuild_keep_damage_across_both_renderers() {
         assert!((block(&end, "wood", "remaining") - (kept - second)).abs() < 1e-9);
         assert_eq!(block(&end, "fragment", "remaining"), fragment);
         h.capture_screenshot("region-split-complete-raster.png");
+        choose(h, &mut s, &mut control, 2);
+        let restarted = snapshot(h, |v| v["steps"] == 0);
+        assert_eq!(physics(&restarted), physics(&initial));
+        assert_eq!(restarted["paused"], true);
+    });
+}
+fn weld(v: &Value, field: &str) -> f64 {
+    v["branch"][field].as_f64().unwrap()
+}
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn material_lab_branch_holds_then_gives_way_and_replays_in_both_renderers() {
+    run_functional_test_with_seed("material-lab-branch", "winit-femtovg", 42, |h| {
+        let ready = h.wait_until_ready();
+        let mut s = launch(h, ready, "vector");
+        let mut control = snapshot(h, |v| v["paused"] == true)["control"]
+            .as_u64()
+            .unwrap();
+        let mut case = scenario_material_lab::Case::default();
+        while case != scenario_material_lab::Case::BranchFailure {
+            choose(h, &mut s, &mut control, 3);
+            case = case.next();
+            // Diagnostics are cached; observe each transition before choosing again.
+            snapshot(h, |v| v["case"] == case.name() && v["steps"] == 0);
+        }
+        let initial = snapshot(h, |v| v["case"] == "Branch gives way");
+        assert_eq!(weld(&initial, "remaining"), weld(&initial, "capacity"));
+        assert_eq!(weld(&initial, "tip_load"), 1000.0);
+        h.capture_screenshot("branch-initial-vector.png");
+        // Run holds the light load to the checkpoint and charges nothing.
+        choose(h, &mut s, &mut control, 0);
+        let held = snapshot(h, |v| {
+            v["steps"] == BRANCH_CHECKPOINT_STEP && v["paused"] == true
+        });
+        assert_eq!(held["phase"], "Holding");
+        assert_eq!(weld(&held, "spent"), 0.0);
+        let utilization = held["branch"]["load"]["utilization"].as_f64().unwrap();
+        assert!((0.6..0.62).contains(&utilization), "{utilization}");
+        assert!(
+            held["guidance"]
+                .as_str()
+                .unwrap()
+                .starts_with("Apply heavy load")
+        );
+        h.capture_screenshot("branch-holding-vector.png");
+        // The heavy load changes no tick. Save with it applied.
+        choose(h, &mut s, &mut control, 8);
+        let heavy = snapshot(h, |v| v["weight"] == 8000.0);
+        assert_eq!(heavy["steps"], held["steps"]);
+        choose(h, &mut s, &mut control, 4);
+        let saved = snapshot(h, |v| {
+            v["storage_status"].as_str().unwrap().starts_with("Saved")
+        });
+        assert_eq!(physics(&saved), physics(&heavy));
+        // Run drains the weld until it severs, then pauses.
+        choose(h, &mut s, &mut control, 0);
+        snapshot(h, |v| v["phase"] == "Overloaded" && weld(v, "spent") > 0.0);
+        h.capture_screenshot("branch-overloaded-vector.png");
+        let severed = snapshot(h, |v| v["phase"] == "Falling" && v["paused"] == true);
+        assert_eq!(weld(&severed, "remaining"), 0.0);
+        assert_eq!(severed["events"].as_array().unwrap().len(), 1);
+        assert_eq!(severed["events"][0]["label"], "Severed");
+        assert!(
+            severed["storage_status"]
+                .as_str()
+                .unwrap()
+                .contains("watch the branch fall")
+        );
+        h.capture_screenshot("branch-severed-vector.png");
+        h.pause_guarded(&s);
+        let host_pause = h.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::PauseMain),
+                ..Default::default()
+            },
+            TRANSITION_TIMEOUT,
+        );
+        h.activate_guarded("pause.return-to-launcher", &host_pause);
+        let ready = h.wait_until_ready();
+        s = launch(h, ready, "raster");
+        control = snapshot(h, |_| true)["control"].as_u64().unwrap();
+        choose(h, &mut s, &mut control, 5);
+        let loaded = snapshot(h, |v| {
+            v["storage_status"].as_str().unwrap().starts_with("Loaded")
+        });
+        assert_eq!(physics(&loaded), physics(&saved));
+        assert_eq!(loaded["paused"], true);
+        h.capture_screenshot("branch-loaded-raster.png");
+        // The restored run severs on the same step with the same record.
+        choose(h, &mut s, &mut control, 0);
+        let again = snapshot(h, |v| v["phase"] == "Falling" && v["paused"] == true);
+        assert_eq!(physics(&again), physics(&severed));
+        choose(h, &mut s, &mut control, 6);
+        let refused = snapshot(h, |v| {
+            v["storage_status"]
+                .as_str()
+                .unwrap()
+                .starts_with("The weld has severed")
+        });
+        assert_eq!(physics(&refused), physics(&severed));
+        choose(h, &mut s, &mut control, 0);
+        let end = snapshot(h, |v| v["stopped"].is_string());
+        assert!(end["stopped"].as_str().unwrap().starts_with("Run complete"));
+        assert_eq!(end["storage_status"], end["stopped"]);
+        assert!(weld(&end, "drop") > 1.7, "{}", end["branch"]);
+        assert_eq!(end["branch"]["load"], severed["branch"]["load"]);
+        assert_eq!(end["events"], severed["events"]);
+        h.capture_screenshot("branch-fallen-raster.png");
         choose(h, &mut s, &mut control, 2);
         let restarted = snapshot(h, |v| v["steps"] == 0);
         assert_eq!(physics(&restarted), physics(&initial));

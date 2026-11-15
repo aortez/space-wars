@@ -25,7 +25,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Material Lab: impact, compression and rebound in slow motion. Starts paused. Up/down chooses a control; Space or gamepad bottom face activates. Run/Pause, Single step, Restart case and Next case control playback. Release load, Apply light load and Apply heavy load change the force without advancing time; then Run or Single step to observe the response. The Load, release & return case pauses after yielding and separation to guide these changes. Wood strikes wood and Wood meets armor are free two-body collisions: both bodies recoil, each material shows its own deformation, damage and capacity, one ledger accounts for the shared energy, and the load controls do not apply. Support gives way uses a smaller wood layer under a fixed load, pauses when it collapses, and resumes into free fall with the failure retained. Wood pair gives way uses a smaller layer on body A, pauses when it fails, and resumes with both bodies coasting; body B retains its capacity and damage, and the shared ledger includes both elastic releases. Wood split & rebuilt strikes fixed wood with a small armor block, then pauses after each step of its sequence: the back quarter splits off onto a fragment, the rest moves to a replacement body, and the striker returns for a second strike. Each part keeps its share of the damage. Save pauses and replaces one persistent slot; Load restores paused, including load history. Saves survive restarting the application. Each run has a bounded observation window. Esc/Start opens host pause; R restarts the lab. Displacement is magnified 20x; displayed time and work are physical values.",
+    controls_help: "Material Lab: impact, compression and rebound in slow motion. Starts paused. Up/down chooses a control; Space or gamepad bottom face activates. Run/Pause, Single step, Restart case and Next case control playback. Release load, Apply light load and Apply heavy load change the force without advancing time; then Run or Single step to observe the response. The Load, release & return case pauses after yielding and separation to guide these changes. Wood strikes wood and Wood meets armor are free two-body collisions: both bodies recoil, each material shows its own deformation, damage and capacity, one ledger accounts for the shared energy, and the load controls do not apply. Support gives way uses a smaller wood layer under a fixed load, pauses when it collapses, and resumes into free fall with the failure retained. Wood pair gives way uses a smaller layer on body A, pauses when it fails, and resumes with both bodies coasting; body B retains its capacity and damage, and the shared ledger includes both elastic releases. Wood split & rebuilt strikes fixed wood with a small armor block, then pauses after each step of its sequence: the back quarter splits off onto a fragment, the rest moves to a replacement body, and the striker returns for a second strike. Each part keeps its share of the damage. Branch gives way welds a wood branch to a fixed trunk under a weight near its tip and pauses at a checkpoint: the light load costs the weld nothing however long it holds, the heavy load drains its capacity until it severs, and the lab pauses again before the branch falls with the weight. Save pauses and replaces one persistent slot; Load restores paused, including load history. Saves survive restarting the application. Each run has a bounded observation window. Esc/Start opens host pause; R restarts the lab. Displacement is magnified 20x; displayed time and work are physical values.",
     create,
 };
 const COMMAND_KIND: u32 = 1;
@@ -84,7 +84,7 @@ impl MaterialLabClientScenario {
             Ok(Outcome::Saved) => {
                 self.message = format!(
                     "Saved at {:.5} s. Run resumes; Load returns here.",
-                    self.state.summary().elapsed
+                    self.state.elapsed()
                 )
             }
             Ok(Outcome::Loaded(state)) => {
@@ -488,6 +488,66 @@ mod tests {
                 "Run to strike the rebuilt wood again.",
             ]
         );
+        assert!(s.message.starts_with("Run complete"));
+    }
+    #[test]
+    fn material_lab_branch_case_reports_its_severing_and_restores_before_the_overload() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut adapter = create(
+            0,
+            &Settings::default(),
+            Viewport::new(800.0, 480.0),
+            ScenarioStartMode::Normal,
+            &ScenarioAsset::MaterialLab(dir.path().join("material-lab.bin")),
+        )
+        .unwrap();
+        let s = adapter
+            .as_any_mut()
+            .downcast_mut::<MaterialLabClientScenario>()
+            .unwrap();
+        s.selected = 3;
+        while s.state.case != Case::BranchFailure {
+            tick(s, true);
+        }
+        let run = |s: &mut MaterialLabClientScenario| {
+            s.selected = 0;
+            tick(s, true);
+            while !s.state.paused {
+                tick(s, false);
+            }
+        };
+        run(s);
+        assert_eq!(s.state.steps, scenario_material_lab::BRANCH_CHECKPOINT_STEP);
+        s.selected = 8;
+        tick(s, true);
+        assert!(s.message.starts_with("Load set to 8000"));
+        // The save reports the run's own time, with the heavy load applied.
+        s.selected = 4;
+        tick(s, true);
+        settle(s);
+        assert!(s.message.starts_with("Saved at 0.03125 s"), "{}", s.message);
+        let saved = s.state.snapshot_bytes().unwrap();
+        run(s);
+        assert_eq!(
+            s.message,
+            "The weld has severed. Run to watch the branch fall."
+        );
+        let severed = s.state.snapshot_bytes().unwrap();
+        s.selected = 6;
+        tick(s, true);
+        assert!(s.message.starts_with("The weld has severed. Restart"));
+        assert_eq!(s.state.snapshot_bytes().unwrap(), severed);
+        s.selected = 5;
+        tick(s, true);
+        settle(s);
+        assert_eq!(s.state.snapshot_bytes().unwrap(), saved);
+        run(s);
+        assert_eq!(s.state.snapshot_bytes().unwrap(), severed);
+        s.selected = 0;
+        tick(s, true);
+        while s.state.stopped.is_none() {
+            tick(s, false);
+        }
         assert!(s.message.starts_with("Run complete"));
     }
 }
