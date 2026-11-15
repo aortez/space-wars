@@ -6,6 +6,7 @@ use engine_common::{
 use engine_rapier::world::loading::response::dynamic_compression::DynamicCompressionSummary;
 mod branch;
 mod pair;
+mod shell;
 mod split;
 const INK: C = C::rgb(0.78, 0.86, 0.92);
 const CYAN: C = C::rgb(0.22, 0.82, 0.92);
@@ -54,7 +55,9 @@ pub fn frame(s: &MaterialLabState) -> RenderFrame {
         &mut f,
         -17.0,
         10.3,
-        if s.case == Case::BranchFailure {
+        if s.case == Case::ShellThroughMoss {
+            "MATERIAL LAB  /  WEAPON SOURCE"
+        } else if s.case == Case::BranchFailure {
             "MATERIAL LAB  /  CONNECTION FAILURE"
         } else if s.case == Case::RegionSplit {
             "MATERIAL LAB  /  REGION SPLIT"
@@ -84,7 +87,9 @@ pub fn frame(s: &MaterialLabState) -> RenderFrame {
         15.0,
         INK,
     );
-    if let Some(branch) = &s.branch() {
+    if let Some(shell) = &s.shell() {
+        shell::draw(&mut f, s, shell);
+    } else if let Some(branch) = &s.branch() {
         branch::draw(&mut f, s, branch);
     } else if let Some(split) = &s.split() {
         split::draw(&mut f, s, split);
@@ -212,14 +217,19 @@ fn platen(f: &mut RenderFrame, s: &MaterialLabState, a: &DynamicCompressionSumma
     history(f, s, 0.5, bar_y - 0.7);
 }
 /// The latest contact observations, and why a finished run stopped. The
-/// branch case has no contacts to number, only its weld's severing.
+/// branch and shell cases have no contacts to number: the weld severs, and
+/// the shell's source reports what it reached.
 fn history(f: &mut RenderFrame, s: &MaterialLabState, x: f32, y: f32) {
-    let branch = s.case == Case::BranchFailure;
+    let unnumbered = [Case::BranchFailure, Case::ShellThroughMoss].contains(&s.case);
     text(
         f,
         x,
         y,
-        if branch { "HISTORY" } else { "CONTACT HISTORY" },
+        if unnumbered {
+            "HISTORY"
+        } else {
+            "CONTACT HISTORY"
+        },
         13.0,
         CYAN,
     );
@@ -228,7 +238,7 @@ fn history(f: &mut RenderFrame, s: &MaterialLabState, x: f32, y: f32) {
             f,
             x,
             y - 0.8 - i as f32 * 0.7,
-            if branch {
+            if unnumbered {
                 format!("{:.4}s  {}", e.time, e.label)
             } else {
                 format!("{:.4}s  {}  #{}", e.time, e.label, e.episode)

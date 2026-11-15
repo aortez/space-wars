@@ -206,7 +206,13 @@ fn collapsed_support_keeps_its_failure_and_damage_while_the_platen_falls() {
 #[test]
 fn qualified_cases_finish_with_expected_material_behavior() {
     for case in Case::ALL.into_iter().filter(|c| {
-        ![Case::LoadRelease, Case::RegionSplit, Case::BranchFailure].contains(c)
+        ![
+            Case::LoadRelease,
+            Case::RegionSplit,
+            Case::BranchFailure,
+            Case::ShellThroughMoss,
+        ]
+        .contains(c)
             && c.free_pair().is_none()
     }) {
         let mut s = MaterialLabState::new(case);
@@ -1152,4 +1158,329 @@ fn branch_case_load_changes_are_bounded() {
     s.set_load(Load::Light).unwrap();
     assert!(s.set_load(Load::Heavy).unwrap_err().contains("limit"));
     assert_eq!(s.snapshot_bytes().unwrap(), bytes);
+}
+
+/// The step the shell's sweep reaches and cuts the last tuft on its path, and
+/// the step it stops on the plate's face.
+const LAST_TUFT: u32 = 65;
+const ON_THE_PLATE: u32 = 108;
+
+#[test]
+fn shell_case_cuts_the_moss_strikes_the_plate_and_bursts_where_it_stops() {
+    let mut s = MaterialLabState::new(Case::ShellThroughMoss);
+    let mass = s.world.body_mass(scene::body(shell::SHELL_BODY)).unwrap();
+    assert_eq!(
+        s.guidance(),
+        Some("Run to fire the shell; the lab pauses once it has cut the last tuft on its path.")
+    );
+    // The untouched path's work reads as zero, not minus zero.
+    let texts: Vec<String> = render::frame(&s)
+        .layers
+        .into_iter()
+        .flat_map(|layer| layer.primitives)
+        .filter_map(|primitive| match primitive {
+            engine_common::RenderPrimitive::Text(text) => Some(text.text),
+            _ => None,
+        })
+        .collect();
+    assert!(texts.iter().any(|text| text == "0.000  ·  0 cut"));
+    run_until_paused(&mut s);
+
+    // At the last tuft: each tuft on the path is cut by its pass, and the
+    // shell keeps its speed and course. Nothing else is touched.
+    assert_eq!(s.steps, LAST_TUFT);
+    assert!(s.stopped.is_none());
+    assert_eq!(s.phase(), Phase::Flight);
+    assert!(
+        s.guidance()
+            .unwrap()
+            .starts_with("The shell kept its speed")
+    );
+    let view = s.shell().unwrap();
+    assert_eq!(view.stage, ShellStage::Clear);
+    assert_eq!(view.speed, Some(shell::SPEED));
+    assert_eq!(view.position.unwrap().y, 0.0);
+    for tuft in &view.tufts[..shell::PATH] {
+        assert!(tuft.cut);
+        assert_eq!(tuft.pass, Some(tuft.capacity));
+        assert_eq!(tuft.remaining, 0.0);
+    }
+    for tuft in &view.tufts[shell::PATH..] {
+        assert!(!tuft.cut);
+        assert_eq!(tuft.remaining, tuft.capacity);
+    }
+    assert_eq!(view.plate_remaining, view.plate_capacity);
+    let labels: Vec<&str> = s.events.iter().map(|e| e.label.as_str()).collect();
+    assert_eq!(labels, ["Cut M1", "Cut M2", "Cut M3"]);
+    // The first tuft is reached on step 24, as the shell's front crosses 1.4.
+    assert_eq!(s.events[0].time, 24.0 * f64::from(PHYSICS_DT));
+
+    // On the plate: the hit is the impact law's outcome for the shell's
+    // casing against the armor at full speed, the shell bursts where it
+    // stopped, and the run is complete.
+    run_until_paused(&mut s);
+    assert_eq!(s.steps, ON_THE_PLATE);
+    assert!(s.stopped.as_ref().unwrap().starts_with("Run complete"));
+    assert_eq!(s.phase(), Phase::Spent);
+    assert_eq!(s.impacts, 1);
+    let view = s.shell().unwrap();
+    assert_eq!(view.stage, ShellStage::Spent);
+    assert_eq!(view.position, None);
+    assert!(s.world.motion(scene::body(shell::SHELL_BODY)).is_none());
+    let contact = engine_material::ContactGeometry::new(
+        engine_material::patch_width_from_radii(shell::SHELL_RADIUS, None).unwrap(),
+        shell::CASING,
+        shell::PLATE_SECTION,
+    );
+    let load = engine_material::Impact {
+        closing_speed: shell::SPEED,
+        effective_mass: engine_material::effective_mass(
+            engine_material::ContactBody::translating(mass),
+            engine_material::ContactBody::IMMOVABLE,
+        )
+        .unwrap(),
+    };
+    let hit = view.hit.unwrap();
+    assert_eq!(
+        hit,
+        engine_material::impact(&shell::casing(), &shell::armor(), contact, load).unwrap()
+    );
+    // The moss left the shell its whole launch energy, and its casing is
+    // spent.
+    assert_eq!(hit.ledger.available, load.energy());
+    assert!(hit.failed[0]);
+    assert_eq!(hit.consumed[0], shell::casing().capacity());
+    let burst = view.burst.unwrap();
+    assert!(
+        (5.25..5.3).contains(&burst.x) && burst.y == 0.0,
+        "{burst:?}"
+    );
+    // The blast reaches the plate and the tuft in the open, which it cuts;
+    // the plate shadows the tuft behind it, and cut tufts are gone.
+    let plate_blast = view.plate_blast.unwrap();
+    assert!(plate_blast > 0.0);
+    let [.., open, behind] = view.tufts[..] else {
+        unreachable!()
+    };
+    assert!(open.cut && open.blast == Some(open.capacity) && open.pass.is_none());
+    assert!(!behind.cut && behind.blast.is_none());
+    assert_eq!(behind.remaining, behind.capacity);
+    assert!(view.tufts[..shell::PATH].iter().all(|t| t.blast.is_none()));
+    assert_eq!(
+        view.plate_remaining,
+        view.plate_capacity - f64::from(hit.consumed[1]) - f64::from(plate_blast)
+    );
+    // The ledger holds every charge: the passes and the hit for the kinetic
+    // part, which delivers more than its budget since the hit is measured at
+    // full speed, and the blast's shares for the payload, which open
+    // directions leave short of its budget.
+    let ledger = view.ledger;
+    let passes: f64 = view
+        .tufts
+        .iter()
+        .filter_map(|t| t.pass)
+        .map(f64::from)
+        .sum();
+    assert_eq!(
+        ledger.kinetic.budget,
+        0.5 * f64::from(mass) * f64::from(shell::SPEED).powi(2)
+    );
+    assert_eq!(f64::from(hit.ledger.available), ledger.kinetic.budget);
+    assert!(ledger.kinetic.delivered > ledger.kinetic.budget);
+    assert!(
+        (ledger.kinetic.absorbed - passes - f64::from(hit.consumed[1])).abs() < 1.0e-9,
+        "{ledger:?}"
+    );
+    assert!(
+        (ledger.payload.absorbed - f64::from(plate_blast) - f64::from(open.capacity)).abs()
+            < 1.0e-9,
+        "{ledger:?}"
+    );
+    assert_eq!(ledger.payload.budget, f64::from(shell::PAYLOAD.energy));
+    assert!(ledger.payload.delivered < 0.5 * ledger.payload.budget);
+    // The figures the case's note gives.
+    let figures = [
+        (f64::from(hit.consumed[1]), 8310.71),
+        (f64::from(plate_blast), 2096.12),
+        (view.plate_remaining, 29593.16),
+        (ledger.kinetic.delivered - ledger.kinetic.budget, 9.43),
+        (ledger.kinetic.absorbed, 8314.31),
+        (ledger.kinetic.excess, 1434.80),
+        (ledger.payload.delivered, 2266.87),
+        (ledger.payload.absorbed, 2097.32),
+    ];
+    for (value, figure) in figures {
+        assert!((value - figure).abs() < 0.005, "{value} against {figure}");
+    }
+    // The contact response refused the shell's arrival once and applied
+    // nothing.
+    assert_eq!(view.refused, 1);
+    let response = s.world.material_response_diagnostics();
+    assert_eq!(response.refused_batches, 1);
+    assert_eq!(
+        response.last_rejection,
+        Some(engine_rapier::world::loading::response::ResponseRejection::UnboundContact)
+    );
+    assert_eq!(response.applied_batches, 0);
+    let labels: Vec<&str> = s.events.iter().map(|e| e.label.as_str()).collect();
+    assert_eq!(
+        labels,
+        [
+            "Cut M1",
+            "Cut M2",
+            "Cut M3",
+            "Hit the plate",
+            "Burst",
+            "Cut M4"
+        ]
+    );
+    assert!(s.guidance().is_none());
+    assert!(s.set_load(Load::Heavy).is_err());
+}
+
+#[test]
+fn shell_case_takes_no_load_and_ends_its_window_if_nothing_stops_the_shell() {
+    let mut s = MaterialLabState::new(Case::ShellThroughMoss);
+    s.advance();
+    let before = s.snapshot_bytes().unwrap();
+    assert_eq!(
+        s.set_load(Load::Light).unwrap_err(),
+        "The shell case takes no external load. Choose a platen case."
+    );
+    assert_eq!(s.snapshot_bytes().unwrap(), before);
+    // With the plate lifted clear, the shell flies on over the window.
+    s.world.set_pose(
+        scene::body(shell::PLATE),
+        engine_core::Vec2::new(6.0, 10.0),
+        0.0,
+        true,
+    );
+    while s.stopped.is_none() {
+        s.advance();
+    }
+    assert_eq!(s.steps, shell::WINDOW);
+    assert!(s.stopped.as_ref().unwrap().starts_with("Run complete"));
+    let view = s.shell().unwrap();
+    assert_eq!(view.stage, ShellStage::Clear);
+    assert_eq!(view.speed, Some(shell::SPEED));
+    assert!(view.hit.is_none() && view.burst.is_none());
+    assert_eq!(view.ledger.payload.delivered, 0.0);
+}
+
+#[test]
+fn shell_case_stops_at_any_other_refused_response_and_keeps_its_last_valid_world() {
+    let mut s = MaterialLabState::new(Case::ShellThroughMoss);
+    // Bound to a region, the shell's approach is no longer the unbound
+    // arrival the case expects.
+    let body = scene::body(shell::SHELL_BODY);
+    let token = s
+        .world
+        .create_loading_region(
+            engine_rapier::world::loading::RegionId {
+                entity: body.entity,
+                part: 0,
+            },
+            body,
+        )
+        .unwrap();
+    s.world
+        .bind_loading_collider(
+            scene::collider(shell::SHELL_BODY),
+            engine_rapier::world::loading::ContactSource {
+                region: token,
+                patch: 0,
+            },
+        )
+        .unwrap();
+    let mut last = s.world.snapshot_bytes().unwrap();
+    while s.stopped.is_none() {
+        last = s.world.snapshot_bytes().unwrap();
+        s.advance();
+    }
+    // The step that would reach the plate starts with the contact still
+    // separated, and the response refuses it.
+    assert!(
+        s.stopped
+            .as_ref()
+            .unwrap()
+            .contains("material response refused (SpeculativeArrival)"),
+        "{:?}",
+        s.stopped
+    );
+    assert_eq!(s.steps, ON_THE_PLATE - 1);
+    assert!(s.paused);
+    assert_eq!(s.world.snapshot_bytes().unwrap(), last);
+    let view = s.shell().unwrap();
+    assert!(view.hit.is_none());
+    assert_eq!(view.plate_remaining, view.plate_capacity);
+}
+
+#[test]
+fn shell_case_saves_keep_their_own_layout_and_replay_the_flight() {
+    let mut s = MaterialLabState::new(Case::ShellThroughMoss);
+    for steps in [0, 1, 24, LAST_TUFT, 66, ON_THE_PLATE - 1, ON_THE_PLATE] {
+        while s.steps < steps && s.stopped.is_none() {
+            s.advance();
+        }
+        assert_eq!(s.steps, steps, "{:?}", s.stopped);
+        let bytes = s.snapshot_bytes().unwrap();
+        assert_eq!(&bytes[..8], SHELL_SAVE_MAGIC);
+        // The native snapshot keeps the response-enabled v3 layout.
+        let world = s.world.snapshot_bytes().unwrap();
+        assert_eq!(u32::from_le_bytes(world[..4].try_into().unwrap()), 3);
+        let mut loaded = restored(&s);
+        assert_eq!(loaded.shell(), s.shell());
+        assert_eq!(loaded.events, s.events);
+        for magic in [
+            SAVE_MAGIC,
+            LOAD_SAVE_MAGIC,
+            PAIR_SAVE_MAGIC,
+            FAILURE_SAVE_MAGIC,
+            PAIR_FAILURE_SAVE_MAGIC,
+            SPLIT_SAVE_MAGIC,
+            BRANCH_SAVE_MAGIC,
+        ] {
+            let mut bad = bytes.clone();
+            bad[..8].copy_from_slice(magic);
+            assert!(MaterialLabState::from_snapshot_bytes(&bad).is_err());
+        }
+        let changes: &[fn(&mut Save)] = &[
+            |s| s.case = Case::RegionSplit,
+            |s| s.steps += 1,
+            |s| s.impacts += 1,
+            |s| {
+                s.events.push(Event {
+                    time: 0.0,
+                    label: "Burst".into(),
+                    episode: 1,
+                })
+            },
+            |s| s.stopped = Some("Run complete".into()),
+        ];
+        for change in changes {
+            let mut save: Save = codec().deserialize(&bytes[8..]).unwrap();
+            change(&mut save);
+            let mut bad = SHELL_SAVE_MAGIC.to_vec();
+            bad.extend(codec().serialize(&save).unwrap());
+            assert!(MaterialLabState::from_snapshot_bytes(&bad).is_err());
+        }
+        // A restored run continues exactly.
+        loaded.advance();
+        s.advance();
+        assert_eq!(
+            loaded.snapshot_bytes().unwrap(),
+            s.snapshot_bytes().unwrap()
+        );
+    }
+    for case in [Case::RegionSplit, Case::BranchFailure] {
+        let mut old = MaterialLabState::new(case);
+        old.advance();
+        let mut bytes = old.snapshot_bytes().unwrap();
+        bytes[..8].copy_from_slice(SHELL_SAVE_MAGIC);
+        assert!(MaterialLabState::from_snapshot_bytes(&bytes).is_err());
+    }
+    assert_eq!(
+        codec().serialize(&Case::ShellThroughMoss).unwrap(),
+        11_u32.to_le_bytes()
+    );
 }

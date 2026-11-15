@@ -279,7 +279,7 @@ impl MaterialLabState {
             self.stop("Run complete — restart or choose another case".into());
         }
     }
-    fn stop(&mut self, reason: String) {
+    pub(crate) fn stop(&mut self, reason: String) {
         self.stopped = Some(reason);
         self.paused = true;
     }

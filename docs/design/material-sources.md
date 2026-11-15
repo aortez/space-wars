@@ -15,8 +15,9 @@ parts, and each is attributed and accounted separately:
 
 The budgets and the [geometry](#where-the-energy-goes) that divides them are
 in the pure crate. `engine_rapier::world::weapon` flies real shots and beams
-[in a physics world](#in-the-physics-world). A Material Lab case is the last
-piece of #329.
+[in a physics world](#in-the-physics-world), and
+[Material Lab](material-lab.md#shell-through-moss) fires one shell through moss
+into a plate.
 
 ## Deliveries
 

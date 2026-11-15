@@ -105,7 +105,10 @@ The local launcher includes the following scenarios and presets:
   and strikes it again, and each part keeps its share of the damage. A
   branch case welds a wood branch to a trunk under a weight: the light load
   costs the weld nothing, and the heavy load drains it until it severs and
-  the branch falls. Pause, single step and exact save/load replay.
+  the branch falls. A shell case fires a shell through moss into an armor
+  plate: the moss is cut without slowing it, the plate takes the hit, and the
+  blast reaches what the plate does not shadow. Pause, single step and exact
+  save/load replay.
   Enable **Show all scenarios** in the launcher. See [Material Lab](docs/design/material-lab.md).
 - **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with
   independently driven pin-slot suspension wheels on a rotating circular planet.
