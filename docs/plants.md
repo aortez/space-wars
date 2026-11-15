@@ -343,6 +343,8 @@ Damage accepts 0..100 health loss. Killed tissue loses its canonical resource
 share and ceases intake, maintenance and growth. Its occupied cell and optical
 footprint persist until explicit removal. Surviving health can recover through
 ordinary physiology; removed blades can be repurchased from living remnants.
+The [tissue integrity](design/material-tissue.md) adapter keeps mechanical
+integrity under the material law apart from health.
 `detach_invalid` removes cells whose support is lost/stale or whose current
 substrate/space is invalid, discarding their existing shares. Surviving fragments
 retain their original policy/lineage and component-local resources. A severed
