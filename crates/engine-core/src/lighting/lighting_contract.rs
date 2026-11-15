@@ -16,6 +16,7 @@ fn source(id: u64) -> LocalSource {
             position: Vec2::ZERO,
             surface: None,
         }],
+        cone: None,
     }
 }
 fn snapshot(sources: &[LocalSource]) -> LightingSnapshot {
@@ -203,4 +204,130 @@ fn input_copy_and_footprint_caps_fail_without_partial_publication() {
         LightingSnapshot::new(0, 0, invalid_d, &[]),
         Err(LightingError::InvalidInput)
     ));
+}
+/// A beam along +x from the origin: whole within 30 degrees of its axis,
+/// nothing beyond 45.
+fn beam() -> LocalSource {
+    LocalSource {
+        range: 100.0,
+        cone: Some(Cone {
+            axis: Vec2::X,
+            full_cos: 30_f32.to_radians().cos(),
+            edge_cos: 45_f32.to_radians().cos(),
+        }),
+        ..source(1)
+    }
+}
+/// What a receiver 10 units from the origin, `degrees` off +x, gets.
+fn off_axis(s: &LightingSnapshot, degrees: f32) -> Exposure {
+    let position = Vec2::new(10.0, 0.0).rotate_radians(degrees.to_radians());
+    s.query(
+        10,
+        7,
+        &[Receiver {
+            position,
+            surface: None,
+        }],
+        &Clear,
+    )
+    .unwrap()
+    .remove(0)
+}
+#[test]
+fn a_cone_lights_what_it_points_at_and_fades_at_its_edge() {
+    let s = snapshot(&[beam()]);
+    let whole = off_axis(
+        &snapshot(&[LocalSource {
+            cone: None,
+            ..beam()
+        }]),
+        0.0,
+    )
+    .local;
+    // A rotated receiver is 10 units away to within rounding.
+    let near = |a: f32, b: f32| (a - b).abs() < 0.001;
+    assert!(near(whole, 81.0), "{whole}");
+    for degrees in [0.0, 29.0, -29.0] {
+        assert!(
+            near(off_axis(&s, degrees).local, whole),
+            "{degrees} degrees"
+        );
+    }
+    // The share falls steadily across the edge, with no step.
+    let mut previous = whole;
+    for tenth in 300..=450 {
+        let local = off_axis(&s, tenth as f32 / 10.0).local;
+        assert!(local <= previous + 0.001, "{} degrees", tenth as f32 / 10.0);
+        assert!(
+            previous - local < whole * 0.05,
+            "{} degrees",
+            tenth as f32 / 10.0
+        );
+        previous = local;
+    }
+    let edge = off_axis(&s, 37.5);
+    assert!(0.0 < edge.local && edge.local < whole, "{edge:?}");
+    // Outside the beam a receiver casts no ray toward it, and behind it none.
+    for degrees in [46.0, -46.0, 90.0, 180.0] {
+        let outside = off_axis(&s, degrees);
+        assert_eq!((outside.local, outside.rays), (0.0, 1), "{degrees} degrees");
+    }
+    // A receiver at the emission point gets the whole share, as without a cone.
+    let at_source = s.query(10, 7, &[receiver(0.0)], &Clear).unwrap().remove(0);
+    assert_eq!(at_source.local, 100.0);
+    // Equal cosines give the beam a hard edge.
+    let hard = snapshot(&[LocalSource {
+        cone: Some(Cone {
+            axis: Vec2::X,
+            full_cos: 30_f32.to_radians().cos(),
+            edge_cos: 30_f32.to_radians().cos(),
+        }),
+        ..beam()
+    }]);
+    assert!(near(off_axis(&hard, 29.0).local, whole));
+    assert_eq!(off_axis(&hard, 31.0).local, 0.0);
+}
+#[test]
+fn a_cone_needs_a_unit_axis_and_ordered_cosines() {
+    let d = snapshot(&[]).directional;
+    let cone = beam().cone.unwrap();
+    for invalid in [
+        Cone {
+            axis: Vec2::ZERO,
+            ..cone
+        },
+        Cone {
+            axis: Vec2::X * 2.0,
+            ..cone
+        },
+        Cone {
+            axis: Vec2::new(f32::NAN, 0.0),
+            ..cone
+        },
+        Cone {
+            full_cos: 1.5,
+            ..cone
+        },
+        Cone {
+            edge_cos: f32::NAN,
+            ..cone
+        },
+        Cone {
+            full_cos: cone.edge_cos,
+            edge_cos: cone.full_cos,
+            ..cone
+        },
+    ] {
+        let source = LocalSource {
+            cone: Some(invalid),
+            ..beam()
+        };
+        assert!(
+            matches!(
+                LightingSnapshot::new(0, 0, d, &[source]),
+                Err(LightingError::InvalidInput)
+            ),
+            "{invalid:?}"
+        );
+    }
 }

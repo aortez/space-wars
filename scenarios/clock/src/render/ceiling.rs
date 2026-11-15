@@ -19,6 +19,15 @@ pub(crate) struct HostOptics {
 }
 impl HostOptics {
     pub(crate) fn capture(state: &ClockState) -> Self {
+        Self::capture_with(state, true)
+    }
+    /// The same without the plants' own tissue: the light that lands on the
+    /// floor among them, as the floor's light is drawn, rather than the
+    /// shade they cast on the soil beneath them.
+    pub(crate) fn capture_ground(state: &ClockState) -> Self {
+        Self::capture_with(state, false)
+    }
+    fn capture_with(state: &ClockState, tissue: bool) -> Self {
         let world = crate::arena::canonical_world(
             &state.active_event,
             state.duck_visit.is_some(),
@@ -30,7 +39,7 @@ impl HostOptics {
             quads.extend(soil.quads().into_iter().map(|q| q.to_vec()));
         }
         let mut polygons = crate::grass::residents::optical_polygons(quads);
-        if let Some(soil) = &state.soil {
+        if let Some(soil) = state.soil.as_ref().filter(|_| tissue) {
             polygons.extend(crate::grass::residents::tissue_polygons(
                 &state.plants.plants.observe(),
                 soil,

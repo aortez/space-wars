@@ -684,12 +684,13 @@ fn print_arena(arena: &ClockArenaState) {
     }
 }
 
-/// The lamps' setting, and how many times the run's lamps have done each
-/// thing.
+/// The lamps' setting, how much of their light they give at this time of
+/// day, and how many times the run's lamps have done each thing.
 fn lamps_line(lamps: &ClockLampsState, mode: ClockLampMode) -> String {
     format!(
-        "Lamps: {}; notices={} tracks={} handoffs={} startles={} outages={} presents={} fidgets={} dips={}",
+        "Lamps: {}; output={} notices={} tracks={} handoffs={} startles={} outages={} presents={} fidgets={} dips={}",
         mode.label(),
+        lamps.output_milli,
         lamps.notices,
         lamps.tracks,
         lamps.handoffs,
@@ -883,6 +884,7 @@ mod tests {
     #[test]
     fn the_lamp_lines_show_the_setting_the_counts_and_each_lamps_mind() {
         let mut lamps = ClockLampsState {
+            output_milli: 30,
             notices: 4,
             tracks: 5,
             handoffs: 1,
@@ -893,7 +895,7 @@ mod tests {
         };
         assert_eq!(
             lamps_line(&lamps, ClockLampMode::Lively),
-            "Lamps: Lively; notices=4 tracks=5 handoffs=1 startles=0 outages=2 presents=3 fidgets=6 dips=0"
+            "Lamps: Lively; output=30 notices=4 tracks=5 handoffs=1 startles=0 outages=2 presents=3 fidgets=6 dips=0"
         );
         assert_eq!(
             lamp_line("Right", &lamps.right),

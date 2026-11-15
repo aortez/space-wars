@@ -82,6 +82,8 @@ fn create(
     let mut state = ClockScenario::init(
         ClockConfig {
             ceiling_sunlight: grass_fixture != "shortage-v1",
+            lamp_plant_light: grass_fixture != "shortage-v1"
+                && !std::env::var("SPACEWARS_CLOCK_LAMP_PLANT_LIGHT").is_ok_and(|v| v == "0"),
             ceiling_optics: std::env::var("SPACEWARS_CLOCK_CEILING_OPTICS").is_ok_and(|v| v == "1"),
             grass_inspection: std::env::var("SPACEWARS_CLOCK_GRASS_INSPECT")
                 .is_ok_and(|v| v == "1"),

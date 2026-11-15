@@ -782,6 +782,20 @@ impl FunctionalHarness {
                     "0"
                 },
             )
+            // The ceiling's reference sequence is the sun's and the room's
+            // light. By day the corner lamps would keep its grass after the
+            // ceiling closes, so on the wall clock its aftermath would
+            // depend on the hour it ran at.
+            .env(
+                "SPACEWARS_CLOCK_LAMP_PLANT_LIGHT",
+                if test_name.starts_with("clock-ceiling-vector")
+                    || test_name.starts_with("clock-ceiling-raster")
+                {
+                    "0"
+                } else {
+                    "1"
+                },
+            )
             .env(
                 "SPACEWARS_CLOCK_ARENA_FIXTURE",
                 if test_name.starts_with("clock-arena") {

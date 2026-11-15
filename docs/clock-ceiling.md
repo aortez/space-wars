@@ -128,6 +128,8 @@ rate. Connected sunlit tissue does not exempt a locally shaded shoot.
 
 The deterministic reference uses seed 4242, ordinary room intensity 50, resource
 availability [1000,1000], normal playback, and 60 fixed simulation steps/second.
+It leaves out the corner lamps' light, which by day keeps the patch after the
+ceiling closes ([the lamps' light on the plants](clock.md#the-lamps-light-on-the-plants-634)).
 Its simulation-time checkpoints are:
 
 Grass columns count the lit patch only. A retained moss mat shares the same
@@ -207,6 +209,17 @@ mat, so the corridor keeps low cover instead of returning to bare dirt. Every
 mat cell reads light 50 with the ceiling closed, in surface contact and with no
 stress; the organism, its passive surface supply and its shade tolerance all
 belong to Core, and the Clock adds no survival exemption.
+
+In the running Clock the corner lamps change when the closed room shades a blade
+out, not what follows
+([the lamps' light on the plants](clock.md#the-lamps-light-on-the-plants-634)).
+By day the lamp on each side gives the corridor's grass enough to keep its
+patch, so the mat spreads only through the corridor's free columns beside it.
+From dusk their glow is too dim for a blade: the patch dies within minutes and
+the mat spreads into its columns. A mat reads
+the lamps' light on top of the room's, which buys it nothing above saturation.
+The contracts and measurements below leave the lamps out, so they are the
+room's and the sun's.
 
 A mat lies in the first air row above the floor line, row 3 of the 11-row
 habitat. Its own cell has to be clear of solid geometry with the inset soil
@@ -340,8 +353,10 @@ closing boundary with the lit patch still whole, growth through the aftermath
 with nothing dead, and then a later opening that reseeds the full batch over the
 retained mat. Metadata includes seed/configuration, simulation
 and wall times, executable SHA-256, source commit and a digest/list of workspace
-Rust/Slint sources and Cargo manifests. These two long cases are full-only in the
-coverage manifest; the existing two Grass admission/pause/disable/restart smoke
+Rust/Slint sources and Cargo manifests. They launch the client with
+`SPACEWARS_CLOCK_LAMP_PLANT_LIGHT=0`, so the corner lamps do not keep the grass
+by day and the aftermath is the same at any hour. These two long cases are
+full-only in the coverage manifest; the existing two Grass admission/pause/disable/restart smoke
 workflows also check paused ceiling time and cleared restart ownership, so the
 PR smoke filter is unchanged.
 
@@ -350,8 +365,9 @@ inspection, readable digits and host runtime measurements come from those
 registered workflows on a real display; headless tests do not establish them.
 Moss admission and floor succession are covered by the deterministic
 `clock_moss_contract_*` contracts and by those two workflows. Picade
-qualification of the opening and the full artificial-light rollout remain later
-work.
+qualification of the opening remains later work. The corner lamps light the
+plants as [the lamps' light on the plants](clock.md#the-lamps-light-on-the-plants-634)
+describes.
 
 ## Moving-solid presentation verification
 

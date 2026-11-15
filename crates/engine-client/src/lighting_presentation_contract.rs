@@ -28,6 +28,7 @@ fn snapshot(points: &[Vec2]) -> LightingSnapshot {
                     surface: None,
                 })
                 .collect(),
+            cone: None,
         })
         .collect();
     LightingSnapshot::new(

@@ -2685,6 +2685,7 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
                     &h.run_path().join("ceiling-sequence.json"),
                     &serde_json::json!({
                     "seed":4242,"renderer":renderer,"playback":1,"room_intensity":50,
+                    "lamp_plant_light":false,
                     "opening_seconds":5,"hold_seconds":300,"closing_seconds":60,
                     "grace_seconds":60,"damage_per_second":1,
                     "source_commit":provenance["source_commit"],

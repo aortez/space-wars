@@ -36,7 +36,7 @@ mod spider;
 mod tanks;
 
 const BACKGROUND_LAYER: i32 = 0;
-const ARENA_LAYER: i32 = 1;
+pub(crate) const ARENA_LAYER: i32 = 1;
 pub(crate) const GLOW_LAYER: i32 = 2;
 const INACTIVE_CELL_LAYER: i32 = 3;
 pub(crate) const ACTIVE_CELL_LAYER: i32 = 4;
@@ -220,7 +220,21 @@ fn compose(state: &ClockState) -> RenderFrame {
             );
         }
         ground_cover(&mut frame, state, soil);
+        // The lamps' light shows on a floor with soil, where it is the plants'
+        // light, behind them. A bare floor keeps the Clock's usual look.
+        lamp::floor_light(&mut frame, &state.floor_light);
         let observation = state.plants.plants.observe();
+        // Each living plant is drawn by the light it was last given. One grown
+        // since has none yet, and a dead one is given none, so both keep
+        // their own color.
+        let lit = |tissue: &engine_core::plants::Tissue, color: RenderColor| match state
+            .plants
+            .exposure
+            .get(&tissue.id)
+        {
+            Some(exposure) if tissue.health > 0 => lamp::lit_plant(color, exposure.light),
+            _ => color,
+        };
         // Mats draw first: they lie on the floor line that the shoots rise from.
         for tissue in observation
             .tissues
@@ -236,16 +250,19 @@ fn compose(state: &ClockState) -> RenderFrame {
                     ARENA_LAYER,
                     RenderPrimitive::Polygon(RenderPolygon::filled(
                         points,
-                        if tissue.health == 0 {
-                            RenderColor::rgb(0.28, 0.24, 0.16)
-                        } else if tissue.shade_ticks > 0 || tissue.shortage_ticks > 0 {
-                            let health = f32::from(tissue.health) / 100.0;
-                            RenderColor::rgb(0.38 - 0.22 * health, 0.3 + 0.12 * health, 0.17)
-                        } else {
-                            // Deeper and duller than a blade, so a mat never
-                            // reads as grass at a glance.
-                            RenderColor::rgb(0.16, 0.42, 0.24)
-                        },
+                        lit(
+                            tissue,
+                            if tissue.health == 0 {
+                                RenderColor::rgb(0.28, 0.24, 0.16)
+                            } else if tissue.shade_ticks > 0 || tissue.shortage_ticks > 0 {
+                                let health = f32::from(tissue.health) / 100.0;
+                                RenderColor::rgb(0.38 - 0.22 * health, 0.3 + 0.12 * health, 0.17)
+                            } else {
+                                // Deeper and duller than a blade, so a mat never
+                                // reads as grass at a glance.
+                                RenderColor::rgb(0.16, 0.42, 0.24)
+                            },
+                        ),
                     )),
                 );
             }
@@ -265,14 +282,17 @@ fn compose(state: &ClockState) -> RenderFrame {
                     ARENA_LAYER,
                     RenderPrimitive::Polygon(RenderPolygon::filled(
                         points,
-                        if tissue.health == 0 {
-                            RenderColor::rgb(0.35, 0.28, 0.12)
-                        } else if tissue.shade_ticks > 0 || tissue.shortage_ticks > 0 {
-                            let health = f32::from(tissue.health) / 100.0;
-                            RenderColor::rgb(0.45 - 0.23 * health, 0.32 + 0.33 * health, 0.12)
-                        } else {
-                            RenderColor::rgb(0.22, 0.65, 0.16)
-                        },
+                        lit(
+                            tissue,
+                            if tissue.health == 0 {
+                                RenderColor::rgb(0.35, 0.28, 0.12)
+                            } else if tissue.shade_ticks > 0 || tissue.shortage_ticks > 0 {
+                                let health = f32::from(tissue.health) / 100.0;
+                                RenderColor::rgb(0.45 - 0.23 * health, 0.32 + 0.33 * health, 0.12)
+                            } else {
+                                RenderColor::rgb(0.22, 0.65, 0.16)
+                            },
+                        ),
                     )),
                 );
             }

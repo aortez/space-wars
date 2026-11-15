@@ -6,6 +6,9 @@ fn fixture() -> ClockState {
     let mut s = ClockScenario::init(
         ClockConfig {
             event_profile: ClockEventProfile::Off,
+            // These contracts are about the room's and the sun's light, so
+            // the lamps' light on the plants is left out (see `lamps::light`).
+            lamp_plant_light: false,
             ..Default::default()
         },
         4242,
@@ -374,6 +377,9 @@ fn ceiling_light_contract_readings_fonts_and_layouts_keep_paid_growth() {
                             rotate: false,
                             ..Default::default()
                         },
+                        // The openings' sunlight pays for this growth, so
+                        // the lamps' light by day is left out.
+                        lamp_plant_light: false,
                         ..Default::default()
                     },
                     4242,

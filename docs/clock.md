@@ -19,7 +19,9 @@ Coins (#581) turns the lit cells into coins that drop and pile, a magpie
 carries a few of them off, and the rest fly home by the same reassembly,
 which grows back what the bird kept. The corner lamps (#621) follow what
 moves with a spotlight, start at knocks, light the digits that change and go
-out for a few seconds when worked too hard (#631).
+out for a few seconds when worked too hard (#631). By day they light the plants
+too, enough to keep grass after the ceiling closes, and at night they glow too
+dimly for it (#634).
 
 ## Layout
 
@@ -540,6 +542,117 @@ since Lively ones act on what they see. The lamps tests run Lively lamps
 against Steady ones for the bodies the lamps follow. An engine-rapier test pins
 `body_contact_push`: a landing, a resting weight, a sliding box's friction,
 and nothing for a fixed, sleeping or unknown body.
+
+#### The lamps' light on the plants (#634)
+
+The lamps light the plants as well as the room. They keep a day by the
+reading: from 07:00 to 22:00 they give all their light, from 22:30 to 06:30 a
+glow of 3% of it, and through the half hour of dusk after 22:00 and of dawn
+before 07:00 they fade and rise without a step. A Clock that does not know the
+time keeps the day. The room's own dim light of 50 stays on under theirs.
+
+A lamp's light enters the room under its head, half a rail width below the top
+band, so the ceiling the spider spins across that band does not hide it. Its
+steady light goes every way, at full sun (1000) where it enters, falling off
+gently to nothing 3000 world units away. As the lamp narrows into a spotlight,
+that share of its light goes into a cone along the beam it draws instead:
+whole within 40% of the beam's half angle and fading to nothing at its edge, so
+the plants in the pool get it and the rest of its side gets less. A flare past
+full gives the plants no more, and a lamp that is out gives them none. The
+plants' light model shades the lamps' light as it does the sun's: the digits,
+the colon and the meridiem label, the actors, the soil and anything else solid
+between a plant and the lamp block it (see [shared direct lighting](lighting.md)).
+
+By day a resting lamp gives the grass in the corridor on its side the 500 or
+more that a full patch needs to pay its way. With the room's light its shoots
+read 760 to 806 at 800×480, 4:3, 4.0 and 0.25, and up to 1000 where the other
+lamp's light reaches past the face too. So a patch the ceiling planted outlives
+the ceiling: in the 12:34 reference at 800×480 every one of its 18 shoots keeps
+full health for four minutes after the ceiling closes, where without the lamps
+they are all gone within three ([sunlight opportunity](clock-ceiling.md)). In
+a one-off run on for two hours at 12:34, the patch stayed as it was when the
+ceiling closed: 18 shoots at full health and 64 grass tissues, none dead. At
+night both lamps together give a shoot less than 175 however they look, so with
+the room's 50 no shoot gets the 250 it needs. From 22:30 the reference patch's
+shoots are gone in 160 seconds and the whole patch is retired at 320, which
+leaves the floor to the moss, kept at full health by the room's light, and to
+the next day's Grass event. In the same run the moss spread within half an
+hour from 6 columns to 18, into part of the floor the grass left. A patch
+keeps the grass's room until it is retired, so a Grass event later on the same
+day opens its ceiling but plants nothing.
+
+The face shades the floor. From a corner, the light to the middle of the floor
+has to cross the face, and the digits' bars stop it, so at 800×480, 4:3 and 4.0
+each lamp lights the floor from its own corner to about the face's edge and the
+face casts one wide shadow between. At 12:34 at 800×480 the left lamp's light
+reaches x = −168 and the right lamp's x = 330, on a floor 800 wide. In the 0.25
+portrait the lamps hang high over a small face, so the light passes between
+the digits and their shadows stripe the floor. A corridor's grass stays in its
+own lamp's light unless the face's outer glyphs or the meridiem label reach
+over it. A patch planted under the face gets nothing from the lamps and at most
+the room's light, which the face above it can block as well.
+
+**Drawing.** Once soil lies on the floor, the floor shows the lamps' light
+where it lands, behind anything growing there: warm on the floor's top, with an
+alpha of 0.5 there in full sun, and fading out over four soil cells down into
+the floor. None of it stands above the floor line. A bare floor shows none of
+it. The light is sampled every six ticks, every half cell along each stretch of
+floor at the height a mat reads its light, from the same sources and through
+the same solids as the plants' light but without the plants' own tissue, so
+the floor under a lit patch shows lit. It is drawn in proportion to the light,
+in sixteenths of full sun, and changes in four steps from one sample to the
+next, so it fades into a shadow over the half cell between them. Each level is
+laid over the ones under it wherever the floor gets at least that much, so no
+two of its shapes meet edge to edge, where a renderer could fill the edge twice
+and draw a seam. Along a lit stretch the light barely changes at 800×480, from
+753 near the wall to 722 at the face's shadow, so it is drawn as one level
+there; on a 4.0 face it falls from 753 to 488 toward the face. At 12:34 at
+800×480 the lit floor's top is drawn at 0.375, in 66 polygons; at 0.25, where
+the digits stripe the floor, a frame takes up to 177. At night the lamps give
+the floor 3% of their day's light, about 23, too little to draw, so the floor
+shows none of it.
+Each living plant is drawn by the light it was last given, on the scale the
+eye reads, its cube root, from 55% of its color in no light to all of it in
+full sun. A plant grown since its last biology tick and a dead one keep their
+colors. The lamps are drawn by how bright what they give looks, so at night at
+31% of their day's brightness. The wall keeps its soft glow: the light a lamp
+throws on it casts no shadows.
+
+**Cost.** On the development workstation, in the `ci` profile, sampling the
+floor took 0.11 ms at 800×480 and 4:3 and 0.15 ms at 0.25, once every six ticks,
+against a step of about 0.56 ms with the reference patch growing after its
+ceiling closed. A bare floor is not sampled. No cabinet has run it yet.
+
+**Diagnostics.** The `lamps` block of `clock state --json` carries
+`output_milli`, the thousandths of their light the lamps give at the reading's
+time of day: 1000 by day and 30 at night. `spacewars-cli clock state` prints it
+as `output=` on the `Lamps:` line. That makes the state's schema 27.
+
+**Isolation.** `ClockConfig::lamp_plant_light`, on in every ordinary Clock,
+leaves the lamps' light out of the plants' as `ceiling_sunlight` leaves out the
+sun's. The client turns it off for the `shortage-v1` grass fixture, and when
+launched with `SPACEWARS_CLOCK_LAMP_PLANT_LIGHT=0`. The ceiling's normal-speed
+aftermath workflows set that, since on the wall clock the lamps would keep
+their grass by day. The ceiling and grass contracts whose reference sequences
+are the sun's and the room's light leave the lamps out too, in
+`ceiling_light_contract`, `grass::contracts` and `grass::succession_contracts`.
+
+**Tests.** The tests in `lamps::light` check the day's hours, and that dawn and
+dusk change a second at a time without a step; that at night both lamps, at
+any brightness, width and aim and at every aspect, leave every shoot in shade;
+that by day a resting lamp with nothing in its way gives 550 or more along its
+corridor at every aspect; that a spotlight's cone gives its pool the beam's
+whole share and nothing beside it; and that the night's glow still shows.
+`lamp_light_tests` runs the Clock: the 12:34 reference patch keeps every shoot
+whole for four minutes after its ceiling closes, then from 22:30 loses them
+within three minutes and is retired while the moss holds; and a patch planted
+under the face gets none of the lamps' light while one beside it grows in it,
+with the floor drawn lit over the one and dark over the other, and at night,
+when the lamps still give it a little light, not lit at all; and a bare floor
+shows none of it. `render::lamp` pins the night's drawn lamps, the plants'
+shading and the floor's light: none of it above the floor line, fading into a
+shadow in four steps, and no two of its shapes meeting edge to edge. The core
+`lighting_contract` pins the cone.
 
 ## Clock fonts
 
@@ -3478,7 +3591,7 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **26** and reports scenario-instance revision,
+`clock state` uses schema version **27** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`, `warning`, `exploding`), pause state, profile, schedule, current
@@ -3566,7 +3679,7 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 25 and
+after completion or cancellation. Use matching client/CLI builds: schema 26 and
 older requests are rejected. The internal Clock action payload is version 14;
 event ordinals 0–9 are unchanged; Cell Swap is 10. Configure contains a
 little-endian u16 switch mask (bits 0–15, one for each event),
@@ -3602,7 +3715,7 @@ arena's counts, claims, run totals and last step, and `clock events` shows each
 event's refusal.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 26, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 27, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -3619,7 +3732,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 26, `event`
+tick. A raw `clock trigger` request must include schema version 27, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, `cell-swap`, `grass`, `slot-machine`, `spider`, `coins`, or `tanks`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 

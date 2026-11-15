@@ -38,6 +38,8 @@ mod fonts;
 pub mod grass;
 #[cfg(test)]
 mod input_tests;
+#[cfg(test)]
+mod lamp_light_tests;
 mod lamps;
 #[cfg(test)]
 mod lamps_tests;
@@ -421,6 +423,10 @@ pub struct ClockConfig {
     /// Isolate the pre-existing zero-input physiology fixture from sunlight.
     /// Ordinary Clock always enables aperture illumination.
     pub ceiling_sunlight: bool,
+    /// Isolate fixtures from the corner lamps' light on the plants, as
+    /// `ceiling_sunlight` does from the sun's. Ordinary Clock always lets the
+    /// lamps light the plants.
+    pub lamp_plant_light: bool,
     /// Publish fresh per-tick sunlight optics in the grass state. Diagnostic
     /// workflows only; ordinary Clock skips that per-frame geometry query.
     pub ceiling_optics: bool,
@@ -452,6 +458,7 @@ impl Default for ClockConfig {
             arena_fixture: arena_fixture::FixtureStart::None,
             favorable_grass_fixture: false,
             ceiling_sunlight: true,
+            lamp_plant_light: true,
             ceiling_optics: false,
             grass_inspection: false,
             duck_jump_profile: None,
@@ -480,6 +487,7 @@ impl ClockConfig {
             arena_fixture: self.arena_fixture,
             favorable_grass_fixture: self.favorable_grass_fixture,
             ceiling_sunlight: self.ceiling_sunlight,
+            lamp_plant_light: self.lamp_plant_light,
             ceiling_optics: self.ceiling_optics,
             grass_inspection: self.grass_inspection,
             duck_jump_profile: self.duck_jump_profile,
@@ -539,6 +547,8 @@ pub struct ClockState {
     crow_visit: Option<crow::CrowVisit>,
     // The corner lamps' minds, on their own seeded stream.
     lamps: lamps::Lamps,
+    /// The lamps' light along the floor, sampled every few ticks for drawing.
+    floor_light: Vec<lamps::light::FloorSample>,
     player_duck_sequence: u64,
     player_seed: u64,
     font_rng: StdRng,
@@ -1364,7 +1374,10 @@ impl ClockState {
         }
     }
     pub fn lamps_state(&self) -> engine_common::ClockLampsState {
-        self.lamps.state()
+        engine_common::ClockLampsState {
+            output_milli: (self.lamp_output() * 1000.0).round() as u16,
+            ..self.lamps.state()
+        }
     }
 
     /// Starts `activity` on a lamp now, for previews and captures: an
@@ -2023,6 +2036,82 @@ impl ClockState {
         (view, facts)
     }
 
+    /// The share of their light the lamps give at the reading's time of day.
+    pub(crate) fn lamp_output(&self) -> f32 {
+        lamps::light::output(lamps::light::daylight(self.reading))
+    }
+
+    /// What the lamps give the plants this tick.
+    fn lamp_plant_sources(&self) -> Vec<engine_core::lighting::LocalSource> {
+        let layout = Layout::new(self.aspect_ratio());
+        let output = self.lamp_output();
+        (0..2)
+            .flat_map(|lamp| lamps::light::sources(lamp, self.lamps.look(lamp), &layout, output))
+            .collect()
+    }
+
+    /// Samples the lamps' light along the floor for drawing, from the same
+    /// sources and through the same solids as the plants' light, but for the
+    /// plants themselves: the floor under a lit patch is drawn lit. Only a
+    /// floor with soil shows it, so a bare floor is not sampled.
+    fn sample_floor_light(&mut self) {
+        use engine_core::lighting::{FULL_SUN, MAX_RECEIVERS, Receiver};
+        self.floor_light.clear();
+        if self.plants.lamps.is_empty() || self.soil.is_none() {
+            return;
+        }
+        let layout = Layout::new(self.aspect_ratio());
+        let lift = grass::SOIL_CELL_SIZE * 0.5;
+        let (surfaces, _) = self.soil_surfaces();
+        let spacing = layout.pitch * lamps::light::FLOOR_SPACING_CELLS;
+        for (stretch, surface) in surfaces.iter().enumerate() {
+            let run = surface.right - surface.left;
+            if run <= 0.0 {
+                continue;
+            }
+            let count = (run / spacing).ceil() as usize;
+            let width = run / count as f32;
+            for i in 0..count {
+                let x = surface.left + width * (i as f32 + 0.5);
+                self.floor_light.push(lamps::light::FloorSample {
+                    stretch,
+                    position: surface.map(engine_core::Vec2::new(x, layout.floor_y + lift)),
+                    angle: surface.angle,
+                    width,
+                    light: 0.0,
+                });
+            }
+        }
+        self.floor_light.truncate(lamps::light::MAX_FLOOR_SAMPLES);
+        let optics = render::ceiling::HostOptics::capture_ground(self);
+        let tick = self.simulation_tick();
+        let receivers: Vec<_> = self
+            .floor_light
+            .iter()
+            .map(|sample| Receiver {
+                position: sample.position,
+                surface: None,
+            })
+            .collect();
+        let mut lit = Vec::with_capacity(receivers.len());
+        for chunk in receivers.chunks(MAX_RECEIVERS) {
+            match optics
+                .scene()
+                .query_light_with_lamps(tick, 0, &[], &self.plants.lamps, chunk)
+            {
+                Ok(exposures) => lit.extend(exposures.into_iter().map(|e| e.local.min(FULL_SUN))),
+                // A refused query draws no light, rather than a guess.
+                Err(_) => {
+                    self.floor_light.clear();
+                    return;
+                }
+            }
+        }
+        for (sample, light) in self.floor_light.iter_mut().zip(lit) {
+            sample.light = light;
+        }
+    }
+
     /// Where the lamps hang and what they light.
     fn lamp_stage(layout: &Layout) -> lamps::Stage {
         lamps::Stage {
@@ -2243,6 +2332,7 @@ impl Scenario for ClockScenario {
             spider_accounting: spider::SpiderAccounting::default(),
             crow_visit: None,
             lamps: lamps::Lamps::new(seed),
+            floor_light: Vec::new(),
             player_duck_sequence: 0,
             player_seed: seed ^ 0x504c_4159_4455_434b,
             font_rng: StdRng::seed_from_u64(seed ^ 0x464f_4e54),
@@ -2313,7 +2403,15 @@ impl Scenario for ClockScenario {
         } else {
             Vec::new()
         };
+        state.plants.lamps = if state.config.lamp_plant_light {
+            state.lamp_plant_sources()
+        } else {
+            Vec::new()
+        };
         state.advance_plants(dt);
+        if !dt.is_zero() && state.simulation_tick() % lamps::light::FLOOR_TICKS == 0 {
+            state.sample_floor_light();
+        }
         state.settle_surfaces();
         StepResult::default()
     }
