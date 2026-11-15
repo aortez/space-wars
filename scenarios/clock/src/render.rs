@@ -34,6 +34,7 @@ mod slot_machine;
 #[cfg(test)]
 mod slot_machine_contract;
 mod spider;
+mod string_lights;
 mod tanks;
 
 const BACKGROUND_LAYER: i32 = 0;
@@ -67,8 +68,9 @@ pub(crate) const COVER_COLORS: [RenderColor; 3] = [
 const COVER_WITHER_SECONDS: f32 = 45.0;
 /// Columns per cover strip, which bounds the primitives one floor can add.
 const COVER_RUN_COLUMNS: usize = 24;
-const INACTIVE_CELL_COLOR: RenderColor = RenderColor::rgb(0.032, 0.068, 0.083);
-const LABEL_COLOR: RenderColor = RenderColor::rgb(0.52, 0.72, 0.77);
+const INACTIVE_CELL_COLOR: RenderColor = DigitPalette::NORMAL.unlit;
+/// The Normal theme's label color, for text that keeps it whatever the theme.
+const LABEL_COLOR: RenderColor = crate::theme::Appearance::NORMAL.label;
 
 const COLON_X_UNITS: f32 = 14.5;
 const COLON_Y_UNITS: [f32; 2] = [2.25, 5.75];
@@ -130,7 +132,7 @@ fn compose(state: &ClockState) -> RenderFrame {
             RenderPrimitive::Text(RenderText {
                 position: RenderPoint::new(0.0, (layout.bounds_max.y + layout.canopy_y) * 0.5),
                 text: label.into(),
-                color: LABEL_COLOR,
+                color: state.appearance().label,
                 size: 18.0,
                 anchor: TextAnchor::Center,
             }),
@@ -142,6 +144,9 @@ fn compose(state: &ClockState) -> RenderFrame {
     );
     frame::render(&mut frame, state, layout);
     render_canopy(&mut frame, layout);
+    if state.appearance().decoration == crate::theme::Decoration::StringLights {
+        string_lights::render(&mut frame, layout);
+    }
     if state.spider.is_some() {
         spider::render_hatch(&mut frame, layout);
     }
@@ -894,7 +899,7 @@ fn render_square(
             ..palette.fill
         }
     } else {
-        INACTIVE_CELL_COLOR
+        palette.unlit
     };
     let stroke = (brightness > 0.0).then(|| {
         Stroke::new(

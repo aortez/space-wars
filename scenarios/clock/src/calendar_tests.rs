@@ -35,6 +35,23 @@ fn gregorian_validation_and_weekdays_include_century_leap_rules() {
 }
 
 #[test]
+fn the_day_before_crosses_months_years_and_leap_days() {
+    let date = |year, month, day| ClockDate::new(year, month, day).unwrap();
+    for (day, before) in [
+        (date(2026, 12, 25), date(2026, 12, 24)),
+        (date(2026, 5, 1), date(2026, 4, 30)),
+        (date(2026, 3, 1), date(2026, 2, 28)),
+        (date(2024, 3, 1), date(2024, 2, 29)),
+        (date(2000, 3, 1), date(2000, 2, 29)),
+        (date(1900, 3, 1), date(1900, 2, 28)),
+        (date(2027, 1, 1), date(2026, 12, 31)),
+    ] {
+        assert_eq!(day.previous(), Some(before), "{day:?}");
+    }
+    assert_eq!(date(1, 1, 1).previous(), None);
+}
+
+#[test]
 fn date_and_time_actions_are_atomic_validated_and_observable() {
     let value = reading(2024, 2, 29, 23, 59, 59);
     let action = ClockAction::set_reading(value);

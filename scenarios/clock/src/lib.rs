@@ -56,6 +56,7 @@ mod presentation;
 mod rain;
 mod render;
 pub mod spider;
+mod theme;
 pub mod water_fixture;
 
 use rand::{Rng, SeedableRng, rngs::StdRng};
@@ -84,8 +85,8 @@ pub use digits::{
 use engine_common::{
     Action, ClockCrowWaterTolerance, ClockEventKind, ClockEventProfile, ClockEvents, ClockFont,
     ClockFontPool, ClockFontSettings, ClockLampMode, ClockMarqueeMessage, ClockMarqueePreset,
-    ClockRainAmount, ClockSettings, ClockTimeFormat, Observation, RenderFrame, Scenario,
-    StepResult, TickModel,
+    ClockRainAmount, ClockSettings, ClockTheme, ClockThemeChoice, ClockTimeFormat, Observation,
+    RenderFrame, Scenario, StepResult, TickModel,
 };
 pub use events::cell_swap::{CELL_SWAP_FADE_TICKS, CELL_SWAP_MAX_TICKS, CELL_SWAP_TICKS};
 pub use events::digit_slide::DIGIT_SLIDE_TICKS;
@@ -448,6 +449,9 @@ pub struct ClockConfig {
     pub rain_amount: ClockRainAmount,
     pub crow_water_tolerance: ClockCrowWaterTolerance,
     pub lamps: ClockLampMode,
+    /// The look the Clock wears (#455). Fixtures choose one; until the Theme
+    /// setting arrives, ordinary Clock keeps its Normal look.
+    pub theme: ClockThemeChoice,
 }
 
 impl Default for ClockConfig {
@@ -476,6 +480,7 @@ impl Default for ClockConfig {
             rain_amount: ClockRainAmount::default(),
             crow_water_tolerance: ClockCrowWaterTolerance::default(),
             lamps: ClockLampMode::default(),
+            theme: ClockThemeChoice::Normal,
         }
     }
 }
@@ -506,6 +511,7 @@ impl ClockConfig {
             rain_amount: self.rain_amount,
             crow_water_tolerance: self.crow_water_tolerance,
             lamps: self.lamps,
+            theme: self.theme,
         }
     }
 }
@@ -1083,10 +1089,20 @@ impl ClockState {
             .as_ref()
             .map_or(self.schedule.lifecycle_tick, ActiveEvent::phase_tick)
     }
+    /// The digits' colors now: the theme's, unless an event runs. Events
+    /// still draw the Normal face until they follow the theme (#457).
     pub fn palette(&self) -> DigitPalette {
         self.active_event
             .as_ref()
-            .map_or_else(DigitPalette::default, ActiveEvent::palette)
+            .map_or_else(|| self.appearance().digits, ActiveEvent::palette)
+    }
+    /// The look the Clock wears now (#455): the chosen theme at the latest
+    /// reading.
+    pub fn theme(&self) -> ClockTheme {
+        theme::resolve(self.config.theme, self.reading)
+    }
+    pub(crate) fn appearance(&self) -> theme::Appearance {
+        theme::Appearance::of(self.theme())
     }
     pub fn event_enabled(&self, kind: ClockEventKind) -> bool {
         self.config.events.enabled(kind)

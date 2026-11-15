@@ -10,24 +10,31 @@ pub struct ClockDate {
 impl ClockDate {
     /// Civil years 1..=9999. No timezone, timestamp, or independent weekday.
     pub fn new(year: u16, month: u8, day: u8) -> Option<Self> {
-        let leap = is_leap_year(year);
-        let days = match month {
-            4 | 6 | 9 | 11 => 30,
-            2 => {
-                if leap {
-                    29
-                } else {
-                    28
-                }
-            }
-            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-            _ => return None,
-        };
+        let days = days_in_month(year, month)?;
         (year > 0 && year <= 9999 && day > 0 && day <= days).then_some(Self { year, month, day })
     }
 
     pub const fn parts(self) -> [u16; 3] {
         [self.year, self.month as u16, self.day as u16]
+    }
+
+    pub const fn month(self) -> u8 {
+        self.month
+    }
+
+    /// The day before, across months and years, or None before the first.
+    pub fn previous(self) -> Option<Self> {
+        if self.day > 1 {
+            return Some(Self {
+                day: self.day - 1,
+                ..self
+            });
+        }
+        let (year, month) = match self.month {
+            1 => (self.year - 1, 12),
+            month => (self.year, month - 1),
+        };
+        Self::new(year, month, days_in_month(year, month)?)
     }
 
     pub(crate) fn ordinal(self) -> i32 {
@@ -69,6 +76,16 @@ impl ClockDate {
         let weekday = weekdays[(self.ordinal() % 7) as usize];
         let month = months[usize::from(self.month - 1)];
         format!("{weekday} · {month} {}", self.day)
+    }
+}
+
+fn days_in_month(year: u16, month: u8) -> Option<u8> {
+    match month {
+        4 | 6 | 9 | 11 => Some(30),
+        2 if is_leap_year(year) => Some(29),
+        2 => Some(28),
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => Some(31),
+        _ => None,
     }
 }
 

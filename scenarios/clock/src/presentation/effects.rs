@@ -8,14 +8,22 @@ use super::{Bounds, content::Cell};
 pub struct DigitPalette {
     pub fill: RenderColor,
     pub edge: RenderColor,
+    /// The face's dark cells, where no digit is lit.
+    pub unlit: RenderColor,
+}
+
+impl DigitPalette {
+    /// The ordinary face's cyan.
+    pub const NORMAL: Self = Self {
+        fill: RenderColor::rgb(0.33, 0.94, 0.91),
+        edge: RenderColor::rgb(0.72, 1.0, 0.96),
+        unlit: RenderColor::rgb(0.032, 0.068, 0.083),
+    };
 }
 
 impl Default for DigitPalette {
     fn default() -> Self {
-        Self {
-            fill: RenderColor::rgb(0.33, 0.94, 0.91),
-            edge: RenderColor::rgb(0.72, 1.0, 0.96),
-        }
+        Self::NORMAL
     }
 }
 
@@ -92,6 +100,7 @@ impl Lighting {
                     DigitPalette {
                         fill: blend(normal.fill, RenderColor::rgb(1.0, 0.79, 0.32), strength),
                         edge: blend(normal.edge, RenderColor::rgb(1.0, 0.97, 0.77), strength),
+                        ..normal
                     },
                     0.5 + strength * 0.5,
                 )
@@ -238,6 +247,7 @@ pub(crate) fn cycle_palette(progress: f32) -> DigitPalette {
     DigitPalette {
         fill: blend(fills[index], fills[index + 1], t),
         edge: blend(edge(index), edge(index + 1), t),
+        ..normal
     }
 }
 
