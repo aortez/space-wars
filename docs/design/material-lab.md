@@ -1,12 +1,14 @@
-# Material Lab: loading, recovery, collapse and splits (#327, #328)
+# Material Lab: loading, recovery, collapse, splits and welds (#327, #328)
 
 `material-lab` is the first application scenario using the bounded native
 [impact-to-support path](material-impact-support.md), its
 [changing-load extension](material-changing-load.md) and the
-[paired-material path](material-paired-compression.md). One case instead uses
-ordinary steps with the [native response](material-native-response.md) to show
-a [region split](material-region-split.md). Select **Show all scenarios**
-in the launcher, choose **Material Lab**, then start. Direct launch:
+[paired-material path](material-paired-compression.md). Two cases instead use
+ordinary steps: one with the [native response](material-native-response.md) to
+show a [region split](material-region-split.md), and one with a
+[connection load](material-connection-loads.md), a weld that gives way. Select
+**Show all scenarios** in the launcher, choose **Material Lab**, then start.
+Direct launch:
 
 ```sh
 cargo run -p engine-client --profile ci -- --scenario material-lab
@@ -23,8 +25,9 @@ come from the physical history.
 
 Next case walks the five load-controlled platen cases, the two
 [free-pair collisions](#free-pair-collisions), then the
-[collapsing support](#collapsing-support), [paired collapse](#paired-collapse)
-and [split and rebuild](#split-and-rebuild), for ten cases in total.
+[collapsing support](#collapsing-support), [paired collapse](#paired-collapse),
+[split and rebuild](#split-and-rebuild), and
+[branch gives way](#branch-gives-way), for eleven cases in total.
 
 ## Platen cases and playback
 
@@ -223,6 +226,59 @@ the next edit at each pause. The load controls refuse with a message. Pause,
 Single step and Save/Load work at every stage; Restart returns to the undamaged
 wood.
 
+## Branch gives way
+
+**Branch gives way** shows a [connection load](material-connection-loads.md): a
+weld holds a safe load for nothing, drains under an overload and severs. The
+case steps the world normally under gravity 400. Ordinary steps refuse the
+native response while any joint exists, so this world has no loading regions;
+its material is the weld's.
+
+A fixed trunk holds a wood branch welded by its end to the trunk's side. The
+branch is four units long and half a unit high, with mass 20. A 20-mass weight
+rests on it with its center 3.5 out. The load controls set the weight's gravity
+scale, so Release load, Apply light load and Apply heavy load give it a weight
+of 0, 1000 and 8000 without changing its mass or contacts. The weld's beam is
+wood with the branch's height and length and a represented depth of 256. That
+puts its safe moment at 32000, twice the moment of the branch's own weight,
+and its capacity at 30720 (`toughness 60 * volume 512`).
+
+The case starts under the light load. The root carries the branch's weight at
+its center and the weight's at its reach, a moment of 19500 and a utilization
+of 0.61. From the eighth step the weld reads that moment within 0.06% and the
+shear within 0.17%, and it charges exactly nothing. The lab pauses at step 128
+(0.03125 s).
+
+Choose Apply heavy load, then Run. The moment rises to 44000 and the
+utilization to 1.375. The weight takes a few steps to settle onto the branch;
+from the seventh step after the change, each step charges the law's 187.5
+within 0.35%. The weld severs at step 293 (0.071533203125 s), 165 steps later:
+163.84 steps of the steady charge, plus the settling. The lab pauses with no
+capacity left, the phase reads Falling, and the history records Severed. Run
+then lets the branch fall with the weight. The run completes 384 steps later,
+at step 677 (0.165283203125 s), when the branch has dropped 1.76, as in free
+fall.
+
+The schematic draws the trunk, the branch and the weight to scale. The weld
+across the root section is cyan while it holds, amber while an overload drains
+it and grey once it has severed, and an arrow over the weight shows its load.
+The table gives the root moment, the safe moment, the utilization, the shear,
+the capacity left, the work charged, the last step's charge, the time to
+failure and the branch's drop. Bars show the moment against the safe moment
+and the capacity left. Time to failure is the capacity left over the last
+step's charge, in seconds. Once the weight has settled it names the severing
+step to within 0.55 of a step, and while the load is safe it reads "never at
+this load".
+
+Lifting the load partway through an overload stops the drain. The capacity
+spent stays spent, and the heavy load resumes the drain where it stopped. A
+weld relieved after 60 overloaded steps severs after 166 in all, one more than
+an unbroken overload, because the weight settles again. The load controls work
+after the first step, with up to 32 changes, as in the platen cases. A severed
+weld takes no more load. Pause, Single step and Save/Load work throughout, and
+Restart returns to an undamaged weld. The run ends at the case's 1024-step
+window if the weld never severs.
+
 ## Save slot
 
 Save pauses the run and replaces `material-lab.bin` in the application's actual
@@ -258,8 +314,11 @@ Paired collapse uses `MATLAB05`, again with those bounded fields and no command
 list; its native history becomes v23 on enrollment. Split and rebuild uses
 `MATLAB06` with the same fields and no command list: its edits happen at fixed
 steps, so the replay repeats them. Its native snapshot keeps the
-response-enabled v3 layout throughout. Existing case tags and lab envelopes
-retain their layouts. Native saves retain their v1–v23 compatibility.
+response-enabled v3 layout throughout. Branch gives way uses `MATLAB07`, with
+the `MATLAB02` fields and command list even before any load change; the replay
+applies its commands on ordinary steps. Its native snapshot keeps the v1
+layout, with the weld in the connection section. Existing case tags and lab
+envelopes retain their layouts. Native saves retain their v1–v23 compatibility.
 
 ## Evidence and limits
 
@@ -307,10 +366,31 @@ vector renderer, saves, rebuilds, restores in the raster renderer, repeats the
 rebuild exactly, checks load refusal, runs the second strike to completion and
 restarts. It is in the full UI suite.
 
+The main branch-case scenario test draws every state. Under the light load it
+checks the moment and shear against the two weights, that the weld charges
+nothing and that the lab pauses at the checkpoint. Under the heavy load it
+checks each step's charge against the law, each time-to-failure prediction
+against the actual severing and the severing step against the law's schedule.
+It then checks the pause and the history, the refused loads and the fall
+against free fall. Another test lifts the overload partway and checks that the
+spent capacity stays spent and that the overloaded steps in all stay within
+six of the law's schedule. Save tests cover the first steps, two load changes
+at the paused checkpoint, the drain, the severing and the step after, with
+exact continuation, and the completed run. They also cover the `MATLAB07`
+layout, wrong envelopes, forged history and forged commands. A client test
+saves at the checkpoint with the heavy load applied and runs to the severing.
+It checks the refused load, restores, severs again identically and runs to
+completion. The public UI workflow holds the light load in the vector renderer
+and saves with the heavy load applied. It runs to the severing, restores in
+the raster renderer and severs again on the same step. It then checks the
+refused load, runs the fall to completion and restarts. It is in the full UI
+suite.
+
 These are bounded demonstrations with two or three bodies. They do not enable
 material response for existing gameplay, add fracture/topology consequences, or
 broaden the native solver's geometry or connection-loading support. The two
 explicit collapse cases demonstrate bounded #328 failure consequences; other
 cases keep their refusal on exhaustion. The split case's fragment is cut by the
-lab, not by a failure. A moving rigid platen over one material, and severing
-and debris after failure, remain later Lab slices. #327 remains open.
+lab, not by a failure, and the branch case's severing removes only its weld. A
+moving rigid platen over one material, and debris after failure, remain later
+Lab slices. #327 remains open.

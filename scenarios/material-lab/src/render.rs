@@ -4,6 +4,7 @@ use engine_common::{
     RenderPrimitive as R, RenderText, Stroke,
 };
 use engine_rapier::world::loading::response::dynamic_compression::DynamicCompressionSummary;
+mod branch;
 mod pair;
 mod split;
 const INK: C = C::rgb(0.78, 0.86, 0.92);
@@ -53,7 +54,9 @@ pub fn frame(s: &MaterialLabState) -> RenderFrame {
         &mut f,
         -17.0,
         10.3,
-        if s.case == Case::RegionSplit {
+        if s.case == Case::BranchFailure {
+            "MATERIAL LAB  /  CONNECTION FAILURE"
+        } else if s.case == Case::RegionSplit {
             "MATERIAL LAB  /  REGION SPLIT"
         } else if s.case == Case::PairFailure {
             "MATERIAL LAB  /  PAIRED COLLAPSE"
@@ -81,7 +84,9 @@ pub fn frame(s: &MaterialLabState) -> RenderFrame {
         15.0,
         INK,
     );
-    if let Some(split) = &s.split() {
+    if let Some(branch) = &s.branch() {
+        branch::draw(&mut f, s, branch);
+    } else if let Some(split) = &s.split() {
         split::draw(&mut f, s, split);
     } else if let Some(pair) = &pair {
         pair::draw(&mut f, s, pair);
@@ -206,15 +211,28 @@ fn platen(f: &mut RenderFrame, s: &MaterialLabState, a: &DynamicCompressionSumma
     );
     history(f, s, 0.5, bar_y - 0.7);
 }
-/// The latest contact observations, and why a finished run stopped.
+/// The latest contact observations, and why a finished run stopped. The
+/// branch case has no contacts to number, only its weld's severing.
 fn history(f: &mut RenderFrame, s: &MaterialLabState, x: f32, y: f32) {
-    text(f, x, y, "CONTACT HISTORY", 13.0, CYAN);
+    let branch = s.case == Case::BranchFailure;
+    text(
+        f,
+        x,
+        y,
+        if branch { "HISTORY" } else { "CONTACT HISTORY" },
+        13.0,
+        CYAN,
+    );
     for (i, e) in s.events.iter().rev().take(4).enumerate() {
         text(
             f,
             x,
             y - 0.8 - i as f32 * 0.7,
-            format!("{:.4}s  {}  #{}", e.time, e.label, e.episode),
+            if branch {
+                format!("{:.4}s  {}", e.time, e.label)
+            } else {
+                format!("{:.4}s  {}  #{}", e.time, e.label, e.episode)
+            },
             13.0,
             INK,
         );

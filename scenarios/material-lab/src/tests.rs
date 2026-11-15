@@ -205,10 +205,10 @@ fn collapsed_support_keeps_its_failure_and_damage_while_the_platen_falls() {
 }
 #[test]
 fn qualified_cases_finish_with_expected_material_behavior() {
-    for case in Case::ALL
-        .into_iter()
-        .filter(|c| ![Case::LoadRelease, Case::RegionSplit].contains(c) && c.free_pair().is_none())
-    {
+    for case in Case::ALL.into_iter().filter(|c| {
+        ![Case::LoadRelease, Case::RegionSplit, Case::BranchFailure].contains(c)
+            && c.free_pair().is_none()
+    }) {
         let mut s = MaterialLabState::new(case);
         for _ in 0..case.parameters().2 {
             s.advance();
@@ -804,4 +804,352 @@ fn split_case_stops_at_a_refused_response_and_keeps_its_last_valid_world() {
     assert_eq!(s.world.snapshot_bytes().unwrap(), last);
     assert_eq!(s.split().unwrap().wood.remaining, 1200.0);
     assert_eq!(s.impacts, 0);
+}
+
+/// The law's charge for one lab step of `moment` on the weld's beam.
+fn weld_charge_per_step(moment: f32) -> f32 {
+    let probe = engine_material::Connection::new(
+        engine_material::Material {
+            toughness: 1.0e15,
+            ..engine_material::WOOD
+        },
+        branch::beam(),
+    )
+    .unwrap();
+    engine_material::connection(
+        &probe,
+        engine_material::ConnectionLoad {
+            moment,
+            axial: 0.0,
+            duration: PHYSICS_DT,
+            measured_plastic_rotation: None,
+            measured_plastic_extension: None,
+        },
+    )
+    .unwrap()
+    .consumed[0]
+}
+
+/// The root moment of the branch's own weight at its center and of the
+/// weight at its reach.
+fn root_moment(load: Load) -> f32 {
+    branch::BRANCH_MASS * branch::GRAVITY * branch::BRANCH_HALF.x
+        + load.weight() * branch::WEIGHT_REACH
+}
+
+/// Run until the lab pauses, drawing every state.
+fn run_until_paused(s: &mut MaterialLabState) {
+    s.paused = false;
+    while !s.paused {
+        s.advance();
+        render::frame(s);
+    }
+}
+
+#[test]
+fn branch_case_holds_its_light_load_for_nothing_then_severs_on_the_laws_schedule() {
+    let mut s = MaterialLabState::new(Case::BranchFailure);
+    let capacity = f64::from(branch::weld().region().capacity());
+    let start = s.branch().unwrap();
+    assert_eq!((start.remaining, start.spent), (capacity, 0.0));
+    assert_eq!((start.safe_moment, start.tip_load), (32000.0, 1000.0));
+    assert_eq!(start.safe_moment, 2.0 * root_moment(Load::Released));
+    assert_eq!(s.phase(), Phase::Holding);
+    assert!(
+        s.set_load(Load::Heavy)
+            .unwrap_err()
+            .starts_with("Start the run")
+    );
+    // The light load holds to the checkpoint and never charges the weld. The
+    // root carries the moment of both weights, and their sum as shear.
+    s.paused = false;
+    let mut errors = [0.0_f32; 2];
+    while !s.paused {
+        s.advance();
+        render::frame(&s);
+        let b = s.branch().unwrap();
+        assert_eq!((b.load.charged, b.remaining), (0.0, capacity));
+        assert_eq!(b.time_to_failure, None);
+        if s.steps >= 8 {
+            let weights = branch::BRANCH_MASS * branch::GRAVITY + 1000.0;
+            let moment = (b.load.moment + root_moment(Load::Light)) / root_moment(Load::Light);
+            errors[0] = errors[0].max(moment.abs());
+            errors[1] = errors[1].max(((b.load.shear + weights) / weights).abs());
+        }
+    }
+    assert!(errors[0] < 1e-3 && errors[1] < 3e-3, "{errors:?}");
+    assert_eq!(s.steps, BRANCH_CHECKPOINT_STEP);
+    assert_eq!(s.phase(), Phase::Holding);
+    assert_eq!(
+        s.guidance(),
+        Some("Apply heavy load, then Run until the weld gives way.")
+    );
+    let held = s.branch().unwrap();
+    assert!((held.load.utilization - root_moment(Load::Light) / 32000.0).abs() < 1e-3);
+    // The heavy load drains the weld at the law's rate until it severs, and
+    // the lab pauses with the branch still in place.
+    s.set_load(Load::Heavy).unwrap();
+    assert_eq!(s.weight(), 8000.0);
+    let per_step = weld_charge_per_step(root_moment(Load::Heavy));
+    let schedule = capacity / f64::from(per_step);
+    run_until_paused(&mut s);
+    let overload = s.steps - BRANCH_CHECKPOINT_STEP;
+    assert_eq!(s.severed_at, Some(s.steps));
+    assert!(
+        f64::from(overload) > schedule && f64::from(overload) < schedule + 3.0,
+        "{overload} steps against {schedule}"
+    );
+    let severed = s.branch().unwrap();
+    assert_eq!((severed.remaining, severed.spent), (0.0, capacity));
+    assert!(severed.excess.unwrap() >= 0.0 && severed.load.charged > 0.0);
+    assert!((severed.load.utilization - 1.375).abs() < 1e-3);
+    // The weld held the branch in place, to its own slight give.
+    assert!(severed.drop.abs() < 1e-4, "{severed:?}");
+    assert_eq!((severed.time_to_failure, s.phase()), (None, Phase::Falling));
+    assert!(s.collapsed());
+    assert_eq!(
+        s.events,
+        [Event {
+            time: s.elapsed(),
+            label: "Severed".into(),
+            episode: 0,
+        }]
+    );
+    assert_eq!(
+        s.guidance(),
+        Some("The weld has severed. Run to watch the branch fall.")
+    );
+    // Rerun the overload to check each step's charge and prediction.
+    let mut r = MaterialLabState::new(Case::BranchFailure);
+    while r.steps < BRANCH_CHECKPOINT_STEP {
+        r.advance();
+    }
+    r.set_load(Load::Heavy).unwrap();
+    let mut predictions = Vec::new();
+    while r.severed_at.is_none() {
+        r.advance();
+        let b = r.branch().unwrap();
+        if r.steps > BRANCH_CHECKPOINT_STEP + 8 && r.severed_at.is_none() {
+            // The weight settles on the branch within a few steps of the jump,
+            // then rocks slightly on its two contacts.
+            assert!((b.load.charged - per_step).abs() < 5e-3 * per_step, "{b:?}");
+            assert_eq!(r.phase(), Phase::Overloaded);
+            predictions.push((r.steps, b.time_to_failure.unwrap()));
+        }
+    }
+    // Each prediction names the severing step to within one step.
+    for (step, prediction) in predictions {
+        let actual = f64::from(r.steps - step) * f64::from(PHYSICS_DT);
+        assert!(
+            (prediction - actual).abs() <= f64::from(PHYSICS_DT),
+            "{step}: {prediction} against {actual}"
+        );
+    }
+    assert_eq!(r.snapshot_bytes().unwrap(), s.snapshot_bytes().unwrap());
+    // A severed weld takes no more load, and the branch falls with the weight.
+    let bytes = s.snapshot_bytes().unwrap();
+    for load in [Load::Released, Load::Light, Load::Heavy] {
+        assert!(
+            s.set_load(load)
+                .unwrap_err()
+                .starts_with("The weld has severed")
+        );
+        assert_eq!(s.snapshot_bytes().unwrap(), bytes);
+    }
+    let at = severed.weight.y - severed.branch.y;
+    run_until_paused(&mut s);
+    assert!(
+        s.stopped.as_ref().unwrap().starts_with("Run complete"),
+        "{:?}",
+        s.stopped
+    );
+    assert_eq!(s.steps, s.severed_at.unwrap() + branch::FALL_STEPS);
+    let end = s.branch().unwrap();
+    assert_eq!(
+        (end.load, end.excess, end.remaining),
+        (severed.load, severed.excess, 0.0)
+    );
+    // Free fall over the fall's steps, as the integrator takes it.
+    let n = f64::from(branch::FALL_STEPS);
+    let free = f64::from(branch::GRAVITY) * f64::from(PHYSICS_DT).powi(2) * n * (n + 1.0) / 2.0;
+    assert!((f64::from(end.drop) - free).abs() < 2e-3 * free, "{end:?}");
+    assert!((end.weight.y - end.branch.y - at).abs() < 0.01, "{end:?}");
+    assert!(end.branch.angle.abs() < 0.01 && end.weight.angle.abs() < 0.01);
+    assert_eq!(s.events.len(), 1);
+}
+
+#[test]
+fn branch_case_keeps_the_capacity_an_overload_spent_after_the_load_is_lifted() {
+    let mut s = MaterialLabState::new(Case::BranchFailure);
+    while s.steps < BRANCH_CHECKPOINT_STEP {
+        s.advance();
+    }
+    s.set_load(Load::Heavy).unwrap();
+    for _ in 0..60 {
+        s.advance();
+    }
+    let spent = s.branch().unwrap().spent;
+    assert!(spent > 0.0);
+    for load in [Load::Light, Load::Released] {
+        s.set_load(load).unwrap();
+        for _ in 0..64 {
+            s.advance();
+            let b = s.branch().unwrap();
+            assert_eq!((b.spent, b.load.charged), (spent, 0.0));
+        }
+        let b = s.branch().unwrap();
+        assert!((b.load.utilization - root_moment(load) / 32000.0).abs() < 1e-3);
+        assert_eq!(s.phase(), Phase::Holding);
+    }
+    assert_eq!(
+        s.guidance(),
+        Some("Apply heavy load, then Run until the weld gives way.")
+    );
+    // The overload resumes where it stopped, so the weld severs after the same
+    // overloaded steps in all.
+    s.set_load(Load::Heavy).unwrap();
+    let resumed = s.steps;
+    while s.severed_at.is_none() {
+        s.advance();
+    }
+    let overload = 60 + s.steps - resumed;
+    let schedule = f64::from(branch::weld().region().capacity())
+        / f64::from(weld_charge_per_step(root_moment(Load::Heavy)));
+    assert!(
+        f64::from(overload) > schedule && f64::from(overload) < schedule + 6.0,
+        "{overload} steps against {schedule}"
+    );
+    assert_eq!(s.load_changes.len(), 4);
+}
+
+#[test]
+fn branch_case_saves_keep_their_own_layout_and_replay_its_load_changes() {
+    let mut s = MaterialLabState::new(Case::BranchFailure);
+    let mut checkpoints = vec![0, 1, BRANCH_CHECKPOINT_STEP, 200, 250];
+    while s.stopped.is_none() {
+        if s.steps == BRANCH_CHECKPOINT_STEP && s.load_changes.is_empty() {
+            // Two changes at one paused step replay in order.
+            s.set_load(Load::Released).unwrap();
+            s.set_load(Load::Heavy).unwrap();
+        }
+        if checkpoints.first() == Some(&s.steps) || s.severed_at.is_some_and(|at| s.steps <= at + 1)
+        {
+            checkpoints.retain(|c| *c != s.steps);
+            let bytes = s.snapshot_bytes().unwrap();
+            assert_eq!(&bytes[..8], BRANCH_SAVE_MAGIC);
+            // With no loading capture the native snapshot keeps the v1 layout,
+            // with the weld in its connection section.
+            let world = s.world.snapshot_bytes().unwrap();
+            assert_eq!(u32::from_le_bytes(world[..4].try_into().unwrap()), 1);
+            let mut loaded = restored(&s);
+            assert_eq!(loaded.branch(), s.branch());
+            assert_eq!(
+                (&loaded.events, loaded.severed_at),
+                (&s.events, s.severed_at)
+            );
+            for magic in [
+                SAVE_MAGIC,
+                LOAD_SAVE_MAGIC,
+                PAIR_SAVE_MAGIC,
+                FAILURE_SAVE_MAGIC,
+                PAIR_FAILURE_SAVE_MAGIC,
+                SPLIT_SAVE_MAGIC,
+            ] {
+                let mut bad = bytes.clone();
+                bad[..8].copy_from_slice(magic);
+                assert!(MaterialLabState::from_snapshot_bytes(&bad).is_err());
+            }
+            let changes: &[fn(&mut Save, &mut Vec<LoadChange>)] = &[
+                |s, _| s.case = Case::RegionSplit,
+                |s, _| s.steps += 1,
+                |s, _| s.impacts += 1,
+                |s, _| {
+                    s.events.push(Event {
+                        time: 0.0,
+                        label: "Severed".into(),
+                        episode: 0,
+                    })
+                },
+                |s, _| s.stopped = Some("Run complete".into()),
+                |s, c| {
+                    c.push(LoadChange {
+                        step: s.steps,
+                        load: Load::Released,
+                    })
+                },
+            ];
+            for change in changes {
+                let (mut save, mut commands): (Save, Vec<LoadChange>) =
+                    codec().deserialize(&bytes[8..]).unwrap();
+                change(&mut save, &mut commands);
+                let mut bad = BRANCH_SAVE_MAGIC.to_vec();
+                bad.extend(codec().serialize(&(save, commands)).unwrap());
+                assert!(MaterialLabState::from_snapshot_bytes(&bad).is_err());
+            }
+            loaded.advance();
+            s.advance();
+            assert_eq!(
+                loaded.snapshot_bytes().unwrap(),
+                s.snapshot_bytes().unwrap()
+            );
+            continue;
+        }
+        s.advance();
+    }
+    assert!(s.stopped.as_ref().unwrap().starts_with("Run complete"));
+    assert_eq!(s.load_changes.len(), 2);
+    let terminal = restored(&s);
+    assert_eq!(terminal.branch(), s.branch());
+    // Commands the run refuses cannot come back from a save.
+    let bytes = s.snapshot_bytes().unwrap();
+    let forged: &[fn(&mut Vec<LoadChange>)] = &[
+        |c| c.clear(),
+        |c| c[0].step = 0,
+        |c| c.reverse(),
+        |c| c[1].load = Load::Light,
+        |c| c[1].step = 400,
+        |c| *c = vec![c[0].clone(); 33],
+    ];
+    for forge in forged {
+        let (save, mut commands): (Save, Vec<LoadChange>) =
+            codec().deserialize(&bytes[8..]).unwrap();
+        forge(&mut commands);
+        let mut bad = BRANCH_SAVE_MAGIC.to_vec();
+        bad.extend(codec().serialize(&(save, commands)).unwrap());
+        assert!(MaterialLabState::from_snapshot_bytes(&bad).is_err());
+    }
+    // Other cases' saves never pass as this layout, nor this case's as theirs.
+    for case in [Case::PlasticReturn, Case::LoadRelease, Case::RegionSplit] {
+        let mut old = MaterialLabState::new(case);
+        old.advance();
+        let mut bytes = old.snapshot_bytes().unwrap();
+        bytes[..8].copy_from_slice(BRANCH_SAVE_MAGIC);
+        assert!(MaterialLabState::from_snapshot_bytes(&bytes).is_err());
+    }
+    assert_eq!(
+        codec().serialize(&Case::BranchFailure).unwrap(),
+        10_u32.to_le_bytes()
+    );
+}
+
+#[test]
+fn branch_case_load_changes_are_bounded() {
+    let mut s = MaterialLabState::new(Case::BranchFailure);
+    s.advance();
+    let bytes = s.snapshot_bytes().unwrap();
+    s.set_load(Load::Light).unwrap();
+    assert_eq!(s.snapshot_bytes().unwrap(), bytes);
+    for i in 0..MAX_DYNAMIC_COMPRESSION_LOAD_CHANGES {
+        s.set_load(if i % 2 == 0 {
+            Load::Released
+        } else {
+            Load::Light
+        })
+        .unwrap();
+    }
+    s = restored(&s);
+    let bytes = s.snapshot_bytes().unwrap();
+    s.set_load(Load::Light).unwrap();
+    assert!(s.set_load(Load::Heavy).unwrap_err().contains("limit"));
+    assert_eq!(s.snapshot_bytes().unwrap(), bytes);
 }

@@ -1,6 +1,6 @@
 //! The qualified full-face fixtures: a platen over a fixed layer, a free pair,
-//! and the split case's striker and wood.
-use crate::{BodySetup, Case, split};
+//! the split case's striker and wood, and the branch case's welded branch.
+use crate::{BodySetup, Case, branch, split};
 use engine_core::Vec2;
 use engine_material::{ARMOR, Region, Section, WOOD};
 use engine_rapier::world::{
@@ -34,10 +34,14 @@ pub fn support_region(case: Case) -> Region {
         Region::with_remaining(WOOD, VOLUME, 1200.0).unwrap()
     }
 }
-/// Material tokens are in body order; an ideal rigid platen has none.
+/// Material tokens are in body order; an ideal rigid platen has none, and
+/// the branch case's material is its weld's.
 pub fn build(case: Case) -> (PhysicsWorld, [Option<RegionToken>; 2]) {
     if case == Case::RegionSplit {
         return striker_and_wood();
+    }
+    if case == Case::BranchFailure {
+        return (branch::build(), [None, None]);
     }
     let Some(pair) = case.free_pair() else {
         return platen(case);

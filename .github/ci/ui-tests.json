@@ -118,6 +118,10 @@
       "reason": "Launcher extra used for development; its 16-second smoke left PRs with Material Lab's to bring PR UI back under five minutes. Garden Lab's headless scenario and client tests stay on PRs."
     },
     {
+      "test": "material_lab::material_lab_branch_holds_then_gives_way_and_replays_in_both_renderers",
+      "reason": "A welded branch holds its light load for nothing, severs under the heavy load and falls, with cross-renderer save/load replay; Material Lab's headless scenario and client tests stay on PRs."
+    },
+    {
       "test": "material_lab::material_lab_pairs_and_collapse_step_save_load_and_both_renderers",
       "reason": "Two free-pair cases and a collapsing support run to completion, with both renderers and saved histories; Material Lab's headless scenario and client tests stay on PRs."
     },

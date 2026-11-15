@@ -102,8 +102,10 @@ The local launcher includes the following scenarios and presets:
   energy ledger. Collapse cases pause at failure, then let a platen fall or
   both free bodies coast while preserving the surviving layer's capacity. A
   split case cuts struck wood onto a fragment, rebuilds the rest on a new body
-  and strikes it again, and each part keeps its share of the damage.
-  Pause, single step and exact save/load replay.
+  and strikes it again, and each part keeps its share of the damage. A
+  branch case welds a wood branch to a trunk under a weight: the light load
+  costs the weld nothing, and the heavy load drains it until it severs and
+  the branch falls. Pause, single step and exact save/load replay.
   Enable **Show all scenarios** in the launcher. See [Material Lab](docs/design/material-lab.md).
 - **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with
   independently driven pin-slot suspension wheels on a rotating circular planet.
