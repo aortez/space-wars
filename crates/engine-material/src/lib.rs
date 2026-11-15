@@ -19,6 +19,7 @@ mod material;
 mod reference;
 mod region;
 pub mod shared_impact;
+mod source;
 mod sustained;
 mod tissue;
 
@@ -26,15 +27,19 @@ mod tissue;
 mod tests;
 
 pub use geometry::{
-    Beam, ContactBody, ContactGeometry, DEPTH_WIDTH_FRACTION, PATCH_WIDTH_FRACTION, Section,
+    Beam, ContactBody, ContactGeometry, DEPTH_WIDTH_FRACTION, Face, PATCH_WIDTH_FRACTION, Section,
     closing_speed, deformation_depth, effective_mass, lever, patch_width_from_radii,
     point_velocity,
 };
-pub use impact::{Impact, POST_YIELD_STIFFNESS_FRACTION, impact, yield_speed};
+pub use impact::{Impact, POST_YIELD_STIFFNESS_FRACTION, deposit, impact, yield_speed};
 pub use ledger::{LEDGER_TOLERANCE, Outcome, WorkLedger};
 pub use material::{FailureMode, Material};
 pub use reference::{ALL_REFERENCE, ARMOR, HULL, ROCK, SHELL, SOFT_TISSUE, WOOD};
 pub use region::{Connection, Region};
+pub use source::{
+    Part, PartLedger, Projectile, Pulses, Share, Source, SourceError, SourceId, SourceLedger,
+    SourceSpec,
+};
 pub use sustained::{CRUSH_TIME_CONSTANT, ConnectionLoad, SustainedLoad, connection, sustained};
 pub use tissue::{
     TissueError, TissueIntegrity, TissueMaterial, TissueRecord, TissueSave, TissueTable,

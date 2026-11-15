@@ -347,8 +347,9 @@ a registered region, or moves it to another body, with its damage.
 [Connection loads](material-connection-loads.md) charge welds between bodies
 each step and sever them on exhaustion, and
 [tissue integrity](material-tissue.md) keeps a region for each plant tissue,
-apart from its biological health. Transfer between older loading modes and
-broader geometry remain future work.
+apart from its biological health. [Weapon sources](material-sources.md) give
+each shot or charge a finite, separately attributed budget (#329). Transfer
+between older loading modes and broader geometry remain future work.
 
 ## Evidence
 

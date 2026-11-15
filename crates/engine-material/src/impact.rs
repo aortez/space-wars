@@ -4,7 +4,9 @@
 //! first, but cannot cap transmitted force forever. Both sides share one force
 //! and one energy budget; capacity limits damage, not contact resistance.
 
-use crate::{ContactGeometry, FailureMode, MaterialError, Outcome, Region, WorkLedger};
+use crate::{
+    ContactGeometry, Face, FailureMode, MaterialError, Outcome, Region, Section, WorkLedger,
+};
 use serde::Serialize;
 
 /// Transient post-yield compression stiffness relative to elastic stiffness.
@@ -48,15 +50,19 @@ struct Side {
     mode: FailureMode,
 }
 
-fn sides(a: &Region, b: &Region, contact: ContactGeometry) -> [Side; 2] {
-    let area = contact.area();
-    [(a, contact.a), (b, contact.b)].map(|(region, section)| Side {
+fn side(region: &Region, section: Section, area: f32) -> Side {
+    Side {
         stiffness: section.contact_stiffness(region.material().stiffness, area),
         yield_force: region.effective_strength() * area,
         remaining: region.remaining(),
         damping: region.material().damping,
         mode: region.material().mode,
-    })
+    }
+}
+
+fn sides(a: &Region, b: &Region, contact: ContactGeometry) -> [Side; 2] {
+    let area = contact.area();
+    [side(a, contact.a, area), side(b, contact.b, area)]
 }
 
 /// Invert the sum of two bilinear loading-work curves. Each yield point adds
@@ -135,33 +141,77 @@ pub fn impact(
         return outcome.checked();
     }
     let force_squared = peak_force_squared(&side, energy);
-    let force = libm::sqrt(force_squared);
-    let plastic_ratio = 1.0 / f64::from(POST_YIELD_STIFFNESS_FRACTION) - 1.0;
-    let ledger = &mut outcome.ledger;
-    ledger.peak_force = force as f32;
+    outcome.ledger.peak_force = libm::sqrt(force_squared) as f32;
     for (index, side) in side.iter().enumerate() {
-        let stiffness = f64::from(side.stiffness);
-        let yield_force = f64::from(side.yield_force);
-        let stored = (0.5 * force_squared / stiffness) as f32;
-        let work = (0.5 * (force_squared - yield_force * yield_force).max(0.0) * plastic_ratio
-            / stiffness) as f32;
-        outcome.yielded[index] = force_squared > yield_force * yield_force;
-        ledger.peak_stress[index] = (force / f64::from(area)) as f32;
-        ledger.deformation[index] =
-            ((force + (force - yield_force).max(0.0) * plastic_ratio) / stiffness) as f32;
-        let charge = if outcome.yielded[index] && side.mode == FailureMode::Brittle {
-            work + stored
-        } else {
-            store(ledger, index, side, stored);
-            work
-        };
-        let consumed = charge.min(side.remaining);
-        outcome.consumed[index] = consumed;
-        outcome.failed[index] = side.remaining > 0.0 && consumed >= side.remaining;
-        ledger.irreversible[index] = consumed;
-        ledger.excess += charge - consumed;
+        charge_side(&mut outcome, index, side, force_squared, area);
     }
     outcome.checked()
+}
+
+/// One pulse of `energy` arriving on a region's face, such as a blast's share
+/// or a beam's pulse. It is the impact law against a rigid, unbreakable
+/// counterpart: energy within the face's safe limit is recoverable or
+/// harmlessly damped, and the region yields past it. The region is slot 0 of
+/// the outcome, and the host absorbs its `consumed` work.
+pub fn deposit(region: &Region, face: Face, energy: f32) -> Result<Outcome, MaterialError> {
+    face.validate()?;
+    if !(energy.is_finite() && energy >= 0.0) {
+        return Err(MaterialError::InvalidLoad);
+    }
+    let area = face.area();
+    let side = side(region, face.section, area);
+    let mut outcome = Outcome {
+        ledger: WorkLedger {
+            available: energy,
+            ..WorkLedger::default()
+        },
+        ..Outcome::default()
+    };
+    if energy <= 0.0 {
+        return outcome.checked();
+    }
+    // The bilinear loading-work curve of one side, inverted as
+    // `peak_force_squared` does with the counterpart's compliance at zero.
+    let compliance = 0.5 / f64::from(side.stiffness);
+    let yield_squared = f64::from(side.yield_force).powi(2);
+    let elastic = yield_squared * compliance;
+    let energy = f64::from(energy);
+    let force_squared = if energy <= elastic {
+        energy / compliance
+    } else {
+        yield_squared + (energy - elastic) * f64::from(POST_YIELD_STIFFNESS_FRACTION) / compliance
+    };
+    outcome.ledger.peak_force = libm::sqrt(force_squared) as f32;
+    charge_side(&mut outcome, 0, &side, force_squared, area);
+    outcome.checked()
+}
+
+/// Split one side's loading at the peak force into stored, damped and
+/// irreversible work, capped by its remaining capacity.
+fn charge_side(outcome: &mut Outcome, index: usize, side: &Side, force_squared: f64, area: f32) {
+    let plastic_ratio = 1.0 / f64::from(POST_YIELD_STIFFNESS_FRACTION) - 1.0;
+    let force = libm::sqrt(force_squared);
+    let stiffness = f64::from(side.stiffness);
+    let yield_force = f64::from(side.yield_force);
+    let stored = (0.5 * force_squared / stiffness) as f32;
+    let work = (0.5 * (force_squared - yield_force * yield_force).max(0.0) * plastic_ratio
+        / stiffness) as f32;
+    let ledger = &mut outcome.ledger;
+    outcome.yielded[index] = force_squared > yield_force * yield_force;
+    ledger.peak_stress[index] = (force / f64::from(area)) as f32;
+    ledger.deformation[index] =
+        ((force + (force - yield_force).max(0.0) * plastic_ratio) / stiffness) as f32;
+    let charge = if outcome.yielded[index] && side.mode == FailureMode::Brittle {
+        work + stored
+    } else {
+        store(ledger, index, side, stored);
+        work
+    };
+    let consumed = charge.min(side.remaining);
+    outcome.consumed[index] = consumed;
+    outcome.failed[index] = side.remaining > 0.0 && consumed >= side.remaining;
+    ledger.irreversible[index] = consumed;
+    ledger.excess += charge - consumed;
 }
 
 fn store(ledger: &mut WorkLedger, index: usize, side: &Side, stored: f32) {
