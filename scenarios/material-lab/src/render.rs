@@ -9,6 +9,8 @@ mod split;
 const INK: C = C::rgb(0.78, 0.86, 0.92);
 const CYAN: C = C::rgb(0.22, 0.82, 0.92);
 const AMBER: C = C::rgb(1.0, 0.66, 0.24);
+/// Line pitch of the readouts in every layout.
+const ROW: f32 = 0.75;
 pub fn text(f: &mut RenderFrame, x: f32, y: f32, value: impl Into<String>, size: f32, color: C) {
     let mut t = RenderText::new(P::new(x, y), value);
     t.size = size;
@@ -30,8 +32,12 @@ fn rect(f: &mut RenderFrame, x: f32, y: f32, w: f32, h: f32, c: C) {
     );
 }
 fn line(f: &mut RenderFrame, x: f32, y: f32, xx: f32, yy: f32, c: C) {
+    line_on(f, 2, x, y, xx, yy, c);
+}
+/// A line on layer `z`. On the fills' layer it passes behind fills pushed after it.
+fn line_on(f: &mut RenderFrame, z: i32, x: f32, y: f32, xx: f32, yy: f32, c: C) {
     f.push_primitive(
-        2,
+        z,
         R::Line(RenderLine::new(
             P::new(x, y),
             P::new(xx, yy),
@@ -92,10 +98,12 @@ fn platen(f: &mut RenderFrame, s: &MaterialLabState, a: &DynamicCompressionSumma
     let surface = failure
         .as_ref()
         .map_or(permanent.min(platen), |e| 1.0 - e.indentation as f32 * 20.0);
+    // High enough that the longest arrow, over the highest platen, stays clear
+    // of this text at 800x480.
     text(
         f,
         -14.0,
-        5.2,
+        5.5,
         if s.case == Case::SupportFailure {
             format!("Fixed load: {:.0}", s.weight())
         } else {
@@ -127,15 +135,17 @@ fn platen(f: &mut RenderFrame, s: &MaterialLabState, a: &DynamicCompressionSumma
             C::rgb(0.36, 0.24, 0.13)
         },
     );
+    // The grain and both reference levels pass behind the platen, so none of
+    // them crosses its label; the levels stay in view past its ends.
     for i in 0..8 {
         let x = -13.7 + i as f32 * 1.4;
-        line(f, x, -4.0, x, surface - 0.1, C::rgb(0.55, 0.38, 0.21));
+        line_on(f, 1, x, -4.0, x, surface - 0.1, C::rgb(0.55, 0.38, 0.21));
     }
-    line(f, -15.0, 1.0, -2.0, 1.0, C::rgb(0.38, 0.44, 0.5));
-    line(f, -14.5, permanent, -2.5, permanent, AMBER);
+    line_on(f, 1, -15.0, 1.0, -2.0, 1.0, C::rgb(0.38, 0.44, 0.5));
+    line_on(f, 1, -14.5, permanent, -2.5, permanent, AMBER);
     rect(f, -14.0, platen, 11.0, 1.3, C::rgb(0.16, 0.55, 0.69));
     line(f, -14.0, platen, -3.0, platen, CYAN);
-    text(f, -13.6, platen + 0.9, "20 mass units", 14.0, C::WHITE);
+    text(f, -13.6, platen + 1.1, "20 mass units", 14.0, C::WHITE);
     text(
         f,
         -14.0,
@@ -157,25 +167,34 @@ fn platen(f: &mut RenderFrame, s: &MaterialLabState, a: &DynamicCompressionSumma
         12.0,
         AMBER,
     );
-    let mut lines = vec![
-        format!("Normal speed    {:.3}", a.velocity),
-        format!("Compression     {:.5}", a.indentation.max(0.0)),
-        format!("Permanent set   {:.5}", a.plastic_indentation),
-        format!("Capacity left   {:.2} / {:.0}", s.remaining(), s.capacity()),
-        format!("Damage work     {:.3}", a.damage_work),
-        format!("Elastic energy  {:.3}", a.elastic_energy),
-        format!("Motion energy   {:.3}", a.kinetic_energy),
-        format!("Viscous loss    {:.3}", a.viscous_loss),
-        format!("Gravity work    {:.3}", a.gravity_work),
-        format!("Gravity impulse  {:.3}", s.gravity_impulse()),
+    let mut rows = vec![
+        ("Normal speed", format!("{:.3}", a.velocity)),
+        ("Compression", format!("{:.5}", a.indentation.max(0.0))),
+        ("Permanent set", format!("{:.5}", a.plastic_indentation)),
+        (
+            "Capacity left",
+            format!("{:.2} / {:.0}", s.remaining(), s.capacity()),
+        ),
+        ("Damage work", format!("{:.3}", a.damage_work)),
+        ("Elastic energy", format!("{:.3}", a.elastic_energy)),
+        ("Motion energy", format!("{:.3}", a.kinetic_energy)),
+        ("Viscous loss", format!("{:.3}", a.viscous_loss)),
+        ("Gravity work", format!("{:.3}", a.gravity_work)),
+        ("Gravity impulse", format!("{:.3}", s.gravity_impulse())),
     ];
     if let Some(e) = &failure {
-        lines.push(format!("Collapse loss   {:.3}", e.dissipated()));
+        rows.push(("Collapse loss", format!("{:.3}", e.dissipated())));
     }
-    for (i, l) in lines.into_iter().enumerate() {
-        text(f, 0.5, 5.8 - i as f32 * 0.75, l, 14.0, INK);
+    // The value column clears the longest label at 800x480, where text is
+    // largest against the scene.
+    for (i, (label, value)) in rows.iter().enumerate() {
+        let y = 5.8 - i as f32 * ROW;
+        text(f, 0.5, y, *label, 14.0, INK);
+        text(f, 6.5, y, value, 14.0, INK);
     }
-    let bar_y = if failure.is_some() { -2.9 } else { -2.1 };
+    // The bar takes the next row, which keeps it clear of the labels'
+    // descenders at 800x480.
+    let bar_y = 5.8 - (rows.len() + 1) as f32 * ROW;
     rect(f, 0.5, bar_y, 14.5, 0.25, C::rgb(0.2, 0.23, 0.27));
     rect(
         f,

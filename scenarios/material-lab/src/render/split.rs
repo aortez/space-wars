@@ -1,6 +1,6 @@
 //! The split case: the striker, the wood and its fragment along the strike,
 //! one column of readouts per block and the wood's balance from strike to strike.
-use super::{AMBER, CYAN, INK, history, line, rect, text};
+use super::{AMBER, CYAN, INK, ROW, history, line, rect, text};
 use crate::{MaterialLabState, Split, SplitBlock, Stage, split::STRIKER_SPEED};
 use engine_common::{RenderColor as C, RenderFrame};
 
@@ -14,8 +14,6 @@ const SCALE: f32 = 4.6;
 const STRIKER_LENGTH: f32 = 5.2;
 const BOTTOM: f32 = 2.0;
 const HEIGHT: f32 = 2.4;
-/// Line pitch of the readouts, as in the other layouts.
-const ROW: f32 = 0.75;
 const TRACK: C = C::rgb(0.2, 0.23, 0.27);
 
 pub fn draw(f: &mut RenderFrame, s: &MaterialLabState, split: &Split) {

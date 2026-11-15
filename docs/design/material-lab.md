@@ -66,7 +66,8 @@ physical state, with its reason visible. Restart explicitly creates a new run.
 The underlying error allowances and supported scene restrictions are unchanged.
 
 The cyan platen compresses the brown layer. The grey line marks its original
-surface and the amber line its permanently indented surface. The contact history
+surface and the amber line its permanently indented surface. Both lines pass
+behind the platen and show past its ends while covered. The contact history
 shows Impact, Support and Separation observations. Contact numbers are local
 ordinals for presentation; native episode identities remain in the physics save.
 Damage work, viscous loss and recovered elastic energy remain distinct. The
