@@ -16,8 +16,13 @@ pub const PATCH_WIDTH_FRACTION: f32 = 0.5;
 /// with body size, so one width is the stiff end of that range.
 pub const DEPTH_WIDTH_FRACTION: f32 = 1.0;
 
-fn length_ok(value: f32) -> bool {
-    value.is_finite() && (1.0e-6..=1.0e6).contains(&value)
+/// The shortest length the laws accept, `wu`.
+pub(crate) const MIN_LENGTH: f32 = 1.0e-6;
+/// The longest length the laws accept, `wu`.
+pub(crate) const MAX_LENGTH: f32 = 1.0e6;
+
+pub(crate) fn length_ok(value: f32) -> bool {
+    value.is_finite() && (MIN_LENGTH..=MAX_LENGTH).contains(&value)
 }
 
 /// Material geometry behind one side of a contact.

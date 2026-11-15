@@ -13,10 +13,8 @@ parts, and each is attributed and accounted separately:
   pulse its power times the tick, so its damage depends on the tick (see
   [Limits](#limits)).
 
-This piece is the budget alone, in the pure crate. The host supplies every
-recipient, face, coupling and path. Blast coupling, occlusion and the paths
-that sweeps and beams take through tissue are the next piece of #329, and real
-projectiles in the engine follow it.
+The budgets and the [geometry](#where-the-energy-goes) that divides them are
+in the pure crate. Real projectiles in the engine are the next piece of #329.
 
 ## Deliveries
 
@@ -35,9 +33,7 @@ exception: the source keeps it and charges it its side of the hard hit.
 A share's coupling is its fraction of the whole payload or pulse. The couplings
 may not sum past one, beyond a little rounding, and the shares never take more
 than the energy in total. What the couplings leave reaches no recipient: a
-blast's energy that meets nothing, or a beam's that goes on past its path. How
-a blast's front or a beam's cross-section divides among the recipients, with
-nearer ones shadowing farther ones, is geometry the host supplies.
+blast's energy that meets nothing, or a beam's that goes on past its path.
 
 ## The deposit law
 
@@ -80,6 +76,64 @@ For scale: a 0.5 mu shell at 300 wu/s carries 22,500. A 0.02 mu blade of soft
 tissue sees 865 from it. The blade keeps 5.5 of that: its whole capacity of
 1.2, so the shell cuts it, and 4.3 damped. Half the budget would take more than
 2,000 blades.
+
+## Where the energy goes
+
+The geometry functions find the recipients and give each its coupling and its
+face's width. A recipient is one or more circles, each a `Target` with the
+recipient's key, a center, a radius and the recipient's represented thickness
+into the screen. Circles that belong to different recipients should not
+overlap. A recipient's own circles may: each line of energy meets a recipient
+once, as one body, at the first of its circles on that line.
+
+Energy travels in straight lines: outward from a blast's center, or along a
+beam. Wherever it meets a target, the target takes the fraction of what
+arrives that its thickness covers of the front's height, and the rest carries
+on behind it. A target as thick as the front stops everything in the lines it
+covers. A grass blade 0.2 wu thick in a 1 wu front takes a fifth and passes
+four fifths on. The shares can never sum past the whole, however many targets
+crowd the front. The front's height is a property of the source, such as the
+depth of the scene the blast fills.
+
+- `blast_reach` spreads a blast's energy evenly over every direction in the
+  plane. A target takes the directions in which the energy meets it within
+  the blast's radius. That is every direction it subtends, unless it straddles
+  the blast's edge, where it takes fewer, down to none as it leaves. Its face
+  is the part of its diameter that the energy reaches. A blast inside a
+  target meets it first in every direction.
+- `beam_reach` spreads a beam's energy evenly across its width, from its start
+  to the end of its trace, where it meets a hard surface or runs out. A target
+  takes the part of the width that its diameter covers. Its face is the part
+  of that width the energy reaches. `through` is what reaches the end of the
+  path: the coupling of the hard surface there, or what goes on.
+- `sweep_crossings` lists the targets a shot touches as it sweeps from one
+  point to another, in the order it reaches them, for `pass`. A target it
+  already touches at the start comes first. A blade the shot still touches
+  when the next tick's sweep starts is listed again, and the source refuses
+  the repeat.
+- `footprint_overlaps` lists the targets under a footprint, such as the patch
+  where a tank's tread rests, with each one's share of the load and its
+  width. The load spreads evenly along the footprint, and recipients side by
+  side under the same stretch share it equally, however many of their circles
+  lie there. The host presses each tissue with
+  its share through the tissue adapter's sustained law, so the crushing
+  follows the #328 contract, with no timer and no body per blade.
+
+Energy meets the targets covering each piece of a front in the order the
+piece's middle line reaches them. That is exact for targets that do not
+overlap: two such circles cannot change order within a piece without touching.
+The order is not each target's nearest point. A blade in front of a large
+plate's curved face is reached first, even where the plate's nearest point is
+nearer.
+
+Every width the functions give is within the lengths the laws accept, from
+a millionth of a wu to a million, so a sliver of overlap or a vast body still
+makes a valid face.
+
+What the geometry leaves out: energy does not reflect or bend, the front loses
+nothing to a medium within its radius, and a beam's ends treat a target as the
+band across its diameter. The host decides which targets a front can meet,
+such as the tissue within a blast's radius and the bodies its physics reports.
 
 ## Once only
 
@@ -128,8 +182,6 @@ that fell gained speed.
 
 ## Limits
 
-- No geometry. Couplings, faces and paths come from the host until the next
-  piece of #329.
 - No momentum. Passes do not deflect a shot, and deposits do not push.
 - The kinetic budget is the launch energy, not the energy where a pass
   happens.
@@ -166,3 +218,33 @@ that fell gained speed.
   region a rounding hair heavier than the projectile accepted;
 - the deposit law's safe limit, with this note's armor figures, and its
   agreement with an impact against a rigid anvil.
+
+`crates/engine-material/tests/reach.rs` covers:
+
+- a lone target taking the directions it subtends wherever it lies, and a
+  thinner one its thickness's part of them;
+- twelve plates sharing every direction with nothing left over, a hundred more
+  behind them getting nothing, and thin rings taking no more than their
+  thickness allows;
+- nearer plates hiding farther ones, wholly or in part, across the zero
+  direction too;
+- lines meeting a blade in front of a plate's curved face before the plate,
+  in a blast and in a beam;
+- a blade passing four fifths of a blast to the plate behind it;
+- a blast's radius bounding what it reaches, a target straddling its edge
+  taking only the directions that meet it within reach, and a blast inside a
+  target;
+- a recipient's two circles combined into one share, and two overlapping
+  circles of one recipient taking from each line once, in a blast, a beam and
+  a footprint;
+- a beam's width divided between two blades, one partly in the other's
+  shadow, a wall that stops it, and targets beside, behind and past it;
+- a sweep listing what a shot touches, in order, and a shot that has not
+  moved;
+- a footprint's load divided among the blades under it;
+- invalid geometry refused, and slivers of overlap and a vast body still
+  giving valid face widths;
+- every result the same for a scene moved and turned;
+- the whole chain into a plant world's tissue: a blast, a beam and a shot
+  through three blades of moss to a plate, each blade charged once and its
+  failure reported once, and a tread crushing the two blades under it.
