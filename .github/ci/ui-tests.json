@@ -124,6 +124,10 @@
       "reason": "Paired collapse, surviving material capacity, coasting and cross-renderer replay; shared Material Lab playback and storage smoke stays on PRs."
     },
     {
+      "test": "material_lab::material_lab_split_and_rebuild_keep_damage_across_both_renderers",
+      "reason": "Region split, rebuild and second strike on the native response path, with cross-renderer save/load replay; shared Material Lab playback and storage smoke stays on PRs."
+    },
+    {
       "test": "pizza::pizza_event_completes_without_queuing_busy_requests",
       "reason": "Waits for the full 15-second gravity event on GPU; PR smoke covers admission, busy refusal, pause/resume, persistence and lifecycle."
     },

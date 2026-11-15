@@ -25,7 +25,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Material Lab: impact, compression and rebound in slow motion. Starts paused. Up/down chooses a control; Space or gamepad bottom face activates. Run/Pause, Single step, Restart case and Next case control playback. Release load, Apply light load and Apply heavy load change the force without advancing time; then Run or Single step to observe the response. The Load, release & return case pauses after yielding and separation to guide these changes. Wood strikes wood and Wood meets armor are free two-body collisions: both bodies recoil, each material shows its own deformation, damage and capacity, one ledger accounts for the shared energy, and the load controls do not apply. Support gives way uses a smaller wood layer under a fixed load, pauses when it collapses, and resumes into free fall with the failure retained. Wood pair gives way uses a smaller layer on body A, pauses when it fails, and resumes with both bodies coasting; body B retains its capacity and damage, and the shared ledger includes both elastic releases. Save pauses and replaces one persistent slot; Load restores paused, including load history. Saves survive restarting the application. Each run has a bounded observation window. Esc/Start opens host pause; R restarts the lab. Displacement is magnified 20x; displayed time and work are physical values.",
+    controls_help: "Material Lab: impact, compression and rebound in slow motion. Starts paused. Up/down chooses a control; Space or gamepad bottom face activates. Run/Pause, Single step, Restart case and Next case control playback. Release load, Apply light load and Apply heavy load change the force without advancing time; then Run or Single step to observe the response. The Load, release & return case pauses after yielding and separation to guide these changes. Wood strikes wood and Wood meets armor are free two-body collisions: both bodies recoil, each material shows its own deformation, damage and capacity, one ledger accounts for the shared energy, and the load controls do not apply. Support gives way uses a smaller wood layer under a fixed load, pauses when it collapses, and resumes into free fall with the failure retained. Wood pair gives way uses a smaller layer on body A, pauses when it fails, and resumes with both bodies coasting; body B retains its capacity and damage, and the shared ledger includes both elastic releases. Wood split & rebuilt strikes fixed wood with a small armor block, then pauses after each step of its sequence: the back quarter splits off onto a fragment, the rest moves to a replacement body, and the striker returns for a second strike. Each part keeps its share of the damage. Save pauses and replaces one persistent slot; Load restores paused, including load history. Saves survive restarting the application. Each run has a bounded observation window. Esc/Start opens host pause; R restarts the lab. Displacement is magnified 20x; displayed time and work are physical values.",
     create,
 };
 const COMMAND_KIND: u32 = 1;
@@ -167,6 +167,7 @@ impl ClientScenario for MaterialLabClientScenario {
         self.poll();
         let was_stopped = self.state.stopped.is_some();
         let was_collapsed = self.state.collapsed();
+        let was_stage = self.state.split_stage();
         let mut acted = false;
         for action in actions {
             if let Action::Scenario {
@@ -195,6 +196,12 @@ impl ClientScenario for MaterialLabClientScenario {
             && self.state.collapsed()
             && let Some(hint) = self.state.guidance()
         {
+            self.message = hint.into();
+        } else if self.state.split_stage() > was_stage
+            && was_stage.is_some()
+            && let Some(hint) = self.state.guidance()
+        {
+            // Only a step forward reports the next edit; a restart keeps its message.
             self.message = hint.into();
         }
         StepResult::default()
@@ -406,5 +413,81 @@ mod tests {
         s.selected = 1;
         tick(s, true);
         assert_eq!(s.state.snapshot_bytes().unwrap(), next);
+    }
+    #[test]
+    fn material_lab_split_case_names_each_edit_and_saves_between_them() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut adapter = create(
+            0,
+            &Settings::default(),
+            Viewport::new(800.0, 480.0),
+            ScenarioStartMode::Normal,
+            &ScenarioAsset::MaterialLab(dir.path().join("material-lab.bin")),
+        )
+        .unwrap();
+        let s = adapter
+            .as_any_mut()
+            .downcast_mut::<MaterialLabClientScenario>()
+            .unwrap();
+        s.selected = 3;
+        while s.state.case != Case::RegionSplit {
+            tick(s, true);
+        }
+        // Entering the case is not a step forward, so its message stays.
+        assert_eq!(s.message, "New case. Paused.");
+        s.selected = 0;
+        tick(s, true);
+        let mut checkpoints = Vec::new();
+        while s.state.stopped.is_none() {
+            if !s.state.paused {
+                tick(s, false);
+                continue;
+            }
+            checkpoints.push(s.message.clone());
+            match s.state.split_stage() {
+                Some(scenario_material_lab::Stage::Struck) => {
+                    let bytes = s.state.snapshot_bytes().unwrap();
+                    s.selected = 7;
+                    tick(s, true);
+                    assert!(
+                        s.message
+                            .starts_with("The split case takes no external load")
+                    );
+                    assert_eq!(s.state.snapshot_bytes().unwrap(), bytes);
+                }
+                Some(scenario_material_lab::Stage::Split) => {
+                    // Save between the split and the rebuild, step, then restore.
+                    s.selected = 4;
+                    tick(s, true);
+                    settle(s);
+                    assert!(s.message.starts_with("Saved"));
+                    let saved = s.state.snapshot_bytes().unwrap();
+                    s.selected = 1;
+                    tick(s, true);
+                    let rebuilt = s.state.snapshot_bytes().unwrap();
+                    s.selected = 5;
+                    tick(s, true);
+                    settle(s);
+                    assert_eq!(s.state.snapshot_bytes().unwrap(), saved);
+                    s.selected = 1;
+                    tick(s, true);
+                    assert_eq!(s.state.snapshot_bytes().unwrap(), rebuilt);
+                    s.selected = 0;
+                    continue;
+                }
+                _ => {}
+            }
+            s.selected = 0;
+            tick(s, true);
+        }
+        assert_eq!(
+            checkpoints,
+            [
+                "Run to split the back quarter off onto a fragment.",
+                "Run to rebuild the wood on a replacement body.",
+                "Run to strike the rebuilt wood again.",
+            ]
+        );
+        assert!(s.message.starts_with("Run complete"));
     }
 }
