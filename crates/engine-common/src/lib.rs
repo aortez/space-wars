@@ -381,6 +381,53 @@ impl ClockLampMode {
     }
 }
 
+/// The look the Clock wears: its ordinary one or a season's (#455).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[repr(u8)]
+pub enum ClockTheme {
+    /// Cyan digits on the dark wall.
+    #[default]
+    Normal = 0,
+    /// Warm-white digits, red and green accents, and a string of colored
+    /// lights under the canopy (#460).
+    Christmas = 1,
+}
+
+impl ClockTheme {
+    pub const ALL: [Self; 2] = [Self::Normal, Self::Christmas];
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Normal => "Normal",
+            Self::Christmas => "Christmas",
+        }
+    }
+}
+
+/// The look chosen for the Clock (#455). Auto wears a season's look on that
+/// season's nights and the ordinary one otherwise. Any other choice holds at
+/// every date and time, and with no time at all.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[repr(u8)]
+pub enum ClockThemeChoice {
+    #[default]
+    Auto = 0,
+    Normal = 1,
+    Christmas = 2,
+}
+
+impl ClockThemeChoice {
+    pub const ALL: [Self; 3] = [Self::Auto, Self::Normal, Self::Christmas];
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Auto => "Auto",
+            Self::Normal => "Normal",
+            Self::Christmas => "Christmas",
+        }
+    }
+}
+
 /// Most visitors dislike rain; an occasional hardy bird tolerates much more.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

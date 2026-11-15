@@ -941,6 +941,99 @@ fn clock_calendar_date_renders_in_band_through_native_text_overlay() {
 }
 
 #[test]
+fn clock_themes_dress_the_date_line_through_native_text_overlay() {
+    use crate::render::{FrameLayout, Viewport};
+    use engine_common::{ClockEventProfile, ClockLampMode, ClockThemeChoice, Scenario};
+    use scenario_clock::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario};
+    use std::time::Duration;
+    let windows = Rc::new(RefCell::new(Vec::new()));
+    slint::platform::set_platform(Box::new(TestPlatform(windows.clone()))).unwrap();
+    let ui = MainWindow::new().unwrap();
+    ui.show().unwrap();
+    let windows = windows.borrow();
+    for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
+        windows[0].set_size(PhysicalSize::new(width, height));
+        let viewport = Viewport::new(width as f32, height as f32);
+        // Each theme's date line color: Normal's pale teal, Christmas's red.
+        for (theme, name, [r, g, b]) in [
+            (ClockThemeChoice::Normal, "normal", [0.52, 0.72, 0.77]),
+            (ClockThemeChoice::Christmas, "christmas", [0.92, 0.42, 0.40]),
+        ] {
+            let mut state = ClockScenario::init(
+                ClockConfig {
+                    aspect_ratio: viewport.aspect_ratio(),
+                    show_date: true,
+                    time_format: engine_common::ClockTimeFormat::TwelveHour,
+                    lamps: ClockLampMode::Steady,
+                    event_profile: ClockEventProfile::Off,
+                    theme,
+                    ..Default::default()
+                },
+                42,
+            );
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::set_reading(
+                    ClockReading::new(21, 34, 0)
+                        .unwrap()
+                        .with_date(ClockDate::new(2026, 12, 24).unwrap()),
+                )],
+                Duration::ZERO,
+            );
+            reset_panels(&ui);
+            ui.set_launcher_scenario("clock".into());
+            let frames = [ClockScenario::render_frame(&state)];
+            let overlay =
+                crate::render::raster_text_overlay(&frames, viewport, FrameLayout::EqualHorizontal);
+            let date = overlay
+                .iter()
+                .find(|p| p.text == "THURSDAY · DECEMBER 24")
+                .unwrap();
+            assert_eq!(
+                date.color,
+                slint::Brush::SolidColor(slint::Color::from_argb_f32(1.0, r, g, b)),
+                "{name}: the date line wears the theme's label color"
+            );
+            let pixels = crate::thruster_visual_tests::raster(&frames[0], viewport);
+            ui.set_raster_visible(true);
+            ui.set_raster_frame(Image::from_rgb8(pixels));
+            ui.set_primitives(Rc::new(slint::VecModel::from(overlay)).into());
+            let mut screenshot = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+            windows[0].request_redraw();
+            windows[0].draw_if_needed(|renderer| {
+                renderer.render(screenshot.make_mut_slice(), width as usize);
+            });
+            // Red text pixels in the upper band, clear of the bulbs below it.
+            let band = height as usize * 6 / 100;
+            let red = screenshot
+                .as_slice()
+                .iter()
+                .enumerate()
+                .filter(|(i, p)| {
+                    *i / (width as usize) < band && p.r > 150 && p.g < 110 && p.b < 110
+                })
+                .count();
+            if theme == ClockThemeChoice::Christmas {
+                assert!(
+                    red > 50,
+                    "{width}x{height}: the red date must reach real Slint pixels, got {red}"
+                );
+            } else {
+                assert_eq!(red, 0, "{width}x{height}: Normal's date line is not red");
+            }
+            if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {
+                let directory = std::path::PathBuf::from(directory);
+                std::fs::create_dir_all(&directory).unwrap();
+                crate::thruster_visual_tests::write_png(
+                    &directory.join(format!("theme-{width}x{height}-{name}.png")),
+                    &screenshot,
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn retained_text_updates_match_replaced_models_and_full_repaints() {
     use crate::{PrimitiveKind, ScenePrimitive, host::update_scene_primitives};
     use slint::{Color, ModelRc, VecModel};

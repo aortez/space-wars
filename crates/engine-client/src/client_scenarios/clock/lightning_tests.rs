@@ -1,3 +1,4 @@
+use super::capture::{render, save};
 use super::*;
 use engine_common::{ClockEventKind, ClockEventProfile, ClockLampMode, ClockRainAmount};
 
@@ -32,34 +33,6 @@ fn showers(viewport: Viewport, seed: u64) -> [ClockClientScenario; 2] {
     })
 }
 
-/// The scene's frames, the same for both render paths, and their pixels.
-fn render(
-    scenario: &ClockClientScenario,
-    viewport: Viewport,
-) -> (Vec<RenderFrame>, slint::SharedPixelBuffer<slint::Rgb8Pixel>) {
-    let frames = scenario.render_frames(RenderBackend::Raster, viewport);
-    assert_eq!(
-        frames,
-        scenario.render_frames(RenderBackend::Vector, viewport)
-    );
-    let presentation = crate::render::scene_presentation_from_frames_with_layout(
-        &frames,
-        viewport,
-        scenario.frame_layout(),
-    );
-    assert!(!presentation.main_primitives.is_empty());
-    let pixels = crate::raster::RasterRenderer::new()
-        .image_from_frames_with_layout(
-            &frames,
-            viewport,
-            scenario.frame_layout(),
-            crate::raster::RasterOptions::default(),
-        )
-        .to_rgb8()
-        .unwrap();
-    (frames, pixels)
-}
-
 /// The mean of every pixel's channels, 0 to 255.
 fn brightness(pixels: &slint::SharedPixelBuffer<slint::Rgb8Pixel>) -> f64 {
     let sum: u64 = pixels
@@ -80,27 +53,8 @@ fn bolt_pixels(pixels: &slint::SharedPixelBuffer<slint::Rgb8Pixel>) -> usize {
         .count()
 }
 
-/// Writes `pixels` as a PNG named `name` in `SPACEWARS_CLOCK_ARTIFACTS`, when
-/// that is set.
-fn save(pixels: &slint::SharedPixelBuffer<slint::Rgb8Pixel>, name: &str) {
-    let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") else {
-        return;
-    };
-    let directory = std::path::PathBuf::from(directory);
-    std::fs::create_dir_all(&directory).unwrap();
-    let file = std::fs::File::create(directory.join(name)).unwrap();
-    let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
-    encoder.set_color(png::ColorType::Rgb);
-    encoder.set_depth(png::BitDepth::Eight);
-    encoder
-        .write_header()
-        .unwrap()
-        .write_image_data(pixels.as_bytes())
-        .unwrap();
-}
-
 #[test]
-fn a_strike_flashes_the_room_and_draws_its_bolt_in_both_render_paths_then_leaves_no_trace() {
+fn a_strike_flashes_the_room_and_draws_its_bolt_then_leaves_no_trace() {
     for viewport in [
         Viewport::new(800.0, 480.0),
         Viewport::new(1024.0, 768.0),
@@ -140,7 +94,7 @@ fn a_strike_flashes_the_room_and_draws_its_bolt_in_both_render_paths_then_leaves
             bolt_pixels(&dark)
         );
         save(&dark, &format!("lightning-{size}-before.png"));
-        // Every frame of the strike, the same in both render paths.
+        // Every frame of the strike, saved for review.
         for age in 0..48 {
             if age > 0 {
                 stormy.step(&[], TICK);

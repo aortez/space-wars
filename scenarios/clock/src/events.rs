@@ -639,6 +639,13 @@ impl ActiveEvent {
         }
     }
 
+    /// Whether this event draws the face in its own colors rather than the
+    /// theme's. Every event does until events follow the theme (#457),
+    /// except the ordinary minute slide, which only moves the face.
+    pub fn draws_own_face(&self) -> bool {
+        !matches!(self, Self::DigitSlide(_))
+    }
+
     /// Where the face's own surface at `cell` of `slot` is, in a slot this
     /// event does not hold. Only a takeover moves the face without holding it.
     pub fn face_pose(

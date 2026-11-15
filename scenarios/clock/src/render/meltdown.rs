@@ -283,6 +283,7 @@ pub(super) fn render_solids(frame: &mut RenderFrame, event: &MeltdownEvent, layo
                 layout.pitch * crate::meridiem::PIXEL_SIZE,
                 cell.angle,
                 1.0,
+                LABEL_COLOR,
             );
             continue;
         }

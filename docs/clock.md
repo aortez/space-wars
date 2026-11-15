@@ -792,6 +792,101 @@ Actual device screenshots from that release build:
 | --- | --- |
 | ![Clock date on sw-picade-2](screenshots/clock/picade-calendar-date.png) | ![Clock date on spacewars HyperPixel](screenshots/clock/hyperpixel-calendar-date.png) |
 
+## Themes (#455, #460)
+
+A theme is the look the Clock wears. **Normal** is the cyan face the Clock has
+always had. **Christmas** (#460) makes the digits warm white over pine-dark
+cells, turns the date line and the AM/PM mark holly red, and hangs a string of
+colored lights in swags just under the canopy. The wall, the floor, the
+frame's wood, the lamps and everything in the room keep their own colors.
+
+Which theme shows comes from a choice and the latest reading. **Auto** wears a
+season's theme on that season's nights, from 18:00 until 06:00 the next
+morning, and Normal at all other times. A night belongs to the date of its
+evening. December's first night starts at 18:00 on December 1, and its last
+runs until 06:00 on January 1; the small hours of December 1 still belong to
+November's last night. Auto needs a dated reading and wears Normal without one.
+**Normal** or **Christmas**, chosen outright, holds at every date and time, and
+with no time at all. The theme follows from the choice and the reading alone,
+so a repeated hour, a skipped one or a correction either way takes the latest
+reading's theme, and no missed night is made up.
+
+A theme is presentation only. It takes no event slot, draws none of the
+scheduler's random numbers, and leaves the residents, the visitors and the
+physics as they are. The string of lights is wall art: it is no body, no
+surface and no light source, so no plant grows by it and the lamps never see
+it. It draws on the wall's layer, right after the wall, so everything in the
+room shows in front of it: the face, the creatures, the water, the bolt and
+the frame. A lightning flash lights its wire, clips, sockets and bulbs with
+the wall, and leaves their glow alone.
+
+The string runs from one side rail to the other just under the canopy. It is
+tied to each rail and pinned to the wall between swags by small clips, so it
+never moves. Nothing of it touches the canopy, so neither the spider's hatch
+nor the ceiling's openings, which come and go there, ever leave it hanging
+from a hole. Its swags are about seven rail widths wide and 1.4 deep, with
+three bulbs to a swag, red, gold, green and blue in turn. A room gets 2 to 16
+swags, so the string draws at most 16 wires, 15 clips and 48 bulbs. Each bulb
+is a three-step glow, a socket, the bulb and its hot core, so the string adds
+at most 319 primitives.
+
+| Normal | Christmas |
+| --- | --- |
+| ![The 9:34 PM face on Thursday, December 24, in Normal: cyan digits over dark unlit cells, with a pale teal date line and PM mark](screenshots/clock/theme-800x480-normal.png) | ![The same face in Christmas: warm-white digits over pine-dark unlit cells, a holly-red date line and PM mark, and red, gold, green and blue bulbs swagged under the canopy](screenshots/clock/theme-800x480-christmas.png) |
+
+Christmas at [1024×768](screenshots/clock/theme-1024x768-christmas.png) and in
+the [480×800 portrait](screenshots/clock/theme-480x800-christmas.png).
+
+**Not yet.** There is no Theme setting, so ordinary Clock keeps Normal. Only
+fixtures, through `ClockConfig::theme`, or the client's
+`SPACEWARS_CLOCK_THEME=christmas` (or `auto`) choose a theme. While an event
+runs, the face, its AM/PM mark and the date line are Normal's, under the
+string, which stays up. The minute's Digit Slide only moves the face, so it
+keeps the theme's colors. Auto trusts whatever time the host gives. Next come
+`--:--` for unknown time (#257), events and a short fade between themes (#457),
+and the setting with its Auto default (#458, #461). Halloween's look (#456) and
+its October nights wait until next year.
+
+**Cost.** At 800×480 the string adds 219 primitives to the idle face's 472: 11
+wires, 10 clips and 33 bulbs. Building the frame takes about 7.5 µs more (19.5
+against 12.0 µs), and rasterizing it 0.10 ms more (0.97 against 0.88 ms, 11%),
+each the median of 200 frames on the development machine. At 1024×768 it adds
+159 primitives and 0.13 ms (1.67 against 1.54 ms), and at 480×800 119
+primitives and 0.05 ms (0.94 against 0.89 ms). The bulbs' glows are most of it.
+
+The string adds the same primitives to every frame of every event, and about
+the same raster time. In one seeded run, Rain's worst frame, the heaviest of
+any event but Tanks, goes from 1679 to 1898 primitives at 800×480 (1.23 against
+1.13 ms) and from 1642 to 1801 at 1024×768 (2.01 against 1.88 ms). That passes
+the 1800 this page gives as the Clock's frame ceiling, which only
+`presentation::tests::all_recipes_are_bounded_deterministic_clipped_and_restore_the_exact_face`
+holds a frame to; Tanks passes it in Normal at every aspect. No cabinet has run
+the theme yet, and #462 checks the devices.
+
+The tests are `theme::tests` (December's boundaries, the new year, undated and
+absent readings, the fixed choices and the IDs), `render::string_lights::tests`
+and the day-before cases in `calendar_tests`. The string's tests hold:
+
+- its place from rail to rail under the canopy, clear of the face, at seven
+  aspects and both time formats;
+- that nothing of it reaches the canopy, and the hatch nothing below it, across
+  241 aspects;
+- its bounds and its bulbs' colors;
+- a theme changing only the face's colors, on a wall that is otherwise the
+  same;
+- Clock Spin's cells passing in front of it, and a flash lighting it;
+- the minute's slide keeping the theme's face;
+- Falling, Color Cycle, Meltdown and Explosion drawing Normal's face under it;
+- the duck, the spider and the crow keeping the theme's face;
+- the string coming down with the night.
+
+In the client, `theme_tests` rasterizes Normal, Christmas and a 12-hour
+Christmas and finds every bulb color only in Christmas, and
+`ui_render_tests::clock_themes_dress_the_date_line_through_native_text_overlay`
+draws each theme's 12-hour face with its date line in real Slint text, red only
+in Christmas. Set `SPACEWARS_CLOCK_ARTIFACTS` to save their pictures; the ones
+above come from the second.
+
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.

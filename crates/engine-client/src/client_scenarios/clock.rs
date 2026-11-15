@@ -18,6 +18,8 @@ use crate::render::{FrameLayout, Viewport};
 mod arena_tests;
 pub(super) mod benchmark;
 #[cfg(test)]
+mod capture;
+#[cfg(test)]
 mod digit_surface_tests;
 #[cfg(test)]
 mod floor_tests;
@@ -31,6 +33,8 @@ mod meridiem_tests;
 mod player_tests;
 #[cfg(test)]
 mod rain_tests;
+#[cfg(test)]
+mod theme_tests;
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "clock",
@@ -122,6 +126,7 @@ fn create(
             rain_amount: settings.clock.rain_amount,
             crow_water_tolerance: settings.clock.crow_water_tolerance,
             lamps: settings.clock.lamps,
+            theme: theme_choice(std::env::var("SPACEWARS_CLOCK_THEME").ok().as_deref()),
         },
         seed,
     );
@@ -146,6 +151,17 @@ fn duck_jump_profile(value: Option<&str>) -> Option<engine_common::ClockDuckJump
         Some("careful") => Some(engine_common::ClockDuckJumpProfile::Careful),
         Some("flowing") => Some(engine_common::ClockDuckJumpProfile::Flowing),
         _ => None,
+    }
+}
+
+/// A development preview of a theme ahead of its setting (#458); ordinary
+/// Clock keeps its Normal look.
+fn theme_choice(value: Option<&str>) -> engine_common::ClockThemeChoice {
+    use engine_common::ClockThemeChoice;
+    match value {
+        Some("auto") => ClockThemeChoice::Auto,
+        Some("christmas") => ClockThemeChoice::Christmas,
+        _ => ClockThemeChoice::Normal,
     }
 }
 

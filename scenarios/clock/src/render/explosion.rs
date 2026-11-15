@@ -37,7 +37,14 @@ pub(super) fn render(
             continue;
         }
         if cell.label {
-            meridiem::pixel(frame, cell.position, cell.side, cell.angle, 1.0);
+            meridiem::pixel(
+                frame,
+                cell.position,
+                cell.side,
+                cell.angle,
+                1.0,
+                LABEL_COLOR,
+            );
         } else {
             render_square(
                 frame,

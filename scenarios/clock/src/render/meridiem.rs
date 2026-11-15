@@ -7,7 +7,14 @@ use crate::{
 #[cfg(test)]
 mod tests;
 
-pub(super) fn pixel(frame: &mut RenderFrame, center: Vec2, side: f32, angle: f32, opacity: f32) {
+pub(super) fn pixel(
+    frame: &mut RenderFrame,
+    center: Vec2,
+    side: f32,
+    angle: f32,
+    opacity: f32,
+    color: RenderColor,
+) {
     if opacity <= 0.0 {
         return;
     }
@@ -27,7 +34,7 @@ pub(super) fn pixel(frame: &mut RenderFrame, center: Vec2, side: f32, angle: f32
         points,
         RenderColor {
             a: opacity,
-            ..LABEL_COLOR
+            ..color
         },
         None,
     );
@@ -37,13 +44,15 @@ pub(super) fn pixel(frame: &mut RenderFrame, center: Vec2, side: f32, angle: f32
             points.to_vec(),
             RenderColor {
                 a: opacity,
-                ..LABEL_COLOR
+                ..color
             },
         )),
     );
 }
 
 pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
+    // The AM/PM mark wears the theme's label color.
+    let label = state.appearance().label;
     let latest = state.display().meridiem.map(Glyph::for_label);
     if matches!(
         &state.active_event,
@@ -65,6 +74,7 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
                         layout.pitch * PIXEL_SIZE,
                         letter.angle,
                         1.0,
+                        label,
                     );
                 }
             }
@@ -98,6 +108,7 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
                             layout.pitch * PIXEL_SIZE,
                             angle,
                             opacity,
+                            label,
                         );
                     }
                 }
@@ -123,7 +134,7 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
                 continue;
             }
             if progress == 1.0 {
-                pixel(frame, center, side, 0.0, 1.0);
+                pixel(frame, center, side, 0.0, 1.0, label);
             } else {
                 let min = RenderPoint::new(center.x - side * 0.5, center.y - side * 0.5);
                 let max = RenderPoint::new(min.x + side, min.y + side * progress);
@@ -137,7 +148,7 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
                     ],
                     RenderColor {
                         a: progress,
-                        ..LABEL_COLOR
+                        ..label
                     },
                     None,
                 );
@@ -148,7 +159,7 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
                         max,
                         RenderColor {
                             a: progress,
-                            ..LABEL_COLOR
+                            ..label
                         },
                         None,
                     ),
