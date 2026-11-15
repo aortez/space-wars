@@ -28,6 +28,10 @@ mod ccd;
 pub mod ccd_diagnostics;
 mod clearance;
 pub(crate) use clearance::{SolidDependency, SolidObstacles};
+mod connection;
+pub use connection::{
+    ConnectionFailure, ConnectionLoadSample, ConnectionRejection, ConnectionSpec, ConnectionState,
+};
 #[cfg(feature = "query-diagnostics")]
 mod connectivity;
 #[cfg(feature = "query-diagnostics")]
@@ -740,6 +744,10 @@ pub struct PhysicsWorld {
     loading: Option<loading::LoadingState>,
     /// Bodies whose weight the next step carries; see [`Self::carry_weight`].
     carried_weights: Vec<RigidBodyHandle>,
+    /// Structural connections by identity, live or severed.
+    connections: BTreeMap<JointId, connection::ConnectionRecord>,
+    /// The connections the last step severed; see [`Self::severed_connections`].
+    severed_connections: Vec<JointId>,
 }
 
 impl Clone for PhysicsWorld {
@@ -783,6 +791,9 @@ impl Clone for PhysicsWorld {
                 collect_events: self.collect_events,
                 loading: None,
                 carried_weights: self.carried_weights.clone(),
+                connections: self.connections.clone(),
+                // Transient, like the contact events: a snapshot drops it too.
+                severed_connections: Vec::new(),
             }
         };
         // Match snapshot restoration: report current contacts, without replaying
@@ -921,6 +932,8 @@ impl PhysicsWorld {
             collect_events: config.collect_events,
             loading: None,
             carried_weights: Vec::new(),
+            connections: BTreeMap::new(),
+            severed_connections: Vec::new(),
         }
     }
 
@@ -1087,6 +1100,15 @@ impl PhysicsWorld {
                 {
                     return Some(format!("{entity:?} does not list {:?}", joint.id));
                 }
+            }
+        }
+        for (id, record) in &self.connections {
+            let weld = self
+                .joint_indices
+                .get(id)
+                .and_then(|&index| self.joints.get(index));
+            if !record.consistent(weld) {
+                return Some(format!("{id:?} disagrees with its weld"));
             }
         }
         None
@@ -1267,6 +1289,8 @@ impl PhysicsWorld {
         for joint in record.joints {
             self.remove_joint(joint);
         }
+        self.connections
+            .retain(|_, connection| !connection.touches(entity));
         for body in record.bodies {
             if let Some(handle) = self.body_handle(body) {
                 self.raw.remove_body(handle);
@@ -1284,14 +1308,15 @@ impl PhysicsWorld {
     /// velocity, mass, sleep state and gravity scale, its colliders keep every
     /// property, and all of them keep their identities. Only contact history
     /// stays behind, as it would for a body inserted there. Refused, changing
-    /// neither world, when the entity has joints, when `target` already has
-    /// it, or when the two worlds differ in collecting contact events, which
-    /// each collider is built for.
+    /// neither world, when the entity has joints or connections, severed ones
+    /// included, when `target` already has it, or when the two worlds differ
+    /// in collecting contact events, which each collider is built for.
     pub fn transfer_entity(&mut self, entity: PhysicsId, target: &mut PhysicsWorld) -> bool {
         let Some(record) = self.entities.get(&entity) else {
             return false;
         };
         if !record.joints.is_empty()
+            || self.connections.values().any(|c| c.touches(entity))
             || target.entities.contains_key(&entity)
             || self.collect_events != target.collect_events
         {
@@ -1979,6 +2004,7 @@ impl PhysicsWorld {
                     .set_aabb(&self.raw.integration_parameters, child, aabb);
             }
         }
+        self.charge_connections(dt_seconds);
 
         if self.collect_events {
             self.rebuild_events();
@@ -3059,6 +3085,7 @@ impl PhysicsWorld {
             bincode::serialize_into(&mut bytes, &self.carried_weights)
                 .map_err(|error| PhysicsWorldError(error.to_string()))?;
         }
+        self.serialize_connections(&mut bytes)?;
         Ok(bytes)
     }
 
@@ -3240,17 +3267,34 @@ impl PhysicsWorld {
                 ));
             }
         }
-        let mut carried_weights = Vec::new();
-        if reader.position() < bytes.len() as u64 {
-            let tag: u64 = bincode::deserialize_from(&mut reader)
-                .map_err(|error| PhysicsWorldError(error.to_string()))?;
-            if tag != CARRIED_WEIGHT_SNAPSHOT_TAG {
-                return Err(PhysicsWorldError("trailing physics snapshot data".into()));
+        // Optional tagged sections follow in a fixed order: carried weights,
+        // then connections.
+        let next_tag = |reader: &mut std::io::Cursor<&[u8]>| {
+            if reader.position() < bytes.len() as u64 {
+                bincode::deserialize_from::<_, u64>(reader)
+                    .map(Some)
+                    .map_err(|error| PhysicsWorldError(error.to_string()))
+            } else {
+                Ok(None)
             }
+        };
+        let mut tag = next_tag(&mut reader)?;
+        let mut carried_weights = Vec::new();
+        if tag == Some(CARRIED_WEIGHT_SNAPSHOT_TAG) {
             carried_weights = bincode::deserialize_from(&mut reader)
                 .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            tag = next_tag(&mut reader)?;
         }
-        if reader.position() != bytes.len() as u64 {
+        let mut connections = BTreeMap::new();
+        if tag == Some(connection::CONNECTION_SNAPSHOT_TAG) {
+            connections = connection::restore_connections(
+                &mut reader,
+                &snapshot.joint_entries,
+                &snapshot.impulse_joints,
+            )?;
+            tag = None;
+        }
+        if tag.is_some() || reader.position() != bytes.len() as u64 {
             return Err(PhysicsWorldError("trailing physics snapshot data".into()));
         }
 
@@ -3306,6 +3350,8 @@ impl PhysicsWorld {
             collect_events: snapshot.collect_events,
             loading,
             carried_weights,
+            connections,
+            severed_connections: Vec::new(),
         };
         if world
             .loading
@@ -3338,7 +3384,8 @@ impl PhysicsWorld {
         body_b: BodyId,
         joint: GenericJoint,
     ) -> bool {
-        if self.joint_indices.contains_key(&id) {
+        // A severed connection keeps its identity until the host removes it.
+        if self.joint_indices.contains_key(&id) || self.connections.contains_key(&id) {
             return false;
         }
         let Some(handle_a) = self.body_handle(body_a) else {
@@ -3889,6 +3936,7 @@ mod tests {
     mod carry;
     mod cloning;
     mod compound;
+    mod connection;
     mod contact_impulses;
     mod proximity;
     mod tether;

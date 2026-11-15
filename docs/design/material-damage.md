@@ -215,6 +215,9 @@ pure axial loading, one third in pure bending. Bending and axial work are
 calculated separately; only the bending contribution supplies inferred plastic
 rotation. Pure axial loading therefore reports zero rotation. Connections have
 their own capacity and can fail without deleting the assembly.
+[Connection loads](material-connection-loads.md) weld two physics bodies with a
+connection that each step charges for the load its weld carried, and sever it
+when the capacity runs out.
 
 These slow-load modes retain a yield plateau; the transient compression curve
 is not applied as a history-dependent constitutive model to them. The fallback
@@ -341,8 +344,9 @@ commits exhaustion of either finite layer, dissipates both elastic stores and
 preserves surviving capacity while both bodies coast. Other paths retain their
 current failure refusals. The [region split](material-region-split.md) divides
 a registered region, or moves it to another body, with its damage.
-Transfer between older loading modes, general connection
-loads and broader geometry remain future work.
+[Connection loads](material-connection-loads.md) charge welds between bodies
+each step and sever them on exhaustion. Transfer between older loading modes
+and broader geometry remain future work.
 
 ## Evidence
 

@@ -88,8 +88,9 @@ described under Balance.
 
 ## Limits
 
-Splitting or moving a region in contact, connection loads and automatic
-fracture on failure remain future work; hosts keep debris admission. The engine
-records no lineage between a region and its pieces.
+Splitting or moving a region in contact and automatic fracture on failure
+remain future work; hosts keep debris admission. Welds between bodies are
+[connection loads](material-connection-loads.md). The engine records no lineage
+between a region and its pieces.
 [Material Lab's split case](material-lab.md#split-and-rebuild) shows a split
 onto a fragment, a rebuild and a second strike in both renderers.

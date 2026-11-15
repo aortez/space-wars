@@ -167,6 +167,20 @@ impl Connection {
         })
     }
 
+    /// Restore a saved connection with `remaining` of its capacity left, as
+    /// [`Region::with_remaining`] does for a region.
+    pub fn with_remaining(
+        material: Material,
+        beam: Beam,
+        remaining: impl Into<f64>,
+    ) -> Result<Self, MaterialError> {
+        beam.validate()?;
+        Ok(Self {
+            beam,
+            region: Region::with_remaining(material, beam.volume(), remaining)?,
+        })
+    }
+
     pub fn beam(&self) -> Beam {
         self.beam
     }
