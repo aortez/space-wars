@@ -8,6 +8,7 @@
 //! shades those behind it.
 
 use super::*;
+use crate::lamps::light::FloorSample;
 use crate::lamps::{Look, REST_BRIGHTNESS};
 use crate::presentation::Bounds;
 use std::f32::consts::{FRAC_PI_2, PI};
@@ -43,19 +44,26 @@ const SHADOW_OFFSET: f32 = 0.6;
 const SHADOW_SPREAD: f32 = 1.3;
 const SHADOW_DEPTH: f32 = 0.6;
 
-/// How far from straight down a steady lamp's light leans into the room.
-const REST_TILT: f32 = 0.6;
 /// How far a steady lamp's light falls, as a fraction of the camera's height.
 const THROW_REACH: f32 = 0.30;
 const THROW_DISCS: usize = 7;
-/// A beam opening out of the steady light starts this wide, either side.
-const OPEN_SPREAD: f32 = 0.45;
 const BEAM_SHELLS: usize = 6;
 const BEAM_ARC_POINTS: usize = 10;
-/// The spotlight's pool, in face cells.
-const POOL_RADIUS_CELLS: f32 = 3.6;
 const POOL_DISCS: usize = 8;
 const LIGHT_COLOR: RenderColor = RenderColor::rgb(1.0, 0.76, 0.42);
+/// The lamps' light on the floor in full sun: bright on the floor's top and
+/// fading a little way down into it, in bands from the top, each down to a
+/// depth under the floor line in soil cells, with how opaque it is there.
+const FLOOR_BANDS: [(f32, f32); 3] = [(0.75, 0.5), (2.0, 0.2), (4.0, 0.07)];
+/// The floor's light is drawn in levels of a sixteenth of full sun, so a
+/// stretch in about the same light is drawn as one, and in four steps from
+/// one sample to the next, so it fades in and out of a shadow over the half
+/// cell between them.
+const FLOOR_LEVELS: f32 = 16.0;
+const FLOOR_STEPS: usize = 4;
+/// How dark a plant is drawn in no light at all, as a share of how it is
+/// drawn in full sun.
+const PLANT_SHADE: f32 = 0.55;
 
 /// One lamp's light this tick, in world units.
 struct Light {
@@ -83,36 +91,148 @@ struct Pool {
 }
 
 impl Light {
-    fn new(lamp: usize, look: Look, layout: Layout) -> Self {
-        let center = crate::lamps::head(lamp, &layout);
-        let inward = if lamp == 0 { 1.0 } else { -1.0 };
-        let narrow = look.narrow.clamp(0.0, 1.0);
-        let brightness = look.brightness.max(0.0);
-        let target =
-            Vec2::new(layout.face_origin.x, layout.face_origin.y) + look.target * layout.pitch;
-        let toward = target - center;
-        let distance = toward.length().max(1.0);
-        let radius = layout.pitch * POOL_RADIUS_CELLS;
+    /// `output` is the share of their light the lamps give at this time of
+    /// day. It dims all the lamp lights, on the scale the eye reads rather
+    /// than the plants' (see `lamps::light::seen`).
+    fn new(lamp: usize, look: Look, layout: Layout, output: f32) -> Self {
+        let beam = crate::lamps::beam(lamp, look, &layout);
+        let narrow = beam.narrow;
+        let brightness = look.brightness.max(0.0) * crate::lamps::light::seen(output);
         let mix = |steady: f32, spotlight: f32| steady + (spotlight - steady) * narrow;
         Self {
-            center,
+            center: beam.apex,
             brightness,
-            aim: mix(-FRAC_PI_2 + inward * REST_TILT, toward.y.atan2(toward.x)),
-            // The steady light gathers into the beam, which narrows until
-            // it is just wide enough to hold its pool.
+            aim: beam.aim,
+            // The steady light gathers into the beam.
             throw: brightness * (1.0 - narrow),
-            spread: mix(OPEN_SPREAD, (radius * 0.85 / distance).atan()),
-            reach: mix(CAMERA_HEIGHT * THROW_REACH, distance + radius * 0.2),
+            spread: beam.spread,
+            reach: mix(
+                CAMERA_HEIGHT * THROW_REACH,
+                beam.distance + beam.pool_radius * 0.2,
+            ),
             beam: brightness * narrow,
             // The beam draws on the glow around the corner, which rises
             // less than the bulb as the beam narrows.
             halo: brightness * (1.0 - 0.6 * narrow),
             pool: (narrow > 0.0).then_some(Pool {
-                center: target,
-                radius,
+                center: beam.target,
+                radius: beam.pool_radius,
                 strength: brightness.min(1.0) * narrow * narrow,
             }),
         }
+    }
+}
+
+/// The lamps' light on the floor: warm on the floor's top where it lands and
+/// fading a little way down into it, missing where the digits or anything
+/// else solid stand between, so a plant in a shadow is seen to be in one. It
+/// is as strong as the light the plants are given there (see `lamps::light`),
+/// in proportion to full sun, so at night, when the lamps give 3% of their
+/// day's light, it all but vanishes.
+pub(super) fn floor_light(frame: &mut RenderFrame, samples: &[FloorSample]) {
+    let cell = crate::grass::SOIL_CELL_SIZE;
+    for stretch in samples.chunk_by(|a, b| a.stretch == b.stretch) {
+        let (first, last) = (stretch[0], stretch[stretch.len() - 1]);
+        let along = Vec2::new(first.angle.cos(), first.angle.sin());
+        let down = Vec2::new(along.y, -along.x);
+        // The floor line at the stretch's left end; the samples lie half a
+        // soil cell above it.
+        let start = first.position - along * (first.width * 0.5) + down * (cell * 0.5);
+        let end = (last.position - start).dot(along) + last.width * 0.5;
+        let (edges, levels) = floor_pieces(stretch, start, along, end);
+        let mut lit: Vec<u8> = levels.iter().copied().filter(|&level| level > 0).collect();
+        lit.sort_unstable();
+        lit.dedup();
+        // Each level is laid over the levels under it wherever the floor gets
+        // at least that much light, so no two shapes of it meet edge to edge,
+        // where a renderer may fill the edge twice or not at all.
+        let mut under = 0;
+        for level in lit {
+            let mut piece = 0;
+            while piece < levels.len() {
+                if levels[piece] < level {
+                    piece += 1;
+                    continue;
+                }
+                let from = edges[piece];
+                while piece < levels.len() && levels[piece] >= level {
+                    piece += 1;
+                }
+                let (left, right) = (start + along * from, start + along * edges[piece]);
+                for (band, &(depth, _)) in FLOOR_BANDS.iter().enumerate() {
+                    let bottom = down * (cell * depth);
+                    // The layers are one color, so each lets through its
+                    // share, and together the layers over any point let
+                    // through what `floor_clear` gives for its level and
+                    // band.
+                    let clear = floor_clear(level, band) * floor_clear(under, band + 1)
+                        / (floor_clear(under, band) * floor_clear(level, band + 1));
+                    frame.push_primitive(
+                        ARENA_LAYER,
+                        RenderPrimitive::Polygon(RenderPolygon::filled(
+                            [left, right, right + bottom, left + bottom]
+                                .map(|p| RenderPoint::new(p.x, p.y))
+                                .to_vec(),
+                            RenderColor {
+                                a: 1.0 - clear,
+                                ..LIGHT_COLOR
+                            },
+                        )),
+                    );
+                }
+            }
+            under = level;
+        }
+    }
+}
+
+/// How much of what is under it the floor's light at `level` lets through in
+/// `band`, counted from the floor's top: all of it past the last band.
+fn floor_clear(level: u8, band: usize) -> f32 {
+    FLOOR_BANDS.get(band).map_or(1.0, |&(_, alpha)| {
+        1.0 - alpha * f32::from(level) / FLOOR_LEVELS
+    })
+}
+
+/// The light along a stretch of floor in pieces from its left end: the
+/// edges between them, as distances from `start` along the stretch out to
+/// `end`, and each piece's level. From the middle of one sample to the next
+/// it changes in `FLOOR_STEPS` steps, and from each end of the stretch to the
+/// middle of the sample there it is that sample's.
+fn floor_pieces(
+    stretch: &[FloorSample],
+    start: Vec2,
+    along: Vec2,
+    end: f32,
+) -> (Vec<f32>, Vec<u8>) {
+    let level = |light: f32| (light / engine_core::lighting::FULL_SUN * FLOOR_LEVELS).round() as u8;
+    let middle = |sample: &FloorSample| (sample.position - start).dot(along);
+    let (first, last) = (&stretch[0], &stretch[stretch.len() - 1]);
+    let mut edges = vec![0.0, middle(first)];
+    let mut levels = vec![level(first.light)];
+    for pair in stretch.windows(2) {
+        let (from, to) = (middle(&pair[0]), middle(&pair[1]));
+        for step in 0..FLOOR_STEPS {
+            let t = (step as f32 + 0.5) / FLOOR_STEPS as f32;
+            edges.push(from + (to - from) * (step + 1) as f32 / FLOOR_STEPS as f32);
+            levels.push(level(pair[0].light + (pair[1].light - pair[0].light) * t));
+        }
+    }
+    edges.push(end);
+    levels.push(level(last.light));
+    (edges, levels)
+}
+
+/// How a plant that gets `light`, on the plants' scale, is drawn: as `color`
+/// in full sun, and darker the less light it gets, on the scale the eye reads.
+pub(super) fn lit_plant(color: RenderColor, light: u16) -> RenderColor {
+    let seen = crate::lamps::light::seen(f32::from(light) / engine_core::lighting::FULL_SUN);
+    let level = PLANT_SHADE + (1.0 - PLANT_SHADE) * seen;
+    RenderColor {
+        r: color.r * level,
+        g: color.g * level,
+        b: color.b * level,
+        a: color.a,
     }
 }
 
@@ -132,8 +252,8 @@ struct Caster {
 }
 
 impl Spot {
-    fn new(lamp: usize, look: Look, layout: Layout) -> Option<Self> {
-        let light = Light::new(lamp, look, layout);
+    fn new(lamp: usize, look: Look, layout: Layout, output: f32) -> Option<Self> {
+        let light = Light::new(lamp, look, layout, output);
         let pool = light.pool.filter(|pool| pool.strength > 0.0)?;
         let caster = look.subject.map(|subject| {
             let center = Vec2::new(layout.face_origin.x, layout.face_origin.y)
@@ -182,7 +302,7 @@ impl Caster {
 pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
     for lamp in 0..2 {
         let look = state.lamps.look(lamp);
-        let light = Light::new(lamp, look, layout);
+        let light = Light::new(lamp, look, layout, state.lamp_output());
         throw(frame, &light);
         beam(frame, &light, layout);
         if let Some(pool) = light.pool {
@@ -254,7 +374,7 @@ fn sparks(frame: &mut RenderFrame, light: &Light, layout: Layout, tick: u32) {
 /// scene drew it and the frame gains nothing.
 pub(super) fn illuminate(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
     let spots: Vec<Spot> = (0..2)
-        .filter_map(|lamp| Spot::new(lamp, state.lamps.look(lamp), layout))
+        .filter_map(|lamp| Spot::new(lamp, state.lamps.look(lamp), layout, state.lamp_output()))
         .collect();
     light_scene(frame, &spots);
 }

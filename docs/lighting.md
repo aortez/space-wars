@@ -30,6 +30,13 @@ scale, not a display-gamma conversion. Each point receives `strength / count`.
 For distance `d` and range `R`, contribution is
 `strength / count * max(0, 1 - d/R)^2`. This compact quadratic is finite at
 contact, decreases with distance, and has zero value and slope at cutoff.
+A source may send its light into a cone instead of every way: a unit axis and
+two cosines. Seen from an emission point, a receiver within the angle whose
+cosine is `full_cos` of the axis gets that point's whole contribution, one
+beyond the angle whose cosine is `edge_cos` gets none and casts no ray toward
+it, and in between the contribution scales by a smoothstep of the cosine.
+Cosines keep each ray free of trigonometry. A receiver at the emission point
+itself gets the whole contribution, as it does without a cone.
 All visible local and directional contributions add; usable exposure clamps to
 1000. Diagnostics retain separate unclamped local/directional sums. Hue and
 alpha do not change scalar energy. Reflection, refraction, spectral biology,
@@ -131,7 +138,8 @@ silently discards light or multiplies brightness by draw copies. Retaining old
 - Core `lighting_contract`: contact/distance/cutoff, addition and directional
   baseline, hue/active state, footprint energy and draw-copy identity,
   invalid inputs, immutable lifecycle/age/revisions, publication counters,
-  maximum source/footprint/receiver work and overflow.
+  maximum source/footprint/receiver work and overflow, and a cone's whole
+  share, soft or hard edge and validation.
 - Rapier `lighting_contract`: canonical solids, sensor/water exclusions,
   attached receiver and emitter endpoints, intervening same-host part,
   lightweight tissue, removal and immutable copy, moving/rotating support,

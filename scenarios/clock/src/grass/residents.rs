@@ -70,6 +70,9 @@ pub struct ClockPlants {
     /// Real incident source intensity; the ordinary room stays dim.
     pub intensity: u16,
     pub(crate) apertures: Vec<lighting::ApertureSource>,
+    /// The corner lamps' light this tick (see `lamps::light`), on top of the
+    /// room's and the sun's.
+    pub(crate) lamps: Vec<lighting::LocalSource>,
     /// Inclusive soil column ranges the openings have lit during this growth,
     /// one per opening. Material now covers the whole floor, so this is what
     /// bounds an organism instead: a runner may not reach soil the light has
@@ -103,6 +106,7 @@ impl ClockPlants {
             policies: Vec::new(),
             playback: PlantPlayback::Normal,
             apertures: Vec::new(),
+            lamps: Vec::new(),
             lit_columns: None,
             light_bounded: true,
             moss_columns: None,
@@ -433,10 +437,11 @@ impl ClockPlants {
                     geometry,
                     transparent,
                 }
-                .query_light(
+                .query_light_with_lamps(
                     before.tick,
                     self.intensity,
                     &self.apertures,
+                    &self.lamps,
                     &receivers,
                 )
             };
@@ -594,11 +599,26 @@ pub(crate) struct OpticalScene<'a> {
     pub(crate) transparent: &'a [ColliderId],
 }
 impl OpticalScene<'_> {
+    /// The room's light from straight above and the sunlight through the
+    /// ceiling's openings, without the lamps'.
     pub(crate) fn query_light(
         &self,
         tick: u64,
         intensity: u16,
         apertures: &[lighting::ApertureSource],
+        receivers: &[Receiver],
+    ) -> Result<Vec<lighting::Exposure>, lighting::LightingError> {
+        self.query_light_with_lamps(tick, intensity, apertures, &[], receivers)
+    }
+
+    /// All the light the plants get: the room's, the sunlight's and the
+    /// corner lamps' `lamps`, each blocked by whatever is solid between.
+    pub(crate) fn query_light_with_lamps(
+        &self,
+        tick: u64,
+        intensity: u16,
+        apertures: &[lighting::ApertureSource],
+        lamps: &[lighting::LocalSource],
         receivers: &[Receiver],
     ) -> Result<Vec<lighting::Exposure>, lighting::LightingError> {
         if self.polygons.len() + self.footprints.len() > engine_rapier::world::MAX_LIGHT_FOOTPRINTS
@@ -608,7 +628,7 @@ impl OpticalScene<'_> {
         }
         let mut source = engine_rapier::plant_light::full_sun(Vec2::Y);
         source.strength = f32::from(intensity.min(1000));
-        let mut snapshot = lighting::LightingSnapshot::new(tick, tick, source, &[])?;
+        let mut snapshot = lighting::LightingSnapshot::new(tick, tick, source, lamps)?;
         for aperture in apertures {
             snapshot = snapshot.with_aperture(*aperture)?;
         }

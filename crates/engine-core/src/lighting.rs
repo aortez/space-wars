@@ -32,6 +32,50 @@ pub struct LocalSource {
     pub strength: f32,
     pub range: f32,
     pub footprint: Vec<EmissionPoint>,
+    /// The beam each point sends its light into, or `None` to light every way.
+    pub cone: Option<Cone>,
+}
+
+/// A spotlight's beam. A receiver within the angle whose cosine is `full_cos`
+/// of `axis`, seen from an emission point, gets that point's whole share. One
+/// beyond the angle whose cosine is `edge_cos` gets none, and in between the
+/// share fades smoothly. Cosines rather than angles keep each ray free of
+/// trigonometry.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Cone {
+    /// Unit vector from the emission points along the middle of the beam.
+    pub axis: Vec2,
+    pub full_cos: f32,
+    /// At most `full_cos`. Equal cosines give the beam a hard edge.
+    pub edge_cos: f32,
+}
+
+impl Cone {
+    fn valid(&self) -> bool {
+        finite(self.axis)
+            && (self.axis.length_squared() - 1.0).abs() <= 0.0001
+            && (-1.0..=1.0).contains(&self.full_cos)
+            && (-1.0..=1.0).contains(&self.edge_cos)
+            && self.edge_cos <= self.full_cos
+    }
+
+    /// The share of a point's light that reaches `offset` from it. A receiver
+    /// at the point itself gets it all, as it does from a point without a beam.
+    fn share(&self, offset: Vec2) -> f32 {
+        let length = offset.length();
+        if length == 0.0 {
+            return 1.0;
+        }
+        let cos = offset.dot(self.axis) / length;
+        if cos >= self.full_cos {
+            1.0
+        } else if cos <= self.edge_cos {
+            0.0
+        } else {
+            let t = (cos - self.edge_cos) / (self.full_cos - self.edge_cos);
+            t * t * (3.0 - 2.0 * t)
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -148,6 +192,7 @@ impl LightingSnapshot {
                 || source.range <= 0.0
                 || source.range > DIRECTIONAL_DISTANCE
                 || source.footprint.iter().any(|p| !finite(p.position))
+                || source.cone.is_some_and(|cone| !cone.valid())
             {
                 return Err(LightingError::InvalidInput);
             }
@@ -268,9 +313,14 @@ impl LightingSnapshot {
                         let distance = receiver.position.distance_to(point.position);
                         // Squared compact support is finite at contact and C1 at cutoff.
                         let falloff = (1.0 - distance / source.range).max(0.0).powi(2);
+                        // A receiver outside the beam casts no ray, as one
+                        // beyond the range casts none.
+                        let share = source
+                            .cone
+                            .map_or(1.0, |cone| cone.share(receiver.position - point.position));
                         result.local += sample(
                             *point,
-                            source.strength / source.footprint.len() as f32 * falloff,
+                            source.strength / source.footprint.len() as f32 * falloff * share,
                         );
                     }
                 }

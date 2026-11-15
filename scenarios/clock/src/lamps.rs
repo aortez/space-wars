@@ -12,10 +12,12 @@
 use engine_common::{ClockLampActivity, ClockLampSide, ClockLampsState};
 use engine_core::Vec2;
 use rand::{SeedableRng, rngs::StdRng};
+use std::f32::consts::FRAC_PI_2;
 
 use crate::layout::Layout;
 
 mod brain;
+pub(crate) mod light;
 mod perception;
 #[cfg(test)]
 pub(crate) use brain::PRESENT_NARROW;
@@ -23,8 +25,7 @@ pub(crate) use brain::Stage;
 pub(crate) use perception::{Facts, View};
 
 /// At rest a lamp gives this fraction of its full light. Flickers and outages
-/// dim it from here, and a spotlight brightens it past full. The plant-light
-/// calibration (#634) may tune it.
+/// dim it from here, and a spotlight brightens it past full.
 pub(crate) const REST_BRIGHTNESS: f32 = 0.4;
 /// A spotlight at its narrowest runs a little past full.
 const SPOT_PEAK: f32 = 1.15;
@@ -76,6 +77,60 @@ pub(crate) fn head(lamp: usize, layout: &Layout) -> Vec2 {
         layout.bounds_max.x - inset
     };
     Vec2::new(x, layout.bounds_max.y - inset)
+}
+
+/// How far from straight down a steady lamp's light leans into the room.
+const REST_TILT: f32 = 0.6;
+/// A beam opening out of the steady light starts this wide, either side.
+const OPEN_SPREAD: f32 = 0.45;
+/// The spotlight's pool, in face cells.
+const POOL_RADIUS_CELLS: f32 = 3.6;
+
+/// Where a lamp's light goes this tick, in world units. The lamps are drawn
+/// with it, and the plants are lit with it, so the two agree.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Beam {
+    /// Where the light leaves from.
+    pub apex: Vec2,
+    /// How far the light is narrowed into a spotlight, from 0 to 1.
+    pub narrow: f32,
+    /// The way the head points, counterclockwise from +x.
+    pub aim: f32,
+    /// Half the angle the spotlight's beam spreads over.
+    pub spread: f32,
+    /// Where the spotlight points, and how far that is from the head.
+    pub target: Vec2,
+    pub distance: f32,
+    /// The radius of the pool the spotlight lays where it points.
+    pub pool_radius: f32,
+}
+
+/// Where `lamp`'s light goes from its head as it looks like `look`.
+pub(crate) fn beam(lamp: usize, look: Look, layout: &Layout) -> Beam {
+    beam_from(lamp, head(lamp, layout), look, layout)
+}
+
+/// Where `lamp`'s light goes from `apex` as it looks like `look`: the same
+/// pool, seen from there.
+pub(crate) fn beam_from(lamp: usize, apex: Vec2, look: Look, layout: &Layout) -> Beam {
+    let inward = if lamp == 0 { 1.0 } else { -1.0 };
+    let narrow = look.narrow.clamp(0.0, 1.0);
+    let target = Vec2::new(layout.face_origin.x, layout.face_origin.y) + look.target * layout.pitch;
+    let toward = target - apex;
+    let distance = toward.length().max(1.0);
+    let pool_radius = layout.pitch * POOL_RADIUS_CELLS;
+    let mix = |steady: f32, spotlight: f32| steady + (spotlight - steady) * narrow;
+    Beam {
+        apex,
+        narrow,
+        aim: mix(-FRAC_PI_2 + inward * REST_TILT, toward.y.atan2(toward.x)),
+        // The steady light gathers into the beam, which narrows until it is
+        // just wide enough to hold its pool.
+        spread: mix(OPEN_SPREAD, (pool_radius * 0.85 / distance).atan()),
+        target,
+        distance,
+        pool_radius,
+    }
 }
 
 pub(crate) struct Lamps {
@@ -135,11 +190,14 @@ impl Lamps {
         self.brain.preview(&mut self.rng, activity, lamp);
     }
 
+    /// What the lamps' minds hold. The lamps do not know the time of day, so
+    /// the state they give leaves their output to the Clock.
     pub fn state(&self) -> ClockLampsState {
         let counts = self.brain.counts();
         ClockLampsState {
             left: self.brain.state(0),
             right: self.brain.state(1),
+            output_milli: 0,
             notices: counts.notices,
             tracks: counts.tracks,
             handoffs: counts.handoffs,

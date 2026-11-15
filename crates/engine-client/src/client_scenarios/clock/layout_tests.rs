@@ -90,7 +90,14 @@ fn centered_clock_and_wooden_floor_render_across_formats_and_layouts() {
                 ("marquee", Some(ClockEventKind::Marquee)),
             ] {
                 if let Some(event) = event {
-                    scenario.preview_clock_event(event);
+                    // At the fixture's reading rather than the wall clock's,
+                    // which the client's preview would bring in, since the
+                    // lamps in the band light by the time of day.
+                    ClockScenario::step(
+                        &mut scenario.state,
+                        &[ClockAction::preview_event(event)],
+                        Duration::ZERO,
+                    );
                     if event == ClockEventKind::Falling {
                         let opened =
                             raster(&ClockScenario::render_frame(&scenario.state), viewport);

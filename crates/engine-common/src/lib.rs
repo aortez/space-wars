@@ -1186,6 +1186,11 @@ impl ClockLampTemperament {
 pub struct ClockLampsState {
     pub left: ClockLampBrainState,
     pub right: ClockLampBrainState,
+    /// Thousandths of their light the lamps give at the reading's time of
+    /// day: all of it from 07:00 to 22:00 and a glow at night, with half an
+    /// hour of dawn and of dusk between. It dims what they light and what
+    /// they give the plants.
+    pub output_milli: u16,
     pub notices: u32,
     pub tracks: u32,
     /// Movers one lamp handed to the other on that lamp's side, most as they

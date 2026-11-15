@@ -19,6 +19,7 @@ fn light(brightness: f32, layout: Layout) -> Light {
             ..Look::STEADY
         },
         layout,
+        1.0,
     )
 }
 
@@ -95,6 +96,131 @@ fn the_resting_lamps_give_forty_percent_of_their_full_light() {
 }
 
 #[test]
+fn at_night_the_lamps_glow_by_how_bright_their_little_light_looks() {
+    let mut state = ClockScenario::init(
+        ClockConfig {
+            event_profile: ClockEventProfile::Off,
+            ..ClockConfig::default()
+        },
+        7,
+    );
+    ClockScenario::step(
+        &mut state,
+        &[ClockAction::set_reading(
+            ClockReading::new(23, 0, 0).unwrap(),
+        )],
+        Duration::ZERO,
+    );
+    let glow = crate::lamps::light::seen(crate::lamps::light::NIGHT_OUTPUT);
+    let drawn = light_in(&ClockScenario::render_frame(&state));
+    assert!((drawn - 2.0 * 0.4 * glow * FULL).abs() < 1e-4, "{drawn}");
+}
+
+#[test]
+fn a_plant_is_drawn_darker_the_less_light_it_gets() {
+    let green = RenderColor {
+        a: 0.9,
+        ..RenderColor::rgb(0.22, 0.65, 0.16)
+    };
+    let levels: Vec<f32> = [0, 25, 50, 250, 500, 1000]
+        .map(|light| {
+            let lit = lit_plant(green, light);
+            assert_eq!(lit.a, green.a);
+            // The color darkens as a whole, so it keeps its hue.
+            assert!((lit.r / green.r - lit.g / green.g).abs() < 1e-6, "{lit:?}");
+            lit.g / green.g
+        })
+        .to_vec();
+    assert!(
+        levels.windows(2).all(|pair| pair[0] < pair[1]),
+        "{levels:?}"
+    );
+    assert!((levels[0] - PLANT_SHADE).abs() < 1e-6, "{levels:?}");
+    assert!((levels[5] - 1.0).abs() < 1e-6, "{levels:?}");
+}
+
+/// The shapes of the lamps' light drawn on a floor from `samples`: how far
+/// each reaches along x, the highest it reaches and its alpha.
+fn floor_shapes(samples: &[FloorSample]) -> Vec<(f32, f32, f32, f32)> {
+    let mut frame = RenderFrame::new(Camera2::new(RenderPoint::ZERO, CAMERA_HEIGHT));
+    floor_light(&mut frame, samples);
+    frame
+        .layers
+        .iter()
+        .flat_map(|layer| &layer.primitives)
+        .map(|primitive| {
+            let RenderPrimitive::Polygon(polygon) = primitive else {
+                panic!("{primitive:?}");
+            };
+            let xs = polygon.points.iter().map(|p| p.x);
+            (
+                xs.clone().fold(f32::INFINITY, f32::min),
+                xs.fold(f32::NEG_INFINITY, f32::max),
+                polygon
+                    .points
+                    .iter()
+                    .map(|p| p.y)
+                    .fold(f32::NEG_INFINITY, f32::max),
+                polygon.fill.expect("a filled shape").color.a,
+            )
+        })
+        .collect()
+}
+
+/// How opaque the light is on the floor's top at `x`.
+fn on_top(shapes: &[(f32, f32, f32, f32)], x: f32) -> f32 {
+    1.0 - shapes
+        .iter()
+        .filter(|shape| shape.0 <= x && x <= shape.1)
+        .map(|shape| 1.0 - shape.3)
+        .product::<f32>()
+}
+
+#[test]
+fn the_floor_is_drawn_in_its_light_and_fades_into_a_shadow_without_a_seam() {
+    // Three samples four units apart in 750, then three in shadow, along a
+    // floor whose line is at y = 0.
+    let samples: Vec<FloorSample> = [750.0, 750.0, 750.0, 0.0, 0.0, 0.0]
+        .into_iter()
+        .enumerate()
+        .map(|(i, light)| FloorSample {
+            stretch: 0,
+            position: Vec2::new(4.0 * i as f32 + 2.0, crate::grass::SOIL_CELL_SIZE * 0.5),
+            angle: 0.0,
+            width: 4.0,
+            light,
+        })
+        .collect();
+    let shapes = floor_shapes(&samples);
+    // The light lies on the floor: none of it stands above the line.
+    assert!(shapes.iter().all(|shape| shape.2 <= 0.0), "{shapes:?}");
+    // In 750 the floor's top is drawn three quarters as lit as in full sun,
+    // out to the stretch's end, and in the shadow it is not lit at all.
+    for x in [0.5, 6.0, 9.5] {
+        let lit = on_top(&shapes, x);
+        assert!((lit - FLOOR_BANDS[0].1 * 0.75).abs() < 1e-5, "{lit} at {x}");
+    }
+    for x in [14.5, 18.0, 23.5] {
+        assert_eq!(on_top(&shapes, x), 0.0, "at {x}");
+    }
+    // From the last sample in the light to the first in the shadow, it fades
+    // out in four steps.
+    let fade = [10.5, 11.5, 12.5, 13.5].map(|x| on_top(&shapes, x));
+    assert!(
+        fade.windows(2)
+            .all(|pair| pair[0] > pair[1] && pair[1] > 0.0),
+        "{fade:?}"
+    );
+    // No two shapes meet edge to edge, where a renderer may fill the edge
+    // twice and draw a seam.
+    for a in &shapes {
+        for b in &shapes {
+            assert_ne!(a.1, b.0, "{a:?} meets {b:?}");
+        }
+    }
+}
+
+#[test]
 fn the_glass_glows_amber_at_rest() {
     let [dark, rest, full] =
         [0.0, REST_BRIGHTNESS, 1.0].map(|brightness| fill(&head_discs(brightness)[1]));
@@ -144,7 +270,7 @@ fn spot_on(point: Vec2, size: Option<f32>, layout: Layout) -> Spot {
             size: size / layout.pitch,
         }),
     };
-    Spot::new(0, look, layout).expect("a spotlight has a pool")
+    Spot::new(0, look, layout, 1.0).expect("a spotlight has a pool")
 }
 
 fn disc(at: Vec2, radius: f32) -> RenderPrimitive {

@@ -16,6 +16,9 @@ fn fixture() -> ClockState {
     let mut s = ClockScenario::init(
         ClockConfig {
             event_profile: ClockEventProfile::Off,
+            // These contracts are about the room's and the sun's light, so
+            // the lamps' light on the plants is left out (see `lamps::light`).
+            lamp_plant_light: false,
             ..Default::default()
         },
         215,
