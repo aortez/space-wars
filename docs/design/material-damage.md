@@ -348,9 +348,10 @@ a registered region, or moves it to another body, with its damage.
 each step and sever them on exhaustion, and
 [tissue integrity](material-tissue.md) keeps a region for each plant tissue,
 apart from its biological health. [Weapon sources](material-sources.md) give
-each shot or charge a finite, separately attributed budget and divide it among
-the recipients it reaches (#329). Transfer between older loading modes and
-broader geometry remain future work.
+each shot or charge a finite, separately attributed budget, divide it among
+the recipients it reaches and fly real shots and beams in the physics world
+(#329). Transfer between older loading modes and broader geometry remain future
+work.
 
 ## Evidence
 

@@ -14,7 +14,9 @@ parts, and each is attributed and accounted separately:
   [Limits](#limits)).
 
 The budgets and the [geometry](#where-the-energy-goes) that divides them are
-in the pure crate. Real projectiles in the engine are the next piece of #329.
+in the pure crate. `engine_rapier::world::weapon` flies real shots and beams
+[in a physics world](#in-the-physics-world). A Material Lab case is the last
+piece of #329.
 
 ## Deliveries
 
@@ -135,6 +137,80 @@ nothing to a medium within its radius, and a beam's ends treat a target as the
 band across its diameter. The host decides which targets a front can meet,
 such as the tissue within a blast's radius and the bodies its physics reports.
 
+## In the physics world
+
+`Weapons` holds the live sources of one `PhysicsWorld` and delivers them through
+the laws above. The host keeps its tissue and answers for it through the
+`Recipients` trait: the circles near a point that it admits, each tissue's
+region and section, and the work to charge. Bodies are charged through the
+materials registered with the world's
+[loading response](material-native-response.md). A `Recipient` is one of the
+host's tissues, a registered region, or a body outside the material model.
+
+- **Shots.** The host inserts the shot's body, moving at its launch velocity,
+  and `launch` takes it over: the body's mass and speed are the projectile's.
+  The body must be alone in its entity and bound to no loading region, and the
+  world must collect contact events. Around each step, `prepare` records the
+  motion each body brings into the step, a position-driven body's prescribed
+  velocity included, and `settle` uses it. `settle` sweeps each shot from where
+  the step found it to where it left it, passing the tissue on the way at the
+  speed the shot entered the step.
+- **The hard hit.** Of the contacts a shot made in a step, the one that took
+  the most impulse stops it. A touch that pushed nothing, such as a predicted
+  contact the shot slides past, does not. The impact is measured at the
+  contact from both bodies' motion before the step, with the contact-effective
+  mass of the shot's mass and the target's mass, inertia and lever arm; fixed
+  and kinematic bodies are immovable. The patch is the shot's curvature against
+  a flat face. Its outcome charges the body's registered
+  material. The shot's body is not bound to a loading region, so the contact
+  response refuses the batch it arrives in, as it refuses any unbound contact,
+  and charges nothing for the shot. Physics resolves the shot's momentum.
+- **Blasts.** A shot that stops releases its payload where the step left it,
+  divided by `blast_reach` among the tissue and body circles the host admits.
+  `detonate` releases it wherever the shot is, for a fuse the host decides on.
+  A `Burst` event gives the center, so the host can push bodies and draw it.
+- **Beams.** `fire` traces one pulse by ray cast to the first solid surface of
+  the beam's collision groups within its range. The tissue along the way takes
+  its share, and the rest goes into the surface's material.
+- **Retirement.** A shot retires when it stops or its lifetime ends, and the
+  module removes its body's entity once every shot has flown that step, so two
+  shots that meet both stop. A beam retires after its last pulse. `retire` ends
+  a shot or a beam early, without a blast. Each retirement is reported once,
+  with the final ledger and the owner.
+
+Every delivery, refusal and exclusion is an event, and `take_events` reports
+each once. A paused step changes nothing. Each step takes its own `Prepared`
+record, which `settle` uses up. Sources, recipients and contacts are visited in
+a fixed order, so the same build replays the same events.
+
+### Protection and bodies outside the material model
+
+`protected` names an entity a shot or beam never charges, such as its firer. A
+shot that touches it, or a blast that reaches it, reports the energy as
+`Excluded` with the reason `Protected`, and a beam's trace passes through it.
+Collision filtering stays with the host: a shot collides as its body's
+colliders do, and a beam stops on the collision groups it was armed with.
+
+A body without a registered material, such as terrain, still stops shots and
+fronts. The energy it stops is reported as `Excluded` with the reason
+`Unmodeled` and is not charged, and so is the share of a blast or beam that
+reaches tissue the host keeps no region for. The tissue and registered bodies
+the same shot or front reaches take their shares regardless. A recipient with
+a circle the reach geometry refuses is refused with `InvalidGeometry`, and the
+rest of the front goes on without it.
+
+### The terrain boundary
+
+Terrain brushes and chipping keep their current operation, admission and
+conservation contracts. Terrain is not a registered material, so a weapon's
+energy that terrain stops is reported as unmodeled, never charged, and the
+legacy terrain effects have no energy model of their own. A crater brush or a
+chip stays the host's separate effect, and a terrain edit that is refused or
+unavailable does not suppress the source's charges to tissue and bodies. A host
+that moves a weapon onto a source removes that weapon's legacy damage path, so
+no budget is spent through both. Global energy closure waits for the terrain
+migration.
+
 ## Once only
 
 - A shot reaches each recipient once. Another report of the same recipient,
@@ -183,14 +259,23 @@ that fell gained speed.
 ## Limits
 
 - No momentum. Passes do not deflect a shot, and deposits do not push.
+- A shot stops at its first hard contact. It does not ricochet or pierce a
+  body, and its patch assumes a round shot against a flat face.
+- Fronts meet bodies as the circles the host admits for them, which may
+  overstate a long body's shadow.
+- A shot's body is its own entity. The module removes the entity when the shot
+  retires.
+- A shot launched after `prepare` sweeps from its launch, but a hit in that
+  first step may be measured against the other body's motion after the step.
 - The kinetic budget is the launch energy, not the energy where a pass
   happens.
 - A beam's damage depends on its pulses' size. Each pulse charges only the
   energy past a face's safe limit, so the same power in shorter pulses does
   less, and none once a pulse falls within the limit. A continuous beam keeps
   its pulse to the game's tick, not the physics substeps.
-- A `Source` serializes for diagnostics, but it cannot be restored from a save
-  yet.
+- `Weapons` is not saved. A `Source` serializes for diagnostics, but nothing
+  restores live sources, so a host that saves replays them, as Material Lab
+  does.
 
 ## Qualification
 
@@ -248,3 +333,44 @@ that fell gained speed.
 - the whole chain into a plant world's tissue: a blast, a beam and a shot
   through three blades of moss to a plate, each blade charged once and its
   failure reported once, and a tread crushing the two blades under it.
+
+`crates/engine-rapier/tests/material_weapons.rs` flies real shots in a physics
+world. It covers:
+
+- a shot through four blades of moss to an armor plate, each blade passed once
+  at its own collision's energy and cut, and the hit equal to the impact law's
+  outcome without the moss, charged to the plate once;
+- a shell's blast released once where it stops, the plate filling nearly half
+  its directions, and both charges attributed to their parts;
+- a plate shadowing a blade behind it, with a host that lists the shell's own
+  body;
+- a beam's three pulses dividing between three blades and the plate;
+- a hit across two of a plate's colliders, made once, and a body appearing
+  where the shot stopped, which nothing reaches;
+- a protected firer's death mid-flight, after which the shot still delivers
+  under its owner;
+- paused steps, which change nothing, and a replay matching event for event;
+- a shot that outlives its lifetime, retired once with nothing released;
+- a worn plate taking what it has left and a failed one nothing;
+- unregistered ground stopping a shot, its share reported, not charged, while
+  the blast still reaches the moss;
+- a protected firer that a beam passes through and a blast and a shot report,
+  uncharged;
+- moving and turning targets, whose speed and inertia shape the hit, measured
+  where a sliding plate was when struck, and a driven plate's prescribed speed;
+- a slow shot with predicted contacts, passing moss on the plate's face at the
+  speed it arrived with and bursting where it stopped;
+- refused launches: a used id, a body in use, a fixed body, a body sharing its
+  entity, a body bound to a region, a world without contact events and
+  geometry outside the laws' range;
+- a touch that pushes nothing, which doesn't stop a shot;
+- two shots striking one plate in one step, both charging it, and two shells
+  meeting head on, each stopping on the other;
+- a shot launched after `prepare`, which passes the blade in its first step;
+- a beam and a shot retired early, with no blast, and a shot without a blast
+  detonated;
+- beams passing a body outside their collision groups, ending on an unmodeled
+  one with its share reported, and running out at their range;
+- a recipient with a circle the reach geometry refuses, refused while the beam
+  and the shot reach the rest;
+- tissue the host keeps no region for, its beam and blast shares reported.

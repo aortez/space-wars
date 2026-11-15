@@ -28,9 +28,9 @@ mod tissue;
 mod tests;
 
 pub use geometry::{
-    Beam, ContactBody, ContactGeometry, DEPTH_WIDTH_FRACTION, Face, PATCH_WIDTH_FRACTION, Section,
-    closing_speed, deformation_depth, effective_mass, lever, patch_width_from_radii,
-    point_velocity,
+    Beam, ContactBody, ContactGeometry, DEPTH_WIDTH_FRACTION, Face, MAX_LENGTH, MIN_LENGTH,
+    PATCH_WIDTH_FRACTION, Section, closing_speed, deformation_depth, effective_mass, lever,
+    patch_width_from_radii, point_velocity,
 };
 pub use impact::{Impact, POST_YIELD_STIFFNESS_FRACTION, deposit, impact, yield_speed};
 pub use ledger::{LEDGER_TOLERANCE, Outcome, WorkLedger};

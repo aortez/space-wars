@@ -706,6 +706,47 @@ impl PhysicsWorld {
         Ok(())
     }
 
+    /// A registered material's region, with the capacity it has left, and its
+    /// section.
+    pub fn loading_material(&self, token: RegionToken) -> Option<(Region, Section)> {
+        let stored = self
+            .loading
+            .as_ref()?
+            .response
+            .as_ref()?
+            .materials
+            .get(&token)?;
+        Some((stored.region().ok()?, stored.section()))
+    }
+
+    /// Charges a registered material with work done to it outside the contact
+    /// response, such as a weapon's deposit. Returns the work it could not
+    /// take, as `Region::absorb` does.
+    pub fn absorb_loading_material(
+        &mut self,
+        token: RegionToken,
+        work: f32,
+    ) -> Result<f32, LoadingError> {
+        let loading = self.loading.as_mut().ok_or(LoadingError::Disabled)?;
+        if !loading.live(token) {
+            return Err(LoadingError::StaleRegion);
+        }
+        let stored = loading
+            .response
+            .as_mut()
+            .ok_or(LoadingError::ResponseDisabled)?
+            .materials
+            .get_mut(&token)
+            .ok_or(LoadingError::InvalidMaterial)?;
+        let mut region = stored.region().map_err(|_| LoadingError::InvalidMaterial)?;
+        let left = region
+            .absorb(work)
+            .map_err(|_| LoadingError::InvalidMaterial)?;
+        stored.remaining = region.remaining_precise();
+        loading.invalidate_gravity(gravity::Invalidation::ExternalEdit);
+        Ok(left)
+    }
+
     pub fn loading_material_remaining(&self, token: RegionToken) -> Option<f64> {
         self.loading
             .as_ref()?

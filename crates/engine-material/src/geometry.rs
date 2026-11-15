@@ -17,9 +17,9 @@ pub const PATCH_WIDTH_FRACTION: f32 = 0.5;
 pub const DEPTH_WIDTH_FRACTION: f32 = 1.0;
 
 /// The shortest length the laws accept, `wu`.
-pub(crate) const MIN_LENGTH: f32 = 1.0e-6;
+pub const MIN_LENGTH: f32 = 1.0e-6;
 /// The longest length the laws accept, `wu`.
-pub(crate) const MAX_LENGTH: f32 = 1.0e6;
+pub const MAX_LENGTH: f32 = 1.0e6;
 
 pub(crate) fn length_ok(value: f32) -> bool {
     value.is_finite() && (MIN_LENGTH..=MAX_LENGTH).contains(&value)

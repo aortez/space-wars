@@ -776,6 +776,11 @@ impl PhysicsWorld {
         Ok(())
     }
 
+    /// The patch a collider is bound to, if any.
+    pub fn loading_binding(&self, collider: ColliderId) -> Option<ContactSource> {
+        self.loading.as_ref()?.bindings.get(&collider).copied()
+    }
+
     pub fn retire_loading_region(&mut self, token: RegionToken) -> bool {
         self.loading.as_mut().is_some_and(|s| s.retire(token))
     }
