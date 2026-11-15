@@ -269,7 +269,7 @@ terminal saves and malformed envelopes. Client tests exercise all three load
 controls, storage failure and exact continuation after load. A public UI workflow
 uses both renderers, the yielding/separation checkpoints, load changes without
 time advancement, host pause, single step, save/load, process restart and corrupt input;
-it is included in the PR smoke suite.
+like the lab's other UI workflows it runs in the full UI suite, not on PRs.
 
 For the free pairs, scenario tests check at every step that the ledger closes
 and momentum holds, then the contact events, both bodies' recoil, equal damage
