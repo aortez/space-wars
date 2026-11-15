@@ -1,4 +1,6 @@
-//! Rain's physical arena, lit collecting digits and one passive floating duck.
+//! Rain's physical arena, lit collecting digits, one passive floating duck
+//! and, in heavier rain, lightning.
+pub(crate) mod lightning;
 mod physics;
 pub(crate) mod source;
 mod surfaces;
@@ -69,6 +71,7 @@ pub(crate) struct RainEvent {
     floats: Option<FloatWorld>,
     reclaimed_pose: Option<(Vec2, f32)>,
     surfaces: DigitSurfaces,
+    storm: lightning::Storm,
 }
 
 impl RainEvent {
@@ -187,7 +190,37 @@ impl RainEvent {
             floats: None,
             reclaimed_pose: None,
             surfaces,
+            storm: lightning::Storm::new(seed, amount),
         }
+    }
+
+    /// The same shower with no lightning, for fixtures that look at the
+    /// water alone.
+    pub fn without_lightning(mut self) -> Self {
+        self.storm = lightning::Storm::calm();
+        self
+    }
+
+    pub fn storm(&self) -> &lightning::Storm {
+        &self.storm
+    }
+
+    /// How bright the room flashes this tick, 1 at full.
+    pub fn flash(&self) -> f32 {
+        self.storm.flash(self.tick)
+    }
+
+    /// The span a bolt keeps clear of: the duck's, its middle and a little
+    /// more than half its width.
+    fn duck_span(&self) -> Option<(f32, f32)> {
+        let (position, radius) = if self.duck_joined {
+            self.duck_hull?
+        } else {
+            let (position, _) = self.duck_pose()?;
+            let radius = physics::half_extents(self.layout).length();
+            (position, f64::from(radius))
+        };
+        Some((position.x, radius as f32 + self.layout.pitch * 0.5))
     }
 
     pub fn synchronize(&mut self, display: DisplaySnapshot, segments: &mut [SegmentState]) {
@@ -477,6 +510,15 @@ impl RainEvent {
         } else {
             self.update_duck();
         }
+        // A strike reads the water as this tick leaves it.
+        let clear_of = self.duck_span();
+        let (water, floor_pools, layout) = (&self.water, self.surfaces.floor_pools, self.layout);
+        self.storm.step(
+            self.tick,
+            &layout,
+            |x| lightning::surface(water, floor_pools, &layout, x),
+            clear_of,
+        );
         self.tick >= RAIN_TICKS
     }
 
@@ -550,6 +592,10 @@ impl RainEvent {
             door_open_milli: self
                 .door()
                 .map_or(0, |(_, open)| (open * 1000.0).round() as u32),
+            strikes_planned: self.storm.planned(),
+            strikes: self.storm.struck(),
+            flash_milli: (self.flash() * 1000.0).round() as u32,
+            last_strike: self.storm.state(),
         }
     }
 }

@@ -1,8 +1,10 @@
-//! A small rubber-duck sprite attached to the passive hull's actual pose.
+//! A small rubber-duck sprite attached to the passive hull's actual pose,
+//! and the shower's lightning.
 use super::*;
 use crate::rain::RainEvent;
 
 pub(super) fn render(frame: &mut RenderFrame, event: &RainEvent) {
+    lightning::bolt(frame, event);
     let opacity = event.opacity();
     // Digit ledges and released water share the face's layer, above dim anchors.
     // The colon/AM-PM are display-only and drawn afterwards, remaining legible.

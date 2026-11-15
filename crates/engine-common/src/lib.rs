@@ -524,6 +524,41 @@ pub struct ClockRainState {
     pub duck_angle_milli: Option<i32>,
     pub submerged_milli: u32,
     pub door_open_milli: u32,
+    /// The lightning strikes this shower plans, none in light rain, and how
+    /// many have struck.
+    #[serde(default)]
+    pub strikes_planned: u32,
+    #[serde(default)]
+    pub strikes: u32,
+    /// How bright the room flashes this tick, 0 to 1000.
+    #[serde(default)]
+    pub flash_milli: u32,
+    #[serde(default)]
+    pub last_strike: Option<ClockRainStrike>,
+}
+
+/// What a lightning bolt struck.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockStrikeTarget {
+    /// The top of a lit cell.
+    Digit,
+    /// Water standing on the floor.
+    Water,
+    Floor,
+}
+
+/// A shower's latest lightning strike.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockRainStrike {
+    /// The shower's tick it struck on.
+    pub tick: u64,
+    pub strokes: u32,
+    /// Where the bolt left the canopy and where it struck, in world units ×
+    /// 1000.
+    pub top_milli: [i32; 2],
+    pub ground_milli: [i32; 2],
+    pub target: ClockStrikeTarget,
 }
 
 /// Bounded recipes, not separate scheduler events. The choice is captured when
@@ -1269,6 +1304,10 @@ pub struct ClockLampPercepts {
     pub time_of_day_milli: Option<u32>,
     /// The bodies looked at this tick, across every world.
     pub bodies_visited: u32,
+    /// A lightning bolt that struck this tick: where it left the canopy and
+    /// where it struck, in world units × 1000.
+    #[serde(default)]
+    pub bolt_milli: Option<[[i32; 2]; 2]>,
 }
 
 /// A body the lamps see moving.

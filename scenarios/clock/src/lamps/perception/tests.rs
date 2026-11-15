@@ -182,6 +182,7 @@ const NOTHING: Facts = Facts {
     digits: [None; DIGIT_SLOT_COUNT],
     ceiling_open: false,
     reading: None,
+    bolt: None,
 };
 
 #[test]

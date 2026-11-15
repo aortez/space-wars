@@ -70,6 +70,9 @@ pub(crate) struct Facts {
     pub digits: [Option<u8>; DIGIT_SLOT_COUNT],
     pub ceiling_open: bool,
     pub reading: Option<ClockReading>,
+    /// A lightning bolt that struck this tick: where it left the canopy and
+    /// where it struck.
+    pub bolt: Option<[Vec2; 2]>,
 }
 
 /// A body moving in view.
@@ -117,6 +120,9 @@ pub(crate) struct Signals {
     pub ceiling_open: bool,
     /// The fraction of the day gone, when the clock has a reading.
     pub time_of_day: Option<f32>,
+    /// A lightning bolt that struck this tick, from its top to where it
+    /// struck.
+    pub bolt: Option<[Vec2; 2]>,
 }
 
 /// Everything the lamps perceive in a tick.
@@ -175,6 +181,10 @@ impl Percepts {
             // Truncated, so the last minutes of the day stay below 1000.
             time_of_day_milli: self.signals.time_of_day.map(|day| (day * 1000.0) as u32),
             bodies_visited: self.visited as u32,
+            bolt_milli: self
+                .signals
+                .bolt
+                .map(|[top, ground]| [point(top), point(ground)]),
         }
     }
 }
@@ -388,6 +398,7 @@ impl Perception {
                     + u32::from(reading.second());
                 seconds as f32 / 86_400.0
             }),
+            bolt: facts.bolt,
         };
         self.event = event;
         self.face = Some((facts.font, facts.digits));

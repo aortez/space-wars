@@ -239,7 +239,10 @@ Three drives steer a lamp:
 
 A knock of 30 cells a second or more dips the power to both lamps for about a
 quarter of a second, at most once every 20 seconds, and takes out the hotter
-bulb if its heat is 0.7 or more. A bulb also goes out of nothing once in 30
+bulb if its heat is 0.7 or more. Every lightning strike (#625) dips the power
+the same way, without waiting out that rest, and a bolt that comes down within
+9% of the room's height of a lamp's head takes that lamp out, unless the other
+is out already. A bulb also goes out of nothing once in 30
 to 80 minutes of rest.
 
 The run's seed makes one lamp eager and the other lazy:
@@ -409,8 +412,9 @@ mover and notices it again ten seconds later; a mover crossing the middle
 passes between the lamps, unless the other lamp is tired of it; the lamps
 share only a mover that far outshines the rest; a hot bulb goes out, and
 never both; sparks fly from the tick a bulb goes dark, in one burst, and stop
-when it is calmed; a big knock dips the power at most once in 20 seconds; a
-knock near a lamp startles it, at most once a second; a lamp presents the
+when it is calmed; a big knock dips the power at most once in 20 seconds;
+every lightning strike dips it, and one near a lamp takes that lamp out, never
+both; a knock near a lamp startles it, at most once a second; a lamp presents the
 digits that changed on its side; a resting lamp is exactly steady but for its
 fidgets; the beam moves under its limits and stops at the room's edge for a
 mover that runs out; Steady lamps rest; and the brain is seeded. The tests in
@@ -469,7 +473,8 @@ stands, which each lamp weighs from its own position. They perceive:
 - **Signals.** The event under way and the ticks it began and ended, an
   event started over another of its kind counting as a new one; the slots
   whose digit changed, and every slot showing a digit when the font changes;
-  whether the ceiling is open; and the time of day from the reading. The
+  whether the ceiling is open; the time of day from the reading; and a
+  lightning bolt, from the canopy to what it struck, on the tick it strikes. The
   slots follow the reading, not the cells: during Falling a new minute flags
   its slots while their cells lie on the floor.
 
@@ -515,9 +520,10 @@ lamps perceive in `perceived`: `movers`, each with `world` (0 for the arena,
 `entity`, `role`, `position_milli` and `strength_milli` (thousandths of a
 cell a second); and `event`, `event_began`, `event_ended`,
 `changed_digits`, `ceiling_open`, `time_of_day_milli` (thousandths of the
-day, truncated) and `bodies_visited`. `spacewars-cli clock state` prints a
+day, truncated), `bolt_milli` (the two ends of a lightning bolt on the tick it
+strikes, or `null`) and `bodies_visited`. `spacewars-cli clock state` prints a
 `Lamps perceive:` line with the counts, the top mover and impact as
-`world:entity/role`, and what changed.
+`world:entity/role`, what changed, and any lightning.
 
 The tests in `lamps::perception` cover a fixture ball no lamp code names,
 perceived where it is and as it moves, as the diagnostics show it; the most
@@ -1594,6 +1600,88 @@ no Pi deployment was performed. Rust 1.89 workspace/all-target checking, formatt
 and strict scoped Clock/common/control/CLI lint passed. Full-client strict lint
 still reports existing warnings in unrelated host/raster/gamepad/mission code;
 those were left outside this change.
+
+#### Lightning (#625)
+
+A Medium or Heavy shower brings lightning: a jagged bolt from the canopy to the
+highest thing below it, and a flash that lights the room. A Heavy shower
+strikes three to five times and a Medium one once or twice; a Light shower
+never does, and Varied strikes as the amount it chose. The storm plans its
+strikes as the shower begins, from a seeded stream of its own, most where the
+rain falls hardest, between 12% and 92% of the 20 seconds it rains, and at
+least 2.5 seconds apart.
+
+A strike is one to three strokes down the same channel, 4 to 7 ticks apart; one
+strike in five has a single stroke. Each stroke flashes the room, the first at
+full light and the others at 60% to full, and each flash falls to a fifth over
+the next five ticks. The flash is gone within a quarter second of the last
+stroke and the bolt, which fades a little slower, within a third. The room
+never flashes more than three times in any second, the most WCAG 2.3.1 allows,
+so as not to set off seizures in people with photosensitive epilepsy. DirtSim's
+storm, which flashes two to five times 30 to 80 ms apart, goes past that.
+
+The bolt leaves the canopy up to a cell and a half to either side of where it
+strikes and comes down in steps of about half a cell, wandering, kinking now
+and then, and drawn toward what it strikes: the top of a lit cell, the water
+pooled on the floor once it is a twentieth of a cell deep, or the floor. A
+long bolt throws one to three forks, mostly away from where it goes on, which
+die out above the floor and above what it struck; a short bolt has fewer or
+none. A bolt comes down beside the duck, never on it. Where it strikes, seven
+to twelve sparks fly up and out, white-hot and cooling to orange, and fall
+back, gone within 0.6 seconds.
+
+The bolt draws over the face and its water and under the creatures, the frame
+and the lamps: a white core in a blue glow, a wider, fainter haze around them,
+and soft light where it leaves the canopy and where it strikes. The flash
+lights, in place, the opaque things the room is made of, each layer by its own
+gain: at full flash the wall, the unlit cells and the creatures go 30% of the
+way to a pale blue-white, and the floor, the canopy, the duck, the frame and
+the doors 26%. Lit cells, glows, shadows, water, text and the lamps keep the
+light they have. Both render paths draw the same frames.
+
+Lightning only reads the water. It adds and takes away none and pushes
+nothing, so the shower, its water and its duck are exactly what they would be
+without it. Nothing is damaged. Lively lamps see the bolt on the tick it
+strikes: every strike dips their power and a near one takes a lamp out, as
+[What the lamps do](#what-the-lamps-do-631) describes. Steady lamps rest
+through it.
+
+**Cost.** On the development workstation, in the `ci` profile, a Heavy shower
+at seed 7 stepped beside the same shower without lightning took the same
+72 µs a step. While a strike showed, building its frame took about 3 µs more,
+78 µs against 75, and rasterizing it 2.3% more: 2.00 ms against 1.95 at
+800×480 and 4.03 against 3.93 at 1024×768. No cabinet has run it yet.
+
+**Diagnostics.** The `rain` block of `clock state --json` carries
+`strikes_planned`; `strikes`, those struck so far; `flash_milli`, the flash's
+light now, 0 to 1000; and `last_strike`, the latest strike's `tick`, its
+`strokes`, where its bolt left the canopy and struck as `top_milli` and
+`ground_milli` (thousandths of a view unit), and its `target` (`digit`,
+`water` or `floor`), or `null` before the first. They read as zero and `null`
+from older state. `spacewars-cli clock state` prints a `Lightning:` line under
+Rain when the shower plans strikes, and the `Lamps perceive:` line ends with
+the bolt on the tick it strikes. That makes the state's schema 28.
+
+**Isolation.** `ClockConfig::lightning`, on in every ordinary Clock, keeps
+lightning out of fixtures that look at Rain's water. `SPACEWARS_CLOCK_LIGHTNING=0`
+turns it off in the client.
+
+The tests in `rain::lightning` cover how many strikes each amount plans over
+300 seeds; strikes falling while it rains, most where it rains hardest and
+never closer than 2.5 seconds; the room flashing at most three times in any
+second, counting a rise and fall of a tenth of full light as a flash as WCAG
+does, each stroke a flash of its own; a strike's light, full on its first tick
+and gone a quarter second after its last stroke; a bolt dropping at every step
+from the canopy to the highest surface below it and its forks dying out above
+that, at three display shapes; a bolt keeping clear of the duck; and the
+shower, its water and its duck unchanged by lightning. The tests in
+`render::lightning` cover every shape of every bolt being a simple polygon, so
+that both renderers fill it alike, at four display shapes over 16 seeds; the
+bolt drawing only while its strike lasts; and the flash lighting only the
+room's opaque things, each layer by its gain. A client test renders a strike at
+800×480, 1024×768 and 480×800 through both paths: the frames match the shower
+without lightning until the strike, which opens at full flash, brightens the
+frame and shows the bolt, and match again 47 ticks later.
 
 ### Aquarium (#177)
 
@@ -3591,7 +3679,7 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **27** and reports scenario-instance revision,
+`clock state` uses schema version **28** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`, `warning`, `exploding`), pause state, profile, schedule, current
@@ -3679,7 +3767,7 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 26 and
+after completion or cancellation. Use matching client/CLI builds: schema 27 and
 older requests are rejected. The internal Clock action payload is version 14;
 event ordinals 0–9 are unchanged; Cell Swap is 10. Configure contains a
 little-endian u16 switch mask (bits 0–15, one for each event),
@@ -3715,7 +3803,7 @@ arena's counts, claims, run totals and last step, and `clock events` shows each
 event's refusal.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 27, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 28, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -3732,7 +3820,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 27, `event`
+tick. A raw `clock trigger` request must include schema version 28, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, `cell-swap`, `grass`, `slot-machine`, `spider`, `coins`, or `tanks`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 

@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 27;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 28;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -740,7 +740,9 @@ mod tests {
 
     #[test]
     fn rain_diagnostics_settings_and_named_trigger_round_trip() {
-        use engine_common::{ClockRainAmount, ClockRainDuckPhase, ClockRainState};
+        use engine_common::{
+            ClockRainAmount, ClockRainDuckPhase, ClockRainState, ClockRainStrike, ClockStrikeTarget,
+        };
         let mut state = clock_state();
         state.event_kind = Some(ClockEventKind::Rain);
         state.floor = engine_common::ClockFloorMode::EventOwned;
@@ -783,6 +785,16 @@ mod tests {
             duck_angle_milli: Some(32),
             submerged_milli: 450,
             door_open_milli: 0,
+            strikes_planned: 4,
+            strikes: 2,
+            flash_milli: 720,
+            last_strike: Some(ClockRainStrike {
+                tick: 640,
+                strokes: 3,
+                top_milli: [-120_000, 201_600],
+                ground_milli: [-95_500, 105_600],
+                target: ClockStrikeTarget::Digit,
+            }),
         });
         assert_eq!(
             ClockState::from_json(&state.to_json().unwrap()).unwrap(),
@@ -810,6 +822,10 @@ mod tests {
             "floor_load_milli",
             "floor_motion_deferrals",
             "floor_clearance_holds",
+            "strikes_planned",
+            "strikes",
+            "flash_milli",
+            "last_strike",
         ] {
             value["rain"].as_object_mut().unwrap().remove(field);
         }
@@ -830,6 +846,11 @@ mod tests {
         assert_eq!(older.floor_load_milli, 0);
         assert_eq!(older.floor_motion_deferrals, 0);
         assert_eq!(older.floor_clearance_holds, 0);
+        assert_eq!(
+            (older.strikes_planned, older.strikes, older.flash_milli),
+            (0, 0, 0)
+        );
+        assert!(older.last_strike.is_none());
         assert_eq!(older.injected_microunits, 5_000_000);
         value.as_object_mut().unwrap().remove("rain");
         assert!(

@@ -427,6 +427,9 @@ pub struct ClockConfig {
     /// `ceiling_sunlight` does from the sun's. Ordinary Clock always lets the
     /// lamps light the plants.
     pub lamp_plant_light: bool,
+    /// Isolate fixtures that look at Rain's water from its lightning.
+    /// Ordinary Clock always has lightning in heavier rain.
+    pub lightning: bool,
     /// Publish fresh per-tick sunlight optics in the grass state. Diagnostic
     /// workflows only; ordinary Clock skips that per-frame geometry query.
     pub ceiling_optics: bool,
@@ -459,6 +462,7 @@ impl Default for ClockConfig {
             favorable_grass_fixture: false,
             ceiling_sunlight: true,
             lamp_plant_light: true,
+            lightning: true,
             ceiling_optics: false,
             grass_inspection: false,
             duck_jump_profile: None,
@@ -488,6 +492,7 @@ impl ClockConfig {
             favorable_grass_fixture: self.favorable_grass_fixture,
             ceiling_sunlight: self.ceiling_sunlight,
             lamp_plant_light: self.lamp_plant_light,
+            lightning: self.lightning,
             ceiling_optics: self.ceiling_optics,
             grass_inspection: self.grass_inspection,
             duck_jump_profile: self.duck_jump_profile,
@@ -1767,6 +1772,11 @@ impl ClockState {
                     self.display,
                 )
             };
+            let rain = if self.config.lightning {
+                rain
+            } else {
+                rain.without_lightning()
+            };
             self.active_event = Some(ActiveEvent::Rain(Box::new(rain)));
             return;
         }
@@ -2032,6 +2042,13 @@ impl ClockState {
             digits: self.display.digits,
             ceiling_open: self.ceiling.phase != ceiling::Phase::Closed,
             reading: self.reading,
+            bolt: match &self.active_event {
+                Some(ActiveEvent::Rain(rain)) => rain
+                    .storm()
+                    .began(rain.tick)
+                    .map(|strike| [strike.top(), strike.ground()]),
+                _ => None,
+            },
         };
         (view, facts)
     }

@@ -3,8 +3,9 @@
 //! scene, the bodies moving in view, the knocks bodies take and what
 //! changed (see `perception`), and each lamp acts on that (see `brain`): it
 //! notices a mover and follows it with a spotlight, searches where it lost
-//! it, flares at a knock, lights the digits that change, and goes out when
-//! its bulb gets too hot. The lamps draw from a seeded stream of their own,
+//! it, flares at a knock, lights the digits that change, dims when lightning
+//! strikes, and goes out when its bulb gets too hot or a strike comes down
+//! near it. The lamps draw from a seeded stream of their own,
 //! never the event schedule's, and only read the scene, so they never change
 //! it. The lamps' own setting decides whether they act at all: Steady lamps
 //! rest.

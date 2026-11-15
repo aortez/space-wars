@@ -373,12 +373,19 @@ impl ActiveEvent {
                 seed,
                 context.surfaces,
             ))),
-            ClockEventKind::Rain => Self::Rain(Box::new(crate::rain::RainEvent::new(
-                context.layout,
-                seed,
-                config.rain_amount,
-                context.display,
-            ))),
+            ClockEventKind::Rain => {
+                let rain = crate::rain::RainEvent::new(
+                    context.layout,
+                    seed,
+                    config.rain_amount,
+                    context.display,
+                );
+                Self::Rain(Box::new(if config.lightning {
+                    rain
+                } else {
+                    rain.without_lightning()
+                }))
+            }
         }
     }
 
