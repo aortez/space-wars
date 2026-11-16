@@ -54,6 +54,7 @@ pub use query_snapshot::{
 };
 pub use surface_drive::SurfaceDrive;
 pub use tether::{TetherSpec, TetherState};
+pub mod weapon;
 
 const SNAPSHOT_VERSION: u32 = 1;
 const LOADING_SNAPSHOT_VERSION: u32 = 2;

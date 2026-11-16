@@ -25,6 +25,13 @@ Duplicate registration cannot refill capacity. `loading_material_remaining`
 returns the authoritative `f64` balance. Numeric material parameters are stored
 and identified with `Material::identity`; presentation names are not serialized.
 
+`loading_material(token)` returns the registered region, with the capacity it
+has left, and its section. `absorb_loading_material(token, work)` charges work
+done outside the contact response, such as a
+[weapon source's](material-sources.md) deposit, against the same balance and
+returns what the region could not take. `loading_binding(collider)` returns the
+patch a collider is bound to.
+
 A new `Impact` episode starts response evaluation. Existing support episodes can
 participate in the same load, so a resting interface can receive transmitted
 work. Every positive-energy independent component must contain a new impact
