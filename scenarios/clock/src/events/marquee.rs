@@ -212,12 +212,10 @@ impl MarqueeEvent {
         // turned, scaled and placed: the corners give the frame back.
         let quad = self.recipe.quad(content, self.placement(layout), playback);
         let edge = quad[1] - quad[0];
-        let (_, brightness) = self.recipe.lighting.sample(
-            content,
-            self.content.bounds,
-            playback.seconds,
-            playback.progress,
-        );
+        let brightness =
+            self.recipe
+                .lighting
+                .brightness(content, self.content.bounds, playback.seconds);
         let pose = SurfacePose {
             origin: (quad[0] + quad[2]) * 0.5,
             angle: edge.y.atan2(edge.x),

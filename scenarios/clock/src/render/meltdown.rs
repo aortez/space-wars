@@ -273,8 +273,14 @@ pub(super) fn render_water_colors(
     }
 }
 
-/// The solid blocks, kept legible as they pass through the pool to the floor.
-pub(super) fn render_solids(frame: &mut RenderFrame, event: &MeltdownEvent, layout: Layout) {
+/// The solid blocks, kept legible as they pass through the pool to the floor,
+/// in the `look` the face wears.
+pub(super) fn render_solids(
+    frame: &mut RenderFrame,
+    event: &MeltdownEvent,
+    layout: Layout,
+    look: crate::theme::Appearance,
+) {
     for cell in &event.cells {
         if cell.meridiem {
             super::meridiem::pixel(
@@ -283,7 +289,7 @@ pub(super) fn render_solids(frame: &mut RenderFrame, event: &MeltdownEvent, layo
                 layout.pitch * crate::meridiem::PIXEL_SIZE,
                 cell.angle,
                 1.0,
-                LABEL_COLOR,
+                look.label,
             );
             continue;
         }
@@ -293,12 +299,17 @@ pub(super) fn render_solids(frame: &mut RenderFrame, event: &MeltdownEvent, layo
             layout.pitch,
             cell.angle,
             1.0,
-            DigitPalette::default(),
+            look.digits,
         );
     }
 }
 
-pub(super) fn render(frame: &mut RenderFrame, event: &MeltdownEvent, layout: Layout) {
+pub(super) fn render(
+    frame: &mut RenderFrame,
+    event: &MeltdownEvent,
+    layout: Layout,
+    look: crate::theme::Appearance,
+) {
     if let Some(lab) = &event.floats {
         for (min, max) in &lab.supports {
             frame.push_primitive(
@@ -313,7 +324,7 @@ pub(super) fn render(frame: &mut RenderFrame, event: &MeltdownEvent, layout: Lay
         }
     }
     render_water(frame, &event.water, ACTIVE_CELL_LAYER, 1.0);
-    render_solids(frame, event, layout);
+    render_solids(frame, event, layout, look);
     if let Some(lab) = &event.floats {
         if let Some(y) = lab.reference_y {
             let spec = event.water.pools()[0].spec();

@@ -14,7 +14,9 @@ impl ColorCycle {
         self.tick >= COLOR_CYCLE_TICKS
     }
 
-    pub fn palette(&self) -> DigitPalette {
-        cycle_palette(self.tick as f32 / COLOR_CYCLE_TICKS as f32)
+    /// The colors `tick` of the way through the cycle, which leaves `base`
+    /// and comes back to it.
+    pub fn palette(&self, base: DigitPalette) -> DigitPalette {
+        cycle_palette(base, self.tick as f32 / COLOR_CYCLE_TICKS as f32)
     }
 }

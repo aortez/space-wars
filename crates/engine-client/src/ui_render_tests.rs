@@ -1034,6 +1034,130 @@ fn clock_themes_dress_the_date_line_through_native_text_overlay() {
 }
 
 #[test]
+fn clock_events_and_a_change_of_theme_wear_the_theme_in_real_pixels() {
+    use crate::render::{FrameLayout, Viewport};
+    use engine_common::{
+        ClockEventKind, ClockEventProfile, ClockLampMode, ClockMarqueePreset, ClockThemeChoice,
+        Scenario,
+    };
+    use scenario_clock::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario};
+    use std::time::Duration;
+    const TICK: Duration = Duration::from_nanos(16_666_667);
+    let windows = Rc::new(RefCell::new(Vec::new()));
+    slint::platform::set_platform(Box::new(TestPlatform(windows.clone()))).unwrap();
+    let ui = MainWindow::new().unwrap();
+    ui.show().unwrap();
+    let windows = windows.borrow();
+    let (width, height) = (800, 480);
+    windows[0].set_size(PhysicalSize::new(width, height));
+    let viewport = Viewport::new(width as f32, height as f32);
+    let clock = |theme| {
+        let mut state = ClockScenario::init(
+            ClockConfig {
+                aspect_ratio: viewport.aspect_ratio(),
+                show_date: true,
+                time_format: engine_common::ClockTimeFormat::TwelveHour,
+                lamps: ClockLampMode::Steady,
+                event_profile: ClockEventProfile::Off,
+                marquee_preset: ClockMarqueePreset::ClockChase,
+                theme,
+                ..Default::default()
+            },
+            42,
+        );
+        ClockScenario::step(
+            &mut state,
+            &[ClockAction::set_reading(
+                ClockReading::new(21, 34, 0)
+                    .unwrap()
+                    .with_date(ClockDate::new(2026, 12, 24).unwrap()),
+            )],
+            Duration::ZERO,
+        );
+        state
+    };
+    let shoot = |state: &scenario_clock::ClockState| {
+        reset_panels(&ui);
+        ui.set_launcher_scenario("clock".into());
+        let frames = [ClockScenario::render_frame(state)];
+        let overlay =
+            crate::render::raster_text_overlay(&frames, viewport, FrameLayout::EqualHorizontal);
+        let pixels = crate::thruster_visual_tests::raster(&frames[0], viewport);
+        ui.set_raster_visible(true);
+        ui.set_raster_frame(Image::from_rgb8(pixels));
+        ui.set_primitives(Rc::new(slint::VecModel::from(overlay)).into());
+        let mut screenshot = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+        windows[0].request_redraw();
+        windows[0].draw_if_needed(|renderer| {
+            renderer.render(screenshot.make_mut_slice(), width as usize);
+        });
+        screenshot
+    };
+    let count = |shot: &SharedPixelBuffer<Rgb8Pixel>, matches: fn(&Rgb8Pixel) -> bool| {
+        shot.as_slice().iter().filter(|p| matches(p)).count()
+    };
+    // Normal's lit cells are cyan at any brightness: green and blue alike, and
+    // both well above red. The string's blue bulbs are bluer than green.
+    let cyan: fn(&Rgb8Pixel) -> bool =
+        |p| p.g > p.r.saturating_add(60) && p.b > p.r.saturating_add(60) && p.g.abs_diff(p.b) < 40;
+    let save = |shot: &SharedPixelBuffer<Rgb8Pixel>, name: &str| {
+        if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {
+            let directory = std::path::PathBuf::from(directory);
+            std::fs::create_dir_all(&directory).unwrap();
+            crate::thruster_visual_tests::write_png(
+                &directory.join(format!("theme-{width}x{height}-{name}.png")),
+                shot,
+            );
+        }
+    };
+    // An event runs the same in both, and Christmas keeps nothing of Normal's
+    // cyan. Explosion's pieces and the chase's trail start from the theme's
+    // warm white. Partway through its excursion, Color Cycle wears its own
+    // purple in both, over each theme's dark cells.
+    for (kind, ticks, name, normal_is_cyan) in [
+        (
+            ClockEventKind::ColorCycle,
+            80,
+            "christmas-color-cycle",
+            false,
+        ),
+        (ClockEventKind::Explosion, 150, "christmas-explosion", true),
+        (ClockEventKind::Marquee, 140, "christmas-marquee", true),
+    ] {
+        let mut normal = clock(ClockThemeChoice::Normal);
+        let mut christmas = clock(ClockThemeChoice::Christmas);
+        for state in [&mut normal, &mut christmas] {
+            ClockScenario::step(state, &[ClockAction::trigger_event(kind)], Duration::ZERO);
+            for _ in 0..ticks {
+                ClockScenario::step(state, &[], TICK);
+            }
+            assert_eq!(state.event_kind(), Some(kind), "{name}");
+        }
+        let (normal, christmas) = (shoot(&normal), shoot(&christmas));
+        assert_eq!(count(&normal, cyan) > 200, normal_is_cyan, "{name}");
+        assert_eq!(count(&christmas, cyan), 0, "{name}");
+        save(&christmas, name);
+    }
+    // Half a second's fade, at its middle: the face is half way from cyan to
+    // warm white, and the string is half lit.
+    let mut state = clock(ClockThemeChoice::Normal);
+    ClockScenario::step(&mut state, &[], TICK);
+    ClockScenario::step(
+        &mut state,
+        &[ClockAction::set_theme(ClockThemeChoice::Christmas)],
+        TICK,
+    );
+    for _ in 1..15 {
+        ClockScenario::step(&mut state, &[], TICK);
+    }
+    let fade = shoot(&state);
+    let halfway: fn(&Rgb8Pixel) -> bool = |p| (150..=190).contains(&p.r) && p.g > 215 && p.b > 195;
+    assert_eq!(count(&fade, cyan), 0, "the fade has left Normal's cyan");
+    assert!(count(&fade, halfway) > 200, "the face is half way");
+    save(&fade, "fade");
+}
+
+#[test]
 fn retained_text_updates_match_replaced_models_and_full_repaints() {
     use crate::{PrimitiveKind, ScenePrimitive, host::update_scene_primitives};
     use slint::{Color, ModelRc, VecModel};

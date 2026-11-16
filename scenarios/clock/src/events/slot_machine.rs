@@ -213,7 +213,7 @@ impl SlotMachineEvent {
                             opacity: if departing || !self.paying_out() {
                                 1.0
                             } else {
-                                self.payout_light(self.settled_cell(slot, cell)).1
+                                self.payout_brightness(self.settled_cell(slot, cell))
                             },
                             clip: Some(layout.digit_band()),
                             ..anchored
@@ -374,10 +374,19 @@ impl SlotMachineEvent {
     }
 
     /// The chase the Marquee already uses, carried across every cell of the
-    /// settled reading once over the payout.
-    pub fn payout_light(&self, cell: Cell) -> (DigitPalette, f32) {
-        let seconds = (self.phase_tick() as f32 / PAYOUT_TICKS as f32) * PAYOUT_SWEEP / CHASE_RATE;
-        Lighting::Chase.sample(cell, CLOCK_BOUNDS, seconds, 1.0)
+    /// settled reading once over the payout, over the look's `base`.
+    pub fn payout_light(&self, base: DigitPalette, cell: Cell) -> (DigitPalette, f32) {
+        Lighting::Chase.sample(base, cell, CLOCK_BOUNDS, self.payout_seconds(), 1.0)
+    }
+
+    /// How bright the payout's chase leaves `cell`, whatever its colors.
+    pub fn payout_brightness(&self, cell: Cell) -> f32 {
+        Lighting::Chase.brightness(cell, CLOCK_BOUNDS, self.payout_seconds())
+    }
+
+    /// The chase's clock: one sweep over the payout.
+    fn payout_seconds(&self) -> f32 {
+        (self.phase_tick() as f32 / PAYOUT_TICKS as f32) * PAYOUT_SWEEP / CHASE_RATE
     }
 
     /// Whether a reel position is texture rather than a reading: the scramble

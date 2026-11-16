@@ -484,15 +484,64 @@ fn combined_recipe_samples_all_three_independent_effects() {
     assert!(event.recipe.wave.is_some());
     assert_eq!(event.recipe.lighting, Lighting::Sweep);
     let cell = event.content.cells[0];
+    let base = DigitPalette::default();
     let sample = event
         .recipe
         .lighting
-        .sample(cell, event.content.bounds, 1.0, 0.3);
+        .sample(base, cell, event.content.bounds, 1.0, 0.3);
     let later = event
         .recipe
         .lighting
-        .sample(cell, event.content.bounds, 2.5, 0.5);
+        .sample(base, cell, event.content.bounds, 2.5, 0.5);
     assert_ne!(sample, later);
+}
+
+#[test]
+fn every_lighting_starts_from_the_looks_colors_and_cycles_back_to_them() {
+    // Christmas's colors stand for whatever the face wears (#457).
+    let base = crate::theme::Appearance::CHRISTMAS.digits;
+    let event = MarqueeEvent::new(
+        ClockMarqueePreset::TextRibbon,
+        engine_common::ClockMarqueeMessage::default(),
+        DisplaySnapshot::unsynchronized(),
+    );
+    let bounds = event.content.bounds;
+    let near = |a: engine_common::RenderColor, b: engine_common::RenderColor, within: f32| {
+        (a.r - b.r).abs() <= within && (a.g - b.g).abs() <= within && (a.b - b.b).abs() <= within
+    };
+    for cell in event.content.cells.iter().step_by(7) {
+        assert_eq!(
+            Lighting::Normal.sample(base, *cell, bounds, 1.3, 0.4),
+            (base, 1.0)
+        );
+        // A cycle leaves the colors and comes back to them, and never touches
+        // the dark cells.
+        assert_eq!(
+            Lighting::Cycle.sample(base, *cell, bounds, 0.0, 0.0).0,
+            base
+        );
+        let end = Lighting::Cycle.sample(base, *cell, bounds, 9.0, 1.0).0;
+        assert!(near(end.fill, base.fill, 1e-6) && near(end.edge, base.edge, 1e-6));
+        // A trail runs gold over the colors and fades back to them behind it.
+        for lighting in [Lighting::Sweep, Lighting::Chase] {
+            let samples: Vec<_> = (0..240)
+                .map(|tick| lighting.sample(base, *cell, bounds, tick as f32 / 60.0, 0.5))
+                .collect();
+            for (palette, brightness) in &samples {
+                assert_eq!(palette.unlit, base.unlit, "{lighting:?}");
+                let strength = (brightness - 0.5) * 2.0;
+                assert!((0.0..=1.0).contains(&strength), "{lighting:?}");
+            }
+            let (faintest, _) = samples.iter().min_by(|a, b| a.1.total_cmp(&b.1)).unwrap();
+            assert!(
+                near(faintest.fill, base.fill, 0.01),
+                "{lighting:?}: {faintest:?}"
+            );
+        }
+    }
+    for progress in [0.1, 0.3, 0.5, 0.7, 0.9] {
+        assert_eq!(cycle_palette(base, progress).unlit, base.unlit);
+    }
 }
 
 #[test]

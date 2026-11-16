@@ -3,18 +3,24 @@ use engine_common::{Fill, RenderColor, RenderFrame, RenderPoint, RenderPolygon, 
 use crate::{
     events::marquee::{MarqueeEvent, viewport},
     layout::Layout,
-    presentation::{clip_quad, content::Cell},
+    presentation::{clip_quad, content::Cell, effects::DigitPalette},
 };
 
-pub(super) fn render(frame: &mut RenderFrame, event: &MarqueeEvent, layout: Layout) {
-    render_cells(frame, event, layout, |_| true);
+pub(super) fn render(
+    frame: &mut RenderFrame,
+    event: &MarqueeEvent,
+    layout: Layout,
+    base: DigitPalette,
+) {
+    render_cells(frame, event, layout, base, |_| true);
 }
 
-/// Draws the content cells `keep` chooses.
+/// Draws the content cells `keep` chooses, lit from the look's `base`.
 pub(super) fn render_cells(
     frame: &mut RenderFrame,
     event: &MarqueeEvent,
     layout: Layout,
+    base: DigitPalette,
     keep: impl Fn(&Cell) -> bool,
 ) {
     let playback = event.playback();
@@ -30,6 +36,7 @@ pub(super) fn render_cells(
             continue;
         }
         let (palette, brightness) = event.recipe.lighting.sample(
+            base,
             *cell,
             event.content.bounds,
             playback.seconds,

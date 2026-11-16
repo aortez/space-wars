@@ -22,16 +22,18 @@ struct Look {
 }
 
 impl Look {
-    fn cell(cell: &crate::events::explosion::Cell, palette: DigitPalette) -> Self {
+    /// The digit cell or label pixel a piece was, in the `face` the Clock
+    /// wears.
+    fn cell(cell: &crate::events::explosion::Cell, face: crate::theme::Appearance) -> Self {
         if cell.label {
             Self {
-                fill: LABEL_COLOR,
+                fill: face.label,
                 edge: None,
             }
         } else {
             Self {
-                fill: palette.fill,
-                edge: Some(palette.edge),
+                fill: face.digits.fill,
+                edge: Some(face.digits.edge),
             }
         }
     }
@@ -81,11 +83,11 @@ pub(super) fn render(
                 layout.pitch,
                 0.0,
                 0.0,
-                DigitPalette::default(),
+                state.palette(),
             );
         }
     }
-    let palette = DigitPalette::default();
+    let face = state.appearance();
     let stroke_width = (layout.pitch * 0.045).max(0.8);
     // The shape is the event's, so the footprints it publishes agree with
     // what is drawn: the cell's face until the minting turn is edge-on, the
@@ -97,11 +99,11 @@ pub(super) fn render(
             continue;
         }
         let look = if roundness <= 0.0 {
-            Look::cell(cell, palette)
+            Look::cell(cell, face)
         } else if roundness >= 1.0 {
             Look::COIN
         } else {
-            Look::COIN.blend(Look::cell(cell, palette), 1.0 - roundness)
+            Look::COIN.blend(Look::cell(cell, face), 1.0 - roundness)
         };
         let layer = if cell.label {
             LABEL_LAYER

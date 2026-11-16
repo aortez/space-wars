@@ -639,18 +639,14 @@ impl ActiveEvent {
         }
     }
 
-    pub fn palette(&self) -> DigitPalette {
+    /// The digits' colors while this event runs, from the look's `base`
+    /// (#457). Only Color Cycle changes them, and it starts and ends on the
+    /// base.
+    pub fn palette(&self, base: DigitPalette) -> DigitPalette {
         match self {
-            Self::ColorCycle(event) => event.palette(),
-            _ => DigitPalette::default(),
+            Self::ColorCycle(event) => event.palette(base),
+            _ => base,
         }
-    }
-
-    /// Whether this event draws the face in its own colors rather than the
-    /// theme's. Every event does until events follow the theme (#457),
-    /// except the ordinary minute slide, which only moves the face.
-    pub fn draws_own_face(&self) -> bool {
-        !matches!(self, Self::DigitSlide(_))
     }
 
     /// Where the face's own surface at `cell` of `slot` is, in a slot this

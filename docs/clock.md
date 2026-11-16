@@ -912,7 +912,7 @@ never finishes its answer holding the first frame up only briefly, and
 `SPACEWARS_CLOCK_ARTIFACTS` to save the pictures; the ones above come from
 `every_face_draws_its_dashes_in_the_rasters_pixels`.
 
-## Themes (#455, #460)
+## Themes (#455, #460, #457)
 
 A theme is the look the Clock wears. **Normal** is the cyan face the Clock has
 always had. **Christmas** (#460) makes the digits warm white over pine-dark
@@ -931,14 +931,36 @@ with no time at all. The theme follows from the choice and the reading alone,
 so a repeated hour, a skipped one or a correction either way takes the latest
 reading's theme, and no missed night is made up.
 
+**Changing theme (#457).** A new theme fades in over half a second of the
+Clock's own time, 30 ticks. The digits, their dark cells, the date line and the
+AM/PM mark mix from the colors on show to the new theme's, and the string of
+lights fades in or out with them. The fade moves only while the Clock runs, so
+a pause holds it where it is and play carries it on. A reading or a choice that
+leaves the theme as it is doesn't start it again, and a change partway through
+turns back from the colors on show, so nothing jumps. The Clock opens on its
+theme with no fade, so starting it or coming back to it never flashes Normal.
+
+**Events wear the theme.** Every event draws the face in the theme's colors:
+the minute's slide, Falling, Explosion and Coins and their return, Meltdown's
+solid blocks, Rain, the Aquarium, Cell Swap, the Slot Machine, Grass, Tanks and
+every Marquee. Color Cycle still runs its excursion, leaving the theme's colors
+and coming back to them. A marquee's Cycle, Sweep and Chase light the theme's
+colors as they lit the cyan, and Explosion's warning still pulses amber. Water,
+coins, fish and the visitors keep their own colors. A notice, or a player's
+`P1 DUCK` tag, stands in for the date line, so it wears the date line's color.
+An event running when the theme changes carries on with the same ID, age and
+cooldowns, and ends on the theme the Clock wears by then.
+
 A theme is presentation only. It takes no event slot, draws none of the
 scheduler's random numbers, and leaves the residents, the visitors and the
-physics as they are. The string of lights is wall art: it is no body, no
-surface and no light source, so no plant grows by it and the lamps never see
-it. It draws on the wall's layer, right after the wall, so everything in the
-room shows in front of it: the face, the creatures, the water, the bolt and
-the frame. A lightning flash lights its wire, clips, sockets and bulbs with
-the wall, and leaves their glow alone.
+physics as they are. Changing it restarts and cancels nothing. The string of
+lights is wall art: it is no body, no surface and no light source, so no plant
+grows by it and the lamps never see it. It draws on the wall's layer, right
+after the wall, so everything in the room shows in front of it: the face, the
+creatures, the water, the bolt and the frame. A lightning flash lights its
+wire, clips, sockets and bulbs with the wall, and leaves their glow alone.
+While the string fades in or out, every part of it is see-through, so a flash
+leaves it unlit until the fade is over.
 
 The string runs from one side rail to the other just under the canopy. It is
 tied to each rail and pinned to the wall between swags by small clips, so it
@@ -957,14 +979,21 @@ at most 319 primitives.
 Christmas at [1024×768](screenshots/clock/theme-1024x768-christmas.png) and in
 the [480×800 portrait](screenshots/clock/theme-480x800-christmas.png).
 
-**Not yet.** There is no Theme setting, so ordinary Clock keeps Normal. Only
-fixtures, through `ClockConfig::theme`, or the client's
-`SPACEWARS_CLOCK_THEME=christmas` (or `auto`) choose a theme. While an event
-runs, the face, its AM/PM mark and the date line are Normal's, under the
-string, which stays up. The minute's Digit Slide only moves the face, so it
-keeps the theme's colors. While the time is unknown, Auto shows Normal, since
-there is no date to pick by (#257). Next come events and a short fade between
-themes (#457), and the setting with its Auto default (#458, #461). Halloween's
+| Color Cycle in Christmas | Explosion in Christmas |
+| --- | --- |
+| ![Color Cycle partway through its excursion under the string: violet digits and colon over pine-dark cells, with a holly-red date line and PM mark](screenshots/clock/theme-800x480-christmas-color-cycle.png) | ![An explosion in Christmas: warm-white pieces scattered across the room and piled on the floor, over the pine-dark guides](screenshots/clock/theme-800x480-christmas-explosion.png) |
+
+| Clock Chase in Christmas | Halfway from Normal to Christmas |
+| --- | --- |
+| ![The Clock Chase marquee in Christmas: a gold trail running over warm-white cells, the others dimmed](screenshots/clock/theme-800x480-christmas-marquee.png) | ![The middle of the fade: mint digits halfway between cyan and warm white, a mauve date line and PM mark, and the string half lit](screenshots/clock/theme-800x480-fade.png) |
+
+**Not yet.** There is no Theme setting (#458, #461), so ordinary Clock keeps
+Normal. Fixtures choose a theme through `ClockConfig::theme`, and the client
+takes `SPACEWARS_CLOCK_THEME=christmas` (or `auto`) when the Clock starts. A
+running Clock takes a new choice through `ClockAction::set_theme` (kind 10, a
+version and one byte: 0 Auto, 1 Normal, 2 Christmas), which only tests send for
+now. While the time is unknown, Auto shows Normal, since there is no date to
+pick by (#257), and a chosen Christmas dresses the `--:--` face. Halloween's
 look (#456) and its October nights wait until next year.
 
 **Cost.** At 800×480 the string adds 219 primitives to the idle face's 472: 11
@@ -973,6 +1002,7 @@ against 12.0 µs), and rasterizing it 0.10 ms more (0.97 against 0.88 ms, 11%),
 each the median of 200 frames on the development machine. At 1024×768 it adds
 159 primitives and 0.13 ms (1.67 against 1.54 ms), and at 480×800 119
 primitives and 0.05 ms (0.94 against 0.89 ms). The bulbs' glows are most of it.
+A fade draws the same primitives as Christmas, only fainter.
 
 The string adds the same primitives to every frame of every event, and about
 the same raster time. In one seeded run, Rain's worst frame, the heaviest of
@@ -983,9 +1013,25 @@ the 1800 this page gives as the Clock's frame ceiling, which only
 holds a frame to; Tanks passes it in Normal at every aspect. No cabinet has run
 the theme yet, and #462 checks the devices.
 
-The tests are `theme::tests` (December's boundaries, the new year, undated and
-absent readings, the fixed choices and the IDs), `render::string_lights::tests`
-and the day-before cases in `calendar_tests`. The string's tests hold:
+The tests are `theme::tests`, `render::string_lights::tests`,
+`presentation::tests::every_lighting_starts_from_the_looks_colors_and_cycles_back_to_them`
+and the day-before cases in `calendar_tests`. The theme's tests hold December's
+boundaries, the new year, undated and absent readings, the fixed choices and
+the IDs, and the fade:
+
+- its half second, easing in and out, and a change partway through turning back
+  without a jump;
+- a pause and a resize holding it, and repeated readings leaving it alone;
+- rapid changes never jumping, and settling on the last;
+- unknown time taking Auto to Normal and back, with no reading made up;
+- the first frame wearing the theme at once;
+- `SetTheme` carrying each choice and refusing anything else;
+- a Demo-profile twin that changes theme a dozen times, during this seed's
+  events and between them, while a player sits in and the host pauses, keeping
+  the same events, IDs, ages, cooldowns, visitors, bodies, surfaces and lamps,
+  tick for tick, and the same frame once it is back on Normal.
+
+The string's tests hold:
 
 - its place from rail to rail under the canopy, clear of the face, at seven
   aspects and both time formats;
@@ -996,16 +1042,23 @@ and the day-before cases in `calendar_tests`. The string's tests hold:
   same;
 - Clock Spin's cells passing in front of it, and a flash lighting it;
 - the minute's slide keeping the theme's face;
-- Falling, Color Cycle, Meltdown and Explosion drawing Normal's face under it;
-- the duck, the spider and the crow keeping the theme's face;
-- the string coming down with the night.
+- every event, every marquee preset and every visit, turned Christmas partway
+  through, drawing the same scene as a Normal twin with only the face
+  recolored, nothing of Normal's face left once the fade is over, and
+  Christmas kept when it ends;
+- the string fading in and out whole, each part as faint as the fade;
+- the string coming down with the night, after its fade.
 
 In the client, `theme_tests` rasterizes Normal, Christmas and a 12-hour
 Christmas and finds every bulb color only in Christmas, and
 `ui_render_tests::clock_themes_dress_the_date_line_through_native_text_overlay`
 draws each theme's 12-hour face with its date line in real Slint text, red only
-in Christmas. Set `SPACEWARS_CLOCK_ARTIFACTS` to save their pictures; the ones
-above come from the second.
+in Christmas.
+`ui_render_tests::clock_events_and_a_change_of_theme_wear_the_theme_in_real_pixels`
+draws Color Cycle, Explosion and Clock Chase in both themes and finds Normal's
+cyan only in Normal's Explosion and Clock Chase, and draws the fade at its
+middle. Set `SPACEWARS_CLOCK_ARTIFACTS` to save their pictures; the ones above
+come from the last two.
 
 ## Events
 
@@ -2156,11 +2209,11 @@ compound body whose pixel colliders match its visible shape. There is no
 second anchored copy of the label.
 
 Color Cycle eases the illuminated cells and colon through violet, pink, gold,
-and green, returning to the normal cyan palette. Digits remain anchored and
+and green, returning to the theme's colors. Digits remain anchored and
 follow live time throughout; the event creates no physics objects.
 
 Meltdown releases the lit digit cells roughly bottom-up, with small seeded
-delays. They stay cyan, square and solid-looking while falling, including through
+delays. They keep the face's colors, square and solid-looking while falling, including through
 existing water. In standalone Meltdown, gravity, slight rotation and side-wall reflection remain cheap
 ballistic motion, without rigid bodies or block-block collisions. Reaching the
 actual inclined panel top converts each block once: normally 70% of its

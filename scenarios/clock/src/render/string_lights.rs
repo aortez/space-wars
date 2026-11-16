@@ -102,9 +102,16 @@ fn wire_at(from: Vec2, to: Vec2, sag: f32, t: f32) -> Vec2 {
     from + (to - from) * t - Vec2::new(0.0, sag * 4.0 * t * (1.0 - t))
 }
 
-pub(super) fn render(frame: &mut RenderFrame, layout: Layout) {
+/// Hangs the string at `opacity`, from 0 for none to 1 for all of it, so a
+/// change of theme fades it in or out (#457). Its shape is the same at every
+/// opacity.
+pub(super) fn render(frame: &mut RenderFrame, layout: Layout, opacity: f32) {
     let unit = layout.frame_width;
     let hang = hang(layout);
+    let faded = |color: RenderColor| RenderColor {
+        a: color.a * opacity,
+        ..color
+    };
     for pair in hang.pins.windows(2) {
         let path: Vec<Vec2> = (0..=WIRE_PIECES)
             .map(|i| wire_at(pair[0], pair[1], hang.sag, i as f32 / WIRE_PIECES as f32))
@@ -113,7 +120,7 @@ pub(super) fn render(frame: &mut RenderFrame, layout: Layout) {
             LIGHTS_LAYER,
             RenderPrimitive::Polygon(RenderPolygon::filled(
                 strip(&path, wire_half(layout)),
-                WIRE_COLOR,
+                faded(WIRE_COLOR),
             )),
         );
     }
@@ -124,7 +131,7 @@ pub(super) fn render(frame: &mut RenderFrame, layout: Layout) {
             RenderPrimitive::Circle(RenderCircle::filled(
                 point(pin),
                 clip_radius(layout),
-                SOCKET_COLOR,
+                faded(SOCKET_COLOR),
             )),
         );
     }
@@ -136,7 +143,7 @@ pub(super) fn render(frame: &mut RenderFrame, layout: Layout) {
                 RenderPrimitive::Circle(RenderCircle::filled(
                     point(center),
                     unit * radius,
-                    RenderColor { a: alpha, ..color },
+                    faded(RenderColor { a: alpha, ..color }),
                 )),
             );
         }
@@ -151,7 +158,7 @@ pub(super) fn render(frame: &mut RenderFrame, layout: Layout) {
                     RenderPoint::new(center.x + half, top + unit * SOCKET_HEIGHT),
                     RenderPoint::new(center.x - half, top + unit * SOCKET_HEIGHT),
                 ],
-                SOCKET_COLOR,
+                faded(SOCKET_COLOR),
             )),
         );
         let white = |c: f32| c + (1.0 - c) * CORE_WHITE;
@@ -177,7 +184,7 @@ pub(super) fn render(frame: &mut RenderFrame, layout: Layout) {
                             )
                         })
                         .collect(),
-                    color,
+                    faded(color),
                 )),
             );
         }
