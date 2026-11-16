@@ -166,6 +166,10 @@ host's tissues, a registered region, or a body outside the material model.
   material. The shot's body is not bound to a loading region, so the contact
   response refuses the batch it arrives in, as it refuses any unbound contact,
   and charges nothing for the shot. Physics resolves the shot's momentum.
+  A host that sweeps its own projectiles, which need not be bodies, measures
+  their hits the same way with `projectile_impact`, from the projectile's mass
+  and velocity and the struck body's motion, recorded entering the step or
+  read now.
 - **Blasts.** A shot that stops releases its payload where the step left it,
   divided by `blast_reach` among the tissue and body circles the host admits.
   `detonate` releases it wherever the shot is, for a fuse the host decides on.

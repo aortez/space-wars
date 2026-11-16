@@ -1057,14 +1057,41 @@ fn measure(
     point: Vec2,
 ) -> Option<Impact> {
     let body = world.collider_body(other)?;
-    let motion = prepared
-        .motions
-        .get(&body)
-        .copied()
-        .or_else(|| world.motion(body))?;
-    // Where its center was when the step's contact was found.
+    projectile_impact(
+        world,
+        world.body_mass(shot.body)?,
+        before.linear_velocity,
+        other,
+        prepared.motions.get(&body).copied(),
+        normal,
+        point,
+    )
+}
+
+/// The impact of a projectile of `mass` moving at `velocity` on `collider`'s
+/// body at `point`, measured as [`Weapons`] measures its shots' hits. It is
+/// for hosts that sweep their own projectiles, which need not be bodies.
+///
+/// The unit `normal` points from the projectile into the body. `motion` is the
+/// body's motion entering the step, where the host recorded it, and its
+/// motion now otherwise. A dynamic body gives way by its mass and, unless its
+/// rotation is locked, by its inertia about the point; any other body is
+/// immovable. A projectile moving away closes at zero. `None` means there is
+/// no such body or the load is invalid, such as a mass that isn't positive.
+pub fn projectile_impact(
+    world: &PhysicsWorld,
+    mass: f32,
+    velocity: Vec2,
+    collider: ColliderId,
+    motion: Option<BodyMotion>,
+    normal: Vec2,
+    point: Vec2,
+) -> Option<Impact> {
+    let body = world.collider_body(collider)?;
+    let motion = motion.or_else(|| world.motion(body))?;
+    // Where its center was when the contact was found.
     let com = center(world, body, motion)?;
-    let velocity = point_velocity(motion.linear_velocity, motion.angular_velocity, point - com);
+    let at = point_velocity(motion.linear_velocity, motion.angular_velocity, point - com);
     let target = match world.body_kind(body)? {
         BodyKind::Dynamic => {
             let mass = world.body_mass(body)?;
@@ -1077,9 +1104,8 @@ fn measure(
         }
         _ => ContactBody::IMMOVABLE,
     };
-    let mass = world.body_mass(shot.body)?;
     let load = Impact {
-        closing_speed: closing_speed(normal, before.linear_velocity, velocity),
+        closing_speed: closing_speed(normal, velocity, at),
         effective_mass: effective_mass(ContactBody::translating(mass), target).ok()?,
     };
     load.validate().ok()?;
