@@ -1,9 +1,10 @@
 use super::*;
+use crate::presentation::effects::smoothstep;
 use crate::theme::{Appearance, FADE_TICKS};
 use crate::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario};
 use engine_common::{
     ClockEventKind, ClockEventProfile, ClockLampMode, ClockMarqueePreset, ClockRainAmount,
-    ClockThemeChoice, ClockTimeFormat, Scenario,
+    ClockTheme, ClockThemeChoice, ClockTimeFormat, Scenario,
 };
 use std::time::Duration;
 
@@ -70,7 +71,7 @@ fn on_layer(frame: &RenderFrame, z: i32) -> Vec<&RenderPrimitive> {
 /// The string's own primitives, drawn alone.
 fn string(layout: Layout) -> Vec<RenderPrimitive> {
     let mut frame = RenderFrame::new(Camera2::new(RenderPoint::ZERO, CAMERA_HEIGHT));
-    render(&mut frame, layout, 1.0);
+    render(&mut frame, layout, 1.0, 0.0);
     on_layer(&frame, LIGHTS_LAYER)
         .into_iter()
         .cloned()
@@ -382,16 +383,48 @@ fn the_lightning_flash_lights_the_string_but_not_its_glow() {
     let mut frame = crate::render::render_frame(&state);
     super::super::lightning::flash(&mut frame, 1.0);
     let wall = on_layer(&frame, LIGHTS_LAYER);
-    let fill = |p: &RenderPrimitive| match p {
-        RenderPrimitive::Circle(circle) => circle.fill.unwrap().color,
-        RenderPrimitive::Polygon(polygon) => polygon.fill.unwrap().color,
-        other => panic!("{other:?}"),
-    };
     for (lit, dark) in wall[1..].iter().zip(string(layout)) {
         if fill(&dark).a >= 1.0 {
             assert_ne!(fill(lit), fill(&dark), "an opaque part stays dark");
         } else {
             assert_eq!(**lit, dark, "a glow is lit");
+        }
+    }
+}
+
+#[test]
+fn a_flash_lights_a_fading_string_as_it_lights_the_whole_one() {
+    let layout = Layout::new(800.0 / 480.0);
+    // The string as the frame shows it once the room's flash has lit it.
+    let lit = |opacity: f32, flash: f32| {
+        let mut frame = RenderFrame::new(Camera2::new(RenderPoint::ZERO, CAMERA_HEIGHT));
+        render(&mut frame, layout, opacity, flash);
+        super::super::lightning::flash(&mut frame, flash);
+        on_layer(&frame, LIGHTS_LAYER)
+            .into_iter()
+            .map(fill)
+            .collect::<Vec<_>>()
+    };
+    for flash in [0.0, 0.4, 1.0] {
+        let whole = lit(1.0, flash);
+        // At every step of a fade, up to the last before it is over, each
+        // part keeps the color the flash gives the whole string, only fainter.
+        let mut look = crate::theme::Look::settled(ClockTheme::Normal);
+        look.head_for(ClockTheme::Christmas);
+        for tick in 1..FADE_TICKS {
+            look.advance();
+            let opacity = look.drawn().lights;
+            let faded = lit(opacity, flash);
+            assert_eq!(faded.len(), whole.len());
+            for (part, whole) in faded.iter().zip(&whole) {
+                let at = format!("flash {flash}, tick {tick}");
+                assert_eq!(
+                    [part.r, part.g, part.b],
+                    [whole.r, whole.g, whole.b],
+                    "{at}"
+                );
+                assert_eq!(part.a, whole.a * opacity, "{at}");
+            }
         }
     }
 }
@@ -424,37 +457,62 @@ fn the_minute_slide_keeps_the_themes_face() {
     }
 }
 
-/// Every color on the face's layers, setting aside how opaque it is.
-fn face_colors(frame: &RenderFrame) -> Vec<[f32; 3]> {
-    let rgb = |c: RenderColor| [c.r, c.g, c.b];
+/// Every paint on the face's layers in the order it is drawn: each
+/// primitive's fill and outline, or its one color.
+fn face_paints(frame: &RenderFrame) -> Vec<RenderColor> {
     FACE_LAYERS
         .iter()
         .flat_map(|&z| on_layer(frame, z))
         .flat_map(|primitive| match primitive {
-            RenderPrimitive::Circle(circle) => [
-                circle.fill.map(|f| rgb(f.color)),
-                circle.stroke.map(|s| rgb(s.color)),
-            ],
+            RenderPrimitive::Circle(circle) => {
+                [circle.fill.map(|f| f.color), circle.stroke.map(|s| s.color)]
+            }
             RenderPrimitive::Polygon(polygon) => [
-                polygon.fill.map(|f| rgb(f.color)),
-                polygon.stroke.map(|s| rgb(s.color)),
+                polygon.fill.map(|f| f.color),
+                polygon.stroke.map(|s| s.color),
             ],
-            RenderPrimitive::Line(line) => [Some(rgb(line.stroke.color)), None],
-            RenderPrimitive::Text(text) => [Some(rgb(text.color)), None],
+            RenderPrimitive::Line(line) => [Some(line.stroke.color), None],
+            RenderPrimitive::Text(text) => [Some(text.color), None],
         })
         .flatten()
         .collect()
 }
 
-/// The Normal face's colors, setting aside how opaque they are.
-fn normal_face() -> [[f32; 3]; 4] {
+/// Every color on the face's layers, setting aside how opaque it is.
+fn face_colors(frame: &RenderFrame) -> Vec<[f32; 3]> {
+    face_paints(frame)
+        .into_iter()
+        .map(|c| [c.r, c.g, c.b])
+        .collect()
+}
+
+/// The colors `look` gives the face, setting aside how opaque they are.
+fn face_of(look: Appearance) -> [[f32; 3]; 4] {
     [
-        DigitPalette::NORMAL.fill,
-        DigitPalette::NORMAL.edge,
-        DigitPalette::NORMAL.unlit,
-        Appearance::NORMAL.label,
+        look.digits.fill,
+        look.digits.edge,
+        look.digits.unlit,
+        look.label,
     ]
     .map(|c| [c.r, c.g, c.b])
+}
+
+/// The fill of one of the string's parts, all of which are filled shapes.
+fn fill(primitive: &RenderPrimitive) -> RenderColor {
+    match primitive {
+        RenderPrimitive::Circle(circle) => circle.fill.unwrap().color,
+        RenderPrimitive::Polygon(polygon) => polygon.fill.unwrap().color,
+        other => panic!("{other:?}"),
+    }
+}
+
+/// The string as `frame` hangs it, just after the wall.
+fn hung(frame: &RenderFrame, layout: Layout) -> Vec<RenderPrimitive> {
+    let parts = string(layout).len();
+    on_layer(frame, LIGHTS_LAYER)[1..=parts]
+        .iter()
+        .map(|&part| part.clone())
+        .collect()
 }
 
 /// Checks that `themed` draws the scene `normal` draws, with only the face's
@@ -497,6 +555,82 @@ fn same_scene(normal: &RenderFrame, themed: &RenderFrame, layout: Layout, hung: 
     }
 }
 
+/// A clock's change of theme, `since` ticks ago.
+#[derive(Debug, Clone, Copy)]
+struct Turn {
+    from: ClockTheme,
+    to: ClockTheme,
+    since: u32,
+}
+
+impl Turn {
+    /// A clock that has worn `theme` since it began.
+    fn settled(theme: ClockTheme) -> Self {
+        Self {
+            from: theme,
+            to: theme,
+            since: FADE_TICKS,
+        }
+    }
+}
+
+/// Checks the frame of a clock in the middle of `turn` or after it, against
+/// the frames of twins that wear Normal and Christmas throughout. While it
+/// fades, it draws the Normal twin's scene, and every color on its face is
+/// the fade's share of the way from the color the twin it turns from has
+/// there to the color the twin it turns to has. It hangs the Christmas twin's
+/// string, lit by any flash as that one is, only as faint as the fade. Once
+/// the fade is over, it draws exactly what the twin it turned to draws.
+fn turns_cleanly(
+    state: &ClockState,
+    turn: Turn,
+    [normal, dressed]: [&RenderFrame; 2],
+    layout: Layout,
+    at: &str,
+) {
+    let twin = |theme| match theme {
+        ClockTheme::Normal => normal,
+        ClockTheme::Christmas => dressed,
+    };
+    let frame = crate::render::render_frame(state);
+    if turn.since >= FADE_TICKS {
+        assert!(frame == *twin(turn.to), "{at}: {turn:?} unlike its twin");
+        return;
+    }
+    let share = smoothstep(turn.since as f32 / FADE_TICKS as f32);
+    let mix = |a: f32, b: f32| a * (1.0 - share) + b * share;
+    let lights = mix(
+        Appearance::of(turn.from).lights,
+        Appearance::of(turn.to).lights,
+    );
+    same_scene(normal, &frame, layout, lights > 0.0, at);
+    let [drawn, from, to] = [&frame, twin(turn.from), twin(turn.to)].map(face_paints);
+    assert_eq!(drawn.len(), from.len(), "{at}");
+    assert_eq!(drawn.len(), to.len(), "{at}");
+    for ((drawn, from), to) in drawn.iter().zip(&from).zip(&to) {
+        let off = [
+            drawn.r - mix(from.r, to.r),
+            drawn.g - mix(from.g, to.g),
+            drawn.b - mix(from.b, to.b),
+        ];
+        assert!(
+            off.iter().all(|off| off.abs() < 1e-4) && drawn.a == from.a && drawn.a == to.a,
+            "{at}: {drawn:?} is not {share} of the way from {from:?} to {to:?}"
+        );
+    }
+    if lights > 0.0 {
+        for (part, whole) in hung(&frame, layout).iter().zip(&hung(dressed, layout)) {
+            let (part, whole) = (fill(part), fill(whole));
+            assert_eq!(
+                [part.r, part.g, part.b],
+                [whole.r, whole.g, whole.b],
+                "{at}: the string's colors"
+            );
+            assert_eq!(part.a, whole.a * lights, "{at}: the string's opacity");
+        }
+    }
+}
+
 /// Whether an event or a visit is still going on.
 fn busy(state: &ClockState) -> bool {
     state.event_kind().is_some()
@@ -505,14 +639,25 @@ fn busy(state: &ClockState) -> bool {
         || state.crow_state().is_some()
 }
 
-/// Starts `kind` in a Normal clock and in a twin that turns Christmas
-/// `CHANGE` ticks in, then checks every frame until it is over. The twins
-/// draw the same scene and the twin only recolors the face and hangs the
-/// string. Once its fade is over, nothing on the twin's face is Normal's,
-/// and when the event ends the twin keeps Christmas. Returns how many ticks
-/// the event ran.
-fn wears_the_theme(kind: ClockEventKind, tweak: impl Fn(&mut ClockConfig)) -> u32 {
-    const CHANGE: u32 = 20;
+/// What `wears_the_theme` saw.
+struct Worn {
+    /// How many ticks the event or the visit ran.
+    ticks: u32,
+    /// How many frames a lightning flash lit while the turning clock faded.
+    flashes_in_fades: u32,
+}
+
+/// Starts `kind` in three clocks: one that wears Normal throughout, one that
+/// wears Christmas from the start, and one given Christmas `FIRST` ticks in
+/// and then Normal and Christmas by turns every `PERIOD` ticks, so that it is
+/// in the middle of a fade for most of the event. On every frame, the
+/// Christmas clock draws the Normal one's scene with only the face recolored
+/// and the string hung, and nothing of Normal's face, and the turning clock
+/// passes `turns_cleanly`. When it is over, each clock settles on the theme
+/// it was last given.
+fn wears_the_theme(kind: ClockEventKind, tweak: impl Fn(&mut ClockConfig)) -> Worn {
+    const FIRST: u32 = 20;
+    const PERIOD: u32 = FADE_TICKS + 10;
     let aspect = 800.0 / 480.0;
     let layout = Layout::new(aspect);
     let config = |config: &mut ClockConfig| {
@@ -520,40 +665,75 @@ fn wears_the_theme(kind: ClockEventKind, tweak: impl Fn(&mut ClockConfig)) -> u3
         tweak(config);
     };
     let mut normal = clock_with(aspect, ClockThemeChoice::Normal, config);
-    let mut themed = clock_with(aspect, ClockThemeChoice::Normal, config);
-    for state in [&mut normal, &mut themed] {
+    let mut dressed = clock_with(aspect, ClockThemeChoice::Christmas, config);
+    let mut turning = clock_with(aspect, ClockThemeChoice::Normal, config);
+    for state in [&mut normal, &mut dressed, &mut turning] {
         ClockScenario::step(state, &[ClockAction::trigger_event(kind)], Duration::ZERO);
     }
-    assert!(busy(&themed), "{kind:?} never started");
-    let mut ticks = 0;
-    while busy(&themed) {
-        let change = [ClockAction::set_theme(ClockThemeChoice::Christmas)];
-        let actions: &[_] = if ticks == CHANGE { &change } else { &[] };
-        ClockScenario::step(&mut normal, &[], TICK);
-        ClockScenario::step(&mut themed, actions, TICK);
-        ticks += 1;
-        let at = format!("{kind:?} tick {ticks}");
-        let themed_frame = crate::render::render_frame(&themed);
-        same_scene(
-            &crate::render::render_frame(&normal),
-            &themed_frame,
-            layout,
-            themed.appearance().lights > 0.0,
-            &at,
-        );
-        if ticks >= CHANGE + FADE_TICKS {
-            for color in face_colors(&themed_frame) {
-                assert!(!normal_face().contains(&color), "{at}: {color:?}");
-            }
+    assert!(busy(&normal), "{kind:?} never started");
+    let mut turn = Turn::settled(ClockTheme::Normal);
+    let mut worn = Worn {
+        ticks: 0,
+        flashes_in_fades: 0,
+    };
+    while busy(&normal) {
+        let mut actions = Vec::new();
+        if worn.ticks >= FIRST && (worn.ticks - FIRST) % PERIOD == 0 {
+            let (to, choice) = if (worn.ticks - FIRST) / PERIOD % 2 == 0 {
+                (ClockTheme::Christmas, ClockThemeChoice::Christmas)
+            } else {
+                (ClockTheme::Normal, ClockThemeChoice::Normal)
+            };
+            actions.push(ClockAction::set_theme(choice));
+            // The last change's fade is over, so this one turns from its
+            // theme.
+            turn = Turn {
+                from: turn.to,
+                to,
+                since: 0,
+            };
         }
-        assert!(ticks < 20_000, "{kind:?} never ended");
+        ClockScenario::step(&mut normal, &[], TICK);
+        ClockScenario::step(&mut dressed, &[], TICK);
+        ClockScenario::step(&mut turning, &actions, TICK);
+        worn.ticks += 1;
+        turn.since += 1;
+        let at = format!("{kind:?} tick {}", worn.ticks);
+        assert_eq!(busy(&dressed), busy(&normal), "{at}");
+        assert_eq!(busy(&turning), busy(&normal), "{at}");
+        let normal_frame = crate::render::render_frame(&normal);
+        let dressed_frame = crate::render::render_frame(&dressed);
+        same_scene(&normal_frame, &dressed_frame, layout, true, &at);
+        for color in face_colors(&dressed_frame) {
+            assert!(
+                !face_of(Appearance::NORMAL).contains(&color),
+                "{at}: {color:?}"
+            );
+        }
+        turns_cleanly(&turning, turn, [&normal_frame, &dressed_frame], layout, &at);
+        if turn.since < FADE_TICKS && flash_level(&turning) > 0.0 {
+            worn.flashes_in_fades += 1;
+        }
+        assert!(worn.ticks < 20_000, "{kind:?} never ended");
     }
-    assert!(!busy(&normal), "{kind:?}");
-    assert!(ticks > CHANGE + FADE_TICKS, "{kind:?}: ran {ticks} ticks");
-    // It ends on the theme the Clock wears now, not the one it began in.
-    assert_eq!(themed.appearance(), Appearance::CHRISTMAS, "{kind:?}");
-    assert_eq!(themed.palette(), Appearance::CHRISTMAS.digits, "{kind:?}");
-    ticks
+    assert!(
+        worn.ticks > FIRST + FADE_TICKS,
+        "{kind:?}: ran {} ticks",
+        worn.ticks
+    );
+    // Each ends on the theme it was last given, not the one it began in.
+    assert_eq!(dressed.appearance(), Appearance::CHRISTMAS, "{kind:?}");
+    assert_eq!(dressed.palette(), Appearance::CHRISTMAS.digits, "{kind:?}");
+    while turn.since < FADE_TICKS {
+        for state in [&mut normal, &mut dressed, &mut turning] {
+            ClockScenario::step(state, &[], TICK);
+        }
+        turn.since += 1;
+    }
+    let frames = [&normal, &dressed].map(crate::render::render_frame);
+    let at = format!("{kind:?} over");
+    turns_cleanly(&turning, turn, [&frames[0], &frames[1]], layout, &at);
+    worn
 }
 
 #[test]
@@ -570,9 +750,12 @@ fn falling_explosion_coins_and_meltdown_wear_the_theme() {
 
 #[test]
 fn rain_and_the_aquarium_wear_the_theme() {
-    wears_the_theme(ClockEventKind::Rain, |config| {
+    let rain = wears_the_theme(ClockEventKind::Rain, |config| {
         config.rain_amount = ClockRainAmount::Heavy;
     });
+    // The lightning struck while the string faded, and lit it as it lights
+    // the whole string.
+    assert!(rain.flashes_in_fades > 0, "no flash while the string faded");
     wears_the_theme(ClockEventKind::Aquarium, |_| {});
 }
 
@@ -613,8 +796,151 @@ fn a_visit_wears_the_theme() {
         ClockEventKind::Spider,
         ClockEventKind::Crow,
     ] {
-        let ticks = wears_the_theme(kind, |_| {});
+        let ticks = wears_the_theme(kind, |_| {}).ticks;
         assert!(ticks > 100, "{kind:?}: visited for {ticks} ticks");
+    }
+}
+
+#[test]
+fn auto_turns_the_theme_in_the_middle_of_the_minute_slide() {
+    // Calm slides the digits whenever the minute turns over, so Auto's
+    // change of theme at 18:00 and at 06:00 lands on a slide.
+    let aspect = 800.0 / 480.0;
+    let layout = Layout::new(aspect);
+    for (before, (hour, minute, second), after) in [
+        (ClockTheme::Normal, (18, 0, 0), ClockTheme::Christmas),
+        (ClockTheme::Christmas, (6, 0, 0), ClockTheme::Normal),
+    ] {
+        let clock = |theme| {
+            let mut state = ClockScenario::init(
+                ClockConfig {
+                    aspect_ratio: aspect,
+                    theme,
+                    show_date: true,
+                    lamps: ClockLampMode::Steady,
+                    event_profile: ClockEventProfile::Calm,
+                    time_format: ClockTimeFormat::TwelveHour,
+                    ..ClockConfig::default()
+                },
+                1,
+            );
+            read(&mut state, (hour + 23) % 24, 59, 59, Duration::ZERO);
+            state
+        };
+        let mut normal = clock(ClockThemeChoice::Normal);
+        let mut dressed = clock(ClockThemeChoice::Christmas);
+        let mut auto = clock(ClockThemeChoice::Auto);
+        let frames = |normal: &ClockState, dressed: &ClockState| {
+            [normal, dressed].map(crate::render::render_frame)
+        };
+        // A moment of the last minute, in the theme of the hour before.
+        for tick in 1..=10 {
+            for state in [&mut normal, &mut dressed, &mut auto] {
+                ClockScenario::step(state, &[], TICK);
+            }
+            let [n, d] = frames(&normal, &dressed);
+            let at = format!("{hour}:00, {tick} ticks before");
+            turns_cleanly(&auto, Turn::settled(before), [&n, &d], layout, &at);
+        }
+        for state in [&mut normal, &mut dressed, &mut auto] {
+            read(state, hour, minute, second, TICK);
+        }
+        // The turn of the hour starts the slide in all three, and Auto's fade
+        // runs inside it.
+        let mut turn = Turn {
+            from: before,
+            to: after,
+            since: 1,
+        };
+        loop {
+            let at = format!("{hour}:00, tick {}", turn.since);
+            for state in [&normal, &dressed] {
+                assert_eq!(state.event_kind(), auto.event_kind(), "{at}");
+            }
+            if turn.since < FADE_TICKS {
+                assert_eq!(auto.event_kind(), Some(ClockEventKind::DigitSlide), "{at}");
+            } else if auto.event_kind().is_none() {
+                break;
+            }
+            let [n, d] = frames(&normal, &dressed);
+            turns_cleanly(&auto, turn, [&n, &d], layout, &at);
+            for state in [&mut normal, &mut dressed, &mut auto] {
+                ClockScenario::step(state, &[], TICK);
+            }
+            turn.since += 1;
+            assert!(turn.since < 1000, "{at}: the slide never ended");
+        }
+        assert!(turn.since > 40, "{hour}:00: slid for {} ticks", turn.since);
+        // The slide ends on the theme of the new hour.
+        assert_eq!(auto.appearance(), Appearance::of(after), "{hour}:00");
+        let [n, d] = frames(&normal, &dressed);
+        turns_cleanly(&auto, turn, [&n, &d], layout, "after the slide");
+    }
+}
+
+/// Whether `frame` writes `text` anywhere.
+fn shows(frame: &RenderFrame, text: &str) -> bool {
+    frame
+        .layers
+        .iter()
+        .flat_map(|layer| &layer.primitives)
+        .any(|primitive| matches!(primitive, RenderPrimitive::Text(t) if t.text == text))
+}
+
+#[test]
+fn a_notice_and_a_players_tag_wear_the_date_lines_color_through_a_fade() {
+    const CHANGE: u32 = 10;
+    let aspect = 800.0 / 480.0;
+    let layout = Layout::new(aspect);
+    // A seated player's duck is tagged by the date line, and a player who
+    // asks for a duck during Tanks is told no in the date line's place.
+    for (start, text) in [
+        (vec![ClockAction::toggle_player_duck(1)], "P1 DUCK"),
+        (
+            vec![
+                ClockAction::trigger_event(ClockEventKind::Tanks),
+                ClockAction::toggle_player_duck(1),
+            ],
+            "Tanks is using the arena",
+        ),
+    ] {
+        let make = |theme| {
+            let mut state = clock(aspect, theme, ClockTimeFormat::TwelveHour);
+            ClockScenario::step(&mut state, &start, Duration::ZERO);
+            state
+        };
+        let mut normal = make(ClockThemeChoice::Normal);
+        let mut dressed = make(ClockThemeChoice::Christmas);
+        let mut turning = make(ClockThemeChoice::Normal);
+        let mut turn = Turn::settled(ClockTheme::Normal);
+        for tick in 0..CHANGE + FADE_TICKS + 5 {
+            let mut actions = Vec::new();
+            if tick == CHANGE {
+                actions.push(ClockAction::set_theme(ClockThemeChoice::Christmas));
+                turn = Turn {
+                    from: ClockTheme::Normal,
+                    to: ClockTheme::Christmas,
+                    since: 0,
+                };
+            }
+            ClockScenario::step(&mut normal, &[], TICK);
+            ClockScenario::step(&mut dressed, &[], TICK);
+            ClockScenario::step(&mut turning, &actions, TICK);
+            turn.since += 1;
+            let at = format!("{text}, tick {tick}");
+            let frames = [&normal, &dressed].map(crate::render::render_frame);
+            for frame in &frames {
+                assert!(shows(frame, text), "{at}");
+            }
+            same_scene(&frames[0], &frames[1], layout, true, &at);
+            for color in face_colors(&frames[1]) {
+                assert!(
+                    !face_of(Appearance::NORMAL).contains(&color),
+                    "{at}: {color:?}"
+                );
+            }
+            turns_cleanly(&turning, turn, [&frames[0], &frames[1]], layout, &at);
+        }
     }
 }
 
@@ -623,11 +949,6 @@ fn the_string_fades_in_and_out_with_its_theme() {
     let aspect = 800.0 / 480.0;
     let layout = Layout::new(aspect);
     let full = string(layout);
-    let alpha = |primitive: &RenderPrimitive| match primitive {
-        RenderPrimitive::Circle(circle) => circle.fill.unwrap().color.a,
-        RenderPrimitive::Polygon(polygon) => polygon.fill.unwrap().color.a,
-        other => panic!("{other:?}"),
-    };
     let mut state = clock(
         aspect,
         ClockThemeChoice::Normal,
@@ -647,7 +968,7 @@ fn the_string_fades_in_and_out_with_its_theme() {
             let wall = on_layer(&frame, LIGHTS_LAYER);
             for (part, whole) in wall[1..=full.len()].iter().zip(&full) {
                 assert_eq!(shape(part), shape(whole), "{theme:?} tick {tick}");
-                assert_eq!(alpha(part), alpha(whole) * last, "{theme:?} tick {tick}");
+                assert_eq!(fill(part).a, fill(whole).a * last, "{theme:?} tick {tick}");
             }
             ClockScenario::step(&mut state, &[], TICK);
             let lights = state.appearance().lights;

@@ -1110,19 +1110,14 @@ fn clock_events_and_a_change_of_theme_wear_the_theme_in_real_pixels() {
             );
         }
     };
-    // An event runs the same in both, and Christmas keeps nothing of Normal's
-    // cyan. Explosion's pieces and the chase's trail start from the theme's
-    // warm white. Partway through its excursion, Color Cycle wears its own
-    // purple in both, over each theme's dark cells.
-    for (kind, ticks, name, normal_is_cyan) in [
-        (
-            ClockEventKind::ColorCycle,
-            80,
-            "christmas-color-cycle",
-            false,
-        ),
-        (ClockEventKind::Explosion, 150, "christmas-explosion", true),
-        (ClockEventKind::Marquee, 140, "christmas-marquee", true),
+    // An event runs the same in both, and only Normal's face shows its cyan.
+    // Color Cycle sets out from the theme's colors toward its own violet, and
+    // Explosion's pieces and the chase's trail start from the theme's warm
+    // white.
+    for (kind, ticks, name) in [
+        (ClockEventKind::ColorCycle, 25, "christmas-color-cycle"),
+        (ClockEventKind::Explosion, 150, "christmas-explosion"),
+        (ClockEventKind::Marquee, 140, "christmas-marquee"),
     ] {
         let mut normal = clock(ClockThemeChoice::Normal);
         let mut christmas = clock(ClockThemeChoice::Christmas);
@@ -1134,7 +1129,7 @@ fn clock_events_and_a_change_of_theme_wear_the_theme_in_real_pixels() {
             assert_eq!(state.event_kind(), Some(kind), "{name}");
         }
         let (normal, christmas) = (shoot(&normal), shoot(&christmas));
-        assert_eq!(count(&normal, cyan) > 200, normal_is_cyan, "{name}");
+        assert!(count(&normal, cyan) > 200, "{name}");
         assert_eq!(count(&christmas, cyan), 0, "{name}");
         save(&christmas, name);
     }

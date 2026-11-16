@@ -96,10 +96,16 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     // whichever way it drew them.
     lamp::illuminate(&mut frame, state, Layout::new(state.aspect_ratio()));
     // A lightning flash lights the room, the spotlights' pools with it.
-    if let Some(crate::events::ActiveEvent::Rain(rain)) = &state.active_event {
-        lightning::flash(&mut frame, rain.flash());
-    }
+    lightning::flash(&mut frame, flash_level(state));
     frame
+}
+
+/// How bright the lightning's flash is now, from 0 for none to 1 at full.
+fn flash_level(state: &ClockState) -> f32 {
+    match &state.active_event {
+        Some(crate::events::ActiveEvent::Rain(rain)) => rain.flash(),
+        _ => 0.0,
+    }
 }
 
 /// The frame as the scene draws it, before the spotlights light it.
@@ -147,7 +153,7 @@ fn compose(state: &ClockState) -> RenderFrame {
     render_canopy(&mut frame, layout);
     let lights = state.appearance().lights;
     if lights > 0.0 {
-        string_lights::render(&mut frame, layout, lights);
+        string_lights::render(&mut frame, layout, lights, flash_level(state));
     }
     if state.spider.is_some() {
         spider::render_hatch(&mut frame, layout);

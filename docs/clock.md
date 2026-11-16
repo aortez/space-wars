@@ -959,8 +959,8 @@ grows by it and the lamps never see it. It draws on the wall's layer, right
 after the wall, so everything in the room shows in front of it: the face, the
 creatures, the water, the bolt and the frame. A lightning flash lights its
 wire, clips, sockets and bulbs with the wall, and leaves their glow alone.
-While the string fades in or out, every part of it is see-through, so a flash
-leaves it unlit until the fade is over.
+While the string fades in or out, a flash lights it just the same, only as
+faint as the fade.
 
 The string runs from one side rail to the other just under the canopy. It is
 tied to each rail and pinned to the wall between swags by small clips, so it
@@ -981,7 +981,7 @@ the [480×800 portrait](screenshots/clock/theme-480x800-christmas.png).
 
 | Color Cycle in Christmas | Explosion in Christmas |
 | --- | --- |
-| ![Color Cycle partway through its excursion under the string: violet digits and colon over pine-dark cells, with a holly-red date line and PM mark](screenshots/clock/theme-800x480-christmas-color-cycle.png) | ![An explosion in Christmas: warm-white pieces scattered across the room and piled on the floor, over the pine-dark guides](screenshots/clock/theme-800x480-christmas-explosion.png) |
+| ![Color Cycle setting out from the theme's colors under the string: the warm-white digits and colon turning pale pink on their way to violet, over pine-dark cells, with a holly-red date line and PM mark](screenshots/clock/theme-800x480-christmas-color-cycle.png) | ![An explosion in Christmas: warm-white pieces scattered across the room and piled on the floor, over the pine-dark guides](screenshots/clock/theme-800x480-christmas-explosion.png) |
 
 | Clock Chase in Christmas | Halfway from Normal to Christmas |
 | --- | --- |
@@ -1042,11 +1042,18 @@ The string's tests hold:
   same;
 - Clock Spin's cells passing in front of it, and a flash lighting it;
 - the minute's slide keeping the theme's face;
-- every event, every marquee preset and every visit, turned Christmas partway
-  through, drawing the same scene as a Normal twin with only the face
-  recolored, nothing of Normal's face left once the fade is over, and
-  Christmas kept when it ends;
-- the string fading in and out whole, each part as faint as the fade;
+- every event, every marquee preset and every visit in three twins. One wears
+  Normal. One wears Christmas from its first frame: the same scene with only
+  the face recolored, and nothing of Normal's face. The third turns between
+  them every two-thirds of a second, so it is fading through most of the
+  event. In the middle of a fade, every color on its face is exactly the
+  fade's share of the way between the twins' colors there. Once a fade is
+  over, it draws exactly what its twin draws, and each ends on the theme it
+  was last given;
+- Auto's turn at 18:00 and at 06:00, in the middle of the minute's slide;
+- a notice and a player's tag wearing the date line's color through a fade;
+- the string fading in and out whole, each part as faint as the fade, and a
+  flash lighting it at every step of the fade as it lights the whole string;
 - the string coming down with the night, after its fade.
 
 In the client, `theme_tests` rasterizes Normal, Christmas and a 12-hour
@@ -1055,8 +1062,8 @@ Christmas and finds every bulb color only in Christmas, and
 draws each theme's 12-hour face with its date line in real Slint text, red only
 in Christmas.
 `ui_render_tests::clock_events_and_a_change_of_theme_wear_the_theme_in_real_pixels`
-draws Color Cycle, Explosion and Clock Chase in both themes and finds Normal's
-cyan only in Normal's Explosion and Clock Chase, and draws the fade at its
+draws Color Cycle, Explosion and Clock Chase in both themes, finds Normal's
+cyan in each Normal picture and in no Christmas one, and draws the fade at its
 middle. Set `SPACEWARS_CLOCK_ARTIFACTS` to save their pictures; the ones above
 come from the last two.
 
@@ -2213,7 +2220,7 @@ and green, returning to the theme's colors. Digits remain anchored and
 follow live time throughout; the event creates no physics objects.
 
 Meltdown releases the lit digit cells roughly bottom-up, with small seeded
-delays. They keep the face's colors, square and solid-looking while falling, including through
+delays. They keep the face's colors and stay square and solid-looking while falling, including through
 existing water. In standalone Meltdown, gravity, slight rotation and side-wall reflection remain cheap
 ballistic motion, without rigid bodies or block-block collisions. Reaching the
 actual inclined panel top converts each block once: normally 70% of its

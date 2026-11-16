@@ -228,7 +228,7 @@ pub(super) fn flash(frame: &mut RenderFrame, level: f32) {
         return;
     }
     for layer in &mut frame.layers {
-        let Some(&(_, gain)) = FLASH_LAYERS.iter().find(|(z, _)| *z == layer.z) else {
+        let Some(gain) = gain(layer.z) else {
             continue;
         };
         for primitive in &mut layer.primitives {
@@ -237,17 +237,42 @@ pub(super) fn flash(frame: &mut RenderFrame, level: f32) {
     }
 }
 
+/// `color` as a flash at `level` lights an opaque thing on `layer`, even
+/// where `color` itself is translucent. The string of lights takes the
+/// flash's light this way while it fades (#457), since `flash` passes over
+/// whatever it can see through.
+pub(super) fn lit(color: RenderColor, layer: i32, level: f32) -> RenderColor {
+    toward_flash(color, gain(layer).unwrap_or(0.0) * level)
+}
+
+/// How far a full flash takes the opaque things on `layer` toward its light,
+/// if it lights that layer at all.
+fn gain(layer: i32) -> Option<f32> {
+    FLASH_LAYERS
+        .iter()
+        .find(|(z, _)| *z == layer)
+        .map(|&(_, gain)| gain)
+}
+
+/// `color` taken `amount` of the way to the flash's light, as opaque as it
+/// was.
+fn toward_flash(color: RenderColor, amount: f32) -> RenderColor {
+    RenderColor {
+        r: color.r + (FLASH_COLOR.r - color.r) * amount,
+        g: color.g + (FLASH_COLOR.g - color.g) * amount,
+        b: color.b + (FLASH_COLOR.b - color.b) * amount,
+        a: color.a,
+    }
+}
+
 /// Takes the opaque fill and stroke of `primitive` `amount` of the way to
 /// the flash's light. Translucent ones are glows and shadows, which a flash
 /// would wash out rather than light.
 fn light(primitive: &mut RenderPrimitive, amount: f32) {
     let toward = |color: &mut RenderColor| {
-        if color.a < 1.0 {
-            return;
+        if color.a >= 1.0 {
+            *color = toward_flash(*color, amount);
         }
-        color.r += (FLASH_COLOR.r - color.r) * amount;
-        color.g += (FLASH_COLOR.g - color.g) * amount;
-        color.b += (FLASH_COLOR.b - color.b) * amount;
     };
     let (fill, stroke) = match primitive {
         RenderPrimitive::Circle(circle) => (circle.fill.as_mut(), circle.stroke.as_mut()),
