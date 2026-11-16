@@ -16,6 +16,7 @@ mod geometry;
 mod impact;
 mod ledger;
 mod material;
+mod reach;
 mod reference;
 mod region;
 pub mod shared_impact;
@@ -34,6 +35,10 @@ pub use geometry::{
 pub use impact::{Impact, POST_YIELD_STIFFNESS_FRACTION, deposit, impact, yield_speed};
 pub use ledger::{LEDGER_TOLERANCE, Outcome, WorkLedger};
 pub use material::{FailureMode, Material};
+pub use reach::{
+    Crossing, Overlap, PathReach, Reach, Target, beam_reach, blast_reach, footprint_overlaps,
+    sweep_crossings,
+};
 pub use reference::{ALL_REFERENCE, ARMOR, HULL, ROCK, SHELL, SOFT_TISSUE, WOOD};
 pub use region::{Connection, Region};
 pub use source::{
