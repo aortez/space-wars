@@ -336,6 +336,17 @@ impl Fixture {
             thread::sleep(Duration::from_millis(5));
         }
     }
+    /// Waits for the backend to count `count` acceptances, and no more. The
+    /// status reports Acknowledged once the consent is spent, before the
+    /// backend counts it; an unattended attempt saves its image in between.
+    fn accepted(&self, count: usize) {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while self.backend.accepted.load(Ordering::SeqCst) < count {
+            assert!(Instant::now() < deadline);
+            thread::sleep(Duration::from_millis(5));
+        }
+        assert_eq!(self.backend.accepted.load(Ordering::SeqCst), count);
+    }
 }
 #[test]
 fn actual_service_and_host_sockets_consume_once_and_reject_late_cancel() {
@@ -343,7 +354,7 @@ fn actual_service_and_host_sockets_consume_once_and_reject_late_cancel() {
     let offer = f.prepare();
     f.release.send(()).unwrap();
     f.wait(Phase::Acknowledged);
-    assert_eq!(f.backend.accepted.load(Ordering::SeqCst), 1);
+    f.accepted(1);
     assert_eq!(
         f.request(ServiceRequest::Cancel {
             schema: SCHEMA,

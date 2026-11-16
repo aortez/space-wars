@@ -155,7 +155,7 @@ fn an_idle_launcher_counts_down_then_installs_without_a_confirmation() {
     assert_eq!(f.backend.accepted.load(Ordering::SeqCst), 0);
     f.release.send(()).unwrap();
     f.wait(Phase::Acknowledged);
-    assert_eq!(f.backend.accepted.load(Ordering::SeqCst), 1);
+    f.accepted(1);
     // Whatever its installation does next, this image is never tried again.
     let tried = gate.status(Some(IMAGE));
     assert_eq!(tried.gate, Gate::ImageTried);
@@ -184,7 +184,7 @@ fn the_clock_is_ended_and_a_game_never_is() {
     f.entered.recv_timeout(Duration::from_secs(10)).unwrap();
     f.release.send(()).unwrap();
     f.wait(Phase::Acknowledged);
-    assert_eq!(f.backend.accepted.load(Ordering::SeqCst), 1);
+    f.accepted(1);
 }
 
 #[test]
@@ -364,7 +364,7 @@ fn ask_mode_never_looks_at_the_app_and_a_confirmation_is_not_an_attempt() {
     f.prepare();
     f.release.send(()).unwrap();
     f.wait(Phase::Acknowledged);
-    assert_eq!(f.backend.accepted.load(Ordering::SeqCst), 1);
+    f.accepted(1);
     let status = gate.status(Some(IMAGE));
     assert_eq!((status.last_attempt, status.tried_build_id), (None, None));
 }
