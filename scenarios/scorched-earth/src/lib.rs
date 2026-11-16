@@ -163,6 +163,9 @@ struct Shell {
     /// The shell's energy: its mass at its launch speed, and its payload.
     #[serde(skip)]
     source: Source,
+    /// The keys its source knows the host's recipients by.
+    #[serde(skip)]
+    keys: armor::Keys,
 }
 
 #[derive(Clone)]
@@ -262,7 +265,8 @@ impl ScorchedState {
     fn advance(&mut self, drive: f32) {
         let drives = self.duel.prepare_controls(&mut self.physics, drive);
         self.duel.last_physics = self.physics.step_with_surface_drives(DT, &drives);
-        self.duel.finish_step(&mut self.physics);
+        self.duel
+            .finish_step(&mut self.physics, &mut armor::NoRecipients);
     }
     fn advance_with_drive_override(
         &mut self,
@@ -275,7 +279,8 @@ impl ScorchedState {
             self.duel
                 .prepare_with_drive_override(&mut self.physics, drive, axis, ground, support);
         self.duel.last_physics = self.physics.step_with_surface_drives(DT, &drives);
-        self.duel.finish_step(&mut self.physics);
+        self.duel
+            .finish_step(&mut self.physics, &mut armor::NoRecipients);
     }
 
     pub fn camera(&self) -> Camera2 {

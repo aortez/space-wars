@@ -12,16 +12,29 @@
 //! sum past the payload. Terrain, loose dirt and fragments neither take shares
 //! nor shield the tanks, as before.
 //!
+//! A host can put its own recipients in the shells' way, through the
+//! engine's [`Recipients`]: tissue that a shell passes on its way and that a
+//! burst reaches, which the host keeps and charges, and bodies that stop a
+//! burst's energy, which is reported rather than charged. Regions bound to the
+//! world's loading response stop energy the same way; the duel does not charge
+//! them.
+//!
 //! Lengths, masses and energies here are Scorched's own units, whatever the
 //! placement's scale, so a hosted duel takes the same damage as a standalone
-//! one.
+//! one. The duel sees the host's recipients at its own scale too: their
+//! lengths divide by the scale, and a region keeps its material and the share
+//! of its capacity it has left. Each then loses the share of its capacity that
+//! the same delivery would cost it at scale 1.
 use super::*;
+use crate::host::Placement;
 use engine_material::{
-    ARMOR, ContactGeometry, Face, Impact, Projectile, SHELL, Section, Share, Source, SourceId,
-    SourceSpec, Target, blast_reach, patch_width_from_radii,
+    ARMOR, ContactGeometry, Face, Impact, MAX_LENGTH, MIN_LENGTH, Projectile, SHELL, Section,
+    Share, Source, SourceId, SourceSpec, Target, blast_reach, patch_width_from_radii,
+    sweep_crossings,
 };
 use engine_rapier::world::RayHit;
-use engine_rapier::world::weapon::projectile_impact;
+use engine_rapier::world::weapon::{Reachable, Recipient, Recipients, projectile_impact};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Represented depth of a tank into the screen, and of a burst's front, so a
 /// tank stops the whole front wherever it lies across it.
@@ -136,8 +149,141 @@ fn outside(targets: &[Target], mut center: Vec2) -> Vec2 {
 pub(crate) struct Struck {
     /// Work each tank's armor absorbed, by slot.
     pub absorbed: [f32; 2],
-    /// Hard-hit energy stopped by a body outside the material model.
+    /// Energy stopped by bodies outside the material model: the hard hit's,
+    /// on what the shell struck, and the burst's shares on the host's bodies.
     pub unmodeled: f32,
+}
+
+/// The host has no recipients of its own: standalone Scorched, and hosts that
+/// supply none.
+pub(crate) struct NoRecipients;
+
+impl Recipients for NoRecipients {
+    fn near(&self, _center: Vec2, _radius: f32) -> Vec<Reachable> {
+        Vec::new()
+    }
+
+    fn tissue(&self, _key: u64) -> Option<(Region, Section)> {
+        None
+    }
+
+    fn absorb(&mut self, _key: u64, _work: f32) {}
+}
+
+/// The keys a source knows the host's recipients by, after the tanks' slots,
+/// in the order it first meets them, so it reaches each once.
+#[derive(Clone, Default)]
+pub(crate) struct Keys(BTreeMap<Recipient, u64>);
+
+impl Keys {
+    fn of(&mut self, recipient: Recipient) -> u64 {
+        let next = 2 + self.0.len() as u64;
+        *self.0.entry(recipient).or_insert(next)
+    }
+}
+
+/// The host's recipients with a circle within `radius` of `center`, at the
+/// duel's scale and keyed by `keys`. A recipient with a circle the reach
+/// geometry would refuse is left out whole.
+fn guests(
+    placement: &Placement,
+    recipients: &impl Recipients,
+    keys: &mut Keys,
+    center: Vec2,
+    radius: f32,
+) -> Vec<(Recipient, Target)> {
+    let scale = placement.scale;
+    let length = |length: f32| {
+        let length = length / scale;
+        (length.is_finite() && (MIN_LENGTH..=MAX_LENGTH).contains(&length)).then_some(length)
+    };
+    let circles = recipients.near(placement.point_to_world(center), radius * scale);
+    let refused: BTreeSet<Recipient> = circles
+        .iter()
+        .filter(|circle| {
+            length(circle.radius).is_none()
+                || length(circle.thickness).is_none()
+                || !(circle.center.x.is_finite() && circle.center.y.is_finite())
+        })
+        .map(|circle| circle.recipient)
+        .collect();
+    circles
+        .into_iter()
+        .filter(|circle| !refused.contains(&circle.recipient))
+        .map(|circle| {
+            let target = Target {
+                key: keys.of(circle.recipient),
+                center: placement.point_from_world(circle.center),
+                radius: circle.radius / scale,
+                thickness: circle.thickness / scale,
+            };
+            (circle.recipient, target)
+        })
+        .collect()
+}
+
+/// A host's tissue as the duel sees it: its material at the duel's `scale`
+/// with the same share of its capacity left, its section at that scale, and
+/// the factor that takes work charged to it back to the tissue. Tissue the
+/// law would refuse at that scale has none, and stops energy as a body does,
+/// so it cannot spoil a delivery to the tanks.
+fn proxy(recipients: &impl Recipients, key: u64, scale: f32) -> Option<(Region, Section, f64)> {
+    let (region, section) = recipients.tissue(key)?;
+    let volume = region.volume() / scale.powi(3);
+    let capacity = f64::from(Region::new(region.material(), volume).ok()?.capacity());
+    let share = region.remaining_precise() / f64::from(region.capacity());
+    let proxy = Region::with_remaining(
+        region.material(),
+        volume,
+        (share * capacity).clamp(0.0, capacity),
+    )
+    .ok()?;
+    let section = Section::new(section.thickness / scale, section.depth / scale);
+    section.validate().ok()?;
+    Some((proxy, section, f64::from(region.capacity()) / capacity))
+}
+
+/// Passes the host's tissue that `shell` crosses on its way to `end`, in
+/// order, each once. The shell flies on as it would have without it.
+pub(super) fn pass_tissue(
+    placement: &Placement,
+    recipients: &mut impl Recipients,
+    shell: &mut Shell,
+    end: Vec2,
+) {
+    let start = shell.position;
+    let tissue: Vec<(Recipient, Target)> = guests(
+        placement,
+        recipients,
+        &mut shell.keys,
+        start.midpoint(end),
+        start.distance_to(end) * 0.5 + SHELL_RADIUS,
+    )
+    .into_iter()
+    .filter(|(recipient, _)| matches!(recipient, Recipient::Tissue(_)))
+    .collect();
+    if tissue.is_empty() {
+        return;
+    }
+    let targets: Vec<Target> = tissue.iter().map(|(_, target)| *target).collect();
+    let Ok(crossings) = sweep_crossings(start, end, SHELL_RADIUS, &targets) else {
+        return;
+    };
+    let speed = shell.velocity.length();
+    for crossing in crossings {
+        let Some((Recipient::Tissue(key), target)) =
+            tissue.iter().find(|(_, target)| target.key == crossing.key)
+        else {
+            continue;
+        };
+        let Some((region, section, back)) = proxy(recipients, *key, placement.scale) else {
+            continue;
+        };
+        let face = Face::new(2.0 * SHELL_RADIUS.min(target.radius), section);
+        if let Ok(outcome) = shell.source.pass(crossing.key, &region, face, speed) {
+            recipients.absorb(*key, (f64::from(outcome.consumed[0]) * back) as f32);
+        }
+    }
 }
 
 impl Duel {
@@ -186,20 +332,46 @@ impl Duel {
     }
 
     /// Releases `source`'s payload from `center` into the armor of the tanks
-    /// within reach. Returns the work each tank's armor took.
+    /// and the host's tissue within reach. The host's bodies stop the energy
+    /// that meets them first. Returns what the tanks' armor took and what the
+    /// host's bodies stopped.
     pub(super) fn release_payload(
         &mut self,
         physics: &PhysicsWorld,
+        recipients: &mut impl Recipients,
         center: Vec2,
         source: &mut Source,
-    ) -> [f32; 2] {
-        let mut absorbed = [0.0; 2];
-        let targets = self.armor_targets(physics);
+        keys: &mut Keys,
+    ) -> Struck {
+        let mut released = Struck::default();
+        let guests = guests(&self.placement, recipients, keys, center, BLAST_REACH);
+        let mut targets = self.armor_targets(physics);
+        targets.extend(guests.iter().map(|(_, target)| *target));
         let Ok(reaches) = blast_reach(center, BLAST_REACH, TANK_THICKNESS, &targets) else {
-            return absorbed;
+            return released;
         };
-        let shares: Vec<Share> = reaches
-            .iter()
+        // The host's tissue that can take a share, as the duel sees it, and
+        // the directions its other bodies fill.
+        let mut tissue = Vec::new();
+        let mut blocked = 0.0;
+        for reach in reaches.iter().filter(|reach| reach.key >= 2) {
+            let recipient = guests
+                .iter()
+                .find(|(_, target)| target.key == reach.key)
+                .map(|(recipient, _)| *recipient);
+            let proxy = match recipient {
+                Some(Recipient::Tissue(key)) => proxy(recipients, key, self.placement.scale)
+                    .map(|(region, section, back)| (key, region, section, back)),
+                _ => None,
+            };
+            match proxy {
+                Some(proxy) => tissue.push((reach, proxy)),
+                None => blocked += reach.coupling,
+            }
+        }
+        let tanks = reaches.iter().filter(|reach| reach.key < 2);
+        let mut shares: Vec<Share> = tanks
+            .clone()
             .map(|reach| Share {
                 key: reach.key,
                 region: &self.tanks[reach.key as usize].armor,
@@ -207,14 +379,25 @@ impl Duel {
                 coupling: reach.coupling,
             })
             .collect();
+        shares.extend(tissue.iter().map(|(reach, (_, region, section, _))| Share {
+            key: reach.key,
+            region,
+            face: Face::new(reach.width, *section),
+            coupling: reach.coupling,
+        }));
         let Ok(outcomes) = source.release(&shares) else {
-            return absorbed;
+            return released;
         };
-        for (reach, outcome) in reaches.iter().zip(outcomes) {
+        released.unmodeled = source.ledger().payload.budget as f32 * blocked;
+        let mut outcomes = outcomes.into_iter();
+        for (reach, outcome) in tanks.zip(outcomes.by_ref()) {
             let slot = reach.key as usize;
-            absorbed[slot] += self.tanks[slot].absorb(outcome.consumed[0]);
+            released.absorbed[slot] += self.tanks[slot].absorb(outcome.consumed[0]);
         }
-        absorbed
+        for ((_, (key, _, _, back)), outcome) in tissue.iter().zip(outcomes) {
+            recipients.absorb(*key, (f64::from(outcome.consumed[0]) * back) as f32);
+        }
+        released
     }
 
     /// The impact of a shell moving at `velocity` on what `hit` found, in
@@ -245,8 +428,8 @@ impl Duel {
     pub(super) fn strike(
         &mut self,
         physics: &mut PhysicsWorld,
-        velocity: Vec2,
-        source: &mut Source,
+        recipients: &mut impl Recipients,
+        shell: &mut Shell,
         point: Vec2,
         hit: &RayHit,
     ) -> Struck {
@@ -254,14 +437,15 @@ impl Duel {
         let slot = (0..2).find(|&slot| {
             self.retired[slot].is_none() && hit.collider.entity == self.tanks[slot].body.entity
         });
-        if let Some(load) = self.measure(physics, velocity, hit) {
+        if let Some(load) = self.measure(physics, shell.velocity, hit) {
             match slot {
                 Some(slot) => {
                     let outcome = patch_width_from_radii(SHELL_RADIUS, None)
                         .ok()
                         .map(|width| ContactGeometry::new(width, CASING, ARMOR_SECTION))
                         .and_then(|contact| {
-                            source
+                            shell
+                                .source
                                 .hit(slot as u64, &self.tanks[slot].armor, contact, load)
                                 .ok()
                         });
@@ -276,10 +460,18 @@ impl Duel {
             &self.armor_targets(physics),
             point + hit.normal * SHELL_RADIUS,
         );
-        let released = self.burst(physics, point, center, source);
-        for (absorbed, released) in struck.absorbed.iter_mut().zip(released) {
+        let released = self.burst(
+            physics,
+            recipients,
+            point,
+            center,
+            &mut shell.source,
+            &mut shell.keys,
+        );
+        for (absorbed, released) in struck.absorbed.iter_mut().zip(released.absorbed) {
             *absorbed += released;
         }
+        struck.unmodeled += released.unmodeled;
         struck
     }
 

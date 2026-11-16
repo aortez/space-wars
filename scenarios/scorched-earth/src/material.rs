@@ -1,5 +1,6 @@
 use super::*;
 use engine_rapier::terrain::{PreparedRelease, RadialImpulse, TerrainBodyMut};
+use engine_rapier::world::weapon::Recipients;
 use engine_terrain::{Brush, EditMode, TerrainEdit, TerrainError};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -131,19 +132,31 @@ impl Duel {
         let before = self.tanks.map(|tank| tank.health);
         let owner_entity = owner.map(|slot| self.tanks[slot].body.entity.value());
         let mut source = armor::charge(0, owner_entity);
-        self.burst(physics, point, point, &mut source);
+        let mut keys = armor::Keys::default();
+        let mut recipients = armor::NoRecipients;
+        self.burst(
+            physics,
+            &mut recipients,
+            point,
+            point,
+            &mut source,
+            &mut keys,
+        );
         self.notify_hits(owner, before);
     }
 
     /// A burst's crater and pushes at `point`, and its payload released from
-    /// `center` into the tanks' armor. Returns the work each tank's armor took.
+    /// `center` into the tanks' armor and the host's tissue. Returns what the
+    /// tanks' armor took and what the host's bodies stopped.
     pub(super) fn burst(
         &mut self,
         physics: &mut PhysicsWorld,
+        recipients: &mut impl Recipients,
         point: Vec2,
         center: Vec2,
         source: &mut Source,
-    ) -> [f32; 2] {
+        keys: &mut armor::Keys,
+    ) -> armor::Struck {
         self.impacts += 1;
         self.flashes.push((point, self.tick));
         self.release_material(physics, point);
@@ -168,14 +181,14 @@ impl Duel {
         .apply(physics, bodies);
         // Combat damage is independent of whether the bounded material pool
         // admitted this edit. Capacity cannot make a tank invulnerable.
-        let absorbed = self.release_payload(physics, center, source);
+        let released = self.release_payload(physics, recipients, center, source, keys);
         RadialImpulse {
             center: self.placement.point_to_world(point),
             radius: 6.0 * self.placement.scale,
             speed: 4.0 * self.placement.scale,
         }
         .apply(physics, self.tanks.iter().map(|t| t.body));
-        absorbed
+        released
     }
 
     pub fn slumping_diagnostics(&self) -> engine_rapier::terrain::SlumpingDiagnostics {

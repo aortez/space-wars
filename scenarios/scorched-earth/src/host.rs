@@ -4,6 +4,7 @@
 //! Placement maps Scorched's native coordinates into the host's physical units.
 //! Both use downward gravity. Contact fracture requires event collection.
 use super::*;
+use engine_rapier::world::weapon::Recipients;
 use engine_rapier::world::{BodyMotion, RayHit, SurfaceDrive};
 use std::ops::Range;
 
@@ -183,8 +184,9 @@ pub struct Impact {
     pub ledger: engine_material::SourceLedger,
     /// Work each tank's armor took from the shell, by slot.
     pub absorbed: [f32; 2],
-    /// Energy of the hit stopped by a body outside the material model, such
-    /// as terrain: reported, not charged.
+    /// Energy stopped by bodies outside the material model, reported rather
+    /// than charged: the hit's, on terrain or any body that is not a tank,
+    /// and the burst's shares on the host's bodies.
     pub unmodeled: f32,
 }
 
@@ -352,6 +354,21 @@ impl HostedDuel {
     /// Call once after the host's fixed 1/60-second physics step. This method
     /// applies shot and material consequences and never advances physics.
     pub fn finish_step(&mut self, world: &mut PhysicsWorld) -> Result<(), HostError> {
+        self.finish_step_with(world, &mut armor::NoRecipients)
+    }
+
+    /// [`Self::finish_step`] with the host's own recipients in the shells'
+    /// way: tissue that a shell passes and a burst reaches, which `recipients`
+    /// keeps and is charged through, and bodies that stop a burst's energy.
+    /// Recipients are in world units, and each loses the share of its capacity
+    /// that the same delivery would cost it at scale 1. A shell stops at the
+    /// first solid collider its ray meets, so tissue it should pass is a
+    /// sensor or has no collider.
+    pub fn finish_step_with(
+        &mut self,
+        world: &mut PhysicsWorld,
+        recipients: &mut impl Recipients,
+    ) -> Result<(), HostError> {
         if self.retired {
             return Err(HostError::Retired);
         }
@@ -359,7 +376,7 @@ impl HostedDuel {
             return Err(HostError::StepOrder);
         }
         Self::gravity(world, self.duel.placement.scale)?;
-        self.duel.finish_step(world);
+        self.duel.finish_step(world, recipients);
         self.sync_gravity(world);
         self.prepared = false;
         Ok(())
