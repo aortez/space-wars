@@ -1,12 +1,21 @@
 use super::*;
 use crate::presentation::effects::smoothstep;
 use crate::theme::{Appearance, FADE_TICKS};
-use crate::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario};
+use crate::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario, ClockState};
 use engine_common::{
-    ClockEventKind, ClockEventProfile, ClockLampMode, ClockMarqueePreset, ClockRainAmount,
-    ClockTheme, ClockThemeChoice, ClockTimeFormat, Scenario,
+    Action, ClockEventKind, ClockEventProfile, ClockLampMode, ClockMarqueePreset, ClockRainAmount,
+    ClockSettings, ClockTheme, ClockThemeChoice, ClockTimeFormat, Scenario,
 };
 use std::time::Duration;
+
+/// The settings `state` has, with `choice` for the theme: how the controls
+/// change the theme (#458).
+fn choose(state: &ClockState, choice: ClockThemeChoice) -> Action {
+    ClockAction::configure(ClockSettings {
+        theme: choice,
+        ..state.settings()
+    })
+}
 
 const ASPECTS: [f32; 7] = [0.25, 0.6, 1.0, 4.0 / 3.0, 800.0 / 480.0, 2.0, 4.0];
 const TICK: Duration = Duration::from_nanos(16_666_667);
@@ -684,7 +693,7 @@ fn wears_the_theme(kind: ClockEventKind, tweak: impl Fn(&mut ClockConfig)) -> Wo
             } else {
                 (ClockTheme::Normal, ClockThemeChoice::Normal)
             };
-            actions.push(ClockAction::set_theme(choice));
+            actions.push(choose(&turning, choice));
             // The last change's fade is over, so this one turns from its
             // theme.
             turn = Turn {
@@ -916,7 +925,7 @@ fn a_notice_and_a_players_tag_wear_the_date_lines_color_through_a_fade() {
         for tick in 0..CHANGE + FADE_TICKS + 5 {
             let mut actions = Vec::new();
             if tick == CHANGE {
-                actions.push(ClockAction::set_theme(ClockThemeChoice::Christmas));
+                actions.push(choose(&turning, ClockThemeChoice::Christmas));
                 turn = Turn {
                     from: ClockTheme::Normal,
                     to: ClockTheme::Christmas,
@@ -959,7 +968,8 @@ fn the_string_fades_in_and_out_with_its_theme() {
         (ClockThemeChoice::Christmas, true),
         (ClockThemeChoice::Normal, false),
     ] {
-        ClockScenario::step(&mut state, &[ClockAction::set_theme(theme)], TICK);
+        let change = choose(&state, theme);
+        ClockScenario::step(&mut state, &[change], TICK);
         let mut last = state.appearance().lights;
         for tick in 1..FADE_TICKS {
             // The whole string hangs at every step of the fade, each part as

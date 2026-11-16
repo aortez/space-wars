@@ -3,7 +3,7 @@ use clap::Subcommand;
 use engine_common::{
     ClockArenaOwner, ClockArenaState, ClockArenaUnavailable, ClockDigitSurfaceState,
     ClockLampBrainState, ClockLampMode, ClockLampPercepts, ClockLampsState, ClockSurfaceChangeKind,
-    ClockSurfaceRetirement,
+    ClockSurfaceRetirement, ClockThemeChoice, ClockThemeState,
 };
 use spacewars_control::{
     ClockEventKind, ClockMarqueeMessage, ClockMessageRequest, ClockState, ClockStatePredicate,
@@ -275,6 +275,9 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         );
         if let Some(error) = &state.settings_error {
             println!("Settings warning: {error}");
+        }
+        if let Some(theme) = &state.theme {
+            println!("{}", theme_line(theme, state.settings.theme));
         }
         if let Some(arena) = &state.arena {
             print_arena(arena);
@@ -692,6 +695,18 @@ fn print_arena(arena: &ClockArenaState) {
     }
 }
 
+/// The theme's setting, the theme it wears now, the one Auto would, and how
+/// far the fade to it has come, in thousandths of its half second.
+fn theme_line(theme: &ClockThemeState, choice: ClockThemeChoice) -> String {
+    format!(
+        "Theme: {}; wears={} auto={} fade={}",
+        choice.label(),
+        theme.theme.label(),
+        theme.auto.label(),
+        theme.fade_milli
+    )
+}
+
 /// The lamps' setting, how much of their light they give at this time of
 /// day, and how many times the run's lamps have done each thing.
 fn lamps_line(lamps: &ClockLampsState, mode: ClockLampMode) -> String {
@@ -917,6 +932,20 @@ mod tests {
         ClockLampActivity, ClockLampDrives, ClockLampImpact, ClockLampMover, ClockLampTarget,
         ClockLampTemperament,
     };
+
+    #[test]
+    fn the_theme_line_shows_the_setting_what_it_wears_what_auto_would_and_the_fade() {
+        use engine_common::ClockTheme;
+        let theme = ClockThemeState {
+            theme: ClockTheme::Normal,
+            auto: ClockTheme::Christmas,
+            fade_milli: 400,
+        };
+        assert_eq!(
+            theme_line(&theme, ClockThemeChoice::Normal),
+            "Theme: Normal; wears=Normal auto=Christmas fade=400"
+        );
+    }
 
     #[test]
     fn the_lamp_lines_show_the_setting_the_counts_and_each_lamps_mind() {

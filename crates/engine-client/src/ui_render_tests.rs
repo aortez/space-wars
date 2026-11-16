@@ -1137,11 +1137,11 @@ fn clock_events_and_a_change_of_theme_wear_the_theme_in_real_pixels() {
     // warm white, and the string is half lit.
     let mut state = clock(ClockThemeChoice::Normal);
     ClockScenario::step(&mut state, &[], TICK);
-    ClockScenario::step(
-        &mut state,
-        &[ClockAction::set_theme(ClockThemeChoice::Christmas)],
-        TICK,
-    );
+    let christmas = ClockAction::configure(engine_common::ClockSettings {
+        theme: ClockThemeChoice::Christmas,
+        ..state.settings()
+    });
+    ClockScenario::step(&mut state, &[christmas], TICK);
     for _ in 1..15 {
         ClockScenario::step(&mut state, &[], TICK);
     }
@@ -1150,6 +1150,123 @@ fn clock_events_and_a_change_of_theme_wear_the_theme_in_real_pixels() {
     assert_eq!(count(&fade, cyan), 0, "the fade has left Normal's cyan");
     assert!(count(&fade, halfway) > 200, "the face is half way");
     save(&fade, "fade");
+}
+
+#[test]
+fn the_theme_control_and_what_auto_does_show_on_both_settings_pages() {
+    use crate::render::{FrameLayout, Viewport};
+    use engine_common::{
+        ClockEventKind, ClockEventProfile, ClockLampMode, ClockSettings, ClockThemeChoice, Scenario,
+    };
+    use scenario_clock::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario};
+    use std::time::Duration;
+    let windows = Rc::new(RefCell::new(Vec::new()));
+    slint::platform::set_platform(Box::new(TestPlatform(windows.clone()))).unwrap();
+    let ui = MainWindow::new().unwrap();
+    ui.show().unwrap();
+    let windows = windows.borrow();
+    // Christmas, the longest choice, beside Demo, the profile's longest value.
+    let settings = ClockSettings {
+        theme: ClockThemeChoice::Christmas,
+        event_profile: ClockEventProfile::Demo,
+        ..ClockSettings::default()
+    };
+    for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
+        windows[0].set_size(PhysicalSize::new(width, height));
+        let viewport = Viewport::new(width as f32, height as f32);
+        // The live page shows over the paused Clock, here in Christmas.
+        let mut state = ClockScenario::init(
+            ClockConfig {
+                aspect_ratio: viewport.aspect_ratio(),
+                show_date: true,
+                lamps: ClockLampMode::Steady,
+                event_profile: ClockEventProfile::Off,
+                theme: ClockThemeChoice::Christmas,
+                ..Default::default()
+            },
+            42,
+        );
+        ClockScenario::step(
+            &mut state,
+            &[ClockAction::set_reading(
+                ClockReading::new(21, 34, 0)
+                    .unwrap()
+                    .with_date(ClockDate::new(2026, 12, 24).unwrap()),
+            )],
+            Duration::ZERO,
+        );
+        let frames = [ClockScenario::render_frame(&state)];
+        let overlay =
+            crate::render::raster_text_overlay(&frames, viewport, FrameLayout::EqualHorizontal);
+        let face = crate::thruster_visual_tests::raster(&frames[0], viewport);
+        let shoot = |live: bool, focus: i32| {
+            reset_panels(&ui);
+            ui.set_launcher_scenario("clock".into());
+            crate::apply_scenario_metadata(&ui, "clock");
+            crate::clock_controls::publish_settings(&ui, settings);
+            ui.set_clock_event_labels(
+                Rc::new(slint::VecModel::from(
+                    ClockEventKind::ALL
+                        .iter()
+                        .map(|kind| kind.label().into())
+                        .collect::<Vec<_>>(),
+                ))
+                .into(),
+            );
+            ui.set_raster_visible(true);
+            ui.set_raster_frame(Image::from_rgb8(face.clone()));
+            ui.set_primitives(Rc::new(slint::VecModel::from(overlay.clone())).into());
+            if live {
+                ui.set_ingame_menu_visible(true);
+                ui.set_ingame_clock_visible(true);
+                ui.set_ingame_clock_focus_index(focus);
+            } else {
+                ui.set_launcher_visible(true);
+                ui.set_launcher_settings_visible(true);
+                ui.set_launcher_settings_focus_index(focus);
+            }
+            let mut shot = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+            windows[0].request_redraw();
+            windows[0].draw_if_needed(|renderer| {
+                renderer.render(shot.make_mut_slice(), width as usize);
+            });
+            shot
+        };
+        let band = |shot: &SharedPixelBuffer<Rgb8Pixel>, top: u32, rows: u32| {
+            let at = (top * width) as usize;
+            shot.as_slice()[at..at + (rows * width) as usize].to_vec()
+        };
+        // The live page's status line says what Auto does while Theme is
+        // selected, and that settings save otherwise. The line sits between
+        // the recipe's row and Back, in a panel 432 px tall.
+        let live = shoot(true, 25);
+        assert_eq!(ui.get_launcher_clock_theme(), "Christmas");
+        let status = (height - 432) / 2 + 62 + 276;
+        assert_ne!(
+            band(&live, status, 20),
+            band(&shoot(true, 10), status, 20),
+            "{width}x{height}"
+        );
+        // The launcher's subtitle says it in place of the scenario's name, in
+        // a panel 440 px tall.
+        let launcher = shoot(false, 24);
+        let subtitle = (height - 440) / 2 + 52;
+        assert_ne!(
+            band(&launcher, subtitle, 24),
+            band(&shoot(false, 23), subtitle, 24),
+            "{width}x{height}"
+        );
+        if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {
+            let directory = std::path::PathBuf::from(directory);
+            std::fs::create_dir_all(&directory).unwrap();
+            for (page, shot) in [("live", &live), ("launcher", &launcher)] {
+                crate::thruster_visual_tests::write_png(
+                    &directory.join(format!("theme-{width}x{height}-{page}-controls.png")),
+                    shot,
+                );
+            }
+        }
+    }
 }
 
 #[test]

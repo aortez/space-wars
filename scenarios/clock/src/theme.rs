@@ -160,4 +160,9 @@ impl Look {
     pub fn advance(&mut self) {
         self.tick = (self.tick + 1).min(FADE_TICKS);
     }
+
+    /// Thousandths of the fade's time gone, 1000 once it is over.
+    pub fn fade_milli(self) -> u16 {
+        (self.tick * 1000 / FADE_TICKS) as u16
+    }
 }

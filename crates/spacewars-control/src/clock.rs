@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 29;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 30;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -84,6 +84,10 @@ pub struct ClockState {
     /// the run's lamps have done each thing, and what they perceive.
     #[serde(default)]
     pub lamps: Option<engine_common::ClockLampsState>,
+    /// The theme on the face: the theme the settings' choice wears now, the
+    /// one Auto would, and how far the fade to it has come.
+    #[serde(default)]
+    pub theme: Option<engine_common::ClockThemeState>,
     #[serde(default)]
     pub tanks: Option<engine_common::ClockTanksState>,
     pub player_duck: Option<engine_common::ClockPlayerDuckState>,
@@ -477,6 +481,7 @@ mod tests {
             explosion: None,
             coins: None,
             lamps: None,
+            theme: None,
             tanks: None,
             player_duck: None,
             automatic_events_suspended: false,

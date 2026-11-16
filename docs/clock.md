@@ -292,7 +292,7 @@ where the beam falls steeply onto the minutes.
 Controls, is Lively by default. Steady keeps both lamps at rest whatever goes
 on, and an outage under way skips to its warm-up. Lively lamps act under every
 event profile, Off included, where they follow a player's duck. The setting is
-saved with the others. In Scenario Settings it sits between Date and Fonts; in
+saved with the others. In Scenario Settings it sits between Date and Theme; in
 Clock Controls the top row makes room for it between Profile and Fonts, its
 buttons narrowed so the profile still shows Demo whole, and Left and Right
 switch it, as they do Time and Date.
@@ -987,14 +987,56 @@ the [480×800 portrait](screenshots/clock/theme-480x800-christmas.png).
 | --- | --- |
 | ![The Clock Chase marquee in Christmas: a gold trail running over warm-white cells, the others dimmed](screenshots/clock/theme-800x480-christmas-marquee.png) | ![The middle of the fade: mint digits halfway between cyan and warm white, a mauve date line and PM mark, and the string half lit](screenshots/clock/theme-800x480-fade.png) |
 
-**Not yet.** There is no Theme setting (#458, #461), so ordinary Clock keeps
-Normal. Fixtures choose a theme through `ClockConfig::theme`, and the client
-takes `SPACEWARS_CLOCK_THEME=christmas` (or `auto`) when the Clock starts. A
-running Clock takes a new choice through `ClockAction::set_theme` (kind 10, a
-version and one byte: 0 Auto, 1 Normal, 2 Christmas), which only tests send for
-now. While the time is unknown, Auto shows Normal, since there is no date to
-pick by (#257), and a chosen Christmas dresses the `--:--` face. Halloween's
-look (#456) and its October nights wait until next year.
+**Setting.** **Theme**, in Clock's Scenario Settings and in the live Clock
+Controls, is Auto, Normal or Christmas. Auto is the default, and settings saved
+before there was a Theme read as Auto. Auto wears Christmas on December nights,
+from 6 pm on each December evening until 6 am the next morning, so its last
+night ends at 6 am on January 1; at any other time it wears Normal. While the
+time is unknown, Auto shows Normal, since there is no date to pick by (#257).
+Normal and Christmas hold all year, and a chosen Christmas dresses the `--:--`
+face. Halloween's look (#456) and its October nights wait until next year, and
+until then no Halloween choice is offered.
+
+In Scenario Settings, Theme sits between Lamps and Fonts in a row of five
+buttons, where the time format became a **Time** button so that its value still
+shows in the portrait view. In Clock Controls, Theme ends the recipe's row:
+Down from the recipe reaches it, and Down again reaches Preview & Resume. Left
+and Right switch it, as they do Time, Date and Lamps, and a press or a tap
+moves it on. While Theme is selected, the page says what Auto does, "Auto:
+Christmas on December nights, 6 pm to 6 am.", in Scenario Settings in place of
+the subtitle and in Clock Controls in place of the status line.
+
+| Clock Controls | Scenario Settings |
+| --- | --- |
+| ![Theme Christmas, selected, at the end of the recipe's row in the paused Clock's controls, with "Auto: Christmas on December nights, 6 pm to 6 am." under the row](screenshots/clock/theme-800x480-live-controls.png) | ![Theme Christmas, selected, between Lamps and Fonts in the launcher's Clock settings, with the same line in place of the subtitle](screenshots/clock/theme-800x480-launcher-controls.png) |
+
+Both at [1024×768](screenshots/clock/theme-1024x768-live-controls.png)
+([settings](screenshots/clock/theme-1024x768-launcher-controls.png)) and in the
+[480×800 portrait](screenshots/clock/theme-480x800-live-controls.png)
+([settings](screenshots/clock/theme-480x800-launcher-controls.png)).
+
+The theme is saved with the other settings, through the same guarded path, so
+it stays across a restart, a change of scenario and a new day, and a failed
+save reports as theirs do. The live controls change settings while the Clock is
+paused: the face heads for the new theme and holds its fade at the start, and
+the fade's half second runs once the Clock does. Switching back to Auto goes by
+the latest reading, without waiting for the next. A change of theme changes
+only the look.
+Fixtures still choose a theme through `ClockConfig::theme`, which is Normal
+unless they choose another. The development variable `SPACEWARS_CLOCK_THEME` is
+gone, and so is the action that carried a theme on its own (kind 10, which is
+not reused): the theme travels with the other settings in Configure.
+
+**Diagnostics.** `clock state --json` carries the choice as the settings'
+`theme` (`auto`, `normal` or `christmas`) and a `theme` block: `theme`, the
+theme the face wears now or is fading to; `auto`, the theme Auto would wear at
+the latest reading; and `fade_milli`, the thousandths of the fade's half second
+gone since the theme last changed, 1000 once it is over. A pause holds it.
+Text `clock state` prints them on one line:
+
+```text
+Theme: Auto; wears=Christmas auto=Christmas fade=1000
+```
 
 **Cost.** At 800×480 the string adds 219 primitives to the idle face's 472: 11
 wires, 10 clips and 33 bulbs. Building the frame takes about 7.5 µs more (19.5
@@ -1025,8 +1067,11 @@ the IDs, and the fade:
 - rapid changes never jumping, and settling on the last;
 - unknown time taking Auto to Normal and back, with no reading made up;
 - the first frame wearing the theme at once;
-- `SetTheme` carrying each choice and refusing anything else;
-- a Demo-profile twin that changes theme a dozen times, during this seed's
+- the settings carrying each choice, and the old theme action refused;
+- the state reporting the theme, what Auto would wear and the fade, held by a
+  pause and running after it, and Auto at an unknown time;
+- a Demo-profile twin that changes theme a dozen times through the settings,
+  during this seed's
   events and between them, while a player sits in and the host pauses, keeping
   the same events, IDs, ages, cooldowns, visitors, bodies, surfaces and lamps,
   tick for tick, and the same frame once it is back on Normal.
@@ -1065,7 +1110,22 @@ in Christmas.
 draws Color Cycle, Explosion and Clock Chase in both themes, finds Normal's
 cyan in each Normal picture and in no Christmas one, and draws the fade at its
 middle. Set `SPACEWARS_CLOCK_ARTIFACTS` to save their pictures; the ones above
-come from the last two.
+come from the last two, and the controls' from
+`ui_render_tests::the_theme_control_and_what_auto_does_show_on_both_settings_pages`,
+which draws both settings pages with Theme selected at each size and finds the
+line about Auto in each.
+
+The setting's tests are
+`settings::tests::theme_is_auto_in_old_settings_and_round_trips_every_choice`,
+`clock_controls::tests::theme_control_cycles_the_choices_both_ways_and_changes_nothing_else`,
+the keyboard, touch and navigation tests of both pages, and two functional
+tests through the public controls.
+`clock::live_clock_controls_preserve_events_preview_and_persist_across_restart_and_relaunch`
+chooses Normal in the paused Clock Controls while saving fails, and finds it
+on the face and the failure on the page. It then chooses Christmas, finds the
+save made and the fade held at the start, and finds Christmas again after a
+restart and a relaunch, worn from the first frame. `clock::marquee_recipes_preview_pause_persist_and_restore_live_clock`
+walks the D-pad from the recipe to Theme and back.
 
 ## Events
 
@@ -2583,7 +2643,7 @@ admission waits for its existing visit to end. During a spider visit it cycles
 Color Cycle and Digit Slide, the events that keep the digits where they are,
 and a request for any other reports that the spider is visiting; another
 Spider admission waits for its visit to end, and the spider itself waits for a
-duck, a crow or an event it would not keep live. Preferences are unchanged. The Clock action protocol is version 14; `NextEvent`
+duck, a crow or an event it would not keep live. Preferences are unchanged. The Clock action protocol is version 15; `NextEvent`
 (kind 6) has no payload after the version prefix.
 Physical cabinet mappings are documented in [Picade controls](picade.md).
 
@@ -3954,7 +4014,7 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **29** and reports scenario-instance revision,
+`clock state` uses schema version **30** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`, `warning`, `exploding`), pause state, profile, schedule, current
@@ -4042,14 +4102,15 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 28 and
-older requests are rejected. The internal Clock action payload is version 14;
+after completion or cancellation. Use matching client/CLI builds: schema 29 and
+older requests are rejected. The internal Clock action payload is version 15;
 event ordinals 0–9 are unchanged; Cell Swap is 10. Configure contains a
 little-endian u16 switch mask (bits 0–15, one for each event),
 validated recipe and rain-amount bytes, a `show_date` byte (0/1),
 font ID, rotation (0/1) and nonempty four-bit font-pool bytes, a crow-water-tolerance
-byte (0 Varied, 1 Shy, 2 Hardy), a lamps byte (0 Steady, 1 Lively), and 1–32 message
-bytes. Reading actions contain either three time bytes or those
+byte (0 Varied, 1 Shy, 2 Hardy), a lamps byte (0 Steady, 1 Lively), a theme byte
+(0 Auto, 1 Normal, 2 Christmas), and 1–32 message bytes. Kind 10 carried a theme
+on its own in version 14 and is not reused. Reading actions contain either three time bytes or those
 same bytes followed by a little-endian u16 year and u8 month/day. Actions of
 any other version are rejected. Observation version 2 appends `show_date`, year/month/day
 to the existing time/format fields; an absent date is four zero bytes.
@@ -4078,7 +4139,7 @@ arena's counts, claims, run totals and last step, and `clock events` shows each
 event's refusal.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 29, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 30, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -4095,7 +4156,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 29, `event`
+tick. A raw `clock trigger` request must include schema version 30, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, `cell-swap`, `grass`, `slot-machine`, `spider`, `coins`, or `tanks`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 

@@ -898,6 +898,7 @@ fn show_launcher(
         settings.clock.crow_water_tolerance.label().into(),
     );
     window.set_launcher_clock_lamps(settings.clock.lamps.label().into());
+    window.set_launcher_clock_theme(settings.clock.theme.label().into());
     window.set_launcher_clock_explosion_enabled(settings.clock.events.explosion);
     window.set_launcher_clock_aquarium_enabled(settings.clock.events.aquarium);
     window.set_launcher_clock_marquee_enabled(settings.clock.events.marquee);
@@ -1670,7 +1671,7 @@ pub(crate) fn launcher_settings_item_count_for(scenario: &str) -> i32 {
         | "spacewars-terrain-travel-duel"
         | "spacewars-terrain-arena"
         | "spacewars-terrain-arena-duel" => 6,
-        "clock" => 25,
+        "clock" => 26,
         "falling" => 1,
         "nes" => 2,
         "surface-expedition"
@@ -1996,6 +1997,12 @@ fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
         let labels = engine_common::ClockLampMode::ALL.map(|mode| mode.label());
         let next = cycle_label(window.get_launcher_clock_lamps().as_str(), &labels, delta);
         window.set_launcher_clock_lamps(next.into());
+        return;
+    }
+    if focus == 24 {
+        let labels = engine_common::ClockThemeChoice::ALL.map(|choice| choice.label());
+        let next = cycle_label(window.get_launcher_clock_theme().as_str(), &labels, delta);
+        window.set_launcher_clock_theme(next.into());
         return;
     }
     if focus == 19 {
@@ -2703,6 +2710,10 @@ fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String>
             .into_iter()
             .find(|mode| mode.label() == window.get_launcher_clock_lamps().as_str())
             .ok_or("Unknown Clock lamp mode")?,
+        theme: engine_common::ClockThemeChoice::ALL
+            .into_iter()
+            .find(|choice| choice.label() == window.get_launcher_clock_theme().as_str())
+            .ok_or("Unknown Clock theme")?,
         marquee_message: window
             .get_launcher_clock_marquee_message()
             .as_str()
@@ -4494,6 +4505,7 @@ mod tests {
                 rain_amount: engine_common::ClockRainAmount::Heavy,
                 crow_water_tolerance: engine_common::ClockCrowWaterTolerance::Hardy,
                 lamps: engine_common::ClockLampMode::Steady,
+                theme: engine_common::ClockThemeChoice::Christmas,
             },
             spacewars: SpacewarsSettings {
                 universe_radius: 2400,

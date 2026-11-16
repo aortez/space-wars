@@ -754,6 +754,9 @@ export component MainWindow inherits Window {
     in-out property <bool> launcher-clock-crow-enabled: true;
     in-out property <string> launcher-clock-crow-water-tolerance: "Varied";
     in-out property <string> launcher-clock-lamps: "Lively";
+    in-out property <string> launcher-clock-theme: "Auto";
+    // What Auto does, shown while Theme is selected (#458, #461).
+    property <string> clock-theme-help: "Auto: Christmas on December nights, 6 pm to 6 am.";
     in-out property <bool> launcher-clock-explosion-enabled: true;
     in-out property <bool> launcher-clock-aquarium-enabled: true;
     in-out property <bool> launcher-clock-marquee-enabled: true;
@@ -1699,7 +1702,7 @@ export component MainWindow inherits Window {
                 ChoiceRow {
                     x: 0px;
                     y: 230px;
-                    width: parent.width;
+                    width: parent.width - 98px;
                     height: 44px;
                     label: "Recipe";
                     label-fraction: 0.25;
@@ -1709,11 +1712,25 @@ export component MainWindow inherits Window {
                     previous => { root.ingame-clock-adjust(10, -1); }
                     next => { root.ingame-clock-adjust(10, 1); }
                 }
+                // Theme ends the recipe's row, as Crow and Explosion end the
+                // preview's, in a size that shows Christmas whole.
+                MenuButton {
+                    x: parent.width - 90px;
+                    y: 230px;
+                    width: 90px;
+                    height: 44px;
+                    text-size: 14px;
+                    text-padding: 6px;
+                    text: "Theme\n" + root.launcher-clock-theme;
+                    selected: root.ingame-clock-focus-index == 25;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(25, 1); }
+                }
                 Text {
                     y: 276px;
                     width: parent.width;
                     height: 20px;
-                    text: root.clock-controls-pending ? "Applying…" : root.settings-save-pending ? "Saving settings…" : root.clock-settings-error != "" ? root.clock-settings-error : "Saved. Preview runs now, even if Off.";
+                    text: root.clock-controls-pending ? "Applying…" : root.settings-save-pending ? "Saving settings…" : root.clock-settings-error != "" ? root.clock-settings-error : root.ingame-clock-focus-index == 25 ? root.clock-theme-help : "Saved. Preview runs now, even if Off.";
                     color: root.clock-settings-error != "" ? #ffb0a0 : #80d8ff;
                     font-size: 13px;
                     overflow: elide;
@@ -2019,7 +2036,7 @@ export component MainWindow inherits Window {
                 // Scenario-specific forms retain their existing geometry in this pass.
                 height: Math.min(parent.height - 24px, root.launcher-controls-visible || root.launcher-settings-visible ? 440px : root.width < 600px ? 580px : 520px);
                 heading: root.launcher-settings-visible ? "Scenario Settings" : root.launcher-controls-visible ? "Controls" : "Space-Wars";
-                subtitle: root.launcher-error-text != "" ? root.launcher-error-text : self.show-save-error ? "Save failed. Retry Save in App Settings." : root.launcher-settings-visible && root.launcher-material-match ? "World seed: " + root.launcher-seed-text : root.launcher-controls-visible || root.launcher-settings-visible ? root.launcher-scenario-title : root.autostart-caption != "" ? root.autostart-caption : "Choose a scenario";
+                subtitle: root.launcher-error-text != "" ? root.launcher-error-text : self.show-save-error ? "Save failed. Retry Save in App Settings." : root.launcher-settings-visible && root.launcher-material-match ? "World seed: " + root.launcher-seed-text : root.launcher-settings-visible && root.launcher-scenario == "clock" && root.launcher-settings-focus-index == 24 ? root.clock-theme-help : root.launcher-controls-visible || root.launcher-settings-visible ? root.launcher-scenario-title : root.autostart-caption != "" ? root.autostart-caption : "Choose a scenario";
                 error: root.launcher-error-text != "" || self.show-save-error;
                 hint: root.launcher-controls-visible || root.launcher-settings-visible ? "" : root.launcher-focus-index == 0 ? (self.width < 600px ? "Left / Right browse · A confirm" : "Left / Right browse · A / Enter confirm · Start plays") : self.width < 600px ? "D-pad move · A select · Tap to choose" : "D-pad / arrows move · A / Enter selects · Tap to choose";
 
@@ -2460,52 +2477,60 @@ export component MainWindow inherits Window {
                         height: parent.height;
                         background: transparent;
 
-                        ChoiceRow {
+                        // Time, Date, the lamps, the theme and fonts share the
+                        // row as five buttons, so each shows its value whole on
+                        // the portrait panel too.
+                        MenuButton {
                             x: 0px;
                             y: 52px;
-                            width: (parent.width - 12px) / 2;
-                            height: 48px;
-                            label: "Time Format";
-                            value: root.launcher-clock-time-format;
-                            selected: root.launcher-settings-focus-index == 2;
-                            previous => {
-                                root.launcher-settings-focus-index = 2;
-                                root.ui-action(2);
-                            }
-                            next => {
-                                root.launcher-settings-focus-index = 2;
-                                root.ui-action(3);
-                            }
-                        }
-
-                        // Date, the lamps and fonts share the row's other half.
-                        MenuButton {
-                            x: parent.width / 2 + 6px;
-                            y: 52px;
-                            width: (parent.width - 44px) / 6;
+                            width: (parent.width - 32px) / 5;
                             height: 48px;
                             text-size: parent.width < 500px ? 13px : 16px;
+                            text-padding: 2px;
+                            text: "Time\n" + root.launcher-clock-time-format;
+                            selected: root.launcher-settings-focus-index == 2;
+                            activated => { root.launcher-settings-focus-index = 2; root.ui-action(3); }
+                        }
+                        MenuButton {
+                            x: (parent.width + 8px) / 5;
+                            y: 52px;
+                            width: (parent.width - 32px) / 5;
+                            height: 48px;
+                            text-size: parent.width < 500px ? 13px : 16px;
+                            text-padding: 2px;
                             text: "Date\n" + (root.launcher-clock-show-date ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 12;
                             activated => { root.launcher-settings-focus-index = 12; root.ui-action(3); }
                         }
                         MenuButton {
-                            x: parent.width / 2 + 14px + (parent.width - 44px) / 6;
+                            x: 2 * (parent.width + 8px) / 5;
                             y: 52px;
-                            width: (parent.width - 44px) / 6;
+                            width: (parent.width - 32px) / 5;
                             height: 48px;
                             text-size: parent.width < 500px ? 13px : 16px;
-                            text-padding: 4px;
+                            text-padding: 2px;
                             text: "Lamps\n" + root.launcher-clock-lamps;
                             selected: root.launcher-settings-focus-index == 23;
                             activated => { root.launcher-settings-focus-index = 23; root.ui-action(3); }
                         }
                         MenuButton {
-                            x: parent.width / 2 + 22px + 2 * (parent.width - 44px) / 6;
+                            x: 3 * (parent.width + 8px) / 5;
                             y: 52px;
-                            width: (parent.width - 44px) / 6;
+                            width: (parent.width - 32px) / 5;
                             height: 48px;
                             text-size: parent.width < 500px ? 13px : 16px;
+                            text-padding: 2px;
+                            text: "Theme\n" + root.launcher-clock-theme;
+                            selected: root.launcher-settings-focus-index == 24;
+                            activated => { root.launcher-settings-focus-index = 24; root.ui-action(3); }
+                        }
+                        MenuButton {
+                            x: 4 * (parent.width + 8px) / 5;
+                            y: 52px;
+                            width: (parent.width - 32px) / 5;
+                            height: 48px;
+                            text-size: parent.width < 500px ? 13px : 16px;
+                            text-padding: 2px;
                             text: "Fonts";
                             selected: root.launcher-settings-focus-index == 15;
                             activated => { root.clock-fonts-open(); }
@@ -2827,7 +2852,7 @@ export component MainWindow inherits Window {
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 24 : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 6 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 25 : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 6 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }

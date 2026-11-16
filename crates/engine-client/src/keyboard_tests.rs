@@ -1030,6 +1030,19 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(window.get_ingame_clock_focus_index(), 3);
     key(&window, Key::Return);
     assert_eq!(adjusted.get(), Some((3, 1)));
+    // Theme ends the recipe's row: Down walks from the recipe to it and on to
+    // Preview & Resume, and Left and Right adjust it.
+    window.set_ingame_clock_focus_index(10);
+    key(&window, Key::DownArrow);
+    assert_eq!(window.get_ingame_clock_focus_index(), 25);
+    key(&window, Key::Return);
+    assert_eq!(adjusted.get(), Some((25, 1)));
+    key(&window, Key::LeftArrow);
+    assert_eq!(adjusted.get(), Some((25, -1)));
+    assert_eq!(window.get_ingame_clock_focus_index(), 25);
+    key(&window, Key::DownArrow);
+    assert_eq!(window.get_ingame_clock_focus_index(), 6);
+    window.set_ingame_clock_focus_index(0);
     let resumes = Rc::new(Cell::new(0));
     let resumed = Rc::clone(&resumes);
     window.on_ingame_resume(move || resumed.set(resumed.get() + 1));
@@ -1114,8 +1127,11 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(adjusted.get(), Some((12, 1)));
     click(&window, 175.0, 292.0);
     assert_eq!(adjusted.get(), Some((9, 1)));
-    click(&window, 649.0, 338.0);
+    // The recipe shares its row with Theme, at its end.
+    click(&window, 550.0, 338.0);
     assert_eq!(adjusted.get(), Some((10, 1)));
+    click(&window, 631.0, 338.0);
+    assert_eq!(adjusted.get(), Some((25, 1)));
     // Each event switch in the lower row remains directly hittable.
     click(&window, 404.0, 292.0);
     assert_eq!(adjusted.get(), Some((21, 1)));
@@ -1128,9 +1144,24 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     window.set_launcher_visible(true);
     window.set_launcher_settings_visible(true);
     assert!(window.get_launcher_clock_digit_slide_enabled());
-    click(&window, 480.0, 168.0);
+    // Time, Date, Lamps, Theme and Fonts share a row of five buttons.
+    click(&window, 112.0, 168.0);
+    assert_eq!(window.get_launcher_clock_time_format(), "12-hour");
+    assert_eq!(window.get_launcher_settings_focus_index(), 2);
+    click(&window, 256.0, 168.0);
     assert!(window.get_launcher_clock_show_date());
     assert_eq!(window.get_launcher_settings_focus_index(), 12);
+    click(&window, 400.0, 168.0);
+    assert_eq!(window.get_launcher_clock_lamps(), "Steady");
+    assert_eq!(window.get_launcher_settings_focus_index(), 23);
+    for expected in ["Normal", "Christmas", "Auto"] {
+        click(&window, 544.0, 168.0);
+        assert_eq!(window.get_launcher_clock_theme(), expected);
+        assert_eq!(window.get_launcher_settings_focus_index(), 24);
+    }
+    fonts_opened.set(false);
+    click(&window, 688.0, 168.0);
+    assert!(fonts_opened.get());
     // The six event choices keep their existing control identities.
     assert!(window.get_launcher_clock_tanks_enabled());
     click(&window, 660.0, 220.0);
