@@ -178,6 +178,14 @@ pub struct Impact {
     pub collider: ColliderId,
     pub point: Vec2,
     pub velocity: Vec2,
+    /// Where the shell's energy went once it hit and burst, in Scorched's
+    /// units.
+    pub ledger: engine_material::SourceLedger,
+    /// Work each tank's armor took from the shell, by slot.
+    pub absorbed: [f32; 2],
+    /// Energy of the hit stopped by a body outside the material model, such
+    /// as terrain: reported, not charged.
+    pub unmodeled: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -409,7 +417,7 @@ impl HostedDuel {
         self.duel.shells.iter().map(|shell| ShellState {
             source: ShotSource {
                 owner: self.duel.tanks[shell.owner].body.entity,
-                id: shell.flight.expect("hosted shot has a source").source_id(),
+                id: shell.source.id(),
             },
             position: self.duel.placement.point_to_world(shell.position),
             velocity: shell.velocity * self.duel.placement.scale,

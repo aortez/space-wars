@@ -114,16 +114,36 @@ impl Duel {
         true
     }
 
+    #[cfg(test)]
     pub(super) fn explode(&mut self, physics: &mut PhysicsWorld, point: Vec2) {
         self.explode_from(physics, point, None);
     }
 
+    /// A burst at `point` without a shell, such as a scripted charge: its
+    /// payload alone. A bot hears of damage when `owner` is the other tank.
+    #[cfg(test)]
     pub(super) fn explode_from(
         &mut self,
         physics: &mut PhysicsWorld,
         point: Vec2,
         owner: Option<usize>,
     ) {
+        let before = self.tanks.map(|tank| tank.health);
+        let owner_entity = owner.map(|slot| self.tanks[slot].body.entity.value());
+        let mut source = armor::charge(0, owner_entity);
+        self.burst(physics, point, point, &mut source);
+        self.notify_hits(owner, before);
+    }
+
+    /// A burst's crater and pushes at `point`, and its payload released from
+    /// `center` into the tanks' armor. Returns the work each tank's armor took.
+    pub(super) fn burst(
+        &mut self,
+        physics: &mut PhysicsWorld,
+        point: Vec2,
+        center: Vec2,
+        source: &mut Source,
+    ) -> [f32; 2] {
         self.impacts += 1;
         self.flashes.push((point, self.tick));
         self.release_material(physics, point);
@@ -148,27 +168,14 @@ impl Duel {
         .apply(physics, bodies);
         // Combat damage is independent of whether the bounded material pool
         // admitted this edit. Capacity cannot make a tank invulnerable.
-        for (player, tank) in self.tanks.iter_mut().enumerate() {
-            if self.retired[player].is_some() {
-                continue;
-            }
-            let mut motion = physics.motion(tank.body).unwrap();
-            motion.position = self.placement.point_from_world(motion.position);
-            let distance = motion.position.distance_to(point);
-            if distance < 6.0 {
-                let before = tank.health;
-                tank.health = (tank.health - 42.0 * (1.0 - distance / 6.0)).max(0.0);
-                if owner.is_some_and(|owner| owner != player) && tank.health < before {
-                    self.bots[player].hit(self.tick, before - tank.health);
-                }
-            }
-        }
+        let absorbed = self.release_payload(physics, center, source);
         RadialImpulse {
             center: self.placement.point_to_world(point),
             radius: 6.0 * self.placement.scale,
             speed: 4.0 * self.placement.scale,
         }
         .apply(physics, self.tanks.iter().map(|t| t.body));
+        absorbed
     }
 
     pub fn slumping_diagnostics(&self) -> engine_rapier::terrain::SlumpingDiagnostics {

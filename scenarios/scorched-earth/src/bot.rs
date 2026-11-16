@@ -60,10 +60,6 @@ pub(super) struct Flight {
 }
 
 impl Flight {
-    pub(crate) fn source_id(&self) -> u64 {
-        self.launch.id
-    }
-
     pub fn observe(&mut self, from: Vec2, to: Vec2, target: Vec2) {
         self.target_moved |= target.distance_to(self.launch.target) > 1.5;
         self.closest = self

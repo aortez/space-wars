@@ -171,6 +171,7 @@ impl Duel {
                 speed: 32.0,
                 facing: if index == 0 { 1.0 } else { -1.0 },
                 health: 100.0,
+                armor: armor::armor(),
                 next_shot: if config.course.is_some() {
                     u64::MAX
                 } else if config.hillside || config.roof {
@@ -311,12 +312,14 @@ impl Duel {
             .map_or(muzzle, |hit| hit.point);
         let velocity = tank.direction() * tank.speed + motion.linear_velocity;
         let flight = self.record_launch(physics, player, position, velocity, position != muzzle);
+        let owner = Some(tank.body.entity.value());
         self.shells.push(Shell {
             owner: player,
             position,
             velocity,
             age: 0,
             flight: Some(flight),
+            source: armor::shell(self.shots + 1, owner, velocity.length()),
         });
         self.tanks[player].next_shot = self.tick + 75;
         self.tanks[player].shots += 1;
@@ -423,12 +426,14 @@ impl Duel {
                 && self.shells.len() < MAX_SHELLS
             {
                 let phase = (self.shots % 9 + self.seed % 9) % 9;
+                let velocity = Vec2::new(0.0, -8.0);
                 self.shells.push(Shell {
                     owner: (self.shots % 2) as usize,
                     position: Vec2::new(-24.0 + phase as f32 * 6.0, 24.0),
-                    velocity: Vec2::new(0.0, -8.0),
+                    velocity,
                     age: 10,
                     flight: None,
+                    source: armor::shell(self.shots + 1, None, velocity.length()),
                 });
                 self.shots += 1;
             }
@@ -460,7 +465,7 @@ impl Duel {
         let retired = self.retired;
         self.shells.retain_mut(|shell| {
             let movement = shell.velocity * DT + Vec2::new(0.0, -0.5 * GRAVITY * DT * DT);
-            let hit = physics.cast_ray(
+            let world_hit = physics.cast_ray(
                 placement.point_to_world(shell.position),
                 movement,
                 RayCastOptions {
@@ -469,7 +474,7 @@ impl Duel {
                     ..Default::default()
                 },
             );
-            let hit = hit.map(|mut hit| {
+            let hit = world_hit.map(|mut hit| {
                 hit.point = placement.point_from_world(hit.point);
                 hit
             });
@@ -494,16 +499,7 @@ impl Duel {
                 } else {
                     "terrain"
                 };
-                self.impact_events.push(host::Impact {
-                    source: host::ShotSource {
-                        id: shell.flight.map_or(0, |f| f.source_id()),
-                        owner: self.tanks[shell.owner].body.entity,
-                    },
-                    collider: hit.collider,
-                    point: placement.point_to_world(hit.point),
-                    velocity: shell.velocity * placement.scale,
-                });
-                finished.push((*shell, hit.point, kind, true));
+                finished.push((shell.clone(), hit.point, kind, world_hit));
                 return false;
             }
             shell.position += movement;
@@ -513,26 +509,35 @@ impl Duel {
                 shell.age < SHELL_LIFETIME_TICKS && placement.bounds.contains(shell.position);
             if !alive {
                 finished.push((
-                    *shell,
+                    shell.clone(),
                     shell.position,
                     if shell.age >= SHELL_LIFETIME_TICKS {
                         "expired"
                     } else {
                         "out of bounds"
                     },
-                    false,
+                    None,
                 ));
             }
             alive
         });
-        for (shell, point, kind, impact) in finished {
+        for (mut shell, point, kind, hit) in finished {
             let health = self.tanks.map(|tank| tank.health);
-            if impact {
-                if shell.flight.is_some() {
-                    self.explode_from(physics, point, Some(shell.owner));
-                } else {
-                    self.explode(physics, point);
-                }
+            if let Some(hit) = hit {
+                let struck = self.strike(physics, shell.velocity, &mut shell.source, point, &hit);
+                self.notify_hits(shell.flight.is_some().then_some(shell.owner), health);
+                self.impact_events.push(host::Impact {
+                    source: host::ShotSource {
+                        id: shell.source.id(),
+                        owner: self.tanks[shell.owner].body.entity,
+                    },
+                    collider: hit.collider,
+                    point: hit.point,
+                    velocity: shell.velocity * self.placement.scale,
+                    ledger: shell.source.ledger(),
+                    absorbed: struck.absorbed,
+                    unmodeled: struck.unmodeled,
+                });
             }
             self.record_outcome(shell, point, kind, health);
         }

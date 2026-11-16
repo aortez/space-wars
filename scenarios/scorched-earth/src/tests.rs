@@ -460,6 +460,7 @@ fn swept_shell_hits_ground_instead_of_skipping_through_it() {
         velocity: Vec2::new(0.0, -1000.0),
         age: 10,
         flight: None,
+        source: armor::shell(1, None, 1000.0),
     });
     step(&mut state, &[]);
     assert!(state.shells.is_empty());
