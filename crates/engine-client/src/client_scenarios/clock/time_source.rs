@@ -1,7 +1,7 @@
 //! Where the Clock learns whether it may show the host's time (#257).
 use std::io;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -9,12 +9,13 @@ use spacewars_control::device_time::{STATUS_SOCKET, time_usable};
 
 /// How often the device service is asked.
 const POLL: Duration = Duration::from_secs(1);
-/// The longest one question may take.
+/// How long each read or write of one question may wait.
 const CALL: Duration = Duration::from_secs(2);
-/// The longest the first question may hold up the Clock's first frame.
+/// The longest the first answer may hold up the Clock's first frame.
 const FIRST_CALL: Duration = Duration::from_millis(250);
-/// A verdict outlives the service's silence this long, so a restart or a busy
-/// moment doesn't blank the face. After it, the time is unknown.
+/// A verdict outlives the service's silence this long, so a busy moment
+/// doesn't blank the face. After it, the time is unknown. The service takes
+/// longer than this to restart, so a restart shows `--:--` until it answers.
 const HOLD: Duration = Duration::from_secs(5);
 
 /// Decides whether the Clock may show the host's time.
@@ -70,31 +71,45 @@ impl DeviceTime {
             .clone()
     }
 
-    /// Asks the service at `path` once before returning, waiting at most
-    /// `FIRST_CALL`, so a kiosk whose time is good never opens on `--:--`.
-    /// Then asks every `poll` on a thread of its own. Until an answer comes,
-    /// and once `hold` has passed without one, the time is unknown: a kiosk
-    /// never falls back to trusting the host's clock.
+    /// Asks the service at `path` on a thread of its own, at once and then
+    /// every `poll`, and waits at most `FIRST_CALL` for the first answer
+    /// before returning. A kiosk whose service answers promptly opens on its
+    /// time rather than on `--:--`, and a stuck service can't hold the Clock
+    /// up for longer than that. Until an answer comes, and once `hold` has
+    /// passed without one, the time is unknown: a kiosk never falls back to
+    /// trusting the host's clock.
     pub(crate) fn watch(path: PathBuf, poll: Duration, hold: Duration) -> Arc<Self> {
         let device = Arc::new(Self {
             latest: Mutex::new(None),
             hold,
         });
-        let mut said = device.hear(time_usable(&path, FIRST_CALL), None);
+        let (answered, first_answer) = mpsc::channel();
         let watcher = Arc::downgrade(&device);
         let spawned = thread::Builder::new()
             .name("clock-device-time".into())
             .spawn(move || {
+                let mut answered = Some(answered);
+                let mut said = None;
                 loop {
-                    thread::sleep(poll);
+                    let answer = time_usable(&path, CALL);
                     let Some(device) = watcher.upgrade() else {
                         return;
                     };
-                    said = device.hear(time_usable(&path, CALL), said);
+                    said = device.hear(answer, said);
+                    drop(device);
+                    if let Some(answered) = answered.take() {
+                        let _ = answered.send(());
+                    }
+                    thread::sleep(poll);
                 }
             });
-        if let Err(error) = spawned {
-            tracing::error!(%error, "cannot watch the device service; the time will be unknown");
+        match spawned {
+            Ok(_) => {
+                let _ = first_answer.recv_timeout(FIRST_CALL);
+            }
+            Err(error) => {
+                tracing::error!(%error, "cannot watch the device service; the time will be unknown");
+            }
         }
         device
     }
@@ -196,7 +211,36 @@ mod tests {
         let _listener = UnixListener::bind(&path).unwrap();
         let asked = Instant::now();
         let device = DeviceTime::watch(path, Duration::from_secs(3600), Duration::from_secs(60));
-        assert!(asked.elapsed() < CALL, "{:?}", asked.elapsed());
+        assert!(asked.elapsed() < BRIEFLY, "{:?}", asked.elapsed());
+        assert!(!device.usable());
+    }
+
+    /// Well under the stuck service's 5 seconds, with room for a busy machine.
+    const BRIEFLY: Duration = Duration::from_millis(FIRST_CALL.as_millis() as u64 + 750);
+
+    #[test]
+    fn a_service_that_never_finishes_its_answer_holds_the_first_frame_up_only_briefly() {
+        // It sends a byte every 50 milliseconds for 5 seconds, so no single
+        // read ever waits long enough to time out.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("status.sock");
+        let listener = UnixListener::bind(&path).unwrap();
+        thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                thread::spawn(move || {
+                    for _ in 0..100 {
+                        if stream.write_all(b" ").is_err() {
+                            return;
+                        }
+                        thread::sleep(Duration::from_millis(50));
+                    }
+                });
+            }
+        });
+        let asked = Instant::now();
+        let device = DeviceTime::watch(path, Duration::from_secs(3600), Duration::from_secs(60));
+        assert!(asked.elapsed() < BRIEFLY, "{:?}", asked.elapsed());
         assert!(!device.usable());
     }
 
@@ -215,7 +259,7 @@ mod tests {
         // believed only for the hold.
         let verdict = Arc::new(AtomicU8::new(USABLE));
         let (_dir, path) = service(verdict.clone());
-        let device = DeviceTime::watch(path, Duration::from_millis(10), Duration::from_millis(300));
+        let device = DeviceTime::watch(path, Duration::from_millis(10), Duration::from_secs(2));
         eventually(&device, true);
         verdict.store(NO_ANSWER, Ordering::SeqCst);
         thread::sleep(Duration::from_millis(100));

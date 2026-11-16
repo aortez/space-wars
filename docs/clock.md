@@ -800,13 +800,16 @@ lit. There is no date line and no AM/PM in either format, and Auto shows Normal.
 The time format and the font keep their settings.
 
 **Who vouches for it.** On the Pi kiosk the client asks the device service
-(#256) through `/run/spacewars-system/status.sock`: once before the Clock's
-first frame, waiting at most a quarter of a second, and then once a second on
-a thread of its own. The service vouches for the time after a confirmed
-network sync or a retained RTC, and `engine-os-manager status` shows its
-verdict as `time.usable`. Until an answer comes, and once 5 seconds pass
-without one, the time is unknown: a kiosk never falls back to its own clock
-because the service is missing. A desktop keeps its OS clock, and tests never ask the
+(#256) through `/run/spacewars-system/status.sock`, on a thread of its own:
+at once, and then once a second. The Clock's first frame waits at most a
+quarter of a second for the first answer, so a service that answers promptly
+opens the Clock on its time, and a stuck one can't hold it up longer. The
+service vouches for the time after a confirmed network sync or a retained RTC,
+and `engine-os-manager status` shows its verdict as `time.usable`. Until an
+answer comes, and once 5 seconds pass without one, the time is unknown: a
+kiosk never falls back to its own clock because the service is missing. The
+service restarts 5 seconds after a crash, so a restart shows `--:--` until it
+answers again. A desktop keeps its OS clock, and tests never ask the
 service. `SPACEWARS_CLOCK_TIME=unknown` previews `--:--` anywhere, and
 `SPACEWARS_CLOCK_TIME=host` trusts the host's clock on a kiosk.
 
@@ -824,17 +827,28 @@ face the way it follows any new reading, so an event in flight runs its course
 and settles on the dashes, its water and debris cleaned up as usual. The
 explosion's warning and the coins' minting hold the old time whole before
 anything moves, so they end at once. A slot machine reel that has already
-stopped shows the dash at once instead of its digit.
+stopped shows the dash at once instead of its digit, and its new digit at once
+when the time returns.
 
-While the time is unknown nothing new starts: no automatic event, visit,
-preview, Next or player's duck. A request says "Events wait until the clock
-knows the time". A visit already under way carries on and leaves as it would.
+**What waits.** While the time is unknown, the events that move, reshape or
+replace the digits wait for it: Falling, Meltdown, Marquee, Digit Slide,
+Explosion, Cell Swap, Slot Machine and Coins, whose effect is `digit-geometry`
+or `content`. The rest of the scene carries on as usual. The duck, crow and
+spider visit, Rain, Aquarium, Grass, Tanks and Color Cycle run on schedule and
+on request, and a player's duck comes and goes. The schedule leaves the
+waiting events out instead of queueing them, so with nothing else enabled it
+schedules nothing. A preview, `clock trigger` or Next that asks for one of
+them says "Digit events wait until the clock knows the time"; Next skips them
+when anything else is enabled. The lamps hold the light of the last reading
+instead of jumping to the day; a Clock that has never known the time keeps the
+day.
 
 When the time comes back, the face shows the latest reading straight away, with
 no Digit Slide out of the dashes and no replay of the minutes it missed. The
-schedule starts a fresh wait rather than firing the deadline that passed
-meanwhile. Pause freezes the scene as usual; the client keeps watching the
-service, and resume uses its latest answer.
+digit events return to the schedule, which starts a fresh wait if it is idle
+rather than fire a deadline that passed meanwhile. Pause freezes the scene as
+usual; the client keeps watching the service, and resume uses its latest
+answer.
 
 **The dashes.** Classic lights its middle bar. Matrix uses its 5×7 hyphen,
 three cells wide and two tall, which sits a column right as Matrix's other bars
@@ -853,8 +867,10 @@ digit cells, so it lights only cells the face already draws dim.
 
 **Diagnostics.** `clock state --json` carries `time_unknown`. While it is true,
 `reading`, `date` and `date_label` are null, and so is every slot of
-`display_digits`. The state's schema is 29. `spacewars-cli clock state` prints
-`Time: unknown, showing --:--`.
+`display_digits`. Each entry of `events` carries `blocked_by_unknown_time`,
+true for the events that wait. In `slot_machine.target_digits` and
+`cell_swap.to_digits`, 10 stands for a dash. The state's schema is 29.
+`spacewars-cli clock state` prints `Time: unknown, showing --:--`.
 
 **Tests.** The scenario's `unknown_time_tests` hold:
 
@@ -864,18 +880,34 @@ digit cells, so it lights only cells the face already draws dim.
 - a steady colon, and a new font reaching the dashes;
 - the time returning without a slide;
 - repeated updates changing nothing during Rain;
-- nothing starting, and no notice showing on its own, while the time is
-  unknown, every request answered with the notice, and a fresh wait after it;
+- which events wait;
+- the digit events waiting through a minute of Demo with no notice on its own,
+  every request for one answered with the notice, a fresh wait once the time
+  returns, and nothing starting when the time is lost a tick before a
+  deadline;
+- the rest of the scene carrying on: three minutes of Demo, every other event
+  on a preview and a trigger, and Next, all over the dashes;
+- a refused Next leaving an open grass ceiling be;
+- a player's duck joining while the time is unknown, and one that joined
+  before being sent home once it's lost;
+- the lamps holding their light;
 - every timed event losing the time as it starts and at 5, 50 and 90%, never
   resting on the old time again and ending exactly like a clock that never
   knew it;
-- a stopped reel showing the dash, and visits carrying on.
+- Cell Swap and Marquee's clock presets taking the dashes at once;
+- every timed event getting the time back mid-event and ending like a clock
+  that only ever knew the new time;
+- a stopped reel showing the dash, and its digit again when the time returns,
+  and visits carrying on.
 
 `font_tests` holds each font's dash. In the client, `unknown_time_tests` checks
 the state report and the adapter's actions, and rasterizes every font at
 800×480, 1024×768 and 480×800: one thin band across the middle of the digits,
-and no AM/PM. `time_source` tests the watcher against a stand-in service,
-including the first answer arriving before the first frame, and
+and no AM/PM. `ipc` checks that `clock trigger` refuses only the digit events,
+with the reason, and `host` that a live trigger of one is turned down while the
+pause menu's preview still reaches the Clock. `time_source` tests the watcher against a stand-in service,
+including the first answer arriving before the first frame and a service that
+never finishes its answer holding the first frame up only briefly, and
 `spacewars-control`'s `device_time` tests the socket reader. Set
 `SPACEWARS_CLOCK_ARTIFACTS` to save the pictures; the ones above come from
 `every_face_draws_its_dashes_in_the_rasters_pixels`.
@@ -3862,7 +3894,7 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **28** and reports scenario-instance revision,
+`clock state` uses schema version **29** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`, `warning`, `exploding`), pause state, profile, schedule, current
@@ -3950,7 +3982,7 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 27 and
+after completion or cancellation. Use matching client/CLI builds: schema 28 and
 older requests are rejected. The internal Clock action payload is version 14;
 event ordinals 0–9 are unchanged; Cell Swap is 10. Configure contains a
 little-endian u16 switch mask (bits 0–15, one for each event),
@@ -3986,7 +4018,7 @@ arena's counts, claims, run totals and last step, and `clock events` shows each
 event's refusal.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 28, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 29, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -4003,7 +4035,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 28, `event`
+tick. A raw `clock trigger` request must include schema version 29, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, `cell-swap`, `grass`, `slot-machine`, `spider`, `coins`, or `tanks`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 

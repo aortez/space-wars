@@ -1223,6 +1223,15 @@ fn validate_clock_trigger(
     } else if clock
         .events
         .iter()
+        .any(|event| event.kind == request.event && event.blocked_by_unknown_time)
+    {
+        Some((
+            ControlFailureCode::ActionUnavailable,
+            "Digit events wait until the clock knows the time",
+        ))
+    } else if clock
+        .events
+        .iter()
         .any(|event| event.kind == request.event && event.blocked_by_duck)
     {
         Some((
@@ -1718,6 +1727,75 @@ fn write_rgba_png(
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_trigger_waits_for_the_time_only_if_the_event_works_on_the_digits() {
+        use crate::client_scenarios::{ScenarioStartMode, registration};
+        use crate::render::Viewport;
+        use engine_common::{ClockEventKind, Settings};
+        use scenario_clock::ClockAction;
+        let mut scenario = registration("clock")
+            .unwrap()
+            .create(
+                42,
+                &Settings::default(),
+                Viewport::new(800.0, 480.0),
+                ScenarioStartMode::Normal,
+            )
+            .unwrap();
+        scenario.step(&[ClockAction::set_time_unknown()], Duration::ZERO);
+        let mut clock = scenario.clock_state().unwrap();
+        clock.scenario_revision = 7;
+        let ui = UiState {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            revision: 1,
+            screen: UiScreen::Gameplay,
+            active_scenario: Some("clock".into()),
+            selected_scenario: "clock".into(),
+            selected_control: None,
+            controls: vec![],
+            actions: vec![],
+            scenario_revision: Some(7),
+            paused: false,
+            benchmark_active: false,
+            error: None,
+        };
+        assert!(clock.time_unknown);
+        assert!(clock.can_trigger);
+        let waiting: Vec<_> = clock
+            .events
+            .iter()
+            .filter(|entry| entry.blocked_by_unknown_time)
+            .map(|entry| entry.kind)
+            .collect();
+        assert_eq!(
+            waiting,
+            [
+                ClockEventKind::Falling,
+                ClockEventKind::Meltdown,
+                ClockEventKind::Marquee,
+                ClockEventKind::DigitSlide,
+                ClockEventKind::Explosion,
+                ClockEventKind::CellSwap,
+                ClockEventKind::SlotMachine,
+                ClockEventKind::Coins,
+            ]
+        );
+        for entry in &clock.events {
+            let request = ClockTriggerRequest::new(&clock, entry.kind);
+            let result = validate_clock_trigger(&request, &ui, &clock);
+            if entry.blocked_by_unknown_time {
+                let failure = result.unwrap_err();
+                assert_eq!(failure.code, ControlFailureCode::ActionUnavailable);
+                assert_eq!(
+                    failure.message,
+                    "Digit events wait until the clock knows the time"
+                );
+            } else {
+                result.unwrap();
+            }
+        }
+    }
 
     #[test]
     fn player_duck_event_restrictions_are_public_and_trigger_failures_are_explicit() {

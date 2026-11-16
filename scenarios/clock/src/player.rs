@@ -116,8 +116,9 @@ impl ClockState {
     }
 
     pub(super) fn toggle_player_duck(&mut self, player: u8) {
-        if self.reading.is_none() {
-            self.refuse_while_time_unknown();
+        // A player's duck is the room's own business, so it comes and goes
+        // whether or not the clock knows the time.
+        if !self.heard_the_time() {
             return;
         }
         if self.event_kind() == Some(ClockEventKind::Tanks) {

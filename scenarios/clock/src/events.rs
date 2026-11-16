@@ -129,6 +129,13 @@ pub enum EventEffect {
 }
 
 impl EventEffect {
+    /// Whether the event moves, reshapes or replaces what the digits show.
+    /// Such an event waits while the time is unknown (#257), since it would
+    /// only play over `--:--`. The rest of the scene carries on.
+    pub const fn waits_for_the_time(self) -> bool {
+        matches!(self, Self::DigitGeometry | Self::Content)
+    }
+
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::DigitGeometry => "digit-geometry",
@@ -848,15 +855,6 @@ impl EventSchedule {
                 self.schedule_next();
             }
             self.preserve_periodic_deadline = false;
-        }
-    }
-
-    /// Starts a fresh wait when the time comes back after being unknown, so
-    /// the deadline that passed while the clock waited doesn't fire the moment
-    /// the face returns. A running event or its cooldown keeps its own course.
-    pub fn restart_wait(&mut self) {
-        if self.lifecycle == EventLifecycle::Idle && !self.preserve_periodic_deadline {
-            self.schedule_next();
         }
     }
 

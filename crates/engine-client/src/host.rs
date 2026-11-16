@@ -222,6 +222,7 @@ impl ScenarioControls {
                         && !entry.blocked_by_tanks
                         && !entry.blocked_by_crow
                         && !entry.blocked_by_spider
+                        && !entry.blocked_by_unknown_time
                 })
         }) {
             return false;
@@ -248,11 +249,12 @@ impl ScenarioControls {
     }
 
     pub fn request_clock_preview(&mut self, event: engine_common::ClockEventKind) -> bool {
+        // While the time is unknown the scenario decides, and says why an
+        // event on the digits has to wait.
         if self.request.is_some()
-            || !self
-                .clock_state
-                .as_ref()
-                .is_some_and(|state| state.paused && state.reading.is_some())
+            || !self.clock_state.as_ref().is_some_and(|state| {
+                state.paused && (state.reading.is_some() || state.time_unknown)
+            })
         {
             return false;
         }
@@ -2867,6 +2869,24 @@ mod tests {
         controls.publish_clock_state(&scenario, 7, true);
         assert!(!controls.request_clock_event(ClockEventKind::Marquee));
         assert!(controls.request_clock_preview(ClockEventKind::Marquee));
+    }
+
+    #[test]
+    fn while_the_time_is_unknown_only_digit_events_wait() {
+        use engine_common::ClockEventKind;
+        use scenario_clock::ClockAction;
+        let mut scenario = hosted_scenario("clock", 42).unwrap();
+        scenario.step(&[ClockAction::set_time_unknown()], Duration::ZERO);
+        let mut controls = ScenarioControls::default();
+        controls.publish_clock_state(&scenario, 7, false);
+        assert!(controls.clock_state().unwrap().can_trigger);
+        assert!(!controls.request_clock_event(ClockEventKind::Falling));
+        assert!(controls.request_clock_event(ClockEventKind::Rain));
+        controls.request = None;
+        // The pause menu's preview reaches the clock, which says why an event
+        // on the digits has to wait.
+        controls.publish_clock_state(&scenario, 7, true);
+        assert!(controls.request_clock_preview(ClockEventKind::Falling));
     }
 
     fn render_test_window() -> MainWindow {

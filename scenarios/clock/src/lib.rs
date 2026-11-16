@@ -534,9 +534,12 @@ pub struct ClockState {
     config: ClockConfig,
     reading: Option<ClockReading>,
     /// The time's source said it can't be trusted, and no reading has come
-    /// since. The face shows `--:--`, no reading or date is kept, and nothing
-    /// new starts until a reading arrives.
+    /// since. The face shows `--:--`, no reading or date is kept, and events
+    /// on the digits wait until a reading arrives.
     time_unknown: bool,
+    /// The latest reading, kept while the time is unknown, so the lamps hold
+    /// their light instead of jumping to the day.
+    lamp_reading: Option<ClockReading>,
     date_label: Option<String>,
     display: DisplaySnapshot,
     segments: Vec<SegmentState>,
@@ -1534,6 +1537,28 @@ impl ClockState {
             || self.event_blocked_by_spider(kind)
             || self.event_blocked_by_arena(kind).is_some()
             || kind == ClockEventKind::Grass && self.ceiling.phase != ceiling::Phase::Closed
+            || self.event_blocked_by_unknown_time(kind)
+    }
+
+    /// While the time is unknown, an event that works on the digits waits for
+    /// it (#257). Visitors and the rest of the scene carry on.
+    pub fn event_blocked_by_unknown_time(&self, kind: ClockEventKind) -> bool {
+        self.time_unknown && EVENT_CATALOG[kind as usize].effect.waits_for_the_time()
+    }
+
+    /// Whether the clock has word on the time: a reading, or that there's
+    /// none it can trust.
+    fn heard_the_time(&self) -> bool {
+        self.reading.is_some() || self.time_unknown
+    }
+
+    /// While the time is unknown, whether every enabled event waits for it.
+    fn every_enabled_event_waits_for_the_time(&self) -> bool {
+        let mut enabled = ClockEventKind::ALL
+            .into_iter()
+            .filter(|kind| self.config.events.enabled(*kind))
+            .peekable();
+        enabled.peek().is_some() && enabled.all(|kind| self.event_blocked_by_unknown_time(kind))
     }
 
     /// The crow leaves the arena with its perches.
@@ -1563,7 +1588,7 @@ impl ClockState {
         }
     }
     pub fn can_trigger_event(&self) -> bool {
-        self.reading.is_some() && self.lifecycle() == EventLifecycle::Idle
+        self.heard_the_time() && self.lifecycle() == EventLifecycle::Idle
     }
 
     pub fn rain_state(&self) -> Option<engine_common::ClockRainState> {
@@ -1583,7 +1608,7 @@ impl ClockState {
     fn trigger_event(&mut self, kind: ClockEventKind) {
         if self.can_trigger_event() && !self.event_blocked(kind) {
             self.start_event(kind);
-        } else if self.time_unknown {
+        } else if self.event_blocked_by_unknown_time(kind) {
             self.refuse_while_time_unknown();
         } else if kind == ClockEventKind::Tanks {
             let notice = self.event_blocked_by_arena(kind).map_or(
@@ -1594,8 +1619,8 @@ impl ClockState {
         }
     }
 
-    /// Why nothing starts while the face shows `--:--`.
-    const TIME_UNKNOWN_NOTICE: &'static str = "Events wait until the clock knows the time";
+    /// Why an event on the digits doesn't start while the face shows `--:--`.
+    const TIME_UNKNOWN_NOTICE: &'static str = "Digit events wait until the clock knows the time";
 
     /// Says why a request did nothing, if the time is unknown.
     fn refuse_while_time_unknown(&mut self) {
@@ -1608,9 +1633,9 @@ impl ClockState {
     }
 
     fn preview_event(&mut self, kind: ClockEventKind) {
-        if self.reading.is_none() {
+        if self.event_blocked_by_unknown_time(kind) {
             self.refuse_while_time_unknown();
-        } else {
+        } else if self.heard_the_time() {
             if self.event_blocked_by_tanks(kind) {
                 self.event_notice = Some(("Tanks is using the arena", self.schedule.tick + 120));
                 return;
@@ -1670,9 +1695,14 @@ impl ClockState {
     }
 
     fn next_event(&mut self) {
-        self.cancel_ceiling();
-        if self.reading.is_none() {
+        // With only events on the digits enabled, nothing can start while the
+        // time is unknown; Next says so and leaves an open ceiling be.
+        if self.every_enabled_event_waits_for_the_time() {
             self.refuse_while_time_unknown();
+            return;
+        }
+        self.cancel_ceiling();
+        if !self.heard_the_time() {
             return;
         }
         let kinds = ClockEventKind::ALL;
@@ -1966,7 +1996,7 @@ impl ClockState {
         let stepping = if self.active_event.is_some() {
             true
         } else {
-            if let Some(kind) = self.schedule.due_event(self.reading.is_some()) {
+            if let Some(kind) = self.schedule.due_event(self.heard_the_time()) {
                 self.trigger_event(kind);
             }
             // A newly inserted shared batch must be advanced/read back with
@@ -2126,8 +2156,9 @@ impl ClockState {
     }
 
     /// The share of their light the lamps give at the reading's time of day.
+    /// While the time is unknown they hold the light of the last reading.
     pub(crate) fn lamp_output(&self) -> f32 {
-        lamps::light::output(lamps::light::daylight(self.reading))
+        lamps::light::output(lamps::light::daylight(self.lamp_reading))
     }
 
     /// What the lamps give the plants this tick.
@@ -2316,8 +2347,11 @@ impl ClockState {
             self.date_label = reading.date.map(ClockDate::label);
         }
         self.reading = Some(reading);
+        self.lamp_reading = Some(reading);
+        // The digit events come back into the schedule, which starts a fresh
+        // wait if it is idle rather than fire a deadline that passed meanwhile.
         if std::mem::take(&mut self.time_unknown) {
-            self.schedule.restart_wait();
+            self.sync_event_schedule();
         }
         self.show(next, minute_changed);
         if slide && let Some(kind) = self.schedule.time_change_event() {
@@ -2336,6 +2370,8 @@ impl ClockState {
         self.time_unknown = true;
         self.reading = None;
         self.date_label = None;
+        // The digit events leave the schedule until the time returns.
+        self.sync_event_schedule();
         let next = DisplaySnapshot::unknown(self.display.font);
         let changed = self.display.digits != next.digits;
         self.show(next, changed);
@@ -2432,6 +2468,7 @@ impl Scenario for ClockScenario {
             config: config.normalized(),
             reading: None,
             time_unknown: false,
+            lamp_reading: None,
             date_label: None,
             display: DisplaySnapshot::unsynchronized(),
             segments: digits::create_segments(),

@@ -320,6 +320,7 @@ impl ClientScenario for ClockClientScenario {
                     blocked_by_tanks: self.state.event_blocked_by_tanks(event.kind),
                     blocked_by_spider: self.state.event_blocked_by_spider(event.kind),
                     blocked_by_arena: self.state.event_blocked_by_arena(event.kind),
+                    blocked_by_unknown_time: self.state.event_blocked_by_unknown_time(event.kind),
                     automatic_ready_at_tick: self.state.event_ready_at_tick(event.kind),
                 })
                 .collect(),

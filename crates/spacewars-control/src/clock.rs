@@ -34,6 +34,10 @@ pub struct ClockEventInfo {
     /// Why the run's arena would refuse the event now, if it would.
     #[serde(default)]
     pub blocked_by_arena: Option<engine_common::ClockArenaUnavailable>,
+    /// The time is unknown, and this event works on the digits, so it waits
+    /// for the time to come back.
+    #[serde(default)]
+    pub blocked_by_unknown_time: bool,
     pub automatic_ready_at_tick: u64,
 }
 
@@ -574,6 +578,7 @@ mod tests {
             blocked_by_tanks: false,
             blocked_by_spider: false,
             blocked_by_arena: Some(ClockArenaUnavailable::LayoutIncompatible),
+            blocked_by_unknown_time: true,
             automatic_ready_at_tick: 0,
         });
         let json = state.to_json().unwrap();
@@ -583,6 +588,7 @@ mod tests {
             r#"{"kind":"event","event":"falling"}"#,
             r#""last_remap":{"kind":"declined"}"#,
             r#""blocked_by_arena":"layout-incompatible""#,
+            r#""blocked_by_unknown_time":true"#,
         ] {
             assert!(json.contains(named), "{named} in {json}");
         }
@@ -1530,6 +1536,7 @@ mod tests {
             blocked_by_tanks: false,
             blocked_by_spider: false,
             blocked_by_arena: None,
+            blocked_by_unknown_time: false,
             automatic_ready_at_tick: 0,
         });
         assert_eq!(
