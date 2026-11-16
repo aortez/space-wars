@@ -134,6 +134,10 @@
       "reason": "Launcher extra used for development; at about 34 seconds it was the slowest PR case and took PR UI past five minutes. Material Lab's headless scenario and client tests stay on PRs."
     },
     {
+      "test": "material_lab::material_lab_shell_cuts_the_moss_bursts_and_replays_in_both_renderers",
+      "reason": "A shell cuts the moss on its path, strikes an armor plate and bursts, with cross-renderer save/load replay; Material Lab's headless scenario and client tests stay on PRs."
+    },
+    {
       "test": "material_lab::material_lab_split_and_rebuild_keep_damage_across_both_renderers",
       "reason": "Region split, rebuild and second strike on the native response path, with cross-renderer save/load replay; Material Lab's headless scenario and client tests stay on PRs."
     },

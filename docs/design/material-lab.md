@@ -1,12 +1,14 @@
-# Material Lab: loading, recovery, collapse, splits and welds (#327, #328)
+# Material Lab: loading, recovery, collapse, splits, welds and weapons (#327, #328, #329)
 
 `material-lab` is the first application scenario using the bounded native
 [impact-to-support path](material-impact-support.md), its
 [changing-load extension](material-changing-load.md) and the
-[paired-material path](material-paired-compression.md). Two cases instead use
-ordinary steps: one with the [native response](material-native-response.md) to
-show a [region split](material-region-split.md), and one with a
-[connection load](material-connection-loads.md), a weld that gives way. Select
+[paired-material path](material-paired-compression.md). Three cases instead
+use ordinary steps: one with the [native response](material-native-response.md)
+to show a [region split](material-region-split.md), one with a
+[connection load](material-connection-loads.md), a weld that gives way, and one
+with a [weapon source](material-sources.md), a shell fired through moss into a
+plate. Select
 **Show all scenarios** in the launcher, choose **Material Lab**, then start.
 Direct launch:
 
@@ -26,8 +28,9 @@ come from the physical history.
 Next case walks the five load-controlled platen cases, the two
 [free-pair collisions](#free-pair-collisions), then the
 [collapsing support](#collapsing-support), [paired collapse](#paired-collapse),
-[split and rebuild](#split-and-rebuild), and
-[branch gives way](#branch-gives-way), for eleven cases in total.
+[split and rebuild](#split-and-rebuild),
+[branch gives way](#branch-gives-way) and
+[shell through moss](#shell-through-moss), for twelve cases in total.
 
 ## Platen cases and playback
 
@@ -279,6 +282,59 @@ weld takes no more load. Pause, Single step and Save/Load work throughout, and
 Restart returns to an undamaged weld. The run ends at the case's 1024-step
 window if the weld never severs.
 
+## Shell through moss
+
+**Shell through moss** shows a
+[weapon source](material-sources.md#in-the-physics-world) from launch to
+retirement: one shell, with separate finite budgets for its motion and its
+payload, charges the moss it passes, the plate it hits and what its blast
+reaches. The case steps the world normally. The native response is on so the
+plate's armor can be registered, but the shell is bound to no region, so the
+response refuses its arrival and charges nothing; the source charges the hit.
+
+A shell of mass 0.5 and radius 0.25 flies along +x from the origin at 200,
+25/512 per step, with no gravity. Its kinetic budget is 10000, and it carries a
+5000 payload whose blast reaches 6 with a front 1 high. Three tufts of moss
+stand on its path at x = 1.5, 2.5 and 3.5, a fourth in the open at (4.5, 2.5)
+and a fifth behind the plate at (7.5, 0). Each tuft is soft tissue of volume
+0.02 and capacity 1.2, kept by the [tissue adapter](material-tissue.md). A tuft
+the source cuts is lost, and nothing meets it again. The plate is fixed armor,
+1 wide and 4 high with its face at x = 5.5, of volume 4 and capacity 40000.
+Predicted contacts stop the shell at the plate's face within the step that
+reaches it.
+
+Run sends the shell through the moss. Its sweep reaches the first tuft at step
+24 and the third at step 65, and each pass cuts its tuft with 1.2 of work. The
+moss neither slows nor deflects the shell, which keeps exactly 200. The lab
+pauses at step 65 (0.015869140625 s).
+
+Run again, and the shell strikes the plate at step 108 (0.0263671875 s). The
+hit is the impact law's outcome for the shell's casing against the armor at
+200: the plate takes 8310.71, and the casing, of capacity 150, is spent. The
+shell bursts where the solver stopped it, at x = 5.261, and the source retires.
+The plate absorbs 2096.12 of the blast, and the blast cuts the tuft in the open.
+The plate shadows the tuft behind it, which keeps its whole capacity. The plate
+is left with 29593.16, and the run is complete.
+
+The ledger keeps the two parts apart. The kinetic part delivers the passes'
+9.43 and the hit's 10000, more than its budget: the moss is a weak coupling
+that leaves the shell's motion to physics, so the hit is measured at full
+speed. It absorbs 8314.31, the passes and the plate's share of the hit, and
+1434.80 is excess the spent casing could not take. The payload delivers
+2266.87 of its 5000, and the rest leaves through open directions. It absorbs
+2097.32.
+
+The schematic draws the shell, its path, the moss and the plate to scale.
+Intact moss is green, cut moss a grey ring, and an amber star marks the burst.
+The table gives the source's ledger by part (budget, delivered, absorbed and
+excess) and then the work each recipient absorbed: the path moss, the plate's
+hit and blast shares, the tuft in the open and the tuft behind the plate. It
+ends with the plate's capacity left. A caption counts the response batches the
+shell's arrival refused. The load controls refuse with a message. Pause,
+Single step and Save/Load work throughout, and Restart fires a new shell at an
+untouched scene. The run ends at the case's 160-step window if the shell never
+bursts.
+
 ## Save slot
 
 Save pauses the run and replaces `material-lab.bin` in the application's actual
@@ -317,8 +373,10 @@ steps, so the replay repeats them. Its native snapshot keeps the
 response-enabled v3 layout throughout. Branch gives way uses `MATLAB07`, with
 the `MATLAB02` fields and command list even before any load change; the replay
 applies its commands on ordinary steps. Its native snapshot keeps the v1
-layout, with the weld in the connection section. Existing case tags and lab
-envelopes retain their layouts. Native saves retain their v1–v23 compatibility.
+layout, with the weld in the connection section. Shell through moss uses
+`MATLAB08`, with the `MATLAB01` fields and no command list; the replay flies
+the shell again. Its native snapshot keeps the response-enabled v3 layout
+throughout. Existing case tags and lab envelopes retain their layouts. Native saves retain their v1–v23 compatibility.
 
 ## Evidence and limits
 
@@ -386,11 +444,29 @@ the raster renderer and severs again on the same step. It then checks the
 refused load, runs the fall to completion and restarts. It is in the full UI
 suite.
 
+The main shell-case scenario test draws every state. At the pause after the
+last tuft on the path, it checks the cut tufts and each pass's work, the
+shell's speed and course, the untouched plate and the history. At the plate it
+checks the hit against the impact law, the burst, the blast's reach and the
+plate's shadow, the plate's balance, both parts of the ledger with this
+section's figures, and the response's single refusal. With the plate lifted
+clear, another test flies the shell out to the window. A shell bound to a
+region meets a refusal the case does not expect, which stops the run with the
+last valid world. Save tests cover the start, the first pass, the pause and the
+step after, the step before the hit and the completed run, with exact
+continuation. They also cover the `MATLAB08` layout, wrong envelopes and forged
+history. A client test saves at the pause, checks the refused load, runs to
+the burst, restores and bursts again identically. The public UI workflow runs
+to the pause in the vector renderer and saves there. It runs to the burst,
+restores in the raster renderer and bursts again the same way. It then checks
+the refused load and restarts. It is in the full UI suite.
+
 These are bounded demonstrations with two or three bodies. They do not enable
 material response for existing gameplay, add fracture/topology consequences, or
 broaden the native solver's geometry or connection-loading support. The two
 explicit collapse cases demonstrate bounded #328 failure consequences; other
 cases keep their refusal on exhaustion. The split case's fragment is cut by the
-lab, not by a failure, and the branch case's severing removes only its weld. A
-moving rigid platen over one material, and debris after failure, remain later
-Lab slices. #327 remains open.
+lab, not by a failure, and the branch case's severing removes only its weld.
+The shell case's shell stops at its first hard contact, and its blast meets the
+plate as four circles the lab admits. A moving rigid platen over one material,
+and debris after failure, remain later Lab slices. #327 remains open.

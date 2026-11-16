@@ -82,11 +82,11 @@ The PR selection covers:
   Clock launch/disable, and planetary tank driving/pause/rendering, alongside the
   existing shorter Clock event cases.
 
-The **38 full-only cases** retain all their original assertions. They cover all
+The **39 full-only cases** retain all their original assertions. They cover all
 of Garden Lab and Material Lab, launcher extras used for development: their
 short smoke workflows, Garden Lab's long physiology sequence and moss surfaces,
-and Material Lab's free-pair collisions, collapses, region split and welded
-branch. Both labs' headless scenario and client tests still run on PRs; see
+and Material Lab's free-pair collisions, collapses, region split, welded branch
+and shell. Both labs' headless scenario and client tests still run on PRs; see
 [the 2026-11-14 change](#labs-leave-the-pr-selection-2026-11-14). The others
 cover repeated marquee recipes, complete tank fixture/player-choice matrices,
 autostart repetition/relaunch, complete rain/duck/Demo/match lifecycles, and
@@ -140,7 +140,7 @@ or disappear from the full suite.
 **08:23 UTC**. It calls `ci.yml` with one immutable source SHA and `full=true`,
 running every normal PR check plus:
 
-- all **82 UI workflows**, partitioned across four isolated runners, with tests
+- all **86 UI workflows**, partitioned across four isolated runners, with tests
   serial within each runner/display;
 - Clock's **240-visit mixed-event sweep**;
 - all three extended duck sweeps: jumping profiles, authored patterns and platform seeds;

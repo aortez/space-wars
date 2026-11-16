@@ -48,7 +48,7 @@ fn snapshot(h: &mut FunctionalHarness, predicate: impl Fn(&Value) -> bool) -> Va
     }
 }
 fn physics(v: &Value) -> Value {
-    json!({"case":v["case"],"steps":v["steps"],"summary":v["summary"],"remaining":v["remaining"],"events":v["events"],"impacts":v["impacts"],"separations":v["separations"],"weight":v["weight"],"gravity_impulse":v["gravity_impulse"],"load_changes":v["load_changes"],"pair":v["pair"],"capacity":v["capacity"],"failure":v["failure"],"paired_failure":v["paired_failure"],"split":v["split"],"branch":v["branch"]})
+    json!({"case":v["case"],"steps":v["steps"],"summary":v["summary"],"remaining":v["remaining"],"events":v["events"],"impacts":v["impacts"],"separations":v["separations"],"weight":v["weight"],"gravity_impulse":v["gravity_impulse"],"load_changes":v["load_changes"],"pair":v["pair"],"capacity":v["capacity"],"failure":v["failure"],"paired_failure":v["paired_failure"],"split":v["split"],"branch":v["branch"],"shell":v["shell"]})
 }
 fn launch(h: &mut FunctionalHarness, mut s: UiState, renderer: &str) -> UiState {
     s = h.activate_until_scenario("material-lab", s);
@@ -685,6 +685,101 @@ fn material_lab_branch_holds_then_gives_way_and_replays_in_both_renderers() {
         assert_eq!(end["branch"]["load"], severed["branch"]["load"]);
         assert_eq!(end["events"], severed["events"]);
         h.capture_screenshot("branch-fallen-raster.png");
+        choose(h, &mut s, &mut control, 2);
+        let restarted = snapshot(h, |v| v["steps"] == 0);
+        assert_eq!(physics(&restarted), physics(&initial));
+        assert_eq!(restarted["paused"], true);
+    });
+}
+fn shell(v: &Value, field: &str) -> f64 {
+    v["shell"][field].as_f64().unwrap()
+}
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn material_lab_shell_cuts_the_moss_bursts_and_replays_in_both_renderers() {
+    run_functional_test_with_seed("material-lab-shell", "winit-femtovg", 42, |h| {
+        let ready = h.wait_until_ready();
+        let mut s = launch(h, ready, "vector");
+        let mut control = snapshot(h, |v| v["paused"] == true)["control"]
+            .as_u64()
+            .unwrap();
+        let mut case = scenario_material_lab::Case::default();
+        while case != scenario_material_lab::Case::ShellThroughMoss {
+            choose(h, &mut s, &mut control, 3);
+            case = case.next();
+            // Diagnostics are cached; observe each transition before choosing again.
+            snapshot(h, |v| v["case"] == case.name() && v["steps"] == 0);
+        }
+        let initial = snapshot(h, |v| v["case"] == "Shell through moss");
+        assert_eq!(initial["shell"]["stage"], "Moss");
+        assert_eq!(shell(&initial, "speed"), 200.0);
+        assert_eq!(
+            shell(&initial, "plate_remaining"),
+            shell(&initial, "plate_capacity")
+        );
+        h.capture_screenshot("shell-initial-vector.png");
+        // Run cuts the moss on the shell's path and pauses once the last tuft
+        // is cut, with the shell still at full speed.
+        choose(h, &mut s, &mut control, 0);
+        let past = snapshot(h, |v| v["shell"]["stage"] == "Clear" && v["paused"] == true);
+        assert_eq!(past["steps"], 65);
+        assert_eq!(shell(&past, "speed"), 200.0);
+        assert_eq!(past["events"].as_array().unwrap().len(), 3);
+        assert!(
+            past["guidance"]
+                .as_str()
+                .unwrap()
+                .starts_with("The shell kept its speed")
+        );
+        h.capture_screenshot("shell-past-moss-vector.png");
+        choose(h, &mut s, &mut control, 4);
+        let saved = snapshot(h, |v| {
+            v["storage_status"].as_str().unwrap().starts_with("Saved")
+        });
+        assert_eq!(physics(&saved), physics(&past));
+        // Run strikes the plate; the shell bursts and the run is complete.
+        choose(h, &mut s, &mut control, 0);
+        let end = snapshot(h, |v| v["stopped"].is_string());
+        assert!(end["stopped"].as_str().unwrap().starts_with("Run complete"));
+        assert_eq!(end["storage_status"], end["stopped"]);
+        assert_eq!(end["phase"], "Spent");
+        assert_eq!(end["events"].as_array().unwrap().len(), 6);
+        assert!(shell(&end, "plate_remaining") < shell(&end, "plate_capacity"));
+        assert_eq!(end["shell"]["tufts"][3]["cut"], true);
+        assert_eq!(end["shell"]["tufts"][4]["cut"], false);
+        h.capture_screenshot("shell-burst-vector.png");
+        h.pause_guarded(&s);
+        let host_pause = h.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::PauseMain),
+                ..Default::default()
+            },
+            TRANSITION_TIMEOUT,
+        );
+        h.activate_guarded("pause.return-to-launcher", &host_pause);
+        let ready = h.wait_until_ready();
+        s = launch(h, ready, "raster");
+        control = snapshot(h, |_| true)["control"].as_u64().unwrap();
+        choose(h, &mut s, &mut control, 5);
+        let loaded = snapshot(h, |v| {
+            v["storage_status"].as_str().unwrap().starts_with("Loaded")
+        });
+        assert_eq!(physics(&loaded), physics(&saved));
+        assert_eq!(loaded["paused"], true);
+        h.capture_screenshot("shell-loaded-raster.png");
+        // The restored run strikes and bursts on the same step, the same way.
+        choose(h, &mut s, &mut control, 0);
+        let again = snapshot(h, |v| v["stopped"].is_string());
+        assert_eq!(physics(&again), physics(&end));
+        h.capture_screenshot("shell-burst-raster.png");
+        choose(h, &mut s, &mut control, 7);
+        let refused = snapshot(h, |v| {
+            v["storage_status"]
+                .as_str()
+                .unwrap()
+                .starts_with("The shell case takes no external load")
+        });
+        assert_eq!(physics(&refused), physics(&end));
         choose(h, &mut s, &mut control, 2);
         let restarted = snapshot(h, |v| v["steps"] == 0);
         assert_eq!(physics(&restarted), physics(&initial));
