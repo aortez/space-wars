@@ -12,7 +12,7 @@ use engine_rapier::world::loading::response::ResponseRejection;
 use engine_rapier::world::loading::{CaptureConfig, ContactSource, RegionId, RegionToken};
 use engine_rapier::world::weapon::{
     BeamSpec, Blast, Exclusion, Reachable, Recipient, Recipients, ShotSpec, WeaponError,
-    WeaponEvent, Weapons,
+    WeaponEvent, Weapons, projectile_impact,
 };
 use engine_rapier::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, CollisionGroups,
@@ -918,6 +918,89 @@ fn a_hit_is_measured_from_both_bodies_motion_and_inertia() {
     let m_eff = 1.0 / (1.0 / m + 1.0 / big + 1.0 / inertia);
     let expected = 0.5 * m_eff * f64::from(SPEED).powi(2);
     assert!((f64::from(hit.ledger.available) / expected - 1.0).abs() < 1.0e-3);
+}
+
+#[test]
+fn a_projectile_that_is_not_a_body_is_measured_as_a_shot_is() {
+    let velocity = Vec2::new(SPEED, 0.0);
+    let normal = Vec2::new(1.0, 0.0);
+    let face = Vec2::new(7.5, 0.0);
+    let measure = |world: &PhysicsWorld, mass: f32, velocity: Vec2, entity: u64, point: Vec2| {
+        projectile_impact(
+            world,
+            mass,
+            velocity,
+            collider(entity, 0),
+            None,
+            normal,
+            point,
+        )
+    };
+
+    // A fixed plate doesn't give way, so the projectile's own mass meets it.
+    let mut world = world();
+    plate(&mut world, Some(armor()), &[(0.0, 2.0)]);
+    assert_eq!(
+        measure(&world, SHOT_MASS, velocity, PLATE, face),
+        Some(Impact {
+            closing_speed: SPEED,
+            effective_mass: SHOT_MASS,
+        })
+    );
+    // Moving away, it closes at zero. Without a positive mass or a body there
+    // is no impact.
+    let away = measure(&world, SHOT_MASS, Vec2::new(-SPEED, 0.0), PLATE, face).unwrap();
+    assert_eq!(away.closing_speed, 0.0);
+    assert_eq!(measure(&world, 0.0, velocity, PLATE, face), None);
+    assert_eq!(measure(&world, SHOT_MASS, velocity, PLATE + 1, face), None);
+
+    // A loose plate closing at 10 adds its speed, and its mass shares the
+    // impact's. Motion the host recorded entering the step counts instead of
+    // the plate's motion now.
+    let mut world = crate::world();
+    loose_plate(&mut world, 20.0, Vec2::new(-10.0, 0.0), true);
+    let big = world.body_mass(body(PLATE)).unwrap();
+    let load = measure(&world, SHOT_MASS, velocity, PLATE, face).unwrap();
+    assert_eq!(load.closing_speed, SPEED + 10.0);
+    let m_eff = SHOT_MASS * big / (SHOT_MASS + big);
+    assert!((load.effective_mass / m_eff - 1.0).abs() < 1.0e-6);
+    let mut recorded = world.motion(body(PLATE)).unwrap();
+    recorded.linear_velocity = Vec2::new(-20.0, 0.0);
+    let load = projectile_impact(
+        &world,
+        SHOT_MASS,
+        velocity,
+        collider(PLATE, 0),
+        Some(recorded),
+        normal,
+        face,
+    )
+    .unwrap();
+    assert_eq!(load.closing_speed, SPEED + 20.0);
+
+    // Free to turn and struck 1 wu off its center, it also gives way by its
+    // inertia.
+    let mut world = crate::world();
+    loose_plate(&mut world, 20.0, Vec2::ZERO, false);
+    let inertia = world.dynamic_body_inertia(body(PLATE)).unwrap();
+    let load = measure(&world, SHOT_MASS, velocity, PLATE, Vec2::new(7.5, 1.0)).unwrap();
+    let m_eff = 1.0 / (1.0 / SHOT_MASS + 1.0 / big + 1.0 / inertia);
+    assert!((load.effective_mass / m_eff - 1.0).abs() < 1.0e-6);
+    // Spinning at 5 rad/s, the struck point 1 wu from its center comes at the
+    // projectile at 5 wu/s.
+    let mut spinning = world.motion(body(PLATE)).unwrap();
+    spinning.angular_velocity = 5.0;
+    let load = projectile_impact(
+        &world,
+        SHOT_MASS,
+        velocity,
+        collider(PLATE, 0),
+        Some(spinning),
+        normal,
+        Vec2::new(7.5, 1.0),
+    )
+    .unwrap();
+    assert_eq!(load.closing_speed, SPEED + 5.0);
 }
 
 #[test]
