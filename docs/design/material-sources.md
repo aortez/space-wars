@@ -15,9 +15,10 @@ parts, and each is attributed and accounted separately:
 
 The budgets and the [geometry](#where-the-energy-goes) that divides them are
 in the pure crate. `engine_rapier::world::weapon` flies real shots and beams
-[in a physics world](#in-the-physics-world), and
+[in a physics world](#in-the-physics-world),
 [Material Lab](material-lab.md#shell-through-moss) fires one shell through moss
-into a plate.
+into a plate, and [Scorched](#scorched-tanks) charges its tanks' armor from
+shells it sweeps itself.
 
 ## Deliveries
 
@@ -216,6 +217,34 @@ that moves a weapon onto a source removes that weapon's legacy damage path, so
 no budget is spent through both. Global energy closure waits for the terrain
 migration.
 
+## Scorched tanks
+
+Scorched's shells are not bodies: the duel sweeps each one by ray cast every
+step. For [#331](https://github.com/aortez/space-wars/issues/331) it delivers
+their sources through the pure API rather than `Weapons`, and each tank's armor
+is one region the duel keeps.
+
+- A shell that strikes a tank is measured with `projectile_impact` and charges
+  that tank's armor with its hit. A shell that strikes anything else reports its
+  energy as unmodeled.
+- Its payload bursts a shell's radius off the surface it struck, never inside a
+  tank, and `blast_reach` divides it among the circles standing in for the tanks
+  within 5 units of their surface. Terrain takes no share and shields nothing.
+- A host puts its own recipients in the way through the same `Recipients`
+  trait. A shell passes the tissue it crosses, a burst reaches tissue in one
+  front with the tanks, and other bodies stop the energy that meets them.
+  Regions bound to the world's loading response stop energy the same way,
+  since the native response can't run in a world with gravity.
+- The duel works in Scorched's own units at any placement scale, and sees a
+  host's recipients at that scale: lengths divide by the scale, and a region
+  keeps its material and the share of its capacity it has left. The host is
+  charged the share of its capacity that the same delivery would cost at
+  scale 1.
+
+Contacts charge nothing yet, so a tank that falls or rams something is
+unharmed. They wait on an experiment with measured contacts.
+[Scorched Earth](../scorched-earth.md#armor-and-shells) has the calibration.
+
 ## Once only
 
 - A shot reaches each recipient once. Another report of the same recipient,
@@ -379,3 +408,18 @@ world. It covers:
 - a recipient with a circle the reach geometry refuses, refused while the beam
   and the shot reach the rest;
 - tissue the host keeps no region for, its beam and blast shares reported.
+
+`scenarios/scorched-earth/src/armor/tests.rs` and `host/tests.rs` cover
+Scorched's shells:
+
+- a hit charged once and a burst released once on both running gears, one
+  payload divided between two tanks, the reach and its bot notices, terrain
+  hits reported and not charged, and bursts kept outside every tank;
+- the calibration: about a third of a tank for a direct hit, so a tank falls to
+  the third or fourth, and near misses costing less the farther they land;
+- the same damage at scales 1 and 3, and a retired tank's share and airborne
+  shell;
+- a host's moss passed once by a shell that then hits as it would without it, a
+  burst shared with moss and stopped by a body in its way, tissue the law
+  refuses stopping energy rather than spoiling the tanks' shares, and moss
+  losing the same share of its capacity at scales 1 and 3.
