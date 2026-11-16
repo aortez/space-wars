@@ -104,13 +104,25 @@ fn wire_at(from: Vec2, to: Vec2, sag: f32, t: f32) -> Vec2 {
 
 /// Hangs the string at `opacity`, from 0 for none to 1 for all of it, so a
 /// change of theme fades it in or out (#457). Its shape is the same at every
-/// opacity.
-pub(super) fn render(frame: &mut RenderFrame, layout: Layout, opacity: f32) {
+/// opacity, and so are its colors under a lightning flash at `flash`, from 0
+/// for none to 1 at full.
+pub(super) fn render(frame: &mut RenderFrame, layout: Layout, opacity: f32, flash: f32) {
     let unit = layout.frame_width;
     let hang = hang(layout);
-    let faded = |color: RenderColor| RenderColor {
-        a: color.a * opacity,
-        ..color
+    // The flash lights only what it cannot see through, and a fading string
+    // is see-through everywhere. So while it fades, the parts that are
+    // opaque at full strength take the flash's light here, and a flash at
+    // either end of the fade lights the string without a jump.
+    let faded = |color: RenderColor| {
+        let color = if opacity < 1.0 && color.a >= 1.0 {
+            lightning::lit(color, LIGHTS_LAYER, flash)
+        } else {
+            color
+        };
+        RenderColor {
+            a: color.a * opacity,
+            ..color
+        }
     };
     for pair in hang.pins.windows(2) {
         let path: Vec<Vec2> = (0..=WIRE_PIECES)
