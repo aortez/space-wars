@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 28;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 29;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -34,6 +34,10 @@ pub struct ClockEventInfo {
     /// Why the run's arena would refuse the event now, if it would.
     #[serde(default)]
     pub blocked_by_arena: Option<engine_common::ClockArenaUnavailable>,
+    /// The time is unknown, and this event works on the digits, so it waits
+    /// for the time to come back.
+    #[serde(default)]
+    pub blocked_by_unknown_time: bool,
     pub automatic_ready_at_tick: u64,
 }
 
@@ -102,8 +106,13 @@ pub struct ClockState {
     /// Host-supplied local civil date, [year, month, day].
     pub date: Option<[u16; 3]>,
     pub date_label: Option<String>,
-    /// Latest target digits, including during a fall. Blank 12-hour slots are null.
+    /// Latest target digits, including during a fall. Blank 12-hour slots are
+    /// null, and so is every slot while the time is unknown.
     pub display_digits: [Option<u8>; 4],
+    /// The face shows `--:--` because the time's source can't vouch for the
+    /// host's time. There is no reading, date or AM/PM meanwhile.
+    #[serde(default)]
+    pub time_unknown: bool,
     pub can_trigger: bool,
     pub trigger_pending: bool,
     pub settings_pending: bool,
@@ -482,6 +491,7 @@ mod tests {
             date: Some([2026, 9, 25]),
             date_label: Some("FRIDAY · SEPTEMBER 25".into()),
             display_digits: [Some(1), Some(2), Some(3), Some(4)],
+            time_unknown: false,
             can_trigger: false,
             trigger_pending: false,
             settings_pending: false,
@@ -568,6 +578,7 @@ mod tests {
             blocked_by_tanks: false,
             blocked_by_spider: false,
             blocked_by_arena: Some(ClockArenaUnavailable::LayoutIncompatible),
+            blocked_by_unknown_time: true,
             automatic_ready_at_tick: 0,
         });
         let json = state.to_json().unwrap();
@@ -577,6 +588,7 @@ mod tests {
             r#"{"kind":"event","event":"falling"}"#,
             r#""last_remap":{"kind":"declined"}"#,
             r#""blocked_by_arena":"layout-incompatible""#,
+            r#""blocked_by_unknown_time":true"#,
         ] {
             assert!(json.contains(named), "{named} in {json}");
         }
@@ -1524,6 +1536,7 @@ mod tests {
             blocked_by_tanks: false,
             blocked_by_spider: false,
             blocked_by_arena: None,
+            blocked_by_unknown_time: false,
             automatic_ready_at_tick: 0,
         });
         assert_eq!(

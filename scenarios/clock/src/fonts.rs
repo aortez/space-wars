@@ -24,6 +24,9 @@ impl CellMask {
 }
 
 pub(crate) fn glyph(font: ClockFont, digit: Option<u8>) -> CellMask {
+    if digit == Some(digits::DASH) {
+        return dash(font);
+    }
     let Some(digit) = digit.filter(|d| *d < 10) else {
         return CellMask(0);
     };
@@ -36,6 +39,18 @@ pub(crate) fn glyph(font: ClockFont, digit: Option<u8>) -> CellMask {
         ClockFont::Sans => SANS[digit as usize],
         ClockFont::Serif => SERIF[digit as usize],
     })
+}
+
+/// Each face's own dash: Classic's middle bar, Matrix's sampled hyphen, and the
+/// hyphens `build.rs` samples from the Sans and Serif outlines in their digits'
+/// box.
+fn dash(font: ClockFont) -> CellMask {
+    match font {
+        ClockFont::Classic => region(font, SegmentKind::Middle),
+        ClockFont::Matrix => sampled(b'-'),
+        ClockFont::Sans => CellMask(SANS_DASH),
+        ClockFont::Serif => CellMask(SERIF_DASH),
+    }
 }
 
 /// Samples the code-native 5x7 text font into a digit slot's 6x9 grid. The

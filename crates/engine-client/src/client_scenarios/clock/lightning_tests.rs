@@ -27,7 +27,8 @@ fn showers(viewport: Viewport, seed: u64) -> [ClockClientScenario; 2] {
         );
         ClockClientScenario {
             state,
-            last_emitted_reading: Cell::new(None),
+            time: super::TimeSource::Host,
+            last_emitted: Cell::new(None),
             benchmark: None,
         }
     })

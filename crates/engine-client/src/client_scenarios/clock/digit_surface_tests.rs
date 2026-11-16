@@ -27,7 +27,8 @@ fn clock_state_publishes_the_digit_surfaces_and_their_lifecycle() {
     );
     let mut scenario = ClockClientScenario {
         state,
-        last_emitted_reading: Cell::new(None),
+        time: super::TimeSource::Host,
+        last_emitted: Cell::new(None),
         benchmark: None,
     };
     let clock = scenario.clock_state().unwrap();
@@ -150,7 +151,8 @@ fn raster_frames_put_markers_on_the_lit_cells_they_ride() {
         );
         let mut scenario = ClockClientScenario {
             state,
-            last_emitted_reading: Cell::new(None),
+            time: super::TimeSource::Host,
+            last_emitted: Cell::new(None),
             benchmark: None,
         };
         let luminance = |pixels: &slint::SharedPixelBuffer<slint::Rgb8Pixel>,

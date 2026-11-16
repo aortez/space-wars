@@ -129,6 +129,13 @@ pub enum EventEffect {
 }
 
 impl EventEffect {
+    /// Whether the event moves, reshapes or replaces what the digits show.
+    /// Such an event waits while the time is unknown (#257), since it would
+    /// only play over `--:--`. The rest of the scene carries on.
+    pub const fn waits_for_the_time(self) -> bool {
+        matches!(self, Self::DigitGeometry | Self::Content)
+    }
+
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::DigitGeometry => "digit-geometry",

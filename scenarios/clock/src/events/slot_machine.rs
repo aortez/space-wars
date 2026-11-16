@@ -13,7 +13,7 @@ use engine_common::{ClockFont, ClockSlotMachinePhase, ClockSlotMachineState};
 use engine_core::Vec2;
 
 use crate::{
-    DIGIT_SLOT_COUNT, DigitPalette, DisplaySnapshot, GridCell,
+    DASH, DIGIT_SLOT_COUNT, DigitPalette, DisplaySnapshot, GridCell,
     digit_surfaces::{
         GRID_CELLS, Glyph, Retirement, SlotIds, SurfaceId, SurfaceLedger, SurfacePose,
         SurfaceSource, bit,
@@ -251,7 +251,10 @@ impl SlotMachineEvent {
     /// A reel still turning adopts a new reading without restarting, so a minute
     /// rolling over mid-spin is invisible and the event lands on live time. A
     /// slot that has already locked keeps what it landed on and follows the
-    /// ordinary face once the event completes.
+    /// ordinary face once the event completes, unless the time is lost: then
+    /// it shows the dash at once, so no digits outlast the time they told.
+    /// When the time returns, a slot locked on the dash shows its new digit
+    /// at once, so no dash outlasts the unknown time either.
     pub fn synchronize(&mut self, display: DisplaySnapshot) {
         if self.display.digits == display.digits && self.display.font == display.font {
             self.display = display;
@@ -259,6 +262,16 @@ impl SlotMachineEvent {
         }
         let turning = (0..DIGIT_SLOT_COUNT).any(|slot| self.locked[slot].is_none());
         self.display = display;
+        for (slot, locked) in self.locked.iter_mut().enumerate() {
+            let follows = if display.is_unknown() {
+                locked.is_some()
+            } else {
+                *locked == Some(Some(DASH))
+            };
+            if follows {
+                *locked = Some(display.digits[slot]);
+            }
+        }
         if turning {
             self.retargets += 1;
         }

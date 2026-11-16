@@ -31,7 +31,8 @@ fn settled(viewport: Viewport, fixture: FixtureStart) -> ClockClientScenario {
     }
     ClockClientScenario {
         state,
-        last_emitted_reading: Cell::new(None),
+        time: super::TimeSource::Host,
+        last_emitted: Cell::new(None),
         benchmark: None,
     }
 }
@@ -177,7 +178,8 @@ fn clock_state_publishes_the_arena_and_why_it_refuses_an_event() {
     assert_eq!(state.admit_arena_fixture(&crowded), Ok(0));
     let mut scenario = ClockClientScenario {
         state,
-        last_emitted_reading: Cell::new(None),
+        time: super::TimeSource::Host,
+        last_emitted: Cell::new(None),
         benchmark: None,
     };
     for _ in 0..60 {

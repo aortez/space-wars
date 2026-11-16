@@ -5,6 +5,11 @@ use crate::ClockReading;
 
 pub const DIGIT_SLOT_COUNT: usize = 4;
 
+/// The glyph a slot shows while the time is unknown: one dash, drawn in the
+/// face's font. Slots hold it in place of a digit, so every path that draws or
+/// builds a slot from its glyph handles it the same way.
+pub const DASH: u8 = 10;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum SegmentKind {
@@ -184,6 +189,23 @@ impl DisplaySnapshot {
             colon_lit: false,
             meridiem: None,
         }
+    }
+
+    /// `--:--`, for a time that can't be trusted: a dash in every slot, a
+    /// steady colon, and no AM/PM in either format. Nothing in it comes from a
+    /// reading, so the colon has no seconds to blink with.
+    pub const fn unknown(font: ClockFont) -> Self {
+        Self {
+            font,
+            digits: [Some(DASH); DIGIT_SLOT_COUNT],
+            colon_lit: true,
+            meridiem: None,
+        }
+    }
+
+    /// Whether this is the face for an unknown time.
+    pub fn is_unknown(&self) -> bool {
+        self.digits == [Some(DASH); DIGIT_SLOT_COUNT]
     }
 }
 

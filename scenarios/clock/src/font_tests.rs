@@ -187,3 +187,34 @@ fn font_settings_round_trip_and_reject_empty_or_unknown_pools() {
         assert_eq!(ClockAction::decode(&Action::scenario(kind, invalid)), None);
     }
 }
+
+#[test]
+fn every_face_has_a_dash_of_its_own_across_the_middle_of_its_digits() {
+    for font in ClockFont::ALL {
+        let dash = fonts::glyph(font, Some(DASH));
+        assert!(dash.cells().count() >= 3, "{font:?}");
+        for digit in 0..10 {
+            assert_ne!(dash, fonts::glyph(font, Some(digit)), "{font:?} {digit}");
+        }
+        // Inside the cells the face keeps for its digits, so the dim grid
+        // behind it and the water's supports under it are already there.
+        assert_eq!(dash.0 & !fonts::guides(font).0, 0, "{font:?}");
+        // One band across the middle rows, between the colon's dots.
+        assert!(
+            dash.cells().all(|cell| (3..=5).contains(&cell.y)),
+            "{font:?}"
+        );
+        // Centred in its slot, but for Matrix, whose bars all sit a column
+        // right, as its own digits' bars do.
+        let mirrored = fonts::CellMask(
+            dash.cells()
+                .fold(0, |mask, cell| mask | 1 << (cell.y * 6 + 5 - cell.x)),
+        );
+        if font == ClockFont::Matrix {
+            let eight = fonts::glyph(font, Some(8));
+            assert!(dash.cells().all(|cell| eight.contains(cell)));
+        } else {
+            assert_eq!(mirrored, dash, "{font:?}");
+        }
+    }
+}

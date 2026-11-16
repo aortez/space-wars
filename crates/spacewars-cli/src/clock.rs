@@ -109,7 +109,7 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
             } else {
                 for event in state.events {
                     println!(
-                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={}, blocked by duck={}, blocked by crow={}, blocked by tanks={}, blocked by spider={}, blocked by arena={})",
+                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={}, blocked by duck={}, blocked by crow={}, blocked by tanks={}, blocked by spider={}, blocked by arena={}, blocked by unknown time={})",
                         event.kind.as_str(),
                         event.label,
                         event.effect,
@@ -124,7 +124,8 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
                         event.blocked_by_spider,
                         event
                             .blocked_by_arena
-                            .map_or("none", ClockArenaUnavailable::as_str)
+                            .map_or("none", ClockArenaUnavailable::as_str),
+                        event.blocked_by_unknown_time
                     );
                 }
             }
@@ -241,7 +242,7 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         println!("{}", state.to_json().map_err(human_error)?);
     } else {
         println!(
-            "Clock: {} / {} / {} / {} (instance {}, event {}, phase tick {}, paused={})\nTime: {:?}; target digits: {:?}\nPhysics: {} bodies, {} colliders; simulation tick {}, next event {:?}; can trigger={}",
+            "Clock: {} / {} / {} / {} (instance {}, event {}, phase tick {}, paused={})\nTime: {}; target digits: {:?}\nPhysics: {} bodies, {} colliders; simulation tick {}, next event {:?}; can trigger={}",
             state.profile,
             state.lifecycle,
             state.event_kind.map_or("none", ClockEventKind::as_str),
@@ -250,7 +251,11 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
             state.event_id,
             state.phase_tick,
             state.paused,
-            state.reading,
+            if state.time_unknown {
+                "unknown, showing --:--".to_owned()
+            } else {
+                format!("{:?}", state.reading)
+            },
             state.display_digits,
             state.body_count,
             state.collider_count,

@@ -23,7 +23,8 @@ fn managed_floor_is_visible_in_renderer_inputs_and_reported_in_clock_state() {
         );
         let mut scenario = ClockClientScenario {
             state,
-            last_emitted_reading: Cell::new(None),
+            time: super::TimeSource::Host,
+            last_emitted: Cell::new(None),
             benchmark: None,
         };
         let mut renderer = crate::raster::RasterRenderer::new();
