@@ -1171,6 +1171,8 @@ fn the_theme_control_and_what_auto_does_show_on_both_settings_pages() {
         event_profile: ClockEventProfile::Demo,
         ..ClockSettings::default()
     };
+    // How wide the line about Auto is on each page, at each size.
+    let mut widths = [Vec::new(), Vec::new()];
     for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
         windows[0].set_size(PhysicalSize::new(width, height));
         let viewport = Viewport::new(width as f32, height as f32);
@@ -1236,6 +1238,25 @@ fn the_theme_control_and_what_auto_does_show_on_both_settings_pages() {
             let at = (top * width) as usize;
             shot.as_slice()[at..at + (rows * width) as usize].to_vec()
         };
+        // How wide a line of text is in its box, `from` to `to` across and
+        // `rows` down from `top`: from the first column anything differs from
+        // the panel beside the box to the last.
+        let ink = |shot: &SharedPixelBuffer<Rgb8Pixel>, top: u32, rows: u32, from: u32, to: u32| {
+            let pixels = shot.as_slice();
+            let panel = pixels[(top * width + from - 12) as usize];
+            let inked: Vec<u32> = (from..to)
+                .filter(|&x| {
+                    (top..top + rows).any(|y| {
+                        let p = pixels[(y * width + x) as usize];
+                        p.r.abs_diff(panel.r)
+                            .max(p.g.abs_diff(panel.g))
+                            .max(p.b.abs_diff(panel.b))
+                            > 40
+                    })
+                })
+                .collect();
+            inked.last().unwrap() - inked.first().unwrap()
+        };
         // The live page's status line says what Auto does while Theme is
         // selected, and that settings save otherwise. The line sits between
         // the recipe's row and Back, in a panel 432 px tall.
@@ -1247,6 +1268,16 @@ fn the_theme_control_and_what_auto_does_show_on_both_settings_pages() {
             band(&shoot(true, 10), status, 20),
             "{width}x{height}"
         );
+        // The panel is 600 px wide, or 32 px narrower than the view, and the
+        // line's box leaves 24 px each side.
+        let panel_width = if width < 632 { width - 32 } else { 600 };
+        widths[0].push(ink(
+            &live,
+            status,
+            20,
+            (width - panel_width) / 2 + 24,
+            (width + panel_width) / 2 - 24,
+        ));
         // The launcher's subtitle says it in place of the scenario's name, in
         // a panel 440 px tall.
         let launcher = shoot(false, 24);
@@ -1256,6 +1287,16 @@ fn the_theme_control_and_what_auto_does_show_on_both_settings_pages() {
             band(&shoot(false, 23), subtitle, 24),
             "{width}x{height}"
         );
+        // The page is at most 760 px wide, and 32 px narrower than the view.
+        // The settings' first row starts 20 px below the subtitle's top.
+        let page_width = (width - 32).min(760);
+        widths[1].push(ink(
+            &launcher,
+            subtitle,
+            20,
+            (width - page_width) / 2 + 24,
+            (width + page_width) / 2 - 24,
+        ));
         if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {
             let directory = std::path::PathBuf::from(directory);
             std::fs::create_dir_all(&directory).unwrap();
@@ -1266,6 +1307,12 @@ fn the_theme_control_and_what_auto_does_show_on_both_settings_pages() {
                 );
             }
         }
+    }
+    // The line is whole at every size. Its box is narrower in portrait, so a
+    // line cut short with an ellipsis would be narrower there too.
+    for widths in widths {
+        assert!(widths[0] > 250, "{widths:?}");
+        assert!(widths.iter().all(|w| *w == widths[0]), "{widths:?}");
     }
 }
 

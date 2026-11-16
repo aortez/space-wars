@@ -1229,6 +1229,30 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     click(&window, 728.0, 376.0);
     assert_eq!(window.get_launcher_clock_marquee_preset(), "Clock chase");
     assert_eq!(window.get_launcher_settings_focus_index(), 10);
+    // Up from the top reaches Back and then Theme. Left and Right switch the
+    // theme, Return moves it on, and Return on Back closes the page.
+    window.set_launcher_settings_focus_index(0);
+    key(&window, Key::UpArrow);
+    assert_eq!(window.get_launcher_settings_focus_index(), 25);
+    key(&window, Key::UpArrow);
+    assert_eq!(window.get_launcher_settings_focus_index(), 24);
+    assert_eq!(window.get_launcher_clock_theme(), "Auto");
+    key(&window, Key::RightArrow);
+    assert_eq!(window.get_launcher_clock_theme(), "Normal");
+    key(&window, Key::LeftArrow);
+    key(&window, Key::LeftArrow);
+    assert_eq!(window.get_launcher_clock_theme(), "Christmas");
+    key(&window, Key::Return);
+    assert_eq!(window.get_launcher_clock_theme(), "Auto");
+    assert_eq!(window.get_launcher_settings_focus_index(), 24);
+    key(&window, Key::DownArrow);
+    assert_eq!(window.get_launcher_settings_focus_index(), 25);
+    key(&window, Key::RightArrow);
+    assert_eq!(window.get_launcher_clock_theme(), "Auto");
+    assert!(window.get_launcher_settings_visible());
+    key(&window, Key::Return);
+    assert!(!window.get_launcher_settings_visible());
+    window.set_launcher_settings_visible(true);
     click(&window, 100.0, 428.0);
     assert!(!window.get_launcher_settings_visible());
 }

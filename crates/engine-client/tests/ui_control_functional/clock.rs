@@ -1362,33 +1362,44 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
         page = harness.change_clock_setting("pause.clock.show-date", "On", &page);
-        assert_eq!(control_value(&page, "pause.clock.lamps"), Some("Lively"));
-        page = harness.change_clock_setting("pause.clock.lamps", "Steady", &page);
+        assert_eq!(control_value(&page, "pause.clock.theme"), Some("Auto"));
+        page = harness.change_clock_setting("pause.clock.theme", "Normal", &page);
         // A theme whose save fails still reaches the face, and the page says
         // the save failed. An owned, empty directory at the destination forces
-        // the failure. The next change saves.
+        // the failure. Christmas turns the face whatever the date: paused, it
+        // heads for Christmas and holds its fade at the start.
         let path = harness.run_path().join("config/settings.toml");
         let backup = harness.run_path().join("config/settings-before-error.toml");
         fs::rename(&path, &backup).unwrap();
         fs::create_dir(&path).unwrap();
-        assert_eq!(control_value(&page, "pause.clock.theme"), Some("Auto"));
         let pending = harness.activate_guarded("pause.clock.theme", &page);
         harness.wait_clock_screen(UiScreen::PauseClock, pending.revision);
         let failed = harness.clock_settings_settled();
         assert!(failed.settings_error.is_some());
         assert_eq!(
             failed.settings.theme,
-            engine_common::ClockThemeChoice::Normal
+            engine_common::ClockThemeChoice::Christmas
+        );
+        let theme = failed.theme.unwrap();
+        assert_eq!(
+            (theme.theme, theme.fade_milli),
+            (engine_common::ClockTheme::Christmas, 0)
         );
         page = harness.state();
         assert_eq!(page.screen, UiScreen::PauseClock);
-        assert_eq!(control_value(&page, "pause.clock.theme"), Some("Normal"));
+        assert_eq!(control_value(&page, "pause.clock.theme"), Some("Christmas"));
         assert!(page.error.is_some());
         fs::remove_dir(&path).unwrap();
         fs::rename(&backup, &path).unwrap();
-        page = harness.change_clock_setting("pause.clock.theme", "Christmas", &page);
+        // The next change, to the lamps, saves the theme with it, and leaves
+        // the fade where it was.
+        assert_eq!(control_value(&page, "pause.clock.lamps"), Some("Lively"));
+        page = harness.change_clock_setting("pause.clock.lamps", "Steady", &page);
         let configured = harness.clock_settings_settled();
         assert_eq!(configured.settings_error, None);
+        let saved: engine_common::Settings =
+            toml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(saved.clock, configured.settings);
         assert!(configured.settings.show_date);
         assert_eq!(
             configured.settings.lamps,
@@ -1398,13 +1409,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
             configured.settings.theme,
             engine_common::ClockThemeChoice::Christmas
         );
-        // Paused, the face heads for Christmas and holds its fade at the
-        // start until it runs again.
-        let theme = configured.theme.unwrap();
-        assert_eq!(
-            (theme.theme, theme.fade_milli),
-            (engine_common::ClockTheme::Christmas, 0)
-        );
+        assert_eq!(configured.theme, failed.theme);
         assert!(configured.date.is_some() && configured.date_label.is_some());
         assert_eq!(configured.scenario_revision, initial.scenario_revision);
         assert_eq!(configured.event_id, paused.event_id);
@@ -1442,6 +1447,12 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         assert_eq!((color.body_count, color.collider_count), (0, 0));
         assert!(!color.paused);
         assert_eq!(color.settings, configured.settings);
+        // Running again, the face has faded to Christmas.
+        let theme = color.theme.unwrap();
+        assert_eq!(
+            (theme.theme, theme.fade_milli),
+            (engine_common::ClockTheme::Christmas, 1000)
+        );
         harness.capture_screenshot("clock-live-preview.png");
 
         // Controller-style navigation reaches the full-width Clock button.
@@ -1531,11 +1542,10 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         let relaunched = harness.clock_state();
         assert_ne!(relaunched.scenario_revision, restarted.scenario_revision);
         assert_eq!(relaunched.settings, configured.settings);
-        // A new run opens on its theme, with no fade from Normal.
-        let theme = relaunched.theme.unwrap();
+        // A new run wears the saved theme.
         assert_eq!(
-            (theme.theme, theme.fade_milli),
-            (engine_common::ClockTheme::Christmas, 1000)
+            relaunched.theme.unwrap().theme,
+            engine_common::ClockTheme::Christmas
         );
         let saved: engine_common::Settings = toml::from_str(
             &fs::read_to_string(harness.run_path().join("config/settings.toml")).unwrap(),

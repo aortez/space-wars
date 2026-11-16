@@ -11,7 +11,7 @@ use crate::ClockReading;
 use crate::presentation::effects::{DigitPalette, smoothstep};
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 /// The hour a season's night starts, on its evening.
 const EVENING: u8 = 18;

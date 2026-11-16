@@ -912,7 +912,7 @@ never finishes its answer holding the first frame up only briefly, and
 `SPACEWARS_CLOCK_ARTIFACTS` to save the pictures; the ones above come from
 `every_face_draws_its_dashes_in_the_rasters_pixels`.
 
-## Themes (#455, #460, #457)
+## Themes (#455, #460, #457, #458, #461)
 
 A theme is the look the Clock wears. **Normal** is the cyan face the Clock has
 always had. **Christmas** (#460) makes the digits warm white over pine-dark
@@ -1071,10 +1071,10 @@ the IDs, and the fade:
 - the state reporting the theme, what Auto would wear and the fade, held by a
   pause and running after it, and Auto at an unknown time;
 - a Demo-profile twin that changes theme a dozen times through the settings,
-  during this seed's
-  events and between them, while a player sits in and the host pauses, keeping
-  the same events, IDs, ages, cooldowns, visitors, bodies, surfaces and lamps,
-  tick for tick, and the same frame once it is back on Normal.
+  during this seed's events and between them, while a player sits in and the
+  host pauses, keeping the same events, IDs, ages, cooldowns, visitors, bodies,
+  surfaces, plants, ceiling and lamps, tick for tick, and the same frame once
+  it is back on Normal.
 
 The string's tests hold:
 
@@ -1094,7 +1094,9 @@ The string's tests hold:
   event. In the middle of a fade, every color on its face is exactly the
   fade's share of the way between the twins' colors there. Once a fade is
   over, it draws exactly what its twin draws, and each ends on the theme it
-  was last given;
+  was last given. All three keep the same world, tick for tick, as the
+  Demo-profile twin compares it: the event, its bodies, the visitors, the
+  residents and the plants;
 - Auto's turn at 18:00 and at 06:00, in the middle of the minute's slide;
 - a notice and a player's tag wearing the date line's color through a fade;
 - the string fading in and out whole, each part as faint as the fade, and a
@@ -1112,8 +1114,9 @@ cyan in each Normal picture and in no Christmas one, and draws the fade at its
 middle. Set `SPACEWARS_CLOCK_ARTIFACTS` to save their pictures; the ones above
 come from the last two, and the controls' from
 `ui_render_tests::the_theme_control_and_what_auto_does_show_on_both_settings_pages`,
-which draws both settings pages with Theme selected at each size and finds the
-line about Auto in each.
+which draws both settings pages with Theme selected at each size. It finds the
+line about Auto only while Theme is selected, and as wide at every size, so no
+size cuts it short.
 
 The setting's tests are
 `settings::tests::theme_is_auto_in_old_settings_and_round_trips_every_choice`,
@@ -1121,11 +1124,13 @@ The setting's tests are
 the keyboard, touch and navigation tests of both pages, and two functional
 tests through the public controls.
 `clock::live_clock_controls_preserve_events_preview_and_persist_across_restart_and_relaunch`
-chooses Normal in the paused Clock Controls while saving fails, and finds it
-on the face and the failure on the page. It then chooses Christmas, finds the
-save made and the fade held at the start, and finds Christmas again after a
-restart and a relaunch, worn from the first frame. `clock::marquee_recipes_preview_pause_persist_and_restore_live_clock`
-walks the D-pad from the recipe to Theme and back.
+chooses Christmas in the paused Clock Controls while saving fails. It finds
+the face heading for Christmas with its fade held at the start, and the failure
+on the page. The next change, to the lamps, saves the theme with it. After
+Preview & Resume the fade has run its course, and Christmas is back after a
+restart and a relaunch.
+`clock::marquee_recipes_preview_pause_persist_and_restore_live_clock` walks the
+D-pad from the recipe to Theme and back.
 
 ## Events
 

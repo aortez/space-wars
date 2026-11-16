@@ -1,5 +1,6 @@
 use super::*;
 use crate::presentation::effects::smoothstep;
+use crate::theme::tests::world;
 use crate::theme::{Appearance, FADE_TICKS};
 use crate::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario, ClockState};
 use engine_common::{
@@ -710,6 +711,11 @@ fn wears_the_theme(kind: ClockEventKind, tweak: impl Fn(&mut ClockConfig)) -> Wo
         let at = format!("{kind:?} tick {}", worn.ticks);
         assert_eq!(busy(&dressed), busy(&normal), "{at}");
         assert_eq!(busy(&turning), busy(&normal), "{at}");
+        // The theme leaves the world alone: the event, its bodies, the
+        // visitors and the residents are the same in all three.
+        let plain = world(&normal);
+        assert_eq!(world(&dressed), plain, "{at}");
+        assert_eq!(world(&turning), plain, "{at}");
         let normal_frame = crate::render::render_frame(&normal);
         let dressed_frame = crate::render::render_frame(&dressed);
         same_scene(&normal_frame, &dressed_frame, layout, true, &at);

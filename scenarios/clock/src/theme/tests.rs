@@ -430,7 +430,10 @@ fn rapid_changes_of_theme_never_jump_and_settle_on_the_last() {
 /// What a theme leaves alone, as the Clock reports it: the event running,
 /// its ID and age, the scheduler's deadline and cooldowns, the visitors, the
 /// arena and its bodies, the digits' surfaces, the lamps and a player's seat.
-fn world(state: &ClockState) -> String {
+/// Everything a theme must leave alone, as text: the events and their
+/// schedule, the arena and its residents, every event's and visitor's
+/// state, the plants, the lamps, the player and the face's content.
+pub(crate) fn world(state: &ClockState) -> String {
     let mut arena = state.arena_state();
     // How long a step took on this machine is no part of the world.
     if let Some(step) = arena.last_step.as_mut() {
@@ -468,10 +471,21 @@ fn world(state: &ClockState) -> String {
                 state.spider_state(),
             ),
             (
+                state.grass_state(),
+                state.rain_state(),
+                state.aquarium_state(),
+                state.slot_machine_state(),
+                state.cell_swap_state(),
+                state.digit_slide_state(),
+                state.floor_mode(),
+            ),
+            (
                 state.lamps_state(),
                 state.player_duck_session(),
                 state.display(),
                 state.segments(),
+                state.active_font(),
+                state.date_label(),
             ),
         )
     )
