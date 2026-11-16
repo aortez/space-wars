@@ -77,35 +77,51 @@ impl Lighting {
         }
     }
 
+    /// The colors and brightness of `cell`, lit from the look's `base`
+    /// (#457): Normal keeps the base, Cycle leaves it and comes back, and a
+    /// sweep or chase runs a golden trail over it.
     pub fn sample(
         self,
+        base: DigitPalette,
         cell: Cell,
         bounds: Bounds,
         seconds: f32,
         progress: f32,
     ) -> (DigitPalette, f32) {
         match self {
-            Self::Normal => (DigitPalette::default(), 1.0),
-            Self::Cycle => (cycle_palette(progress), 1.0),
+            Self::Normal => (base, 1.0),
+            Self::Cycle => (cycle_palette(base, progress), 1.0),
             Self::Sweep | Self::Chase => {
-                let trail = if self == Self::Chase {
-                    (seconds * 0.45 - cell.path - f32::from(cell.group) * 0.10).rem_euclid(1.0)
-                } else {
-                    let x = (cell.center.x - bounds.min.x) / bounds.size().x;
-                    (seconds * 0.22 - x).rem_euclid(1.0)
-                };
-                let strength = (-trail / 0.14).exp();
-                let normal = DigitPalette::default();
+                let strength = self.trail(cell, bounds, seconds);
                 (
                     DigitPalette {
-                        fill: blend(normal.fill, RenderColor::rgb(1.0, 0.79, 0.32), strength),
-                        edge: blend(normal.edge, RenderColor::rgb(1.0, 0.97, 0.77), strength),
-                        ..normal
+                        fill: blend(base.fill, RenderColor::rgb(1.0, 0.79, 0.32), strength),
+                        edge: blend(base.edge, RenderColor::rgb(1.0, 0.97, 0.77), strength),
+                        ..base
                     },
                     0.5 + strength * 0.5,
                 )
             }
         }
+    }
+
+    /// How bright `cell` is, whatever its colors.
+    pub fn brightness(self, cell: Cell, bounds: Bounds, seconds: f32) -> f32 {
+        match self {
+            Self::Normal | Self::Cycle => 1.0,
+            Self::Sweep | Self::Chase => 0.5 + self.trail(cell, bounds, seconds) * 0.5,
+        }
+    }
+
+    /// How strongly a sweep's or a chase's trail lights `cell`, from 0 to 1.
+    fn trail(self, cell: Cell, bounds: Bounds, seconds: f32) -> f32 {
+        let trail = if self == Self::Chase {
+            (seconds * 0.45 - cell.path - f32::from(cell.group) * 0.10).rem_euclid(1.0)
+        } else {
+            let x = (cell.center.x - bounds.min.x) / bounds.size().x;
+            (seconds * 0.22 - x).rem_euclid(1.0)
+        };
+        (-trail / 0.14).exp()
     }
 }
 
@@ -223,23 +239,23 @@ pub(crate) fn smoothstep(t: f32) -> f32 {
     t * t * (3.0 - 2.0 * t)
 }
 
-/// Color Cycle and composed Marquee recipes use the same palette pass.
-pub(crate) fn cycle_palette(progress: f32) -> DigitPalette {
-    let normal = DigitPalette::default();
+/// Color Cycle and composed Marquee recipes use the same palette pass, which
+/// leaves `base` and comes back to it.
+pub(crate) fn cycle_palette(base: DigitPalette, progress: f32) -> DigitPalette {
     let fills = [
-        normal.fill,
+        base.fill,
         RenderColor::rgb(0.72, 0.58, 1.0),
         RenderColor::rgb(1.0, 0.48, 0.72),
         RenderColor::rgb(1.0, 0.82, 0.36),
         RenderColor::rgb(0.57, 0.98, 0.52),
-        normal.fill,
+        base.fill,
     ];
     let position = progress.clamp(0.0, 1.0) * 5.0;
     let index = (position as usize).min(4);
     let t = smoothstep(position - index as f32);
     let edge = |i| {
         if i == 0 || i == 5 {
-            normal.edge
+            base.edge
         } else {
             blend(fills[i], RenderColor::rgb(1.0, 1.0, 1.0), 0.65)
         }
@@ -247,7 +263,7 @@ pub(crate) fn cycle_palette(progress: f32) -> DigitPalette {
     DigitPalette {
         fill: blend(fills[index], fills[index + 1], t),
         edge: blend(edge(index), edge(index + 1), t),
-        ..normal
+        ..base
     }
 }
 

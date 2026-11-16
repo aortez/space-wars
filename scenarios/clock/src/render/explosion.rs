@@ -10,7 +10,8 @@ pub(super) fn render(
     event: &ExplosionEvent,
     layout: Layout,
 ) {
-    let mut palette = DigitPalette::default();
+    let look = state.appearance();
+    let mut palette = look.digits;
     if event.phase() == EventPhase::Warning {
         // One smooth amber pulse, not a strobe or full-screen flash.
         let pulse = (std::f32::consts::PI * event.phase_tick() as f32 / WARNING_TICKS as f32).sin();
@@ -28,7 +29,7 @@ pub(super) fn render(
                 layout.pitch,
                 0.0,
                 0.0,
-                DigitPalette::default(),
+                look.digits,
             );
         }
     }
@@ -37,14 +38,7 @@ pub(super) fn render(
             continue;
         }
         if cell.label {
-            meridiem::pixel(
-                frame,
-                cell.position,
-                cell.side,
-                cell.angle,
-                1.0,
-                LABEL_COLOR,
-            );
+            meridiem::pixel(frame, cell.position, cell.side, cell.angle, 1.0, look.label);
         } else {
             render_square(
                 frame,

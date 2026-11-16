@@ -32,7 +32,7 @@ pub(super) fn render(
         }
     }
     if event.paying_out() {
-        payout(frame, event, layout);
+        payout(frame, event, layout, palette);
         return;
     }
     let height = 9.0 * layout.pitch;
@@ -65,7 +65,7 @@ pub(super) fn render(
 /// The reading the reels landed on, lit by the chase the Marquee already uses.
 /// The cells sit at their resting places with their own brightness sampled per
 /// cell, which is a lighting pattern rather than the reading being put out.
-fn payout(frame: &mut RenderFrame, event: &SlotMachineEvent, layout: Layout) {
+fn payout(frame: &mut RenderFrame, event: &SlotMachineEvent, layout: Layout, base: DigitPalette) {
     let content = Content::clock(event.settled());
     for cell in &content.cells {
         // The colon and the label follow live time and are drawn by the ordinary
@@ -73,7 +73,7 @@ fn payout(frame: &mut RenderFrame, event: &SlotMachineEvent, layout: Layout) {
         if usize::from(cell.group) >= DIGIT_SLOT_COUNT {
             continue;
         }
-        let (palette, brightness) = event.payout_light(*cell);
+        let (palette, brightness) = event.payout_light(base, *cell);
         super::render_square(
             frame,
             Vec2::new(

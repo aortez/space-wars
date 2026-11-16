@@ -115,6 +115,7 @@ pub const CLOCK_ACTION_NEXT_EVENT: u32 = 6;
 pub const CLOCK_ACTION_TOGGLE_PLAYER_DUCK: u32 = 7;
 pub const CLOCK_ACTION_PLAYER_DUCK_INPUT: u32 = 8;
 pub const CLOCK_ACTION_SET_TIME_UNKNOWN: u32 = 9;
+pub const CLOCK_ACTION_SET_THEME: u32 = 10;
 pub use player::ClockDuckInput;
 pub const CLOCK_OBSERVATION_VERSION: u16 = 2;
 
@@ -173,6 +174,9 @@ pub enum ClockAction {
     /// The time's source can't vouch for the host's time. The face shows
     /// `--:--` until the next reading.
     SetTimeUnknown,
+    /// Wear this theme from now on (#457). Only the look changes, fading to
+    /// the theme the choice resolves to.
+    SetTheme(ClockThemeChoice),
     TriggerEvent(ClockEventKind),
     Configure(ClockSettings),
     PreviewEvent(ClockEventKind),
@@ -249,6 +253,12 @@ impl ClockAction {
         )
     }
 
+    pub fn set_theme(choice: ClockThemeChoice) -> Action {
+        let mut payload = CLOCK_ACTION_VERSION.to_le_bytes().to_vec();
+        payload.push(choice as u8);
+        Action::scenario(CLOCK_ACTION_SET_THEME, payload)
+    }
+
     pub fn decode(action: &Action) -> Option<Self> {
         let Action::Scenario { kind, payload } = action else {
             return None;
@@ -266,6 +276,10 @@ impl ClockAction {
             }
             (CLOCK_ACTION_NEXT_EVENT, 2) => Some(Self::NextEvent),
             (CLOCK_ACTION_SET_TIME_UNKNOWN, 2) => Some(Self::SetTimeUnknown),
+            (CLOCK_ACTION_SET_THEME, 3) => ClockThemeChoice::ALL
+                .into_iter()
+                .find(|choice| *choice as u8 == payload[2])
+                .map(Self::SetTheme),
             (CLOCK_ACTION_SET_READING, 5) => {
                 ClockReading::new(payload[2], payload[3], payload[4]).map(Self::SetReading)
             }
@@ -540,6 +554,8 @@ pub struct ClockState {
     /// The latest reading, kept while the time is unknown, so the lamps hold
     /// their light instead of jumping to the day.
     lamp_reading: Option<ClockReading>,
+    /// The look on the face, fading toward the theme the Clock wears (#457).
+    look: theme::Look,
     date_label: Option<String>,
     display: DisplaySnapshot,
     segments: Vec<SegmentState>,
@@ -1118,32 +1134,23 @@ impl ClockState {
             .as_ref()
             .map_or(self.schedule.lifecycle_tick, ActiveEvent::phase_tick)
     }
-    /// The digits' colors now: the theme's, unless an event draws its own
-    /// face.
+    /// The digits' colors now: the look's, as the running event colors them
+    /// (#457).
     pub fn palette(&self) -> DigitPalette {
-        match &self.active_event {
-            Some(event) if event.draws_own_face() => event.palette(),
-            _ => self.appearance().digits,
-        }
+        let base = self.appearance().digits;
+        self.active_event
+            .as_ref()
+            .map_or(base, |event| event.palette(base))
     }
-    /// The look the Clock wears now (#455): the chosen theme at the latest
-    /// reading.
+    /// The theme the Clock wears (#455): the chosen theme at the latest
+    /// reading. A change of theme fades in over half a second (#457).
     pub fn theme(&self) -> ClockTheme {
         theme::resolve(self.config.theme, self.reading)
     }
-    /// What the Clock draws now: its theme's look, except that an event that
-    /// draws its own face shows the Normal digits, AM/PM mark and date line
-    /// under the theme's decoration, until events follow the theme (#457).
+    /// What the Clock draws now: the look on its way to the theme, under
+    /// every event alike (#457).
     pub(crate) fn appearance(&self) -> theme::Appearance {
-        let theme = theme::Appearance::of(self.theme());
-        match &self.active_event {
-            Some(event) if event.draws_own_face() => theme::Appearance {
-                digits: theme::Appearance::NORMAL.digits,
-                label: theme::Appearance::NORMAL.label,
-                ..theme
-            },
-            _ => theme,
-        }
+        self.look.drawn()
     }
     pub fn event_enabled(&self, kind: ClockEventKind) -> bool {
         self.config.events.enabled(kind)
@@ -1977,6 +1984,7 @@ impl ClockState {
 
     fn advance_tick(&mut self) {
         self.schedule.advance_tick();
+        self.look.advance();
         // Resident motion can open or close a placement without changing owners.
         if self.active_event.is_none() && self.schedule.tick.is_multiple_of(FIXED_HZ as u64) {
             self.sync_event_schedule();
@@ -2464,11 +2472,13 @@ impl Scenario for ClockScenario {
             // Full-sun ambient feeds the whole habitat, so no opening gates it.
             plants.light_bounded = false;
         }
+        let look = theme::Look::settled(theme::resolve(config.theme, None));
         let mut state = ClockState {
             config: config.normalized(),
             reading: None,
             time_unknown: false,
             lamp_reading: None,
+            look,
             date_label: None,
             display: DisplaySnapshot::unsynchronized(),
             segments: digits::create_segments(),
@@ -2514,6 +2524,7 @@ impl Scenario for ClockScenario {
             match action {
                 ClockAction::SetReading(reading) => state.apply_reading(reading, !dt.is_zero()),
                 ClockAction::SetTimeUnknown => state.forget_time(),
+                ClockAction::SetTheme(choice) => state.config.theme = choice,
                 ClockAction::TriggerEvent(kind) => state.trigger_event(kind),
                 ClockAction::Configure(settings) => state.configure(settings),
                 ClockAction::PreviewEvent(kind) => state.preview_event(kind),
@@ -2521,6 +2532,15 @@ impl Scenario for ClockScenario {
                 ClockAction::TogglePlayerDuck(player) => state.toggle_player_duck(player),
                 ClockAction::PlayerDuckInput(input) => state.apply_player_duck_input(input),
             }
+        }
+        // A reading or a choice may have changed the theme. Before the scene's
+        // first tick there is no look on show to fade from, so it takes the
+        // theme at once.
+        let theme = state.theme();
+        if state.schedule.tick == 0 {
+            state.look = theme::Look::settled(theme);
+        } else {
+            state.look.head_for(theme);
         }
         let closing = state.ceiling.phase == ceiling::Phase::Closing;
         if state.ceiling.advance(dt) {

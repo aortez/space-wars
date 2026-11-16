@@ -1,9 +1,9 @@
 use super::*;
-use crate::theme::Appearance;
+use crate::theme::{Appearance, FADE_TICKS};
 use crate::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario};
 use engine_common::{
-    ClockEventKind, ClockEventProfile, ClockLampMode, ClockMarqueePreset, ClockThemeChoice,
-    ClockTimeFormat, Scenario,
+    ClockEventKind, ClockEventProfile, ClockLampMode, ClockMarqueePreset, ClockRainAmount,
+    ClockThemeChoice, ClockTimeFormat, Scenario,
 };
 use std::time::Duration;
 
@@ -70,7 +70,7 @@ fn on_layer(frame: &RenderFrame, z: i32) -> Vec<&RenderPrimitive> {
 /// The string's own primitives, drawn alone.
 fn string(layout: Layout) -> Vec<RenderPrimitive> {
     let mut frame = RenderFrame::new(Camera2::new(RenderPoint::ZERO, CAMERA_HEIGHT));
-    render(&mut frame, layout);
+    render(&mut frame, layout, 1.0);
     on_layer(&frame, LIGHTS_LAYER)
         .into_iter()
         .cloned()
@@ -446,135 +446,250 @@ fn face_colors(frame: &RenderFrame) -> Vec<[f32; 3]> {
         .collect()
 }
 
-#[test]
-fn an_event_draws_the_normal_face_under_the_string_until_events_follow_the_theme() {
-    let aspect = 800.0 / 480.0;
-    let layout = Layout::new(aspect);
-    for kind in [
-        ClockEventKind::Falling,
-        ClockEventKind::ColorCycle,
-        ClockEventKind::Meltdown,
-        ClockEventKind::Explosion,
-    ] {
-        let format = ClockTimeFormat::TwelveHour;
-        let mut normal = clock(aspect, ClockThemeChoice::Normal, format);
-        let mut christmas = clock(aspect, ClockThemeChoice::Christmas, format);
-        for state in [&mut normal, &mut christmas] {
-            ClockScenario::step(state, &[ClockAction::trigger_event(kind)], Duration::ZERO);
-        }
-        assert_eq!(christmas.event_kind(), Some(kind));
-        // The string stays up and adds the same primitives to every frame;
-        // the digits, the AM/PM mark and the date line are Normal's.
-        let mut ticks = 0;
-        while christmas.event_kind().is_some() {
-            assert_eq!(
-                without_string(&crate::render::render_frame(&christmas), layout),
-                crate::render::render_frame(&normal),
-                "{kind:?} tick {ticks}"
-            );
-            for state in [&mut normal, &mut christmas] {
-                ClockScenario::step(state, &[], TICK);
-            }
-            ticks += 1;
-        }
-        assert_eq!(normal.event_kind(), None, "{kind:?}");
-        assert!(ticks > 100, "{kind:?}: ran {ticks} ticks");
-        assert_eq!(christmas.appearance(), Appearance::CHRISTMAS, "{kind:?}");
-        assert_eq!(
-            christmas.palette(),
-            Appearance::CHRISTMAS.digits,
-            "{kind:?}"
-        );
-    }
-}
-
-#[test]
-fn a_visit_wears_the_themes_face_under_the_string() {
-    let aspect = 800.0 / 480.0;
-    let layout = Layout::new(aspect);
-    let normal_face = [
+/// The Normal face's colors, setting aside how opaque they are.
+fn normal_face() -> [[f32; 3]; 4] {
+    [
         DigitPalette::NORMAL.fill,
         DigitPalette::NORMAL.edge,
         DigitPalette::NORMAL.unlit,
         Appearance::NORMAL.label,
     ]
-    .map(|c| [c.r, c.g, c.b]);
-    let visiting = |state: &ClockState| {
-        state.has_duck_visit() || state.spider_state().is_some() || state.crow_state().is_some()
+    .map(|c| [c.r, c.g, c.b])
+}
+
+/// Checks that `themed` draws the scene `normal` draws, with only the face's
+/// colors changed and, if it is `hung`, the string on the wall at whatever
+/// opacity its fade has reached.
+fn same_scene(normal: &RenderFrame, themed: &RenderFrame, layout: Layout, hung: bool, at: &str) {
+    let mut bare = themed.clone();
+    if hung {
+        let string: Vec<_> = string(layout).iter().map(shape).collect();
+        let wall = bare
+            .layers
+            .iter_mut()
+            .find(|layer| layer.z == LIGHTS_LAYER)
+            .unwrap();
+        let hanging: Vec<_> = wall.primitives[1..=string.len()]
+            .iter()
+            .map(shape)
+            .collect();
+        assert_eq!(hanging, string, "{at}: the string");
+        wall.primitives.drain(1..=string.len());
+    }
+    assert_eq!(normal.layers.len(), bare.layers.len(), "{at}");
+    let shapes = |primitives: &[RenderPrimitive]| primitives.iter().map(shape).collect::<Vec<_>>();
+    for (normal, themed) in normal.layers.iter().zip(&bare.layers) {
+        assert_eq!(normal.z, themed.z, "{at}");
+        if FACE_LAYERS.contains(&normal.z) {
+            assert_eq!(
+                shapes(&normal.primitives),
+                shapes(&themed.primitives),
+                "{at}: layer {}",
+                normal.z
+            );
+        } else {
+            assert_eq!(
+                normal.primitives, themed.primitives,
+                "{at}: layer {}",
+                normal.z
+            );
+        }
+    }
+}
+
+/// Whether an event or a visit is still going on.
+fn busy(state: &ClockState) -> bool {
+    state.event_kind().is_some()
+        || state.has_duck_visit()
+        || state.spider_state().is_some()
+        || state.crow_state().is_some()
+}
+
+/// Starts `kind` in a Normal clock and in a twin that turns Christmas
+/// `CHANGE` ticks in, then checks every frame until it is over. The twins
+/// draw the same scene and the twin only recolors the face and hangs the
+/// string. Once its fade is over, nothing on the twin's face is Normal's,
+/// and when the event ends the twin keeps Christmas. Returns how many ticks
+/// the event ran.
+fn wears_the_theme(kind: ClockEventKind, tweak: impl Fn(&mut ClockConfig)) -> u32 {
+    const CHANGE: u32 = 20;
+    let aspect = 800.0 / 480.0;
+    let layout = Layout::new(aspect);
+    let config = |config: &mut ClockConfig| {
+        config.time_format = ClockTimeFormat::TwelveHour;
+        tweak(config);
     };
+    let mut normal = clock_with(aspect, ClockThemeChoice::Normal, config);
+    let mut themed = clock_with(aspect, ClockThemeChoice::Normal, config);
+    for state in [&mut normal, &mut themed] {
+        ClockScenario::step(state, &[ClockAction::trigger_event(kind)], Duration::ZERO);
+    }
+    assert!(busy(&themed), "{kind:?} never started");
+    let mut ticks = 0;
+    while busy(&themed) {
+        let change = [ClockAction::set_theme(ClockThemeChoice::Christmas)];
+        let actions: &[_] = if ticks == CHANGE { &change } else { &[] };
+        ClockScenario::step(&mut normal, &[], TICK);
+        ClockScenario::step(&mut themed, actions, TICK);
+        ticks += 1;
+        let at = format!("{kind:?} tick {ticks}");
+        let themed_frame = crate::render::render_frame(&themed);
+        same_scene(
+            &crate::render::render_frame(&normal),
+            &themed_frame,
+            layout,
+            themed.appearance().lights > 0.0,
+            &at,
+        );
+        if ticks >= CHANGE + FADE_TICKS {
+            for color in face_colors(&themed_frame) {
+                assert!(!normal_face().contains(&color), "{at}: {color:?}");
+            }
+        }
+        assert!(ticks < 20_000, "{kind:?} never ended");
+    }
+    assert!(!busy(&normal), "{kind:?}");
+    assert!(ticks > CHANGE + FADE_TICKS, "{kind:?}: ran {ticks} ticks");
+    // It ends on the theme the Clock wears now, not the one it began in.
+    assert_eq!(themed.appearance(), Appearance::CHRISTMAS, "{kind:?}");
+    assert_eq!(themed.palette(), Appearance::CHRISTMAS.digits, "{kind:?}");
+    ticks
+}
+
+#[test]
+fn falling_explosion_coins_and_meltdown_wear_the_theme() {
+    for kind in [
+        ClockEventKind::Falling,
+        ClockEventKind::Explosion,
+        ClockEventKind::Coins,
+        ClockEventKind::Meltdown,
+    ] {
+        wears_the_theme(kind, |_| {});
+    }
+}
+
+#[test]
+fn rain_and_the_aquarium_wear_the_theme() {
+    wears_the_theme(ClockEventKind::Rain, |config| {
+        config.rain_amount = ClockRainAmount::Heavy;
+    });
+    wears_the_theme(ClockEventKind::Aquarium, |_| {});
+}
+
+#[test]
+fn color_cycle_and_the_face_events_wear_the_theme() {
+    for kind in [
+        ClockEventKind::ColorCycle,
+        ClockEventKind::CellSwap,
+        ClockEventKind::SlotMachine,
+        ClockEventKind::Grass,
+        ClockEventKind::Tanks,
+    ] {
+        wears_the_theme(kind, |_| {});
+    }
+}
+
+#[test]
+fn every_marquee_wears_the_theme() {
+    for preset in [
+        ClockMarqueePreset::ClockChase,
+        ClockMarqueePreset::ClockWave,
+        ClockMarqueePreset::ClockSpin,
+        ClockMarqueePreset::DigitSpin,
+        ClockMarqueePreset::TextScroll,
+        ClockMarqueePreset::TextRibbon,
+        ClockMarqueePreset::TextSpin,
+    ] {
+        wears_the_theme(ClockEventKind::Marquee, |config| {
+            config.marquee_preset = preset;
+        });
+    }
+}
+
+#[test]
+fn a_visit_wears_the_theme() {
     for kind in [
         ClockEventKind::Duck,
         ClockEventKind::Spider,
         ClockEventKind::Crow,
     ] {
-        let format = ClockTimeFormat::TwelveHour;
-        let mut normal = clock(aspect, ClockThemeChoice::Normal, format);
-        let mut christmas = clock(aspect, ClockThemeChoice::Christmas, format);
-        for state in [&mut normal, &mut christmas] {
-            ClockScenario::step(state, &[ClockAction::trigger_event(kind)], Duration::ZERO);
-        }
-        let mut ticks = 0;
-        while visiting(&christmas) {
-            let normal_frame = crate::render::render_frame(&normal);
-            let christmas_frame = crate::render::render_frame(&christmas);
-            // The visitor and the room are the same in both, the string stays
-            // up, and only the face's colors differ.
-            let bare = without_string(&christmas_frame, layout);
-            assert_eq!(normal_frame.layers.len(), bare.layers.len(), "{kind:?}");
-            for (normal, christmas) in normal_frame.layers.iter().zip(&bare.layers) {
-                assert_eq!(normal.z, christmas.z, "{kind:?} tick {ticks}");
-                if FACE_LAYERS.contains(&normal.z) {
-                    let shapes = |primitives: &[RenderPrimitive]| {
-                        primitives.iter().map(shape).collect::<Vec<_>>()
-                    };
-                    assert_eq!(
-                        shapes(&normal.primitives),
-                        shapes(&christmas.primitives),
-                        "{kind:?} tick {ticks}: layer {}",
-                        normal.z
-                    );
-                } else {
-                    assert_eq!(
-                        normal.primitives, christmas.primitives,
-                        "{kind:?} tick {ticks}: layer {}",
-                        normal.z
-                    );
-                }
-            }
-            // And none of them is Normal's.
-            for color in face_colors(&christmas_frame) {
-                assert!(
-                    !normal_face.contains(&color),
-                    "{kind:?} tick {ticks}: {color:?}"
-                );
-            }
-            for state in [&mut normal, &mut christmas] {
-                ClockScenario::step(state, &[], TICK);
-            }
-            ticks += 1;
-            assert!(ticks < 20_000, "{kind:?} never left");
-        }
-        assert!(!visiting(&normal), "{kind:?}");
+        let ticks = wears_the_theme(kind, |_| {});
         assert!(ticks > 100, "{kind:?}: visited for {ticks} ticks");
     }
 }
 
 #[test]
-fn a_theme_comes_down_completely_when_the_night_ends() {
-    let mut auto = clock(
-        800.0 / 480.0,
-        ClockThemeChoice::Auto,
-        ClockTimeFormat::TwelveHour,
-    );
-    let mut normal = clock(
-        800.0 / 480.0,
+fn the_string_fades_in_and_out_with_its_theme() {
+    let aspect = 800.0 / 480.0;
+    let layout = Layout::new(aspect);
+    let full = string(layout);
+    let alpha = |primitive: &RenderPrimitive| match primitive {
+        RenderPrimitive::Circle(circle) => circle.fill.unwrap().color.a,
+        RenderPrimitive::Polygon(polygon) => polygon.fill.unwrap().color.a,
+        other => panic!("{other:?}"),
+    };
+    let mut state = clock(
+        aspect,
         ClockThemeChoice::Normal,
         ClockTimeFormat::TwelveHour,
     );
-    let layout = Layout::new(800.0 / 480.0);
+    ClockScenario::step(&mut state, &[], TICK);
+    for (theme, rising) in [
+        (ClockThemeChoice::Christmas, true),
+        (ClockThemeChoice::Normal, false),
+    ] {
+        ClockScenario::step(&mut state, &[ClockAction::set_theme(theme)], TICK);
+        let mut last = state.appearance().lights;
+        for tick in 1..FADE_TICKS {
+            // The whole string hangs at every step of the fade, each part as
+            // faint as the fade has come.
+            let frame = crate::render::render_frame(&state);
+            let wall = on_layer(&frame, LIGHTS_LAYER);
+            for (part, whole) in wall[1..=full.len()].iter().zip(&full) {
+                assert_eq!(shape(part), shape(whole), "{theme:?} tick {tick}");
+                assert_eq!(alpha(part), alpha(whole) * last, "{theme:?} tick {tick}");
+            }
+            ClockScenario::step(&mut state, &[], TICK);
+            let lights = state.appearance().lights;
+            assert_eq!(lights > last, rising, "{theme:?} tick {tick}");
+            last = lights;
+        }
+        assert_eq!(last, if rising { 1.0 } else { 0.0 }, "{theme:?}");
+    }
+    // Faded out, it is gone from the wall.
+    let plain = clock(
+        aspect,
+        ClockThemeChoice::Normal,
+        ClockTimeFormat::TwelveHour,
+    );
+    assert_eq!(
+        on_layer(&crate::render::render_frame(&state), LIGHTS_LAYER),
+        on_layer(&crate::render::render_frame(&plain), LIGHTS_LAYER)
+    );
+}
+
+#[test]
+fn a_theme_comes_down_completely_when_the_night_ends() {
+    let aspect = 800.0 / 480.0;
+    let format = ClockTimeFormat::TwelveHour;
+    let mut auto = clock(aspect, ClockThemeChoice::Auto, format);
+    let mut normal = clock(aspect, ClockThemeChoice::Normal, format);
+    let layout = Layout::new(aspect);
     without_string(&crate::render::render_frame(&auto), layout);
     for state in [&mut auto, &mut normal] {
-        read(state, 6, 0, 0, Duration::ZERO);
+        read(state, 5, 59, 59, TICK);
+        read(state, 6, 0, 0, TICK);
+    }
+    // The theme fades over half a second, and then nothing of it is left.
+    for tick in 1..FADE_TICKS {
+        assert_ne!(
+            crate::render::render_frame(&auto),
+            crate::render::render_frame(&normal),
+            "tick {tick}"
+        );
+        for state in [&mut auto, &mut normal] {
+            ClockScenario::step(state, &[], TICK);
+        }
     }
     assert_eq!(
         crate::render::render_frame(&auto),

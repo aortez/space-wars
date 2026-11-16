@@ -347,7 +347,10 @@ fn clock_face_contract_every_vacated_cell_exposes_a_stationary_dim_anchor() {
                     let RenderPrimitive::Polygon(polygon) = primitive else {
                         panic!("expected a dim cell");
                     };
-                    assert_eq!(polygon.fill.as_ref().unwrap().color, INACTIVE_CELL_COLOR);
+                    assert_eq!(
+                        polygon.fill.as_ref().unwrap().color,
+                        DigitPalette::NORMAL.unlit
+                    );
                     assert!(polygon.stroke.is_none());
                 }
             }

@@ -68,10 +68,8 @@ pub(crate) const COVER_COLORS: [RenderColor; 3] = [
 const COVER_WITHER_SECONDS: f32 = 45.0;
 /// Columns per cover strip, which bounds the primitives one floor can add.
 const COVER_RUN_COLUMNS: usize = 24;
-const INACTIVE_CELL_COLOR: RenderColor = DigitPalette::NORMAL.unlit;
-/// The Normal theme's label color. Notices keep it whatever the theme, and
-/// events draw their own AM/PM pieces in it until they follow the theme
-/// (#457).
+/// The Normal theme's label color, which the grass inspection keeps whatever
+/// the theme. It is a developer's view, not part of the face.
 const LABEL_COLOR: RenderColor = crate::theme::Appearance::NORMAL.label;
 
 const COLON_X_UNITS: f32 = 14.5;
@@ -113,13 +111,14 @@ pub(crate) fn render_unlit(state: &ClockState) -> RenderFrame {
 fn compose(state: &ClockState) -> RenderFrame {
     let layout = Layout::new(state.aspect_ratio());
     let mut frame = RenderFrame::new(Camera2::new(RenderPoint::ZERO, CAMERA_HEIGHT));
+    // A notice stands in for the date line, so it wears the date line's color.
     if let Some((message, _)) = state.event_notice {
         frame.push_primitive(
             100,
             RenderPrimitive::Text(RenderText {
                 position: RenderPoint::new(0.0, layout.bounds_max.y - 24.0),
                 text: message.into(),
-                color: LABEL_COLOR,
+                color: state.appearance().label,
                 // RenderText sizes are logical pixels on both render paths.
                 size: 18.0,
                 anchor: TextAnchor::Center,
@@ -146,8 +145,9 @@ fn compose(state: &ClockState) -> RenderFrame {
     );
     frame::render(&mut frame, state, layout);
     render_canopy(&mut frame, layout);
-    if state.appearance().decoration == crate::theme::Decoration::StringLights {
-        string_lights::render(&mut frame, layout);
+    let lights = state.appearance().lights;
+    if lights > 0.0 {
+        string_lights::render(&mut frame, layout, lights);
     }
     if state.spider.is_some() {
         spider::render_hatch(&mut frame, layout);
@@ -335,7 +335,7 @@ fn compose(state: &ClockState) -> RenderFrame {
     }
     if let Some(crate::events::ActiveEvent::Marquee(event)) = &state.active_event {
         render_marquee_face(&mut frame, state, layout, event);
-        marquee::render(&mut frame, event, layout);
+        marquee::render(&mut frame, event, layout, state.palette());
         render_player_and_course(&mut frame, state, layout);
         return frame;
     }
@@ -344,7 +344,7 @@ fn compose(state: &ClockState) -> RenderFrame {
         rain::render(&mut frame, event);
     }
     if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
-        meltdown::render(&mut frame, event, layout);
+        meltdown::render(&mut frame, event, layout, state.appearance());
     }
     render_colon(&mut frame, state, layout);
     render_meridiem(&mut frame, state, layout);
@@ -458,18 +458,20 @@ fn render_marquee_face(
     layout: Layout,
     event: &crate::events::marquee::MarqueeEvent,
 ) {
-    carry_marquee_face(frame, layout, event, |frame| {
+    carry_marquee_face(frame, layout, event, state.palette().unlit, |frame| {
         render_segments(frame, state, layout);
         render_colon(frame, state, layout);
         render_meridiem(frame, state, layout);
     });
 }
 
-/// Draws whatever `draw` puts on the face the way a marquee carries the face.
+/// Draws whatever `draw` puts on the face the way a marquee carries the face,
+/// leaving the face's `unlit` guides behind where it lifts lit cells away.
 fn carry_marquee_face(
     frame: &mut RenderFrame,
     layout: Layout,
     event: &crate::events::marquee::MarqueeEvent,
+    unlit: RenderColor,
     draw: impl FnOnce(&mut RenderFrame),
 ) {
     let before: Vec<usize> = frame.layers.iter().map(|l| l.primitives.len()).collect();
@@ -486,7 +488,7 @@ fn carry_marquee_face(
         .flat_map(|(index, layer)| &layer.primitives[before.get(index).copied().unwrap_or(0)..])
         .filter_map(|primitive| match primitive {
             RenderPrimitive::Polygon(polygon) => Some(RenderPrimitive::Polygon(
-                RenderPolygon::filled(polygon.points.clone(), INACTIVE_CELL_COLOR),
+                RenderPolygon::filled(polygon.points.clone(), unlit),
             )),
             _ => None,
         })
@@ -539,7 +541,7 @@ pub(crate) fn plant_face_polygons(state: &ClockState) -> Vec<Vec<Vec2>> {
     let mut frame = RenderFrame::default();
     if let Some(crate::events::ActiveEvent::Marquee(event)) = &state.active_event {
         render_marquee_face(&mut frame, state, layout, event);
-        marquee::render(&mut frame, event, layout);
+        marquee::render(&mut frame, event, layout, state.palette());
     } else {
         render_segments(&mut frame, state, layout);
         render_colon(&mut frame, state, layout);
@@ -576,18 +578,18 @@ pub(crate) fn digit_cell_polygons(state: &ClockState) -> Vec<(Vec<Vec2>, f32)> {
     let mut frame = RenderFrame::default();
     match &state.active_event {
         Some(crate::events::ActiveEvent::Marquee(event)) => {
-            carry_marquee_face(&mut frame, layout, event, |frame| {
+            carry_marquee_face(&mut frame, layout, event, state.palette().unlit, |frame| {
                 render_segments(frame, state, layout);
             });
             if event.uses_clock {
-                marquee::render_cells(&mut frame, event, layout, |cell| {
+                marquee::render_cells(&mut frame, event, layout, state.palette(), |cell| {
                     usize::from(cell.group) < crate::DIGIT_SLOT_COUNT
                 });
             }
         }
         Some(crate::events::ActiveEvent::Meltdown(event)) => {
             render_segments(&mut frame, state, layout);
-            meltdown::render_solids(&mut frame, event, layout);
+            meltdown::render_solids(&mut frame, event, layout, state.appearance());
         }
         _ => render_segments(&mut frame, state, layout),
     }
@@ -676,7 +678,7 @@ fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout:
             RenderPrimitive::Text(RenderText {
                 position: RenderPoint::new(layout.bounds_max.x - 60.0, layout.bounds_max.y - 24.0),
                 text: format!("P{player} DUCK"),
-                color: LABEL_COLOR,
+                color: state.appearance().label,
                 size: 14.0,
                 anchor: TextAnchor::Center,
             }),
