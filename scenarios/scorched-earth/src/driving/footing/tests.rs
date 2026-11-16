@@ -18,7 +18,7 @@ fn captured_crater() -> ScorchedState {
     for _ in 0..645 {
         step(&mut state);
     }
-    assert_eq!(state.observation_hash(), 0x2eea1b9a60b97b0a);
+    assert_eq!(state.observation_hash(), 0x248d3bba7755e6ce);
     assert!(state.firing_footing_target(1).is_some());
     state
 }

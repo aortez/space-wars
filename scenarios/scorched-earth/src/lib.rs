@@ -7,6 +7,7 @@ use engine_common::{
     TickModel,
 };
 use engine_core::Vec2;
+use engine_material::{Region, Source};
 use engine_rapier::{
     terrain::{
         GrainShape, LooseTerrain, LooseTerrainConfig, TerrainAssembly, TerrainFragment, TerrainSpec,
@@ -20,6 +21,7 @@ use engine_terrain::{Material, MaterialId, Terrain, TerrainGeometry, TerrainSurf
 use serde::Serialize;
 
 mod action;
+mod armor;
 mod bank;
 mod bot;
 pub mod bot_lab;
@@ -133,9 +135,14 @@ struct Tank {
     elevation: f32,
     speed: f32,
     facing: f32,
+    /// Remaining armor on the 0 to 100 scale, or 0 once a scenario rule has
+    /// ended the tank.
     health: f32,
     next_shot: u64,
     shots: u64,
+    /// The hull's armor, whose integrity sets `health`.
+    #[serde(skip)]
+    armor: Region,
 }
 impl Tank {
     fn direction(self) -> Vec2 {
@@ -143,7 +150,7 @@ impl Tank {
     }
 }
 
-#[derive(Clone, Copy, Serialize)]
+#[derive(Clone, Serialize)]
 struct Shell {
     owner: usize,
     position: Vec2,
@@ -153,6 +160,9 @@ struct Shell {
     // preserving the established sweep's physical replay identities.
     #[serde(skip)]
     flight: Option<bot::Flight>,
+    /// The shell's energy: its mass at its launch speed, and its payload.
+    #[serde(skip)]
+    source: Source,
 }
 
 #[derive(Clone)]

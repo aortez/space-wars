@@ -492,3 +492,88 @@ fn scaled_duels_drive_deform_and_replay_with_native_mass_accounting() {
         );
     }
 }
+
+#[test]
+fn scaled_duels_take_the_same_damage_from_the_same_shell() {
+    let mut lost = Vec::new();
+    for scale in [1.0, 3.0] {
+        let mut config = config(GrainShape::Hexagon);
+        config.cpu_driving = false;
+        let mut world = world();
+        world.set_gravity(Vec2::new(0.0, -GRAVITY * scale));
+        world.set_length_unit(scale);
+        let mut placement = Placement::new(1000..100_000, Budget::required(config));
+        placement.scale = scale;
+        let mut duel = HostedDuel::attach(&mut world, config, 42, placement).unwrap();
+        for tank in &mut duel.duel.tanks {
+            tank.next_shot = u64::MAX;
+        }
+        for _ in 0..90 {
+            step(&mut duel, &mut world);
+        }
+        let body = duel.duel.tanks[0].body;
+        let tank = duel
+            .placement()
+            .point_from_world(world.motion(body).unwrap().position);
+        duel.duel.shells.push(Shell {
+            owner: 1,
+            position: tank + Vec2::Y * 6.0,
+            velocity: Vec2::new(0.0, -30.0),
+            age: 10,
+            flight: None,
+            source: armor::shell(500, None, 30.0),
+        });
+        let impacts = duel.duel.impacts;
+        for _ in 0..60 {
+            step(&mut duel, &mut world);
+            if duel.duel.impacts > impacts {
+                break;
+            }
+        }
+        assert_eq!(duel.impacts()[0].collider.entity, body.entity);
+        lost.push(100.0 - duel.duel.tanks[0].health);
+    }
+    assert!(lost[0] > 0.0);
+    assert!((lost[0] - lost[1]).abs() < 0.01, "{lost:?}");
+}
+
+#[test]
+fn a_retired_tank_takes_no_share_and_its_airborne_shell_still_counts() {
+    let mut config = config(GrainShape::Round);
+    config.cpu_driving = false;
+    let mut world = world();
+    let placement = Placement::new(1000..100_000, Budget::required(config));
+    let mut duel = HostedDuel::attach(&mut world, config, 42, placement).unwrap();
+    for tank in &mut duel.duel.tanks {
+        tank.next_shot = u64::MAX;
+    }
+    for _ in 0..30 {
+        step(&mut duel, &mut world);
+    }
+    let firer = duel.duel.tanks[0].body.entity;
+    let at = world.motion(duel.duel.tanks[0].body).unwrap().position;
+    let target = world.motion(duel.duel.tanks[1].body).unwrap().position;
+    duel.duel.shells.push(Shell {
+        owner: 0,
+        position: target + Vec2::Y * 6.0,
+        velocity: Vec2::new(0.0, -30.0),
+        age: 10,
+        flight: None,
+        source: armor::shell(500, Some(firer.value()), 30.0),
+    });
+    duel.retire_tank(&mut world, 0).unwrap();
+    let impacts = duel.duel.impacts;
+    for _ in 0..60 {
+        step(&mut duel, &mut world);
+        if duel.duel.impacts > impacts {
+            break;
+        }
+    }
+    let event = duel.impacts()[0];
+    assert_eq!(event.source.owner, firer);
+    assert!(event.absorbed[1] > 0.0);
+    assert!(duel.duel.tanks[1].health < 100.0);
+    duel.duel.explode(&mut world, at + Vec2::Y);
+    assert_eq!(duel.duel.tanks[0].armor.integrity(), 1.0);
+    assert_eq!(duel.duel.tanks[0].health, 0.0);
+}
