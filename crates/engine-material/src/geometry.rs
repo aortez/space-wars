@@ -144,6 +144,33 @@ impl ContactGeometry {
     }
 }
 
+/// The face of one region that a deposit loads, such as the side a blast
+/// reaches or a beam's footprint.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct Face {
+    /// In-plane width of the loaded patch, `wu`.
+    pub width: f32,
+    pub section: Section,
+}
+
+impl Face {
+    pub const fn new(width: f32, section: Section) -> Self {
+        Self { width, section }
+    }
+
+    pub fn validate(self) -> Result<(), MaterialError> {
+        if !length_ok(self.width) {
+            return Err(MaterialError::InvalidGeometry);
+        }
+        self.section.validate()
+    }
+
+    /// Loaded area: the patch width times the represented thickness.
+    pub fn area(self) -> f32 {
+        self.width * self.section.thickness
+    }
+}
+
 /// Patch width for a curved surface of `radius_a` meeting another curved
 /// surface, or a flat one when `radius_b` is `None`.
 pub fn patch_width_from_radii(radius_a: f32, radius_b: Option<f32>) -> Result<f32, MaterialError> {
