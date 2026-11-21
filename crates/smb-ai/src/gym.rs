@@ -320,19 +320,24 @@ impl Gym {
         })
     }
 
-    /// Cut a new tape for this gym by running the base policy from power-on to
+    /// Cut a new tape for this gym by running [`Gym::driver`] from power-on to
     /// `until`, and measure the verdict that start state produces.
     ///
-    /// The run-up is the setup script the profile already defines, then the reflex,
-    /// because a tape that starts at the handover would be a tape whose first three
-    /// hundred frames nobody recorded: replaying it from power-on would press the
-    /// policy's buttons where the game was still expecting a Start press and land
-    /// somewhere else entirely.
+    /// The run-up begins with the setup script the profile already defines, because a
+    /// tape that started at the handover would be a tape whose first three hundred
+    /// frames nobody recorded: replaying it from power-on would press the policy's
+    /// buttons where the game was still expecting a Start press and land somewhere
+    /// else entirely.
     ///
-    /// The run-up is always the reflex's, whatever [`Gym::driver`] this gym measures.
-    /// That is on purpose: a tape cut by the player being tested would start the gym
-    /// past the frames that player is supposed to solve, and a gym whose start state
-    /// already contains its own answer measures nothing.
+    /// After the handover the run-up belongs to the player this gym names, which is
+    /// what makes a gym downstream of another player's work cuttable at all. Every
+    /// committed tape is still reflex-cut and that is right: each of them sits exactly
+    /// where the reflex stops, so the reflex can make the approach and the frames the
+    /// driver is asked about are still ahead of it. The level's exit is the opposite
+    /// case — the reflex dies at the pit, four hundred pixels short of it — and a tape
+    /// the driver cannot run itself describes a start state its own driver will never
+    /// be handed. What decides a cut is still Phase 2's rule and not this one: a gym is
+    /// cut upstream of the failure it is about, never at it.
     ///
     /// The tape is replayed once before it is handed back. That costs a second
     /// run-up and buys the only check that matters at this moment: the bytes that
@@ -346,7 +351,7 @@ impl Gym {
         if until <= handover {
             return Err(GymError::BeforeHandover { until, handover });
         }
-        let mut bot = BaseBot::default();
+        let mut player = (self.driver.player)(BaseBot::default());
         let mut runs: Vec<(u8, u32)> = Vec::new();
         for frame in 1..=handover {
             push(&mut runs, setup_buttons(frame));
@@ -355,11 +360,11 @@ impl Gym {
         let mut furthest_x = read_state(&machine).absolute_x;
         let mut frame = machine.ppu().frame_id();
         while frame < until {
-            let buttons = bot.buttons(&machine);
+            let buttons = player.buttons(&machine);
             push(&mut runs, buttons);
             machine.run_frame([buttons, ControllerButtons::NONE])?;
             let produced = read_state(&machine);
-            if bot.observe(&produced, &machine, frame).is_some() {
+            if player.observe(&produced, &machine, frame).is_some() {
                 refusals += 1;
             }
             furthest_x = furthest_x.max(produced.absolute_x);

@@ -270,8 +270,127 @@ pub const PIPE_608: Gym = Gym {
     },
 };
 
+/// The run-up the flagpole gym starts from: this gym's own driver — the script — from
+/// power-on to frame 1900, which is absolute X 3005 on the ground at full running speed,
+/// a hundred and sixty-three pixels short of the flagpole and one pit behind it.
+///
+/// Recorded, not authored — `gym --record 1900 flagpole-3168` cut it and replayed it
+/// before printing it. This is the first tape here the reflex could not have cut: it
+/// spends two lives at the hole four hundred pixels back, so every frame between the pit
+/// and the level's exit is a run-up only the script can make. That is the whole reason
+/// [`Gym::record`] runs the gym's own driver rather than the base policy.
+const FLAGPOLE_3168_TAPE: Tape = Tape {
+    cartridge: smb_model::cartridge::SMB_IDENTITY,
+    runs: Cow::Borrowed(&[
+        (0x00, 119), // NONE
+        (0x08, 1),   // START
+        (0x00, 167), // NONE
+        (0x82, 119), // B|RIGHT
+        (0x83, 4),   // A|B|RIGHT
+        (0x82, 67),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 72),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 43),  // B|RIGHT
+        (0x83, 4),   // A|B|RIGHT
+        (0x82, 37),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 86),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 59),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 30),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 40),  // B|RIGHT
+        (0x83, 4),   // A|B|RIGHT
+        (0x82, 20),  // B|RIGHT
+        (0x83, 4),   // A|B|RIGHT
+        (0x82, 22),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 47),  // B|RIGHT
+        (0x83, 4),   // A|B|RIGHT
+        (0x82, 57),  // B|RIGHT
+        (0x83, 4),   // A|B|RIGHT
+        (0x82, 45),  // B|RIGHT
+        (0x83, 4),   // A|B|RIGHT
+        (0x82, 60),  // B|RIGHT
+        (0x83, 4),   // A|B|RIGHT
+        (0x82, 83),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 17),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 33),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 67),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 29),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 61),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 63),  // B|RIGHT
+        (0x83, 4),   // A|B|RIGHT
+        (0x82, 43),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 34),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 10),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 13),  // B|RIGHT
+    ]),
+    frame: 1900,
+    golden_hash: engine_nes::StateHash {
+        version: 3,
+        value: 0x97f2_d3ee_150f_8352,
+    },
+};
+
+/// 1-1's exit, cut upstream of it, for the one wall in the level no skill in the library
+/// has an answer for.
+///
+/// The flagpole is a column the reader reports as solid and twelve rows tall, and the run
+/// only gets past it because [`smb_model::affordances::MAX_WALL_ROWS`] caps a reported
+/// height at eight, which is where the height gate cannot fire. That is the situation
+/// Phase 3 still owes: a wall too tall to jump needs a skill whose postcondition is not
+/// "past the top of it", and until that skill exists the level ends by accident rather
+/// than by design. This gym is where the accident is on record and where the skill will
+/// be measured when it lands.
+///
+/// The objective is the level's own ending rather than a pixel, because the pixel is the
+/// thing under dispute: absolute X holds at 3161 for sixty-four frames while the game
+/// takes the grab, and a `ReachX` past the pole would be met by the walk into the castle
+/// whether or not anything understood the pole. `ClearLevel` asks the only question that
+/// cannot be answered by drifting past a wall.
+///
+/// The two budgets are sized by the ending and not by the obstacle, which is worth
+/// saying out loud because it is the one place a stall window has to be measured against
+/// the game rather than against a bot: after the grab he walks to the castle door, and
+/// the game then holds absolute X at 3266 for four hundred and eighty-eight frames while
+/// it plays the level out. A stall window of the house's 120 frames calls that `Stuck`
+/// two hundred and sixty-eight frames before the level says it is finished.
+pub const FLAGPOLE_3168: Gym = Gym {
+    name: "flagpole-3168",
+    objective: Objective::ClearLevel,
+    seed: LedgerSeed::Cold,
+    tape: FLAGPOLE_3168_TAPE,
+    driver: skills::SCRIPTED,
+    frame_budget: 900,
+    stall_frames: 600,
+    recorded: Verdict {
+        outcome: Outcome::Met,
+        frames: 736,
+        furthest_x: 3267,
+        refusals: 1,
+    },
+};
+
 /// Every committed gym, in the order a transcript prints them.
-pub const ALL: [Gym; 4] = [CAMERA_LIMIT, CAMERA_LIMIT_REMEMBERING, PIPE_608, PIT_1379];
+pub const ALL: [Gym; 5] = [
+    CAMERA_LIMIT,
+    CAMERA_LIMIT_REMEMBERING,
+    FLAGPOLE_3168,
+    PIPE_608,
+    PIT_1379,
+];
 
 /// The gym a command line means, by the name it carries.
 ///

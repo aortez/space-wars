@@ -6,11 +6,13 @@
 //! [`GymError::Drifted`] says in those words, or the model and the bots changed what
 //! they do from the same start state, which is what a gym is for measuring.
 //!
-//! `gym --record FRAME` runs the base policy from power-on to that frame id and
-//! prints the gym as Rust, so a new gym is committed as source the compiler checks
+//! `gym --record FRAME GYM` runs that gym's own driver from power-on to that frame id
+//! and prints the gym as Rust, so a new gym is committed as source the compiler checks
 //! and not as a data file something has to find at runtime. The tape it prints has
 //! already been replayed once by [`Gym::record`], so the run-up printed is the
-//! run-up that produced the verdict printed beside it.
+//! run-up that produced the verdict printed beside it, made by the player the gym
+//! names — which is what makes a start state downstream of that player's own work,
+//! like the level's exit, cuttable in the first place.
 
 use std::{env, error::Error};
 
@@ -73,7 +75,11 @@ fn record(rom: &[u8], args: &[String]) -> Result<(), Box<dyn Error>> {
         cut.furthest_x_before
     );
     println!("// measured from that start state: {:?}", cut.verdict);
-    println!("// the run-up is always the reflex's, whatever player this gym measures.");
+    println!(
+        "// the run-up was cut by this gym's own driver, {}, because a start state its \
+         driver cannot reach is one it will never be handed.",
+        gym.driver.name
+    );
     println!("// replay the tape with a {:?} ledger.", gym.seed);
     println!("runs: Cow::Borrowed(&[");
     for (mask, count) in cut.tape.runs.iter() {

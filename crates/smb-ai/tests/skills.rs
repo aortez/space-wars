@@ -809,3 +809,137 @@ fn the_pipe_gym_fails_without_the_skill_that_acts_on_a_wall() {
          and then jumps: {stalled:?} vs {cleared:?}"
     );
 }
+
+/// The library minus one named entry, as a driver, so a gym can be run with an
+/// ablation the transcript can also print.
+///
+/// A `Driver`'s player is a function pointer and cannot capture the filtered list, so
+/// each ablation this project has measured gets its own one-line function naming the
+/// library it removes. Three is the whole library, so the table is complete.
+fn without_a_gap_skill(bot: BaseBot) -> Box<dyn Bot> {
+    Box::new(ScriptedBot::with_script(bot, &[&CLEAR_WALL, &HOP_OBSTACLE]))
+}
+
+fn without_a_hop_skill(bot: BaseBot) -> Box<dyn Bot> {
+    Box::new(ScriptedBot::with_script(bot, &[&CLEAR_GAP, &CLEAR_WALL]))
+}
+
+/// A driver with one entry deleted, named for the deletion so a verdict prints beside
+/// the thing it is a measurement of.
+fn minus(name: &'static str) -> gym::Driver {
+    let player: fn(BaseBot) -> Box<dyn Bot> = match name {
+        "clear-wall" => without_a_wall_skill,
+        "clear-gap" => without_a_gap_skill,
+        "hop-obstacle" => without_a_hop_skill,
+        other => panic!("no skill named {other} to delete"),
+    };
+    gym::Driver {
+        name: Box::leak(format!("script minus {name}").into_boxed_str()),
+        player,
+    }
+}
+
+/// 1-1's exit, measured four ways from one tape, and the answer is not the one the plan
+/// had for it.
+///
+/// The plan left the flagpole as the situation the library has no skill for: a column
+/// twelve rows tall that no jump in the library gets over, needing "a skill whose
+/// postcondition is not 'past it'". `flagpole-3168` is that column with a verdict
+/// attached, and the verdict says the missing skill is not the missing thing.
+///
+/// **The script wins it, and so does the reflex.** `Met` after 736 frames at absolute X
+/// 3267 for the script, `Met` after 757 at 3266 for the reflex — the first gym in this
+/// repository the reflex wins, and it wins because the flagpole is not a wall to the
+/// game. The run's one behaviour is `clear-wall` on frame 1971 from absolute X 3154 about
+/// pixel 3168, and what that jump buys is not height: absolute X holds at 3161 for
+/// sixty-four frames while the game takes the grab, and the level ends at 3266. The
+/// reflex gets there twenty-one frames later by the same route, because its rule — jump
+/// what the reader reports and what the game has refused — fires at the pole exactly as
+/// the skill's does. The height gate never fires, because `MAX_WALL_ROWS` caps the
+/// reported column at eight rows and the flagpole's twelve are never a number a skill is
+/// shown.
+///
+/// **The exit is load-bearing on `clear-wall` all the same.** Delete that one entry and
+/// the same tape, the same objective and the same model come to `Stuck` after 666 frames
+/// at absolute X 3155 with ninety-two refusals — a body pressed against a column the
+/// ledger has named since the first of them, short of the pole at 3168, short of the
+/// level. Delete either of the other two and the verdict is unchanged to the frame, which
+/// is what makes the ninety-two refusals an attribution and not a coincidence.
+///
+/// **And the cap and the deletion are the same measurement.** `MAX_WALL_ROWS` raised from
+/// eight to twelve — the honest height of the flagpole, measured once already and
+/// reported by `affordances` against the constant — moves this gym to `Stuck` after 666
+/// frames at absolute X 3155 with ninety-two refusals, and moves none of the other four.
+/// Frame count, position and refusal count identical to the ablation above, because a
+/// height gate that fires on the only wall in a gym *is* a deleted skill, and this is the
+/// gym where that equivalence shows up. It is why the cap is still eight and why the
+/// tall-wall skill is still owed: the level's exit is the one place in 1-1 where the
+/// model's wall and the game's wall disagree, and the disagreement is currently paid for
+/// by a number chosen so that nothing asks the question.
+#[test]
+fn the_level_exit_needs_the_wall_skill_and_not_a_taller_one() {
+    let Some(rom) = cartridge::read_or_skip() else {
+        return;
+    };
+    let flagpole = gyms::FLAGPOLE_3168;
+
+    let cleared = flagpole
+        .run(&rom)
+        .expect("the scripted flagpole gym should run");
+    assert_eq!(
+        cleared.outcome,
+        gym::Outcome::Met,
+        "the script is expected to finish the level from three hundred pixels out: {cleared:?}"
+    );
+
+    let reflex = Gym {
+        driver: gym::REFLEX,
+        ..flagpole.clone()
+    }
+    .run(&rom)
+    .expect("the same tape under the reflex should run");
+    assert_eq!(
+        reflex.outcome,
+        gym::Outcome::Met,
+        "the flagpole is the level's exit and the game takes a body that arrives at it, so \
+         the reflex wins here too: {reflex:?} against the scripted {cleared:?}"
+    );
+
+    let stalled = Gym {
+        driver: minus(CLEAR_WALL.name),
+        ..flagpole.clone()
+    }
+    .run(&rom)
+    .expect("the same tape with the wall skill deleted should run");
+    assert_eq!(
+        stalled.outcome,
+        gym::Outcome::Stuck,
+        "the level's exit was expected to fail without the wall skill, and it did not: \
+         {stalled:?} against the scripted {cleared:?}"
+    );
+    assert!(
+        stalled.furthest_x < 3168,
+        "ninety-two refusals is a body that never gets its box past the pole at 3168: \
+         furthest absolute X {}",
+        stalled.furthest_x,
+    );
+    assert!(
+        stalled.refusals > 10 * cleared.refusals,
+        "the ablated run is refused over and over by the column the scripted run is \
+         refused once and then jumps into: {stalled:?} vs {cleared:?}"
+    );
+
+    for name in [CLEAR_GAP.name, HOP_OBSTACLE.name] {
+        let other = Gym {
+            driver: minus(name),
+            ..flagpole.clone()
+        }
+        .run(&rom)
+        .expect("the same tape with one other skill deleted should run");
+        assert_eq!(
+            other, cleared,
+            "deleting {name} changes this gym's verdict, so the ninety-two refusals above \
+             are about the wall skill and nothing else: {other:?} vs {cleared:?}"
+        );
+    }
+}

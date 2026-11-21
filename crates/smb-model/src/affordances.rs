@@ -211,18 +211,22 @@ pub const WALL_LOOK_COLUMNS: i16 = 1;
 /// a wall the reader reports is never taller than the envelope asked to clear it: the
 /// height term in `clear-wall`'s precondition is a gate that does not gate, and it is
 /// worth saying why it is still left in. Raising the cap to twelve — about how far above
-/// his head the nametable can still be read — was measured, not argued, and the full-level
-/// run stopped fourteen pixels short of 1-1's exit. The thing it stopped against is the
-/// flagpole, which the model reads correctly as a solid column and correctly counts as
-/// twelve rows of drawing, and which no jump in the library gets over; the jump that ends
-/// the level is the one taken *into* that column rather than over it, so a gate that fires
-/// on height alone strands the bot against the level's exit with nothing else in the
-/// script to take the frame.
+/// his head the nametable can still be read — turns out to be the same measurement as
+/// deleting `clear-wall` from the library: `flagpole-3168`, 1-1's own exit, comes to
+/// `Stuck` after 666 frames at absolute X 3155 with ninety-two refusals under either
+/// change, frame count, position and refusal count identical, and neither moves any of the
+/// other four gyms. What both stop against is the flagpole, which the model reads correctly
+/// as a solid column and correctly counts as twelve rows of drawing, and which no jump in
+/// the library gets over; the jump that ends the level is the one taken *into* that column
+/// rather than over it, so a gate that fires on height alone strands the bot against the
+/// level's exit with nothing else in the script to take the frame.
 ///
-/// That is a situation the library does not have a skill for, not a number to fudge: a
-/// wall too tall to clear is still worth pressing into, because a jump into a wall costs
-/// the air it takes and nothing else, and 1-1's exit is the case that proves it. The cap
-/// stays where the gate cannot fire until that skill exists, and the flagpole is the gym.
+/// A height gate that fires on the only wall in a gym *is* a deleted skill, and that is the
+/// constant's standing reason: the cap is not hiding a bug, it is standing in for a skill
+/// the library does not have yet. A wall too tall to clear is still worth pressing into,
+/// because a jump into a wall costs the air it takes and nothing else, and 1-1's exit is
+/// the case that proves it. The cap stays where the gate cannot fire until that skill
+/// exists, and `flagpole-3168` is the gym that skill will be scored on.
 pub const MAX_WALL_ROWS: i16 = 8;
 
 /// A wall the model can see, named by the pixel it starts at and how tall it is.

@@ -13,8 +13,8 @@ moves. Where it disagrees with the mission's ordering, it says so.
 | --- | --- | --- | --- |
 | 0 seam | where the model lives, what a skill may ask | cheapest moment to decide; touches every later file | done: both crates exist |
 | 1 solidity | L3, learned from the game's reactions | turns every later failure from mystery into a named hole | met; the stop it could not name turned out not to be a wall |
-| 2 gyms | the harness, not the gyms | turns every later iteration from minutes into seconds | met: four gyms, two of them winnable |
-| 3 skills | the library, and a scripted bot that finishes a level | the unit everything else is measured in | exit met: three skills, each with a gym that fails without it; the flagpole is the next one |
+| 2 gyms | the harness, not the gyms | turns every later iteration from minutes into seconds | met: five gyms, three of them winnable |
+| 3 skills | the library, and a scripted bot that finishes a level | the unit everything else is measured in | exit met: three skills, each with a gym that fails without it; the flagpole's gym exists, the skill it measures does not |
 | 4 breadth | arbitrary-level start, 32-level inventory | generality is only testable once the model makes a claim | not started |
 | 5 search | A* over skills | needs a cost model and a baseline to be compared against | not started |
 | 6 fabrication | levels we author | should be aimed at holes that turned out to be real | not started |
@@ -247,12 +247,17 @@ That pair is the clearest thing in this project about the two-layer split the de
 on — the model knew the pipe and the library still had nothing to do about it — and it was
 cut to tick a checklist item.
 
-What Phase 3 still owes is the flagpole: a twelve-row solid column the run only gets past
-because the height cap is set where it cannot refuse. A wall too tall to clear needs a skill
-whose postcondition is not "past it", because pressing into such a wall costs the air it
-takes and nothing else. Its gym is the level's own exit, and that exit is downstream of the
-pit, so cutting the tape needs the gym's own driver rather than the reflex's — the one thing
-`Gym::record` does not do yet.
+What Phase 3 still owes is the flagpole, and `flagpole-3168` says what the debt actually is.
+The gym exists — the script's own run-up to frame 1900, `Objective::ClearLevel` — and cutting
+it needed the harness change the plan did not foresee: `Gym::record` now runs the gym's own
+driver through the run-up, because a tape the driver cannot run itself describes a start state
+its own driver will never be handed. The gym is `Met` today, by a jump *into* the twelve-row
+column rather than over it, and the reflex wins it too. The skill is still owed: raising
+`MAX_WALL_ROWS` to the pole's honest twelve moves this gym to the verdict that deleting
+`clear-wall` moves it to, frame for frame, so the level ends on a constant standing in for a
+skill the library does not have. That is the shape the tall-wall skill has to fix, and it is
+now specific — a postcondition that holds at a column the body reaches and does not clear, on
+a tape whose objective is the level's ending — and the gym it will be scored on is committed.
 
 ## Phase 4 - Every level
 
@@ -298,7 +303,7 @@ is scheduled.
 
 ## Two gaps to close on the way
 
-- **Golden state hashes.** Three now exist, one per committed tape, each asserted by the
+- **Golden state hashes.** Five now exist, one per committed tape, each asserted by the
   gym tests that replay it, which is what makes those gyms durable across core work on a
   machine that has the cartridge. They are still all hashes of states only a cartridge
   can produce, so a core change that quietly alters SMB stays invisible on a machine that
@@ -327,6 +332,10 @@ than one pipe.
 - A gym is cut upstream of the failure, not at it. If no input from the start state can
   reach the objective, the gym reports the same verdict whoever plays it and measures
   nothing.
+- A stall window is measured against the game's ending, not the bot's. 1-1 holds absolute X
+  at 3266 for four hundred and eighty-eight frames while it plays the level out, so a
+  `ClearLevel` gym's stall has to be wider than that or the harness reports the ending as
+  `Stuck` — and no bot trace shows it, because in a trace the run looks like it is winning.
 - An instrument that rewinds has its rewind pinned by a test. A restore that quietly
   loses a timer moves every sample it takes and still prints plausible numbers.
 - An envelope is measured per frame, not per button. The same hold rises three different

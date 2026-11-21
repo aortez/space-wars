@@ -3,7 +3,10 @@
 //! `film [GYM] [DIR] [FRAMES]` replays a committed gym's tape, hands the machine to the
 //! player that gym names in [`Gym::driver`], and writes a PNG per emulator frame to `DIR`
 //! in the naming `tools/nes-reference/film-smb-run.py` reads. The frame a jump starts on
-//! gets an extra `event-jump-*` still, which is what a contact sheet is made of.
+//! gets an extra `event-jump-*` still, which is what a contact sheet is made of, and the
+//! frame the gym's own objective first holds gets an `event-clear-*` still, because a
+//! verdict's last frame is the one a film of a verdict should show. `bot --shots` already
+//! marks the level's ending; this is the same still for a run that starts mid-level.
 //!
 //! The tape, the ledger seed and the player all come off the `Gym` itself, which is the
 //! whole reason this exists rather than a screenshot: the film is cut by the same code
@@ -80,6 +83,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     } = gym.tape.replay(&rom, gym.seed)?;
     fs::create_dir_all(&dir)?;
     let mut player = (gym.driver.player)(bot);
+    let opened = read_state(&machine);
+    let started_at = (opened.world, opened.level);
+    let mut scored = false;
     let mut holding = false;
     println!(
         "{}: tape ends at frame {frame}, filming {frames} frames under the {} with a {:?} ledger",
@@ -100,6 +106,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!(
                 "  frame {at_frame}: A goes down at absolute X {}",
                 produced.absolute_x
+            );
+        }
+        if !scored && gym.objective.held(&produced, started_at) {
+            scored = true;
+            // The frame the verdict stops on, from the same `Objective::held` the verdict
+            // is scored with. On a `ClearLevel` gym the PPU has already moved to the next
+            // area by it, so the still holds the ending and not the jump that bought it.
+            let name = format!("event-clear-f{at_frame}-x{:05}.png", produced.absolute_x);
+            write_png(&dir.join(name), &picture)?;
+            println!(
+                "  frame {at_frame}: {} held at absolute X {} — the verdict's last frame",
+                gym.objective, produced.absolute_x
             );
         }
         let name = format!("frame-{at_frame:06}-x{:05}.png", produced.absolute_x);

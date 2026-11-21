@@ -879,6 +879,71 @@ says it is grounded and running from 608 (absolute X 531) to 636 (593), stuck at
 X 546, is inside the run, before the refusal, and far enough back that the pipe is met under
 the gym's own driver rather than on momentum the tape already spent.
 
+### The level's exit, cut by the player that reaches it
+
+The last gym Phase 3 named and did not have is 1-1's own ending, and it needed a harness
+change to exist. `Gym::record` cut every run-up with the base policy, on the reasoning that a
+tape cut by the player being tested starts past the frames that player is supposed to solve.
+That holds for the four tapes committed before this one, because each sits exactly where the
+reflex stops and the frames the driver is asked about are still ahead of it. It does not hold for the level's exit, which is four hundred pixels past the pit
+the reflex dies at: a tape the driver cannot run itself describes a start state its own driver
+will never be handed. `record` now runs the gym's own driver from the handover to the cut
+frame, and Phase 2's rule — upstream of the failure, never at it — still decides where.
+
+`flagpole-3168` is what that buys. The script's run-up to frame 1900: fifty-four button runs,
+two refusals, absolute X 3005 on the ground at running speed, one hundred and sixty-three
+pixels short of the flagpole, golden hash `v3:0x97f2d3ee150f8352`. The objective is
+`Objective::ClearLevel` — the level byte changing, not a pixel — because the pixel is the
+thing under dispute: absolute X holds at 3161 for sixty-four frames while the game takes the
+grab, so a `ReachX` past the pole could be met by a body that never understood it.
+
+```text
+flagpole-3168   finish the level   tape to frame 1900 with a Cold ledger
+  script                    Met   after 736 frames, furthest absolute X 3267, 1 refusal
+  reflex                    Met   after 757 frames, furthest absolute X 3266, 1 refusal
+  script minus clear-wall   Stuck after 666 frames, furthest absolute X 3155, 92 refusals
+  script minus clear-gap    Met   after 736 frames, furthest absolute X 3267, 1 refusal
+  script minus hop-obstacle Met   after 736 frames, furthest absolute X 3267, 1 refusal
+```
+
+**The flagpole is not a wall to the game.** The scripted run starts exactly one behaviour:
+`clear-wall` on frame 1971 from absolute X 3154 about pixel 3168. That jump does not get over
+the top of a twelve-row column — nothing in the library gets over it — it puts a body into the
+column, and the game takes the grab, slides him down, and walks him to the castle. The
+skill's own postcondition, "standing past 3168", is satisfied by a jump that cleared nothing.
+The reflex wins the same gym twenty-one frames later on a rule that has no notion of a
+flagpole at all: jump what the reader reports and what the game has refused. This is the first
+gym here the reflex wins, and it is worth sitting with, because the script's advantage in
+every other gym in this repository is about holes it can see a landing for and walls it can
+name — and at the level's exit neither of those is what the game asks for.
+
+**The exit is load-bearing on `clear-wall` anyway.** Delete that one entry and the same tape,
+the same objective, the same model comes to `Stuck` at absolute X 3155 with ninety-two
+refusals, short of the pole at 3168 and short of the level; delete either of the other two and
+the verdict is unchanged to the frame. `the_level_exit_needs_the_wall_skill_and_not_a_taller_one`
+holds the five-way comparison, and it is the only place a gym is attributed to one skill by
+deleting the other two as well.
+
+**The height cap and the deleted skill are the same measurement.** `MAX_WALL_ROWS` exists to
+cap a reported wall at eight rows, and its comment says raising it to the flagpole's honest
+twelve stopped a level run fourteen pixels short of the exit. Measured against this gym, the
+twelve-row cap gives `Stuck` after 666 frames at absolute X 3155 with ninety-two refusals —
+identical to the ablation above in frame count, position and refusal count — and moves none of
+the other four gyms. A height gate that fires on the only wall in a gym *is* a deleted skill.
+That is the constant's justification rewritten from a prediction into a number, and it is why
+the tall-wall skill is still owed rather than still wanted: `flagpole-3168` fails today in
+exactly the shape that skill has to fix, and the shape is now specific — a postcondition that
+holds at a column the body reaches and does not clear, on a tape whose objective is the
+level's ending.
+
+**A stall window has to be measured against the game's ending, not the bot.** After the slide
+he walks to the castle door, and the game then holds absolute X at 3266 for four hundred and
+eighty-eight frames before the world and level bytes change. The house stall of 120 frames
+calls that `Stuck` two hundred and sixty-eight frames before the level says it is finished, so
+this gym carries a stall of 600 and a budget of 900. Nothing in a bot trace shows this — the
+run looks like it is winning throughout, because it is — so every `ClearLevel` gym from here
+inherits the requirement and cannot discover it from the run it is cut from.
+
 ### The frame a button arrives on
 
 `engine-client`'s training test flaked on a shared runner and was reported as possible
@@ -976,16 +1041,19 @@ free of a filesystem, clock, thread and renderer.
 - The stop that ended every run of 1-1 is named and crossed, and so is the rest of the
   level: `bot --script` clears world 1-1 at absolute X 3266 with no death. See *The first
   skill* and *The library plays a whole level* above. What is still missing is everything
-  past the exit. The flagpole is a twelve-row solid column the script only gets past because
-  the height cap hides its height, so the level's own ending is the one wall in 1-1 with no
-  skill that owns it. The base policy asks `gap_within_reach` only while it is grounded and
+  past the exit. The flagpole is a twelve-row solid column and the run only gets past it
+  because `MAX_WALL_ROWS` caps the reported height at eight, so the level's own ending is the
+  one wall in 1-1 with no skill that owns it — and `flagpole-3168` now measures the debt: the
+  cap raised to the pole's honest twelve and `clear-wall` deleted from the library give the
+  same verdict to the frame, so the level ends today on a number chosen so that nothing asks
+  the question. The base policy asks `gap_within_reach` only while it is grounded and
   only over five columns, and the script that crosses asks `gap_ahead` over twenty-four,
   which at running speed is past the picture's own edge — so the crossing works because the
   hole reports its far lip, and it would stop working on a hole whose far lip is not the
   ground return. Three skills is also three skills: one level, one cartridge, one start, and
-  the only tapes ever run under them are the level's own beginning and four gyms cut out of
-  runs that stopped — three of them about the hole, and the fourth the only one that asks the
-  wall skill anything.
+  the only tapes ever run under them are the level's own beginning and five gyms cut out of
+  runs that stopped — three of them about the hole, and the other two, the pipe and the
+  level's exit, the only ones that ask the wall skill anything.
 - A takeoff that fails its own postcondition leaves no trace, and the library will spend the
   same envelope at the same pixel again with nothing new known. On the pipe tape the script
   starts `clear-wall` from absolute X 722 about pixel 736 on frames 740, 783 and 826 — three
@@ -1000,14 +1068,14 @@ can start. It has three macro-actions written inline in an
 example where DirtSim has eleven, no reward or termination wiring, no item or block
 state, five enemy slots because that is all the game keeps live, a sideways
 solidity model that knows only what one bot has already walked into, three skills that
-between them clear one level and cannot name the thing that ends it, and four golden hashes —
-the frames four tapes start on — so a core change that quietly alters SMB is caught where a
+between them clear one level and cannot name the thing that ends it, and five golden hashes —
+the frames five tapes start on — so a core change that quietly alters SMB is caught where a
 gym happens to stand and is still invisible everywhere else.
 
 ## What is in the tree now
 
 One model in four layers, one policy, a three-entry skill library that clears 1-1, one
-harness, four gyms, nine drivers, twenty-nine tests — eighteen of them skipped when the
+harness, five gyms, nine drivers, thirty tests — nineteen of them skipped when the
 cartridge is absent, the eleven that hold the skill rules needing no game at all — and one
 film cutter.
 
@@ -1097,9 +1165,10 @@ Observed on x86-64 Linux with a release build:
   the tail itself collected and the furthest absolute X, all from one checkpoint state
   captured 120 frames after the refusal was learned.
 - `gym` replays every committed gym and says whether each still measures the verdict it
-  carries; all three do. `gym --record FRAME [NAME]` cuts a tape instead, and prints the
-  run-up, the golden hash and the verdict measured from it — which is how `pit-1379` got
-  its bytes, and why it has no hand-typed ones.
+  carries; all five do. `gym --record FRAME [NAME]` cuts a tape instead: it runs the gym's
+  own driver through the run-up, replays what it recorded before printing it, and prints the
+  run-up, the golden hash and the verdict measured from it — which is how `pit-1379` and
+  `flagpole-3168` got their bytes, and why neither has hand-typed ones.
 - `limit [FRAME]` is the instrument behind the pit section: it cuts a run-up to any frame
   with the base policy, checkpoints the end of it, and asks the same question of the game
   and of the picture — what the policy knew as it approached, what the state bytes say the
@@ -1118,13 +1187,13 @@ tool writes its output into that directory unless `--out` says otherwise:
 | Name | What it is |
 | --- | --- |
 | `data/shots/<run>/` | the raw PNG series, `frame-*` plain and `model-*` with the dots on |
-| `data/shots/<run>/event-<what>-f<frame>-x<x>.png` | a still at a moment: `jump`, `refusal`, `death`, `stuck`, `game-over` |
+| `data/shots/<run>/event-<what>-f<frame>-x<x>.png` | a still at a moment: `jump`, `refusal`, `death`, `stuck`, `game-over`, `clear` |
 | `<run>.mp4` | the plain series at 60/N, so it still runs in real time |
 | `<run>-model.mp4` | the same frames at 60 with the model's own beliefs dotted on |
 | `<run>-clip-<lo>-<hi>.mp4` | an overlay clip over emulator frames `lo` to `hi` |
 | `<run>-events.png` | every event still in the order they happened, legend printed |
 
-Six runs are worth keeping. `reader-only` is the honest one, 2,283 frames, stopped
+Seven runs are worth keeping. `reader-only` is the honest one, 2,283 frames, stopped
 against the pipe at absolute X 899. `reflex` is the reaction rule that was deleted,
 8,168 frames, reaching 2601 and dying twice; it stays because it is the evidence for
 SMB-008, not a current build. `ledger` is the current one, 2,380 frames, absolute X
@@ -1170,6 +1239,21 @@ being spent — the `event-jump` still at frame 643 is one frame after the game 
 the pipe, which is the ordering the gym was cut to produce, and the two stills at absolute X
 722, frames 740 and 783, are two of the three takeoffs at the next pipe, the same pixel asked
 twice. `pipe-608-events.png` is those four in order.
+
+The seventh is `flagpole-3168`: 760 frames from the tape's own frame 1900, cut by
+`film flagpole-3168 data/shots/flagpole-3168 760`, and the first film here of a run that
+finishes a level from the middle of one. Its sheet is two stills, and they are the gym's whole
+finding in one picture: `event-jump-f1971-x03154` is the only behaviour the run starts, a jump
+taken *into* the flagpole, and `event-clear-f2634-x03266` is the frame the objective held, six
+hundred and sixty-three frames later with the castle already on screen. Between them absolute
+X holds at 3161 for sixty-four frames while the game takes the grab and slides him down. That
+second still is new to `film` and is the one `bot --shots` has written since the level
+run: the frame comes from the same `Objective::held` the verdict is scored with, so a film of
+a gym shows the frame its verdict stops on. `flagpole-3168.mp4` is 25.3 s — the tool thins to
+every second frame by default and a gym film writes every frame, so it plays at half speed —
+and `flagpole-3168-events.png` is those two in order. Re-cutting either reproduces every
+frame and every still byte for byte.
+
 `sheet-moments.png` and the `hero-*.png` stills are one-off comparisons
 of the screen against the model at chosen frames. The two older runs were cut with
 `--out data/shots`, which is why their films sit beside their series; `ledger`'s sit

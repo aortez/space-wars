@@ -691,3 +691,76 @@ objective that stops its verdict, and takes `--without SKILL` so the ablated run
 as well as asserted. Third, three of the four gyms in the tree are still about the hole; the
 balance is better and not good, and Phase 4's inventory is where that gets fixed by
 measurement rather than by intent.
+
+## SMB-025 — 2026-11-21 — A gym's run-up is cut by the driver it will hand the machine to
+
+`Gym::record` runs the gym's own driver through the run-up instead of always the base
+policy, and `flagpole-3168` is the gym that needed it: 1-1's exit, the first start state
+here that sits downstream of a problem the reflex never solved — and a verdict that says the
+thing the plan sent it to measure is not the missing thing after all.
+
+Rationale: the harness hard-coded the reflex as the run-up's player, and the reason written
+beside it was sound at the time — a tape cut by the player being tested starts past the
+frames that player is supposed to solve, so a gym whose start state already contains its own
+answer measures nothing. What that reasoning quietly assumed is that every gym sits where the
+reflex stops. The flagpole is the counter-example the plan named: the level's exit is four
+hundred pixels past the pit, the reflex spends two lives at the pit, so a reflex-cut run-up
+cannot reach the exit at all and the only tape that can is one the script makes. The general
+form is the sentence in `Gym::record` now: **a tape the driver cannot run itself describes a
+start state its own driver will never be handed.** Phase 2's rule still decides *where* a gym
+is cut — upstream of the failure, never at it — and this decides only *who makes the frames
+up to there*. Every committed tape stays reflex-cut, because each of them sits exactly where
+the reflex stops; the change adds a case rather than replacing one.
+
+Evidence: `flagpole-3168` carries the script's recorded run-up to frame 1900 — fifty-four
+button runs, two refusals, furthest absolute X 3005, golden hash `v3:0x97f2d3ee150f8352` — a
+cold ledger, `Objective::ClearLevel`, budget 900, stall 600. Under `skills::SCRIPTED` it is
+`Met` after 736 frames at absolute X 3267 with one refusal and exactly one behaviour:
+`clear-wall` on frame 1971 from absolute X 3154 about pixel 3168. Under the reflex the same
+tape is `Met` after 757 frames at 3266 — the first gym in this repository the reflex wins.
+Delete `clear-wall` and it is `Stuck` after 666 frames at absolute X 3155 with **ninety-two**
+refusals; delete either of the other two skills and the verdict is unchanged to the frame.
+`the_level_exit_needs_the_wall_skill_and_not_a_taller_one` holds all of it, and the suite is
+thirty tests, eleven of which need no cartridge.
+
+`film flagpole-3168 data/shots/flagpole-3168 760` cuts the run outside the repository, and
+`film` marks the frame the gym's own objective first holds as an `event-clear-*` still — the
+one `bot --shots` has written since the level run and the gym films did not have — so the
+sheet is the jump at 1971 and the ending at 2634 beside each other, which is the finding of
+the gym in two pictures.
+
+Two numbers in that set are the finding, and neither is the one the plan expected.
+
+**The flagpole is not a wall to the game.** The script's one jump is taken at 3154 about
+3168, absolute X then holds at 3161 for sixty-four frames while the game takes the grab, and
+the level ends at 3266 — so the postcondition `clear-wall` claims, "standing past 3168", is
+satisfied by a jump that never gets over the top of anything. The reflex arrives the same way
+twenty-one frames later on a rule that has no idea what a flagpole is. The twelve-row column
+the plan sent this gym to find is real in the picture and irrelevant to the run, because the
+height gate that would have refused it is `MAX_WALL_ROWS`, and that is set to eight.
+
+**The cap and the deleted skill are the same measurement.** Setting `MAX_WALL_ROWS` to the
+flagpole's honest twelve moves this gym to `Stuck` after 666 frames at absolute X 3155 with
+ninety-two refusals — frame count, position and refusal count identical to the ablation
+above — and moves none of the other four gyms. A height gate that fires on the only wall in a
+gym *is* a deleted skill, and the equivalence is now measured rather than argued, which is
+the strongest available reason for the constant's comment: the cap is not hiding a bug, it is
+standing in for a skill, and `flagpole-3168` is the pin that says so.
+
+A third number arrived by surprise and belongs to the harness. After the slide he walks to the
+castle door, and the game then holds absolute X at 3266 for **four hundred and eighty-eight
+frames** before the world and level bytes change. The house stall window of 120 frames calls
+that `Stuck` two hundred and sixty-eight frames before the level says it is finished, so this
+gym's stall is 600 and its budget 900 — sized by the game's ending and not by the obstacle.
+Every `ClearLevel` gym from here has the same requirement, and none of them can discover it
+from a bot trace, because in a trace the run looks like it is winning the whole time.
+
+Consequence: Phase 3's flagpole item is closed as a measurement and stays open as a skill.
+The gym the tall-wall skill will be scored on exists, it fails today in exactly the shape
+that skill has to fix, and the shape is now specific: whatever it postconditions, it must
+hold at a column the body reaches and does not clear, on a tape whose objective is the level's
+ending. `MAX_WALL_ROWS` stays at eight, with the equivalence above in its comment instead of
+a paragraph of prediction. The stall-window rule goes into the plan's standing disciplines,
+because it will bite on every level in Phase 4 and cannot be inferred from a bot's behaviour.
+And the reflex winning a gym for the first time is worth recording for what it says about the
+other four: the script's advantage in this project has never been about walls.
