@@ -311,8 +311,14 @@ load-bearing, red where a cell draws something that is not, blue on the cell he 
 standing in. At the pipe the row under his feet is an unbroken line of green and the
 three rows of pipe in front of him are red, which is trap 7 without any of the prose.
 Frames are named for what was happening (`event-jump-*`, `event-death-*`,
-`event-stuck-*`, `event-game-over-*`), and `--every 2` thins the film to 30 fps for
-`ffmpeg -pattern_type glob`.
+`event-stuck-*`, `event-game-over-*`), and `tools/nes-reference/film-smb-run.py` turns a
+shots directory into two films that stay in step (plain, and the same frames with the
+dots on), short overlay clips over a frame range, and one contact sheet of the event
+stills in the order they happened. The plain series is thinned to every Nth frame by
+`--every`, so its film runs at 60/N to stay in real time while the overlay series keeps
+all 60. The tool then decodes a frame back out of the film it just wrote and counts the
+dots again: a one-pixel mark is exactly what a lossy encoder discards, and a film that
+quietly lost the overlay still looks like a film.
 
 An earlier draft reported this bot reaching world 1-2 and going blind there. The
 current code dies before the flagpole, so the blindness is an argument again rather
@@ -383,7 +389,7 @@ still invisible without a cartridge to boot.
 
 ## What is in the tree now
 
-One reader, four drivers, one optional test.
+One reader, four drivers, one optional test, one film cutter.
 
 | File | Role |
 | --- | --- |
@@ -393,6 +399,7 @@ One reader, four drivers, one optional test.
 | `crates/engine-nes/examples/world_model_tiles.rs` | Prints the tile grid, the player's cell and the pixel comparison |
 | `crates/engine-nes/examples/world_model_rollout.rs` | Nametable dump, checkpoint/branch/rewind with throughput, and how far ahead of the camera the reader can see |
 | `crates/engine-nes/examples/world_model_bot.rs` | A policy that acts on the reader alone, how far that gets, and PNGs of the run with the model's own beliefs drawn on |
+| `tools/nes-reference/film-smb-run.py` | Cuts films, clips and an event contact sheet out of a `--shots` directory, and checks the overlay survived the encoder |
 
 The reader sits under `tests/`, not `src/`, on purpose: `engine-nes` holds no
 game knowledge, so the SMB address map belongs on the host side of that
@@ -415,6 +422,7 @@ cargo run --release --locked -p engine-nes --example world_model_bot \
   -- data/roms/smb.nes 9000 --reflex
 cargo run --release --locked -p engine-nes --example world_model_bot \
   -- data/roms/smb.nes 2400 --shots /tmp/smb-film --overlay --every 2
+python3 tools/nes-reference/film-smb-run.py /tmp/smb-film --clip 1600-1802
 ```
 
 The last one writes a PNG per frame, with the reader's green/red/blue dots in a
