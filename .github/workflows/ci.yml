@@ -103,6 +103,11 @@ jobs:
           /usr/bin/python3 .github/ci/ota_publisher_fixture.py \
             --signer target/ci/examples/feed_sign \
             --inventory target/ci/examples/feed_inventory
+      - name: Exercise the owner release command with disposable keys
+        run: |
+          /usr/bin/python3 .github/ci/ota_release_fixture.py \
+            --signer target/ci/examples/feed_sign \
+            --inventory target/ci/examples/feed_inventory
       - name: Lint OTA publisher
         run: cargo clippy --locked --profile ci -p engine-ota --features publisher --all-targets -- -D warnings
       - name: Upload OTA coverage and timings
