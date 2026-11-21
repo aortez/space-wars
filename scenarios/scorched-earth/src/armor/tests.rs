@@ -32,6 +32,29 @@ fn last_hit(state: &ScorchedState, slot: usize) -> serde_json::Value {
     serde_json::to_value(&state.bots[slot]).unwrap()["last_hit"].clone()
 }
 
+/// Drops a shell nobody fired at `speed` from 6 units above `offset` from tank
+/// 0, steps until it strikes, and returns the health tank 0 lost.
+fn drop_on(state: &mut ScorchedState, offset: Vec2, speed: f32) -> f32 {
+    let health = state.tanks[0].health;
+    state.duel.shells.push(Shell {
+        owner: 1,
+        position: position(state, 0) + offset + Vec2::Y * 6.0,
+        velocity: Vec2::new(0.0, -speed),
+        age: 10,
+        flight: None,
+        source: shell(500, None, speed),
+        keys: Default::default(),
+    });
+    let impacts = state.impacts;
+    for _ in 0..120 {
+        ScorchedScenario::step(state, &[], Duration::from_secs_f64(1.0 / 60.0));
+        if state.impacts > impacts {
+            return health - state.tanks[0].health;
+        }
+    }
+    panic!("the shell never struck");
+}
+
 #[test]
 fn a_shell_charges_the_tank_it_hits_once_then_bursts_once() {
     for suspension in [false, true] {
@@ -224,4 +247,49 @@ fn a_shell_bursts_outside_every_tank() {
     // A burst on the edge would otherwise meet the tank in every direction.
     let reach = blast_reach(moved, BLAST_REACH, TANK_THICKNESS, &targets).unwrap();
     assert!(reach[0].coupling < 0.51);
+}
+
+#[test]
+fn a_direct_hit_costs_about_a_third_of_a_tank() {
+    for suspension in [false, true] {
+        let mut state = settled(suspension);
+        // A harder shot hits harder.
+        let slow = drop_on(&mut state.clone(), Vec2::ZERO, 15.0);
+        let fast = drop_on(&mut state.clone(), Vec2::ZERO, 35.0);
+        assert!(slow < fast, "sprung={suspension}: {slow} {fast}");
+        // A tank falls to the third or fourth.
+        let mut hits = Vec::new();
+        while state.tanks[0].health > 0.0 {
+            assert!(hits.len() < 4, "sprung={suspension}: {hits:?}");
+            hits.push(drop_on(&mut state, Vec2::ZERO, 25.0));
+            for _ in 0..60 {
+                ScorchedScenario::step(&mut state, &[], Duration::from_secs_f64(1.0 / 60.0));
+            }
+        }
+        assert!(hits.len() >= 3, "sprung={suspension}: {hits:?}");
+        for lost in [slow, fast].iter().chain(&hits[..hits.len() - 1]) {
+            assert!((28.0..=40.0).contains(lost), "sprung={suspension}: {lost}");
+        }
+    }
+}
+
+#[test]
+fn a_near_miss_costs_less_the_farther_it_lands() {
+    for suspension in [false, true] {
+        let state = settled(suspension);
+        let mut nearer = drop_on(&mut state.clone(), Vec2::ZERO, 25.0);
+        // On the ground beside the tank, away from its opponent, by distance
+        // from its middle.
+        for distance in [2.5, 3.5, 5.0, 6.0] {
+            let lost = drop_on(&mut state.clone(), Vec2::new(-distance, 0.0), 25.0);
+            assert!(
+                lost > 0.0 && lost < nearer,
+                "sprung={suspension}: {distance} {lost}"
+            );
+            nearer = lost;
+        }
+        assert!(nearer < 5.0);
+        let beyond = drop_on(&mut state.clone(), Vec2::new(-7.5, 0.0), 25.0);
+        assert_eq!(beyond, 0.0, "sprung={suspension}");
+    }
 }

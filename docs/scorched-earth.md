@@ -63,6 +63,91 @@ for comparison. The headless default retains the original seeded sweep.
 Power is muzzle speed (12–48 world units/s); elevation ranges from 5° to 85°.
 Human shots have a 1.25-second cooldown.
 
+## Armor and shells
+
+A tank's health is the integrity of one armor region, on a 0 to 100 scale.
+Shells charge it through the [material laws](design/material-damage.md) as
+[weapon sources](design/material-sources.md#scorched-tanks), which replaced
+the rule of `42 × (1 − d / 6)` health within six units of a tank's middle in
+[#331](https://github.com/aortez/space-wars/issues/331). Each shell has a
+kinetic part, its mass of 7 at its launch speed, and a payload of 28,000.
+
+- A shell that strikes a tank charges that tank's armor once. The impact is
+  measured from the shell's velocity and the tank's motion, so a harder shot
+  hits harder. A shell that strikes terrain or loose dirt charges nothing, and
+  its energy is reported as unmodeled.
+- The shell then bursts a shell's radius off the surface it struck, never
+  inside a tank. Its payload reaches the circles standing in for each tank
+  within 5 units of their surface. Each tank's share is the directions it
+  fills, so one burst never gives out more than its payload. Terrain neither
+  takes a share nor shields a tank.
+- Craters, pushes, arming after eight ticks, the shell limits, self-damage, the
+  out-of-world rule and a host's retirement work as before.
+
+Contacts don't damage a tank yet: a tank that falls or rams something is
+unharmed, as before. That half of #331 waits on an experiment with measured
+contacts.
+
+The calibration keeps the old cost of a direct hit, about a third of a tank, so
+a tank falls to the third or fourth. Damage now depends on where and how hard a
+shell lands. These are strikes on the settled seed-42 tanks, by the shell's
+speed when it arrives, against the old rule at the same points:
+
+| Shell | Old | Rigid tracks | Sprung wheels |
+| --- | --- | --- | --- |
+| Direct hit from above at 15 / 25 / 35 u/s | 38–39 | 33 / 35 / 38 | 33 / 35 / 38 |
+| Direct hit from above at 48 u/s | 38–39 | 44 | 43 |
+| Direct hit near the hull's end at 25 / 35 u/s | 31–32 | 25 / 28 | 25 / 27 |
+| Direct hit at 45° at 25 / 35 u/s | 36 | 32 / 34 | 29 / 30 |
+| On the ground 2.5 units from the tank's middle | 24 | 12 | 15 |
+| 3 units | 21 | 9 | 11 |
+| 4 units | 14 | 6 | 7 |
+| 5 units | 7 | 4 | 5 |
+| 6 units | 0 | 3 | 4 |
+| 7 units | 0 | 0 | 0 |
+
+A burst near a tank's end or off its side sees less of the tank than one on
+its top, so it does less. Near misses fall off faster than under the old rule:
+2.5 to 4 units out, they cost about half as much. The reach is measured to a
+tank's surface, so a burst beside a tank still costs a few points just past
+the old six units, out to about 7 units from its middle, while one above it
+reaches only 5.6 units over its middle. The armor tests pin these bands:
+direct hits at 15 to 35 u/s cost 28 to 40, a tank falls to the third or
+fourth, and near misses cost less the farther they land, with nothing past the
+reach.
+
+### Calibration review, 2026-11-15
+
+The runs compare the old rule, as of 811b8dd0 on main, against this armor.
+They are kept locally in `scorched-calibration-20261115`, with their harnesses
+and a table of every measurement. The hills move only with `seed % 1000`, so
+consecutive seeds give nearly the same hills; the surveys below spread their
+seeds across that range.
+
+- The fixed-tank aiming lab (`scorched_aim_lab --bot calibrated`, all four
+  cases and both shapes) finds its first useful learned shot exactly as before
+  and as in the 2026-10-11 table: Flat 2, Uphill 1, Downhill 4, Ridge 2. A
+  kill takes one more shot on Flat and Downhill. Uphill's shots strike near the
+  target's far end and cost 25 each against 31, so it falls to the fifth.
+- The bots' tests pass unchanged, among them a useful solution within four
+  shots on flat ground and the retained relocation and correction checkpoints.
+  Two observation hashes moved because health differs.
+- Ordinary duels, 32 per policy (seeds 1, 62, …, 916 on both shapes), run
+  longer to the first kill: Sweep at a median of 32 s against 27 s, Reactive
+  at 36 s against 31 s. Shots passing within a unit of the target cost a
+  median of 31–33 against 36–37, and those passing 2.5 to 4 units away 6–8
+  against 13–15.
+- Clock's Tanks event, 24 fights on Clock seeds 1, 42, …, 944 at 5:3, still
+  ends every fight in a kill inside its 60-second window: at a median of
+  18.6 s against 17.1 s, the longest at 28.5 s against 23.5 s.
+- The relocation lab, over seeds 42, 77, 7, 4099, 202, 271, 512 and 1001 on
+  both shapes for the first two opportunities, finds 16 checkpoints at the
+  same tick as before, where every continuation makes the same decision.
+  Angular 77 keeps its useful shot after 5.05 s against 15.0 s for the
+  destination move. Two checkpoints come earlier, three appear only with the
+  armor, and eleven searches find none either way. Damage totals differ, as
+  expected.
+
 ## CPU aiming and hit reaction
 
 The first pass for [#199](https://github.com/aortez/space-wars/issues/199) learns
@@ -185,9 +270,11 @@ check because these diagnostic continuations suppress subsequent subject moves.
 
 ### First aiming review, 2026-10-11
 
-[Source identities and results](data/tank-aiming-20261011.json), with
-[complete commands, shot records and traces](data/tank-aiming-traces-20261011.json.gz),
-record 74 replay-checked desktop runs. All material audits passed. All 36 retained
+Source identities and results (`docs/data/tank-aiming-20261011.json`, in git history), with
+complete commands, shot records and traces (`docs/data/tank-aiming-traces-20261011.json.gz`, in git history),
+record 74 replay-checked desktop runs. Their damage predates the armor of
+#331; the [calibration review](#calibration-review-2026-11-15) reran the
+fixed-tank cases. All material audits passed. All 36 retained
 driving/destruction benchmarks keep their previous observation hashes with
 Sweep selected. The new matrix adds 18 ordinary policy comparisons, four
 reactive Weak/Strong destruction runs, and 16 fixed-tank aiming comparisons.
@@ -222,9 +309,9 @@ bot difficulty tuning remain separate follow-ups.
 
 ### Relocation comparison, 2026-10-11
 
-[Source identities and comparison results](data/tank-relocation-20261011.json)
+Source identities and comparison results (`docs/data/tank-relocation-20261011.json`, in git history)
 and the complete source patch, commands and traces (`docs/data/tank-relocation-traces-20261011.json.gz`, in git history)
-retain 98 replay-checked commands: 36 bounded opportunity searches, 36 existing
+retain 98 replay-checked commands. Their damage predates the armor of #331: 36 bounded opportunity searches, 36 existing
 driving/destruction benchmarks, 18 ordinary Reactive duels and eight stationary
 calibration checks. All 36 retained observation hashes and all eight stationary
 shot histories match the earlier captures. All material audits pass. The 74
@@ -2029,11 +2116,16 @@ state, including wheel joints, and is idempotent; unrelated bodies survive.
 Inspect `material_balance` before retirement to audit conserved dirt.
 
 Each swept hard hit publishes its collider, world-space point, incoming velocity
-and stable shot source. Native tank/terrain processing has already happened when
-the host receives it. A host material adapter must route only its own targets
-and consume each hit once. This does not implement plant damage or replace the
-current radial tank-health rule; that migration is tracked in
-[#331](https://github.com/aortez/space-wars/issues/331).
+and stable shot source, with the source's ledger, the work each tank's armor
+took and the energy that bodies outside the material model stopped, in
+Scorched's units. Native tank/terrain processing has already happened when the
+host receives it. A host material adapter must route only its own targets and
+consume each hit once. `finish_step_with` puts the host's own
+[recipients](design/material-sources.md#scorched-tanks) in the shells' way:
+tissue that a shell passes and a burst reaches, which the host keeps and is
+charged through, and bodies that stop a burst's energy. The duel sees them at
+its own scale, so each loses the share of its capacity the same shell would
+cost it at scale 1. Clock supplies none yet, and `finish_step` supplies none.
 
 Clone `HostedDuel` together with its canonical world for a same-build replay
 checkpoint. `observe` retains the standalone diagnostic payload in duel-local

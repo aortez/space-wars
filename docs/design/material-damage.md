@@ -30,17 +30,19 @@ fixed amount, after the solver has already resolved the motion.
 | Solar heat | none | percent of `life_max` per second | as for ships | stays: heat | `scenarios/spacewars/src/surface_sortie/solar.rs` |
 | Material-match pilot and pod | the vehicle's rigid body | vehicle life is hull health; pilot health with an exposure factor | ejection grants a protection window; a pod's hull shields its occupant through the whole damage step | #330 | `scenarios/spacewars/src/surface_sortie/match_rules.rs`, `recovery.rs` |
 | Pizza balls | Rapier contact; clashes rewrite velocities | `hp -= impulse / mass * DAMAGE_SCALAR`, and clash velocity change times `DAMAGE_SCALAR` | invincible balls take none | stays, #59 | `scenarios/pizza/src/lib.rs` |
-| Scorched tanks | radial impulse within 6 wu and a `BLAST_RADIUS` crater | `42 * (1 - distance / 6)` within 6 wu | health zero below the floor | #331 | `scenarios/scorched-earth/src/lib.rs`, `material.rs` |
+| Scorched tanks | radial impulse within 6 wu and a `BLAST_RADIUS` crater | shells are weapon sources: the hit charges the struck tank's armor region, and `blast_reach` divides the payload among tanks within 5 wu of their surface; contacts charge nothing | health zero below the floor | #331: shells done, contacts next | `scenarios/scorched-earth/src/armor.rs`, `duel.rs`, `material.rs` |
 | Terrain cells | chipping and collapse release loose fragments | `durability: u8` against hardness, saturating; chipping gated by `yield_speed`; cantilever resistance `strength * h^2 / 6` | the cell turns void at zero durability | stays, #333 and #16 | `crates/engine-terrain`, `crates/engine-rapier/src/terrain` |
 | Plant tissue | none | `health: u16` on 0 to 100 with a per-tick rate and an external `damage` call | dies at zero health | biological upkeep stays | `crates/engine-core/src/plants` |
 
 Rover against debris charges the same full damage to both bodies, the double
 allocation this model's ledger rules out. First-wave migrations are Spacewars
 actors and weapons (#330), with weapon sources under #329, and Scorched tanks
-and artillery (#331). Terrain chipping and collapse stay on their own contract
-under #333 and #16, plant biological upkeep stays in the plant lifecycle, solar
-heat stays a heat source outside this model, and Pizza keeps its decision
-under #59. Consumers that do not exist yet, wood and roots, spacelings' tissue
+and artillery (#331). Scorched's shells have moved onto
+[weapon sources](material-sources.md#scorched-tanks); its contacts wait on an
+experiment with measured contacts. Terrain chipping and collapse stay on their
+own contract under #333 and #16, plant biological upkeep stays in the plant
+lifecycle, solar heat stays a heat source outside this model, and Pizza keeps
+its decision under #59. Consumers that do not exist yet, wood and roots, spacelings' tissue
 and bases, start on this law rather than on new heuristics. Death and
 protection stay host policy in every path: the model reports `consumed`,
 `failed` and integrity, and the host decides what they mean. The terrain
