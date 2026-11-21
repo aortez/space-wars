@@ -12,7 +12,7 @@
 
 use engine_nes::{ControllerButtons, NesMachine};
 use smb_model::affordances::{
-    ENEMY_TRIGGER_PIXELS, WALL_LOOK_COLUMNS, gap_within_reach, wall_ahead,
+    ENEMY_TRIGGER_PIXELS, WALL_LOOK_COLUMNS, gap_within_reach, wall_within_reach,
 };
 use smb_model::frame::{TILE_CELLS, player_tile, scroll_x, snapshot, tile_grid};
 use smb_model::profile::{SmbState, read_state};
@@ -91,11 +91,33 @@ pub trait Bot {
         machine: &NesMachine,
         at_frame: u64,
     ) -> Option<Refusal>;
+
+    /// The model's memory of solidity behind this player's decisions.
+    ///
+    /// Every player keeps one, whatever it decides with, and an instrument that
+    /// paints or prints what the model believes has to reach it without knowing
+    /// which player it is driving.
+    fn ledger(&self) -> &Resistance;
+
+    /// Behaviours this player has started, oldest first, each with the frame and the
+    /// position it started on and the pixel it was started to get past.
+    ///
+    /// Empty for a reflex, which has no names for what it does: `run_right_buttons`
+    /// presses A and never says what for. A script does say, and a transcript of a run
+    /// is the only evidence a skill library has of itself, so an instrument that prints
+    /// one asks this rather than downcasting — the same reason [`Bot::ledger`] exists.
+    fn started(&self) -> &[crate::skills::Running] {
+        &[]
+    }
 }
 
 impl Bot for BaseBot {
     fn buttons(&mut self, machine: &NesMachine) -> ControllerButtons {
         Self::buttons(self, machine)
+    }
+
+    fn ledger(&self) -> &Resistance {
+        &self.ledger
     }
 
     fn observe(
@@ -179,11 +201,11 @@ impl BaseBot {
         let tiles = tile_grid(&frame, origin_x, 0);
         let (column, row) = player_tile(&state, origin_x);
         let columns = self.look_columns;
-        self.wall = wall_ahead(&frame, origin_x, &state, &self.ledger, columns);
+        self.wall = wall_within_reach(&frame, origin_x, &state, &self.ledger, columns);
         // The same question with the ledger wiped, so a yes here is something this
         // model was taught and not something the tile ids already carry.
-        self.ledger_named_wall =
-            self.wall && !wall_ahead(&frame, origin_x, &state, &Resistance::default(), columns);
+        self.ledger_named_wall = self.wall
+            && !wall_within_reach(&frame, origin_x, &state, &Resistance::default(), columns);
         let buttons = run_right_buttons(
             &state,
             machine,

@@ -35,7 +35,7 @@
 use std::{env, error::Error, path::PathBuf};
 
 use smb_ai::policy::run_right_buttons;
-use smb_model::affordances::{WALL_LOOK_COLUMNS, wall_ahead};
+use smb_model::affordances::{WALL_LOOK_COLUMNS, wall_within_reach};
 use smb_model::frame::{
     PpuBytes, pattern_bytes, pattern_hash, player_tile, scroll_x, snapshot, tile_grid,
 };
@@ -124,7 +124,7 @@ fn run(
         let origin_x = scroll_x(&frame);
         let tiles = tile_grid(&frame, origin_x, 0);
         let (column, row) = player_tile(&state, origin_x);
-        let wall = wall_ahead(&frame, origin_x, &state, ledger, WALL_LOOK_COLUMNS);
+        let wall = wall_within_reach(&frame, origin_x, &state, ledger, WALL_LOOK_COLUMNS);
         if wall && pass.first_wall.is_none() {
             pass.first_wall = Some((frame_id, state.absolute_x));
             if plan.report {
@@ -138,7 +138,7 @@ fn run(
         // taught this model and nothing the tile ids already carry.
         if wall
             && pass.first_ledger_wall.is_none()
-            && !wall_ahead(
+            && !wall_within_reach(
                 &frame,
                 origin_x,
                 &state,

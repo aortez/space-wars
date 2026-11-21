@@ -23,12 +23,12 @@ use smb_ai::{
     gyms,
     policy::{BaseBot, Bot},
     skills::{
-        self, CLEAR_GAP, Call, HOP, HOP_OBSTACLE, LONG_JUMP, Running, SCRIPT, ScriptedBot,
-        Situation,
+        self, CLEAR_GAP, CLEAR_WALL, Call, HOP, HOP_OBSTACLE, LONG_JUMP, Running, SCRIPT,
+        ScriptedBot, Situation,
     },
 };
 use smb_model::{
-    affordances::Gap,
+    affordances::{Gap, Wall, body_last_pixel},
     cartridge,
     profile::{MODE_END_GAME, read_state},
 };
@@ -237,6 +237,172 @@ fn no_skill_starts_without_the_controller_or_the_ground() {
                 skill.name,
             );
         }
+    }
+}
+
+/// The first pipe in 1-1, as the model read it on the frame the first full-level run of
+/// the script stopped at: the refusing column starts at world pixel 448 and the pipe
+/// draws four rows above his feet, and the run was stuck there for six hundred frames.
+const PIPE: Wall = Wall { x: 448, rows: 4 };
+
+/// The first step of the stairs near the end of 1-1, at the frame the run after it
+/// stopped: absolute X 2162, the step's near edge at 2176, two rows up.
+///
+/// The `gap` is not decoration — it is what the hole reading actually returned there.
+/// The staircase is drawn with artwork the load-bearing set has never held a body on, and
+/// `carries_weight_at` has no third answer for a cell it has no evidence about, so the
+/// reading walked sixty-four pixels of "nothing to stand on" and stopped at its own cap
+/// with no far side. That is a false hole, and it is the next thing to fix.
+const STAIR_STEP: Wall = Wall { x: 2176, rows: 2 };
+
+/// The feet row both of those walls were read on.
+const STAIR_STEP_ROW: i16 = 21;
+
+const STAIR_HOLE: Gap = Gap {
+    near_x: 2176,
+    far_x: 2240,
+    row: STAIR_STEP_ROW,
+    far_edge_seen: false,
+};
+
+/// Standing on ground, in control, with `wall` in front of him and nothing else known.
+fn facing(wall: Option<Wall>, x: u16) -> Situation {
+    Situation {
+        x,
+        row: STAIR_STEP_ROW,
+        grounded: true,
+        in_control: true,
+        wall,
+        ..Situation::default()
+    }
+}
+
+/// Phase 0's rule, applied to a wall: an affordance that cannot name its cell cannot be
+/// postconditioned, and a skill whose postcondition is already true is not a skill.
+///
+/// This is the bug the first full-level run found at the first pipe. `hop-obstacle`'s
+/// claim used to be "past the obstacle", computed as `x + enemy_pixels.unwrap_or(0)`.
+/// With a pipe in front and no enemy in front of that, the pixel was `x` itself — which a
+/// body fourteen pixels wide is always past — so the postcondition that [`Skill::call`]
+/// asks *first* answered "already done", the skill cancelled its own start, and the run
+/// sat against the pipe with the hop's precondition satisfied on every frame of it. The
+/// wall reports a pixel now, and the pixel is in front of the body on the frame the skill
+/// starts.
+#[test]
+fn a_wall_names_a_pixel_the_body_is_not_already_past() {
+    let at = facing(Some(PIPE), 434);
+    let past = CLEAR_WALL.past(&at);
+    assert_eq!(
+        past, PIPE.x,
+        "the pixel the situation is about is the wall's"
+    );
+    assert!(
+        body_last_pixel(at.x) < past,
+        "a skill started about {} has to be started from behind it, not from {}",
+        past,
+        at.x,
+    );
+    assert!(
+        !CLEAR_WALL.achieved(&at, past),
+        "and its claim has to be one the world has not already granted"
+    );
+}
+
+/// The hop's half of the same frame, and the partition the two skills now agree on.
+///
+/// The hop is enemies and nothing else: measured clearing a koomba, never measured
+/// clearing a wall, and a four-frame hold reaches its top long after it reaches the pipe
+/// in front of it. `clear-wall` is the long jump, which this project has filmed clearing
+/// that pipe, and four rows is thirty-two pixels against a measured rise of seventy-five.
+#[test]
+fn the_hop_leaves_the_pipe_to_the_skill_that_can_get_over_it() {
+    let at = facing(Some(PIPE), 434);
+    assert_eq!(
+        HOP_OBSTACLE.past(&at),
+        at.x,
+        "with no enemy ahead the hop has no pixel in front of the body to be past, which \
+         is its way of saying this is not its situation"
+    );
+    assert_eq!(
+        HOP_OBSTACLE.call(&at),
+        Call::None,
+        "and it declines the frame rather than cancelling on its own postcondition"
+    );
+    assert_eq!(
+        CLEAR_WALL.call(&at),
+        Call::Start,
+        "four rows is {} pixels and the long jump rises {}; the pipe is this one's frame",
+        PIPE.height_pixels(),
+        LONG_JUMP.rise_pixels,
+    );
+}
+
+/// The frame the landing gate cost, pinned.
+///
+/// `clear-wall` is the one skill in the library that does not ask
+/// [`Situation::landing_is_solid`], and this is the frame that decided it. The long jump's
+/// box comes down two pixels past the last column the PPU is drawing, so the direct
+/// question has no answer; the fallback that saves a long jump over a hole is a hole whose
+/// far lip the picture showed, and the hole reading here has never seen a far side because
+/// the staircase's cells are not in the load-bearing set. A gate that cannot be answered is
+/// a refusal, so the version with the gate stood in front of a two-row step — sixteen
+/// pixels, against a rise of seventy-five — and refused it for six hundred frames.
+///
+/// The wall is the landing instead. `wall_ahead` reports a column only when the
+/// load-bearing set has held a body on it or the ledger was refused by it, and a cell that
+/// stops a body sideways is the same collision that holds one up.
+#[test]
+fn clear_wall_starts_where_the_landing_gate_cannot_be_answered() {
+    let at = Situation {
+        gap: Some(STAIR_HOLE),
+        ..facing(Some(STAIR_STEP), 2162)
+    };
+    assert!(
+        !at.landing_is_solid,
+        "the box comes down at {}, and neither source the gate has can speak for it",
+        LONG_JUMP.landing_last_pixel(at.x),
+    );
+    assert_eq!(
+        CLEAR_GAP.call(&at),
+        Call::Wait,
+        "the gap skill reads the staircase as a hole with no far side and passes the frame \
+         on, which is the right answer to a hole it cannot see the end of"
+    );
+    assert_eq!(
+        CLEAR_WALL.call(&at),
+        Call::Start,
+        "two rows is {} pixels: the wall the model can name is a surface it can name",
+        STAIR_STEP.height_pixels(),
+    );
+}
+
+/// The height gate, at its edge.
+///
+/// Nine rows is seventy-two pixels, inside the long jump's measured rise; ten is eighty,
+/// outside it. Neither refusal is reachable from the picture today: `MAX_WALL_ROWS` caps a
+/// reported height at eight rows, sixty-four pixels, under the long jump's rise — and the
+/// reason that cap is not lifted is measured and lives with the constant, because the
+/// flagpole at the end of 1-1 is a twelve-row column no jump in the library clears and a
+/// gate that fires on height alone stops the run fourteen pixels short of it. The rule is
+/// still written for the wall that does not exist yet: a fabricated level can build one,
+/// and a `Start` there is a jump that ends with him pressed against the same column.
+#[test]
+fn a_wall_taller_than_the_rise_is_nobody_s_frame() {
+    for (rows, want) in [(9, Call::Start), (10, Call::Wait)] {
+        let at = facing(Some(Wall { x: 2176, rows }), 2162);
+        assert_eq!(
+            CLEAR_WALL.call(&at),
+            want,
+            "a wall of {rows} rows is {} pixels and this envelope rises {}",
+            rows * 8,
+            LONG_JUMP.rise_pixels,
+        );
+        assert_eq!(
+            HOP_OBSTACLE.call(&at),
+            Call::None,
+            "the hop declines it too, so the frame comes back to the caller unspent rather \
+             than being spent on a jump that cannot finish it"
+        );
     }
 }
 

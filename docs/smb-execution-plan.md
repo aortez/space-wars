@@ -25,9 +25,11 @@ for most of this, which is what the ordering asked for: Phase 1 moved him from 8
 find that out. What Phase 2's instrument bought was an explanation rather than
 distance — the stop every run ends at is a pit, the reader had been able to see it the
 whole time, and there is a measured window for the jump that clears it — and Phase 3
-has since spent that explanation: a two-skill script crosses the pit and reaches
-absolute X 1599 on the tape where the reflex stops at 1544, which is the first
-distance in this project that a library rather than a deleted rule produced.
+has since spent that explanation: a script of measured skills crosses the pit on the
+tape where the reflex stops, and then clears the level, reaching absolute X 3266 with no
+death where the reflex spends two lives at 1553. That is the first distance in this
+project that a library rather than a deleted rule produced, and the first level it ever
+finished.
 
 ## The ordering principle
 
@@ -213,15 +215,33 @@ margin. `pit-1379` is that situation with a verdict attached, and the script now
 it: `Met` on frame 151 at absolute X 1599, against the same gym's `Stuck` at 1544 under
 the reflex, one field of the gym different.
 
-What that is not yet is a library. Two skills exist, one of them load-bearing for a
-reason nobody predicted — the ablation crosses the pit without the hop and dies on the
-koopas 286 pixels past it — and the exit below still asks for a bot that finishes 1-1,
-which needs a skill for every other thing 1-1 does.
+One of those two skills was load-bearing for a reason nobody predicted — the ablation
+crosses the pit without the hop and dies on the koopas 286 pixels past it — and the exit
+below then arrived from the unexpected direction: a third skill, `clear-wall`, and a run
+that finishes 1-1 at absolute X 3266 with no death and twenty-six named behaviours, eleven
+of them walls. The pit the whole library was built around is one long jump out of eleven.
+
+Getting there cost two rules rather than two patches, and both are now standing discipline.
+**An affordance that cannot name its cell cannot be postconditioned:** the wall reported a
+bit, so the skill about to be past it had nothing in front of the body to be past, cancelled
+its own start on the frame it should have jumped, and stopped the run at the first pipe.
+**At a wall the wall is the landing:** the long jump's box comes down two pixels past the
+last column the PPU draws, the hole fallback reads an untried staircase as a hole with no far
+side, and a gate that cannot be answered is a refusal that stood the bot in front of a
+two-row step for six hundred frames. SMB-023 has both, with the measurement that put the
+wall-height cap back where it cannot fire — the flagpole, which the level ends by being
+jumped into.
 
 Exit: a scripted bot finishes 1-1 end to end, and each skill has a measured height,
 duration and run-up beside it. Add to that what the ablation taught: each skill also
 needs a gym that fails without it, because a skill can be measured, correct, and
 load-bearing for a situation its own gym is not named after.
+
+The first clause is met and the second is not. The script finishes 1-1; `clear-gap` and
+`hop-obstacle` have gyms and `clear-wall` has none, and the one wall in the level that no
+skill owns is the flagpole that ends it — a twelve-row solid column the run only gets past
+because the height cap is set where it cannot refuse. A wall too tall to clear is the next
+skill, and its gym is the level's own exit.
 
 ## Phase 4 - Every level
 

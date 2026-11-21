@@ -714,6 +714,99 @@ window the game scored, 1294 to 1371, and it commits at 1296 — the first frame
 is inside the camera's window at all, which is the first frame anything reading the screen
 could have made this decision.
 
+### The library plays a whole level, and two walls teach it to name them
+
+The reflex has never got past the pit, so the script had never been asked to play a level
+either. `bot 2620 --script` now clears world 1-1: absolute X 3266, no death, 376 frames with
+A held, two refusals, and twenty-six named behaviours. The same instrument under the reflex
+reaches 1553 and spends two lives there, which is the pair the whole Phase 3 argument needs
+and it is now a pair about a level rather than about a hole in it.
+
+The `bot` example prints the transcript, because a library with no record of what it chose
+has no evidence about itself:
+
+```text
+frame   406: hop-obstacle  from absolute X   282 to get past 328
+frame   477: clear-wall    from absolute X   434 to get past 448
+frame   569: clear-wall    from absolute X   586 to get past 608
+frame   632: hop-obstacle  from absolute X   676 to get past 701
+frame   673: clear-wall    from absolute X   722 to get past 736
+frame   779: clear-wall    from absolute X   891 to get past 913
+frame   858: clear-gap     from absolute X  1006 to get past 1136
+frame   908: clear-wall    from absolute X  1123 to get past 1137
+frame   968: hop-obstacle  from absolute X  1199 to get past 1244
+frame   992: hop-obstacle  from absolute X  1259 to get past 1281
+frame  1018: clear-gap     from absolute X  1324 to get past 1424
+frame  1085: hop-obstacle  from absolute X  1491 to get past 1539
+frame  1146: hop-obstacle  from absolute X  1644 to get past 1691
+frame  1195: hop-obstacle  from absolute X  1766 to get past 1814
+frame  1259: hop-obstacle  from absolute X  1926 to get past 1974
+frame  1346: clear-wall    from absolute X  2130 to get past 2144
+frame  1383: clear-wall    from absolute X  2154 to get past 2176
+frame  1436: clear-wall    from absolute X  2226 to get past 2240
+frame  1523: clear-wall    from absolute X  2346 to get past 2368
+frame  1572: clear-wall    from absolute X  2467 to get past 2481
+frame  1653: clear-wall    from absolute X  2586 to get past 2608
+frame  1736: hop-obstacle  from absolute X  2724 to get past 2772
+frame  1783: clear-wall    from absolute X  2842 to get past 2864
+frame  1837: clear-wall    from absolute X  2906 to get past 2928
+frame  1867: clear-wall    from absolute X  2978 to get past 2992
+frame  1961: clear-wall    from absolute X  3146 to get past 3168
+```
+
+Eleven of those are `clear-wall`, six are `hop-obstacle`, and the pit — the hole the whole
+gym is named after — is one long jump on frame 1018 out of eleven. That is what the level
+actually asks for, and it is not what the library was built for.
+
+**A wall had to become a pixel before anything could be past it.** The first run stopped at
+absolute X 436, at the first pipe, with the hop's precondition satisfied on every frame of
+it. `Skill::call` asks the postcondition before the precondition — SMB-021's rule, a claim
+the world has already granted is not worth pressing — and `hop-obstacle`'s `past` was
+`x + enemy_pixels.unwrap_or(0)`. With a pipe in front and no enemy in front of the pipe,
+that pixel was `x` itself, which a body fourteen pixels wide is always past, so the skill
+cancelled its own start. Phase 0's rule had simply never been applied to walls: an
+affordance names the cell it is about. `wall_within_reach` keeps the bit the reflex reads,
+and `wall_ahead` now answers `Wall { x, rows }` — the near edge of the refusing column, one
+past the last pixel the body occupies, and how many rows above his feet that column draws.
+
+**The height decides the envelope, so the wall is its own skill.** Four frames of A reach
+their top long after they reach the pipe in front of them: the hop is measured over a
+koomba and has never been measured over a wall, and the long jump is the program this
+project has filmed clearing that pipe. So the hop lost its wall term entirely and
+`clear-wall` is the long jump gated on `rows * 8 <= rise`.
+
+**At a wall, the wall is the landing.** The run then stopped at the stairs at absolute X
+2162, in front of a two-row step, for six hundred frames, and the reason was the landing
+gate. At a wall the long jump's box comes down two pixels past the last column the PPU
+draws, so the direct question has no answer; the fallback that saves a long jump over a
+hole is a hole whose far lip the picture showed, and an untried staircase is drawn with
+artwork the load-bearing set has never held a body on, so the hole reading returns
+sixty-four pixels of "nothing to stand on" with no far side at all. A gate that cannot be
+answered is a refusal, so the skill refused sixteen pixels of step against a rise of
+seventy-five. `clear-wall` does not ask the gate: `wall_ahead` reports a column only where
+the load-bearing set has held a body on it or the ledger was refused by it, which is already
+a claim about solidity, and a cell that stops a body sideways is the same collision that
+holds one up. The residual is the question *behind* the wall — a hole just past the far side
+sits in the two pixels the picture does not have — and that is the risk the reflex has
+always taken, filmed.
+
+**The height cap was lifted and put back.** Twelve rows is ninety-six pixels, above the long
+jump's rise, so the height term became able to fire; and the run stopped fourteen pixels
+short of the exit, against the flagpole. The model reads that column correctly — it is
+solid, it refused him, it draws twelve rows — and no jump in the library gets over it,
+because the level ends by being jumped *into*. A gate on height alone strands the bot there
+with nothing else in the script to take the frame, so the cap is back at eight rows, which
+is sixty-four pixels and under the rise: a gate that does not gate, and the honest name for
+what is missing is a skill for a wall too tall to clear rather than a constant chosen to let
+this run pass.
+
+Two things this run made visible and did not fix. `carries_weight_at` answers two ways where
+the picture has three states: a cell drawn with artwork the model has no evidence about is
+reported as *nothing to stand on*, which is the false sixty-four-pixel hole above, and the
+ledger that already knows those cells is not asked. And a height counted by what *draws* is
+inflated by background artwork stacked over a real wall, which is the price of lifting that
+cap and has no gym attached to it yet.
+
 ### The frame a button arrives on
 
 `engine-client`'s training test flaked on a shared runner and was reported as possible
@@ -808,47 +901,49 @@ free of a filesystem, clock, thread and renderer.
   the cold and warm starts are two gyms with one tape, and a verdict cannot quietly
   depend on which. What is still missing is a way to *persist* a ledger, so a lesson
   learned in one run is available to the next one at all.
-- The stop that ended every run of 1-1 is named and crossed: a pit 48 pixels wide at
-  world pixel 1379, read off the picture, with a measured envelope over it and a script
-  that commits inside the window the game scored. See *The first skill* above. What is
-  still missing is the rest of the level. The base policy asks `gap_within_reach` only
-  while it is grounded and only over five columns, and the script that crosses asks
-  `gap_ahead` over twenty-four, which at running speed is past the picture's own edge —
-  so the crossing works because the hole reports its far lip, and it would stop working
-  on a hole whose far lip is not the ground return. Two skills is also two skills: no
-  pipe, no stair, no gap to drop into, no flagpole, no enemy on flat ground the hop has
-  a gym for, and one tape at one cut has ever been run under them.
+- The stop that ended every run of 1-1 is named and crossed, and so is the rest of the
+  level: `bot --script` clears world 1-1 at absolute X 3266 with no death. See *The first
+  skill* and *The library plays a whole level* above. What is still missing is everything
+  past the exit. The flagpole is a twelve-row solid column the script only gets past because
+  the height cap hides its height, so the level's own ending is the one wall in 1-1 with no
+  skill that owns it. The base policy asks `gap_within_reach` only while it is grounded and
+  only over five columns, and the script that crosses asks `gap_ahead` over twenty-four,
+  which at running speed is past the picture's own edge — so the crossing works because the
+  hole reports its far lip, and it would stop working on a hole whose far lip is not the
+  ground return. Three skills is also three skills: one level, one cartridge, one start, and
+  the only tapes ever run under them are one gym cut and the level's own beginning.
 
-How far that leaves this from a player, measured rather than judged: the bot has
-never finished a level at all, and 1-1 is the only level whose tiles it can read
-and the only place it can start. It has three macro-actions written inline in an
+How far that leaves this from a player, measured rather than judged: the reflex has
+never finished a level and still stops at the pit, and the script has finished exactly
+one — 1-1, which is the only level whose tiles this reader can read and the only place it
+can start. It has three macro-actions written inline in an
 example where DirtSim has eleven, no reward or termination wiring, no item or block
 state, five enemy slots because that is all the game keeps live, a sideways
-solidity model that knows only what one bot has already walked into, two skills that
-between them cross one hole and hop one enemy, and three golden hashes — the frames three tapes
+solidity model that knows only what one bot has already walked into, three skills that
+between them clear one level and cannot name the thing that ends it, and three golden hashes — the frames three tapes
 start on — so a core change that quietly alters SMB is caught where a gym happens to
 stand and is still invisible everywhere else.
 
 ## What is in the tree now
 
-One model in four layers, one policy, a two-entry skill library, one harness, three
-gyms, eight drivers, twenty-four tests — seventeen of them skipped when the cartridge is
-absent, the seven that hold the skill rules needing no game at all — and one film
-cutter.
+One model in four layers, one policy, a three-entry skill library that clears 1-1, one
+harness, three gyms, eight drivers, twenty-eight tests — seventeen of them skipped when the
+cartridge is absent, the eleven that hold the skill rules needing no game at all — and one
+film cutter.
 
 | File | Layer | Role |
 | --- | --- | --- |
 | `crates/smb-model/src/profile.rs` | L1 | the RAM map, its decoders, the setup script, the handover rule |
 | `crates/smb-model/src/frame.rs` | L2 | PPU snapshot, tile grid, pattern hashes, the feet offset, background reconstruction |
 | `crates/smb-model/src/resistance.rs` | L3 | the refusal signature and the ledger keyed on artwork |
-| `crates/smb-model/src/affordances.rs` | L4 | gap, wall, enemy in reach: what a body can act on right now |
+| `crates/smb-model/src/affordances.rs` | L4 | gap, wall, enemy in reach: what a body can act on right now, each naming the cell it is about |
 | `crates/smb-model/src/cartridge.rs` | - | the pinned image, the loader, `SPACEWARS_SMB_ROM` |
 | `crates/smb-ai/src/policy.rs` | L5 | the base policy, the `Bot` seam every player shares, and the frame-exact envelope it acts through |
-| `crates/smb-ai/src/skills.rs` | L5.5 | two measured envelopes, the skills that spend them, the script, and the instrument that measures an envelope from a tape |
+| `crates/smb-ai/src/skills.rs` | L5.5 | two measured envelopes, the three skills that spend them, the script, and the instrument that measures an envelope from a tape |
 | `crates/smb-ai/src/gym.rs` | instrument | tape, replay, objective, frame budget, verdict |
 | `crates/smb-ai/src/gyms.rs` | instrument | the gyms this project has actually needed |
 | `crates/smb-model/examples/{probe,tiles,rollout}.rs` | | read-side exploration: decoded state, the tile grid and the pixel comparison, branch and rewind |
-| `crates/smb-ai/examples/{bot,solidity,gym,film,limit}.rs` | | the bot and its overlay films, the A/B that tells memory from reaction, the tape recorder, the films a gym's own driver was measured under, the instrument that asks a stop what it actually is |
+| `crates/smb-ai/examples/{bot,solidity,gym,film,limit}.rs` | | the bot, its overlay films and the transcript of behaviours it started, the A/B that tells memory from reaction, the tape recorder, the films a gym's own driver was measured under, the instrument that asks a stop what it actually is |
 | `crates/smb-model/tests/reader.rs` | | the optional cartridge test: the RAM map, the tile frame, a frame-exact restore, and the frame a button arrives on |
 | `crates/smb-ai/tests/{gyms,solidity,skills}.rs` | | a gym's verdict is what its driver does, the A/B that tells memory from reaction, and the skill rules and their ablation |
 | `tools/nes-reference/film-smb-run.py` | | cuts films, clips and a contact sheet from a `--shots` directory, and checks the overlay survived the encoder |
@@ -868,6 +963,10 @@ cargo run --release --locked -p smb-model --example probe -- data/roms/smb.nes 7
 cargo run --release --locked -p smb-model --example tiles -- data/roms/smb.nes 900 30
 cargo run --release --locked -p smb-model --example rollout
 cargo run --release --locked -p smb-ai --example bot -- data/roms/smb.nes 9000
+
+# The library, on the whole level: 1-1 cleared, no death, and a line for every behaviour
+# it started. Drop `--script` to watch the reflex spend two lives at the pit.
+cargo run --release --locked -p smb-ai --example bot -- data/roms/smb.nes 2620 --script
 cargo run --release --locked -p smb-ai --example solidity
 cargo run --release --locked -p smb-ai --example gym
 cargo run --release --locked -p smb-ai --example bot -- data/roms/smb.nes 2400 --shots /tmp/smb-film --overlay --every 2
@@ -938,7 +1037,7 @@ tool writes its output into that directory unless `--out` says otherwise:
 | `<run>-clip-<lo>-<hi>.mp4` | an overlay clip over emulator frames `lo` to `hi` |
 | `<run>-events.png` | every event still in the order they happened, legend printed |
 
-Four runs are worth keeping. `reader-only` is the honest one, 2,283 frames, stopped
+Five runs are worth keeping. `reader-only` is the honest one, 2,283 frames, stopped
 against the pipe at absolute X 899. `reflex` is the reaction rule that was deleted,
 8,168 frames, reaching 2601 and dying twice; it stays because it is the evidence for
 SMB-008, not a current build. `ledger` is the current one, 2,380 frames, absolute X
@@ -946,7 +1045,13 @@ SMB-008, not a current build. `ledger` is the current one, 2,380 frames, absolut
 `pit-cross` is 200 frames of the `pit-1379` tape under the script, from the tape's own
 frame 1040, and it is the first film here of a bot crossing the pit on purpose: four
 `event-jump` stills, the hop at 1266, the crossing jump at 1331, the hop at the koopas at
-1494, and one more past the objective at 1646. It has no `model-*` series and no overlay
+1494, and one more past the objective at 1646. `script-1-1` is the first run of anything
+here that finishes a level: 2,327 frames, the script from the handover to absolute X 3266,
+no death, twenty-six `event-jump` stills — one per behaviour it started, which is the
+transcript printed as pictures — and two refusal stills, the first pipe at 434 and the first
+stair at 2130. It is cut by `bot 2620 --script --shots data/shots/script-1-1` with no
+overlay, so the series is the plain one and the film is `script-1-1.mp4`.
+It has no `model-*` series and no overlay
 clip because it is a gym film rather than a `bot` film: `film` replays a gym's tape and
 hands the machine to the driver that gym names, so the run on screen is the run the
 verdict was measured from, and it writes one PNG a frame instead of two. Re-cutting it
@@ -959,7 +1064,11 @@ one frame later; `ledger-clip-830-920`, the second pipe jumped without ever
 being stopped by it, with no refusal event anywhere near it, which is the memory
 rather than the collision;
 and `ledger-clip-1330-1400`, the death at the camera limit that the model says nothing
-about at all. `sheet-moments.png` and the `hero-*.png` stills are one-off comparisons
+about at all. Two clips from the new run carry the current argument:
+`script-1-1-clip-1340-1470` is the stairs at 2130 to 2240, three `clear-wall` jumps up a
+step each, which is the frame range the landing gate used to stand in front of for six
+hundred frames; `script-1-1-clip-1940-2300` is the flagpole — the jump into the twelve-row
+column at 3168, the slide, the walk to the castle, and the level ending. `sheet-moments.png` and the `hero-*.png` stills are one-off comparisons
 of the screen against the model at chosen frames. The two older runs were cut with
 `--out data/shots`, which is why their films sit beside their series; `ledger`'s sit
 inside it, where the tool puts them by default.

@@ -46,7 +46,7 @@
 use engine_nes::{ControllerButtons, NesMachine};
 use smb_model::{
     affordances::{
-        ENEMY_TRIGGER_PIXELS, Gap, WALL_LOOK_COLUMNS, body_last_pixel, carries_weight_at,
+        ENEMY_TRIGGER_PIXELS, Gap, WALL_LOOK_COLUMNS, Wall, body_last_pixel, carries_weight_at,
         gap_ahead, wall_ahead,
     },
     frame::{PpuBytes, is_blank_tile, player_tile, scroll_x, snapshot, tile_at_world_pixel},
@@ -214,9 +214,16 @@ pub struct Situation {
     pub landing_is_solid: bool,
     /// Pixels to the nearest enemy ahead.
     pub enemy_pixels: Option<i16>,
-    /// Whether the model reads something to stand against in the cells his body sweeps
-    /// into, from the load-bearing set or from the ledger.
-    pub wall: bool,
+    /// The first world pixel ahead the model calls solid in the cells his body sweeps
+    /// into, from the load-bearing set or from the ledger, and `None` when nothing in
+    /// reach is.
+    ///
+    /// A pixel rather than a bit, because a postcondition is judged against a pixel.
+    /// `hop-obstacle` is about getting past *this* cell, and with no cell in front of
+    /// the body to be past, its claim was already true on the frame before the jump was
+    /// taken: the skill cancelled its own start and refused every wall in the level,
+    /// which a full-level run found at the first pipe.
+    pub wall: Option<Wall>,
 }
 
 impl PartialEq for Skill {
@@ -425,14 +432,20 @@ pub const CLEAR_GAP: Skill = Skill {
     postcondition: standing_past,
 };
 
-/// Jump something in reach that the model can stand against — an enemy, a pipe — with
-/// the same landing rule as every other skill and an envelope short enough to stop
-/// short of the hole beyond it.
+/// Jump an enemy in reach with the same landing rule as every other skill and an
+/// envelope short enough to stop short of the hole beyond it.
 ///
 /// This is the base policy's reflex with the one thing it was missing. The reflex asked
 /// "is there a reason to jump" and acted at once; this asks that and "does the picture
 /// show where I would come down", and answers with the hop rather than the long jump
 /// because the hop is the program whose landing the picture can vouch for.
+///
+/// Enemies only, and that split is a measurement and not a tidy-up: the hop has been
+/// measured clearing a koomba and has never been measured clearing a wall, and the
+/// first full-level run under this script stopped at the first pipe with the hop's
+/// precondition satisfied on every frame of it. A four-frame hold reaches its top long
+/// after it reaches the pipe in front of it, so the pipe is [`CLEAR_WALL`]'s, which is
+/// the program this project has filmed clearing that pipe.
 pub const HOP_OBSTACLE: Skill = Skill {
     name: "hop-obstacle",
     envelope: HOP,
@@ -440,13 +453,72 @@ pub const HOP_OBSTACLE: Skill = Skill {
         at.grounded
             && at.in_control
             && at.landing_is_solid
-            && (at.wall
-                || at
-                    .enemy_pixels
-                    .is_some_and(|delta| delta <= ENEMY_TRIGGER_PIXELS))
+            && at
+                .enemy_pixels
+                .is_some_and(|delta| delta <= ENEMY_TRIGGER_PIXELS)
     },
     waiting: |_, _| false,
-    past: |at| at.x + u16::try_from(at.enemy_pixels.unwrap_or(0)).unwrap_or(0),
+    past: nearest_obstacle,
+    postcondition: standing_past,
+};
+
+/// The pixel the obstacle situation is about: whichever of the wall and the enemy is
+/// nearer, because that is the one a jump has to clear first.
+///
+/// `at.x` when neither is ahead, which makes [`standing_past`] true and the skill's
+/// [`Call`] `None`: with nothing in front of the body there is no situation to own.
+fn nearest_obstacle(at: &Situation) -> u16 {
+    at.enemy_pixels
+        .and_then(|delta| u16::try_from(i32::from(at.x) + i32::from(delta)).ok())
+        .unwrap_or(at.x)
+}
+
+/// Jump a wall the model can see, with the envelope tall enough to get over the top of
+/// it and a landing past the far side.
+///
+/// The height is the whole reason this is a separate skill from [`HOP_OBSTACLE`] rather
+/// than a bigger hold inside it: an envelope is a measured program, and picking one by
+/// how tall the thing in front is only means anything if the number came from the
+/// picture. [`Wall::height_pixels`] is counted from what draws, so a pipe body the
+/// load-bearing set has never been shown still reports its height.
+///
+/// The rise term is a refusal and not a formality. A wall taller than this envelope's
+/// measured rise is not jumpable from where he is standing, and a skill that says so
+/// leaves the situation to a skill that does not exist yet instead of spending a jump
+/// that ends with him pressed against the same column.
+///
+/// **This is the one skill that does not ask [`Situation::landing_is_solid`], and it is
+/// not an oversight.** The gate exists to stop a jump committed to a landing the picture
+/// cannot vouch for, and at a wall the picture cannot vouch for the long jump's box at
+/// all: the wall is fourteen to forty pixels ahead and the box comes down one hundred and
+/// thirty-one ahead, two pixels past the last column the PPU is drawing (SMB-021 measured
+/// that gap from the other side). The fallback that saves a long jump over a hole — a hole
+/// whose far lip the picture showed — is no use either, because the cells of an untried
+/// wall are not in the load-bearing set and the hole reading calls the whole of one a
+/// sixty-four-pixel hole with no far side. The first version of this skill carried the
+/// gate anyway and stopped at the stairs at absolute X 2162, refusing a two-row step it
+/// could see, could name and could easily clear.
+///
+/// So the landing claim here is the wall. `wall_ahead` reports a column only when the
+/// load-bearing set has held a body on it or the ledger was refused by it, which is
+/// already a claim about solidity, and a cell that stops a body sideways is the same
+/// collision that holds one up: the top of a wall the model can see is a surface, and the
+/// height term is what says this envelope can reach it. What that gives up is the question
+/// *behind* the wall — a hole just past the far side sits in the two pixels the picture
+/// does not have — and that is the same risk the base reflex has always taken and filmed,
+/// not a new one. A pipe with a hole directly behind it is the gym that would price it.
+pub const CLEAR_WALL: Skill = Skill {
+    name: "clear-wall",
+    envelope: LONG_JUMP,
+    precondition: |at, envelope| {
+        at.grounded
+            && at.in_control
+            && at.wall.is_some_and(|wall| {
+                wall.height_pixels() <= envelope.rise_pixels && body_last_pixel(at.x) < wall.x
+            })
+    },
+    waiting: |at, _| at.grounded && at.in_control && at.wall.is_some(),
+    past: |at| at.wall.map_or(at.x, |wall| wall.x),
     postcondition: standing_past,
 };
 
@@ -463,7 +535,7 @@ pub const HOP_OBSTACLE: Skill = Skill {
 /// script gets. Both are inside the window the game scored, so the order costs nothing
 /// *here*, and it is exactly the kind of thing that costs a window three frames wide
 /// somewhere else. A script is a policy, and a policy can be wrong in both directions.
-pub const SCRIPT: &[&Skill] = &[&CLEAR_GAP, &HOP_OBSTACLE];
+pub const SCRIPT: &[&Skill] = &[&CLEAR_GAP, &CLEAR_WALL, &HOP_OBSTACLE];
 
 /// The script, as a gym driver: the same bot the harness builds, under a name a verdict
 /// can be printed beside.
@@ -605,6 +677,14 @@ impl Bot for ScriptedBot {
         at_frame: u64,
     ) -> Option<Refusal> {
         self.base.learn(asked, produced, machine, at_frame)
+    }
+
+    fn ledger(&self) -> &Resistance {
+        ScriptedBot::ledger(self)
+    }
+
+    fn started(&self) -> &[Running] {
+        ScriptedBot::started(self)
     }
 }
 

@@ -12,11 +12,11 @@
 //! which is what the game has refused to let him through.
 
 use crate::frame::{
-    PpuBytes, TILE_CELLS, is_load_bearing, pattern_bytes, pattern_hash, tile_at,
-    tile_at_world_pixel,
+    PpuBytes, TILE_CELLS, is_blank_tile, is_load_bearing, pattern_bytes, pattern_hash, player_tile,
+    tile_at, tile_at_world_pixel,
 };
 use crate::profile::SmbState;
-use crate::resistance::{BODY_ROWS, Resistance, Side, cell_beyond};
+use crate::resistance::{BODY_ROWS, Resistance, Side, cell_beyond, leading_pixel};
 
 /// Columns right of the player to look for a hole. Roughly what a running jump
 /// carries, so anything further is not this policy's problem yet.
@@ -201,6 +201,60 @@ pub fn gap_within_reach(tiles: &[u8; TILE_CELLS], column: i16, row: i16) -> Opti
 /// bearing set could never do.
 pub const WALL_LOOK_COLUMNS: i16 = 1;
 
+/// Rows of cell above his feet row that a wall's height is counted in.
+///
+/// A cap, not a claim: the picture is read through the nametable's window, and a column
+/// that draws something for eight rows is tall enough that no envelope in the library
+/// clears it.
+///
+/// Eight is also sixty-four pixels, and the long jump's measured rise is seventy-five, so
+/// a wall the reader reports is never taller than the envelope asked to clear it: the
+/// height term in `clear-wall`'s precondition is a gate that does not gate, and it is
+/// worth saying why it is still left in. Raising the cap to twelve — about how far above
+/// his head the nametable can still be read — was measured, not argued, and the full-level
+/// run stopped fourteen pixels short of 1-1's exit. The thing it stopped against is the
+/// flagpole, which the model reads correctly as a solid column and correctly counts as
+/// twelve rows of drawing, and which no jump in the library gets over; the jump that ends
+/// the level is the one taken *into* that column rather than over it, so a gate that fires
+/// on height alone strands the bot against the level's exit with nothing else in the
+/// script to take the frame.
+///
+/// That is a situation the library does not have a skill for, not a number to fudge: a
+/// wall too tall to clear is still worth pressing into, because a jump into a wall costs
+/// the air it takes and nothing else, and 1-1's exit is the case that proves it. The cap
+/// stays where the gate cannot fire until that skill exists, and the flagpole is the gym.
+pub const MAX_WALL_ROWS: i16 = 8;
+
+/// A wall the model can see, named by the pixel it starts at and how tall it is.
+///
+/// The two together are what decides an envelope. A pixel alone says where to be
+/// past; a height says whether the jump on offer gets him over the top of it, and
+/// SMB's jump is variable-height, so the same button program is a different answer to
+/// a koomba and to a pipe.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Wall {
+    /// The first world pixel ahead that stands in his way.
+    ///
+    /// The *near* edge of the refusing column, one past the last pixel the body
+    /// occupies, so "standing with the box past it" is false on every frame the wall
+    /// is still ahead and true from the frame he is on top of it.
+    pub x: u16,
+    /// Rows of cell above his feet row that draw something in that column.
+    ///
+    /// Counted by what draws, not by what carries weight, because the question is how
+    /// tall the thing is and a pipe body draws something the load-bearing set has
+    /// never been shown. A cell the reader cannot answer for stops the count: past
+    /// the picture's edge a height is not unknown-but-large, it is unknown.
+    pub rows: i16,
+}
+
+impl Wall {
+    /// Pixels of height, the unit an envelope's rise is quoted in.
+    pub fn height_pixels(&self) -> u16 {
+        u16::try_from(self.rows.max(0) * 8).unwrap_or(u16::MAX)
+    }
+}
+
 /// Whether the model sees something to stand against in the cells his body would
 /// sweep into.
 ///
@@ -210,14 +264,38 @@ pub const WALL_LOOK_COLUMNS: i16 = 1;
 /// him through, the same fact arrived at from the other side, and because it is
 /// keyed on the artwork it carries to every cell drawn the same way, which is what
 /// makes looking more than one cell ahead worth doing at all.
-pub fn wall_ahead(
+pub fn wall_within_reach(
     frame: &PpuBytes,
     origin_x: u16,
     state: &SmbState,
     resistance: &Resistance,
     columns: i16,
 ) -> bool {
-    (0..=columns).any(|step| {
+    wall_ahead(frame, origin_x, state, resistance, columns).is_some()
+}
+
+/// The wall ahead, named by its pixel and its height, or `None` when nothing in
+/// `columns` is.
+///
+/// [`wall_within_reach`] answers "is there something to stand against", which is all a
+/// reflex needs. A skill needs the cell the situation is about — Phase 0's rule that
+/// an affordance names its cell — because a postcondition is judged against a pixel,
+/// and a skill that picks an envelope needs the height to pick it with. Neither is
+/// free: asked as a bare "am I past it", with no pixel in front of the body to be
+/// past, `hop-obstacle`'s claim was already true on the frame before its jump, the
+/// skill cancelled its own start, and a full-level run stopped at the first pipe.
+///
+/// The refusing cell is found the same way both times — a walk outward from the
+/// body's leading edge over the rows his body sweeps into, believing the load-bearing
+/// set and the ledger alike. Only the answer is richer.
+pub fn wall_ahead(
+    frame: &PpuBytes,
+    origin_x: u16,
+    state: &SmbState,
+    resistance: &Resistance,
+    columns: i16,
+) -> Option<Wall> {
+    let step = (0..=columns).find(|&step| {
         (1..=BODY_ROWS).any(|rise| {
             cell_beyond(frame, origin_x, state, Side::Right, step, rise).is_some_and(|tile| {
                 is_load_bearing(tile)
@@ -228,5 +306,23 @@ pub fn wall_ahead(
                     )
             })
         })
+    })?;
+    let x = leading_pixel(state, Side::Right).saturating_add(u16::try_from(step * 8).unwrap_or(0));
+    Some(Wall {
+        x,
+        rows: rows_drawn_above(frame, origin_x, x, player_tile(state, origin_x).1),
     })
+}
+
+/// How many rows above `row` the column at `world_x` draws something.
+///
+/// Consecutive from the row his feet are in, so a column with a gap in it reports the
+/// part of itself he has to clear from where he stands.
+fn rows_drawn_above(frame: &PpuBytes, origin_x: u16, world_x: u16, row: i16) -> i16 {
+    (1..=MAX_WALL_ROWS)
+        .take_while(|&rise| {
+            tile_at_world_pixel(frame, origin_x, world_x, row - rise)
+                .is_some_and(|cell| !is_blank_tile(frame, cell))
+        })
+        .count() as i16
 }

@@ -30,6 +30,16 @@
 //! gathered by watching what the game holds the player up on in that one level, and
 //! an underground area is drawn with ids it never saw.
 //!
+//! `--script` hands the same instrument to `smb_ai::skills`' scripted bot instead of
+//! the reflex, and it is the same instrument on purpose: one loop, one ledger, one
+//! overlay, one set of event stills, so a reflex's stop and a script's stop are read
+//! the same way and the distance between them is the library's. The driver is the
+//! gym harness's [`gym::Driver`], which is what lets a full-level run and a gym's verdict
+//! name the same player. A script also prints what it chose, after the run: every
+//! behaviour it started, the frame it started on, where he was standing, and the pixel it
+//! was started to get past. A library with no record of its own choices has no evidence
+//! about itself, and the reflex prints nothing because it has no names for what it does.
+//!
 //! `--shots DIR` writes a PNG of every frame to `DIR`, so the run can be watched
 //! rather than read, and names the frames where something happened
 //! (`event-jump-*`, `event-death-*`, `event-stuck-*`, `event-clear-*`).
@@ -46,14 +56,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use smb_ai::policy::run_right_buttons;
-use smb_model::affordances::{WALL_LOOK_COLUMNS, wall_ahead};
+use smb_ai::{gym, policy::BaseBot, skills};
+use smb_model::affordances::{WALL_LOOK_COLUMNS, Wall, wall_ahead};
 use smb_model::frame::{
     PpuBytes, TILE_CELLS, TILE_COLUMNS, TILE_ROWS, TOP_CROP_PIXELS, is_blank_tile, is_load_bearing,
     pattern_bytes, pattern_hash, player_tile, scroll_x, snapshot, tile_at, tile_grid,
 };
 use smb_model::profile::{MODE_END_GAME, boot_to_gameplay, read_state, wait_for_handover};
-use smb_model::resistance::{Motion, Resistance, Side};
+use smb_model::resistance::{Resistance, Side};
 
 use engine_nes::{
     ControllerButtons, FRAME_HEIGHT, FRAME_PIXELS, FRAME_WIDTH, NesMachine, write_rgb888,
@@ -159,6 +169,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut args = env::args().skip(1);
     let chosen = args.next().map(PathBuf::from);
     let mut keep_going = false;
+    let mut driver = gym::REFLEX;
     let mut overlay = false;
     let mut shots = None;
     let mut every = 1u64;
@@ -185,6 +196,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             keep_going = true;
         } else if arg == "--overlay" {
             overlay = true;
+        } else if arg == "--script" {
+            driver = skills::SCRIPTED;
         } else if arg == "--shots" {
             expect_dir = true;
         } else {
@@ -204,7 +217,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let (mut machine, gameplay_frame) = boot_to_gameplay(&rom)?;
     println!(
-        "frame {gameplay_frame}: gameplay; policy = run right, jump what the reader sees          and what the game has already refused to let him through"
+        "frame {gameplay_frame}: gameplay; player = {}\n         reflex = run right, jump what the reader sees and what the game has already refused to let him through",
+        driver.name,
     );
 
     // The mode byte says play from the first frame of the level load, and the load
@@ -226,11 +240,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut lives = opened.lives;
     let mut deaths = 0u32;
     let mut a_frames = 0u32;
-    let mut hold_a = 0u64;
-    // What the core has refused this bot so far. It outlives deaths and level
-    // changes, because a wall does not move, and it starts empty, because nothing
-    // has been refused yet.
-    let mut ledger = Resistance::default();
+    // The player, and the model under it: what the core has refused this bot so far.
+    // The ledger outlives deaths and level changes, because a wall does not move, and
+    // it starts empty, because nothing has been refused yet.
+    let mut player = (driver.player)(BaseBot::default());
     let mut refusals = 0u32;
     let mut a_down = false;
     let mut awaiting_respawn = false;
@@ -307,20 +320,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         let origin_x = scroll_x(&frame);
         let tiles = tile_grid(&frame, origin_x, 0);
         let (column, row) = player_tile(&state, origin_x);
-        let wall = wall_ahead(&frame, origin_x, &state, &ledger, WALL_LOOK_COLUMNS);
+        // Read for the transcript and the overlay. The player has its own look and
+        // its own ledger; this is the same question asked of the same model, so a
+        // `wall=true` line means the player driving saw a wall.
+        let wall: Option<Wall> =
+            wall_ahead(&frame, origin_x, &state, player.ledger(), WALL_LOOK_COLUMNS);
 
-        let buttons = run_right_buttons(&state, &machine, &tiles, column, row, wall, &mut hold_a);
-        // A jump starts on the frame A goes down. `run_right_buttons` spends the
-        // hold in the same call that sets it, so the counter is already one short
-        // by the time the buttons are back.
+        let buttons = player.buttons(&machine);
+        // A jump starts on the frame A goes down.
         let jumping = buttons.contains(ControllerButtons::A) && !a_down;
         a_down = buttons.contains(ControllerButtons::A);
         if buttons.contains(ControllerButtons::A) {
             a_frames += 1;
         }
-        // What these buttons were asking for, so the frame after this one can say
-        // what the game did with it.
-        let asked = Motion::asked(&state, buttons);
 
         if state.absolute_x > furthest_x {
             furthest_x = state.absolute_x;
@@ -341,12 +353,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 write_png(&dir.join(&name), &picture)?;
                 if overlay {
                     let mut model = picture;
-                    paint_model(&mut model, &frame, &tiles, column, row, &ledger);
+                    paint_model(&mut model, &frame, &tiles, column, row, player.ledger());
                     write_png(&dir.join(name.replace("frame-", "model-")), &model)?;
                 }
             } else if overlay {
                 let mut model = picture;
-                paint_model(&mut model, &frame, &tiles, column, row, &ledger);
+                paint_model(&mut model, &frame, &tiles, column, row, player.ledger());
                 let name = format!("model-{frame_id:06}-x{:05}.png", state.absolute_x);
                 write_png(&dir.join(name), &model)?;
             }
@@ -354,15 +366,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         machine.run_frame([buttons, ControllerButtons::NONE])?;
 
-        // The other half of the ledger: read what came back and, if the game took
-        // the motion the buttons asked for straight out of the speed, write down the
-        // cell that refused him. `snapshot` only peeks at the PPU, so taking a
-        // second picture of the same frame costs nothing but time.
+        // The other half of the ledger: the player is told what the game did with
+        // its buttons, and if the game took the asked motion straight out of the
+        // speed, the cell that refused him goes down.
         let produced = read_state(&machine);
-        let after: PpuBytes = snapshot(&machine);
-        let after_origin = scroll_x(&after);
-        let after_tiles = tile_grid(&after, after_origin, 0);
-        if let Some(refusal) = ledger.observe(asked, &produced, &after, after_origin, frame_id) {
+        if let Some(refusal) = player.observe(&produced, &machine, frame_id) {
             refusals += 1;
             println!(
                 "  frame {:>5}: the game refused {} at row {:+}, drawn ${:02x}: the model now \
@@ -374,7 +382,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 },
                 refusal.row_offset,
                 refusal.tile,
-                ledger.len(),
+                player.ledger().len(),
             );
             if let (Some(dir), Some(picture)) = (&shots, capture(&machine)) {
                 let name = format!(
@@ -382,8 +390,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                     refusal.frame, refusal.absolute_x
                 );
                 write_png(&dir.join(&name), &picture)?;
+                // `snapshot` only peeks at the PPU, so a second picture of the same
+                // frame costs nothing but time.
+                let after: PpuBytes = snapshot(&machine);
+                let after_tiles = tile_grid(&after, scroll_x(&after), 0);
                 let mut model = picture;
-                paint_model(&mut model, &after, &after_tiles, column, row, &ledger);
+                paint_model(
+                    &mut model,
+                    &after,
+                    &after_tiles,
+                    column,
+                    row,
+                    player.ledger(),
+                );
                 write_png(&dir.join(name.replace("event-", "model-event-")), &model)?;
             }
         }
@@ -392,7 +411,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!(
                 "  frame {:>5}: world {}.{} mode={:#04x} x={:>5} furthest={furthest_x:>5} \
                  col={column:>3} row={row:>2} lives={lives} stuck_for={no_progress_for} \
-                 wall={wall}",
+                 wall={wall:?}",
                 frame_id, state.world, state.level, state.game_mode, state.absolute_x,
             );
         }
@@ -402,7 +421,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!(
                 "  frame {:>5}: covered no new ground for {STUCK_FRAMES} frames at absolute X {} \
                  with hspeed={:+}, screen y={}/{}, player state {:#04x}, float {}, \
-                 and wall_ahead={wall}",
+                 and wall_ahead={wall:?}",
                 frame_id,
                 state.absolute_x,
                 state.h_speed,
@@ -417,14 +436,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                     .ok_or("video output is disabled, so there is nothing to film")?;
                 let name = format!("event-stuck-f{}-x{}.png", frame_id, state.absolute_x);
                 write_png(&dir.join(&name), &picture)?;
-                paint_model(&mut picture, &frame, &tiles, column, row, &ledger);
+                paint_model(&mut picture, &frame, &tiles, column, row, player.ledger());
                 write_png(&dir.join(name.replace("event-", "model-event-")), &picture)?;
             }
             break;
         }
     }
 
-    let known = ledger.len();
+    let known = player.ledger().len();
     println!(
         "furthest absolute X {furthest_x}: {deaths} deaths, {a_frames} frames with A held, \
          {refusals} refusals teaching {known} cell(s) of solidity, {}",
@@ -438,6 +457,20 @@ fn main() -> Result<(), Box<dyn Error>> {
             "ran out of frames"
         }
     );
+    let started = player.started();
+    if !started.is_empty() {
+        println!(
+            "  {} behaviour(s), in the order the script chose them — the pixel each was \
+             started about is the pixel it then had to be past:",
+            started.len()
+        );
+        for run in started {
+            println!(
+                "    frame {:>5}: {:<13} from absolute X {:>5} to get past {}",
+                run.started_at, run.skill.name, run.from_x, run.past
+            );
+        }
+    }
     if let Some(dir) = &shots {
         println!(
             "wrote frames to {}; a film: ffmpeg -framerate 60 -pattern_type glob \

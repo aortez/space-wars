@@ -546,3 +546,75 @@ Phase 5's search will want when it asks whether a macro-action did anything. It 
 settles what "the keyboard is non-deterministic" was worth: on the client side, nothing —
 it was a wall-clock deadline; on the emulator side, nothing measurable, and now a test
 would say so if that ever stops being true.
+
+## SMB-023 — 2026-11-21 — An affordance that cannot name its cell cannot be postconditioned
+
+`wall_ahead` reports a pixel and a height rather than a bit, `clear-wall` joins the
+script, and world 1-1 is cleared by a library rather than by a reflex.
+
+Rationale: the reflex has never got past the pit, so the script had never been asked to
+play a level either, and the first thing worth knowing about a skill library is what it
+does on the ninety per cent of a level its first gym is not about. It stopped at the first
+pipe with the hop's precondition satisfied on every frame of it. The cause was the
+postcondition SMB-021 had just installed in front of the precondition, working as designed
+on a claim that had no cell in it: `hop-obstacle`'s `past` was `x + enemy_pixels.unwrap_or(0)`,
+so with a pipe ahead and no enemy in front of that, the pixel the skill was about was `x`
+itself — which a body fourteen pixels wide is always past — and the skill cancelled its own
+start. Phase 0's rule already had the answer and had not been applied to walls: an
+affordance names the cell it is about. `wall_within_reach` keeps the bit the reflex needs
+and `wall_ahead` answers with `Wall { x, rows }`, the near edge of the refusing column and
+how many rows above his feet that column draws.
+
+The height is what decides the envelope, and that is why the wall got its own skill rather
+than a bigger hold inside the hop: an envelope is a measured program, and four frames of A
+reach their top long after they reach the pipe in front of them. So the hop is enemies and
+nothing else — measured over a koomba, never measured over a wall — and `clear-wall` is the
+long jump, which is the program this project has filmed clearing that pipe.
+
+The second stop was the stairs at absolute X 2162, and it was the landing gate refusing a
+two-row step. At a wall the long jump's box comes down two pixels past the last column the
+PPU draws, so the direct question has no answer, and the fallback that saves a long jump
+over a hole is a hole whose far lip the picture showed — and an untried staircase is drawn
+with artwork the load-bearing set has never held a body on, so the hole reading returns
+sixty-four pixels of "nothing to stand on" with no far side at all. A gate that cannot be
+answered is a refusal, so the skill stood in front of sixteen pixels of step, against a
+rise of seventy-five, for six hundred frames. The decision is that at a wall the wall is
+the landing: `wall_ahead` reports a column only where the load-bearing set has held a body
+on it or the ledger was refused by it, which is already a claim about solidity, and a cell
+that stops a body sideways is the same collision that holds one up. What that gives up is
+the question *behind* the wall, which is the same two pixels the reflex has always been
+jumping into blind.
+
+The height cap was then lifted from eight rows to twelve and measured, and the measurement
+said to put it back. Twelve rows is ninety-six pixels, so the height term became able to
+fire — and the run stopped fourteen pixels short of 1-1's exit, against the flagpole: a
+column the model reads correctly as solid and correctly counts as twelve rows of drawing,
+that no jump in the library gets over, and that the level ends by being jumped *into*. A
+gate on height alone strands the bot there with nothing else in the script to take the
+frame. The cap is therefore back at eight, which is sixty-four pixels and under the long
+jump's rise, so the term is knowingly a gate that does not gate; the alternative was a
+number chosen to let this run pass, and the situation the cap hides is a missing skill
+rather than a wrong constant.
+
+Evidence: `bot 2620 --script` clears world 0.0 at absolute X 3266 with no death, 376 frames
+with A held and 26 named behaviours, of which eleven are `clear-wall`, six `hop-obstacle`
+and two `clear-gap` — the pit crossed on frame 1018 from absolute X 1324, the same hole the
+gym is named after, taken as one behaviour among eleven. The same instrument under the
+reflex reaches 1553 and spends two lives there. `bot 2400 --script` before the wall could
+name itself reached 436; after the pixel and before the gate came down, 596. Four tests
+hold the rules, and none of them needs a cartridge: the wall names a pixel the body is not
+already past, the hop leaves the pipe to the skill that can get over it, `clear-wall` starts
+where the landing gate cannot be answered, and a wall taller than the rise is nobody's
+frame. The films are `script-1-1.mp4` and two clips, one of the stairs and one of the
+flagpole.
+
+Consequence: the flagpole is the next gym, and it is a strange one — the obstacle is the
+level's exit, and the behaviour that fails on it is the one that succeeds everywhere else.
+A wall too tall to clear needs a skill whose claim is not "past it", because pressing into
+such a wall costs the air it takes and nothing else, and 1-1 proves a bot that never does
+that never leaves the level. Two more things are now visible and unfixed. `carries_weight_at`
+has two answers where the picture has three: a cell drawn with artwork the model has no
+evidence about is reported as "nothing to stand on", which is why the staircase read as a
+sixty-four-pixel hole, and the ledger that already knows those cells refuses to be asked.
+And a height counted by what draws is inflated by any background artwork stacked above a
+real wall, which is the cost of lifting that cap and is not yet priced by anything.
