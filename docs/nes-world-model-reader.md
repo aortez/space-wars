@@ -104,7 +104,7 @@ detected when `$0770` becomes 1, the setup script ends at frame 300 and a run
 that has not reached gameplay by frame 500 is a setup failure. The Rust
 examples use the same policy and reach gameplay on frame 120.
 
-## Tile-frame reader and nine decode traps
+## Tile-frame reader and ten decode traps
 
 Terrain comes from the PPU, not RAM. The port reads the scroll latch, walks the
 nametables through the cartridge's own mirroring function, and identifies each
@@ -117,10 +117,10 @@ The decode was validated by reconstructing the background pixel by pixel from
 the nametables, the mirroring and the CHR pattern, and comparing the resulting
 transparency mask against the framebuffer the core actually rendered, with every
 cell a sprite touches set aside. At a static camera the reconstruction is exact:
-51,136 compared pixels, none wrong. Nine traps came out of it: four from that
-pixel comparison, two from joining the terrain to the player, one from driving
-a bot off the result, one from starting a bot a frame too early, and one from
-asking the decoded grid which cell a world pixel falls in.
+51,136 compared pixels, none wrong. Ten traps came out of it: four from that pixel comparison, two from joining the
+terrain to the player, one from driving a bot off the result, one from starting a bot
+a frame too early, and two from asking which cell a world pixel falls in — once
+through the wrong grid, and once past the edge of the screen.
 
 1. **SMB's blank-sky filler is tile `$24`, not `$00`.** A reader that treats
    only `$00` as empty sees a wall of solid tiles across the whole sky. Hashing
@@ -213,6 +213,17 @@ asking the decoded grid which cell a world pixel falls in.
    measured against the wrong grid. A cell at a world pixel is read through
    `tile_at_world_pixel`, which follows the PPU's own mirroring from the world
    coordinate instead of through a column number.
+
+10. **A world-pixel lookup past the camera's window folds back onto the screen.**
+    `tile_at_world_pixel` follows the PPU's own mirroring from a world coordinate, and
+    the mirroring is a modulo over a nametable 32 columns wide, so a pixel 256 or more
+    past the scroll origin names a column the camera is already showing near its *left*
+    edge. The level's cells out there are real, but they are not in the picture the PPU
+    is holding, and asking the PPU a wider question does not fetch them: it answers a
+    different one. Reading the support row ahead of the pit at world pixel 1379 first
+    reported a second hole 256 pixels wide that does not exist; the lookup now returns
+    `None` past `origin + 256` and the walk stops there and says where it stopped. The
+    cells past the screen are Phase 4's arbitrary-level start, not a wider loop.
 
 The attribute table is a separate channel again: 20 of 884 sprite-free cells in
 the sample frame render the same pattern under different palette indices. Tile
@@ -450,6 +461,7 @@ a hidden input.
 | --- | --- | --- |
 | `camera-limit` | nothing: the run-up's refusals are wiped | `Stuck` after 120 frames, absolute X 1544, 0 refusals |
 | `camera-limit-remembering` | the run-up's one refusal, rebuilt by watching the replay | `Stuck` after 120 frames, absolute X 1544, 0 refusals |
+| `pit-1379` | nothing, and the stop is 153 pixels ahead of where it starts | `Stuck` after 248 frames, absolute X 1544, 0 refusals |
 
 Same tape, same buttons, same budget; the only difference is what the model arrives
 knowing. Measured, that difference is nothing, and that is the finding rather than a
@@ -459,6 +471,14 @@ refusals cannot be warm about a stop it was never given, which puts the next hol
 sharper terms than the overlay did: a wall has to be readable from the picture *before*
 contact, not only remembered after it.
 
+The third row is the same stop cut somewhere else. `camera-limit` is cut at frame
+1167, which turns out to be inside the fall it asks about, and the section after this
+one is what that discovery cost and bought. `pit-1379` is the same run stopped at frame
+1040 — absolute X 1226, at full running speed, mid-jump, 153 pixels short of the hole,
+coming down on frame 1060 at 1276 — and it is the first gym here a bot can win from. The
+base policy still loses from it, `Stuck` after 248 frames at absolute X 1544, so it is an
+open problem rather than a formality; what it takes is measured below.
+
 `replaying_the_same_tape_twice_lands_on_the_same_bits` is DirtSim's
 `ReplayFromRootIsDeterministic` transplanted: replay one tape twice, run 60 frames of a
 single button from each landing, and require the same absolute X on every frame and the
@@ -467,6 +487,149 @@ because it is the check that a bot's buttons reach the game in the order they we
 decided: the core latches a controller on the game's own strobe, so an input that
 arrived at the wrong moment inside a frame would surface as two replays of one tape
 disagreeing.
+
+`rewinding_to_the_end_of_a_tape_lands_on_the_same_bits_as_replaying_it` is the same
+argument applied to `checkpoint`/`restore`, and it exists because the instrument below
+rewinds to the end of a tape between samples instead of replaying it. A checkpoint that
+quietly forgets one timer or one enemy slot does not fail: it moves the run by a frame,
+every sample inherits the move, and the commit window the sweep reports belongs to a
+game nobody is playing. So the test plays forty frames past the end of the tape,
+restores, requires the tape's own golden hash, and then plays sixty frames from the
+restored machine and sixty from a fresh replay and requires the same absolute X on every
+frame and the same hash at the end. Frame zero is not the interesting comparison — a
+restore always agrees there.
+
+### The pit at 1379, and what reading it took
+
+`camera-limit` is a name read off an overlay, and an overlay cannot tell a wall from a
+death. Absolute X holding, the player's cell pinned at the right edge of a screen that
+never scrolls, and a picture that does not change by a dot: that is what a locked camera
+looks like from inside the overlay, and it is also what falling off the end of the world
+looks like. The two need opposite skills, so the difference is worth an instrument. The
+instrument is `smb-ai`'s `limit` example — it cuts a run-up to any frame with the base
+policy, rewinds to the end of it between samples rather than replaying it, and asks the
+same question of the game and of the picture.
+
+Read by world pixel rather than by screen column, the support row under him stops and
+starts again:
+
+    #  .  .  .  .  .  .  #  #  #  #  #  #  #  #  #  #
+    b5 -- -- -- -- -- -- b4 b5 b4 b5 b4 b5 b4 b5 b4 b5
+
+from the last frame the game called grounded — absolute X 1371, feet row 25, screen
+column 15 — sixteen columns of eight pixels. `#` carries his weight and `.` does not;
+the hex under each column is the first cell in rows 25..27 that draws anything, and
+`--` where none does. The gap is 48 pixels wide, six cells, and it starts eight pixels
+ahead of him; the ground returns at 1427 wearing the same `$b4`/`$b5` artwork it wore
+before. The `--` is the finding. A gap whose cells hold an id the load-bearing set has
+never been shown is a hole in the model, which is trap 6's failure and wants a wider
+set. A gap whose cells draw nothing is a hole in the level, and wants a bot that jumps.
+
+The game's own side of it, under one fixed input of right and B: grounded at full
+running speed (speed byte 40, two and a half pixels a frame) until frame 1100; walked
+off at absolute X 1376 in float state 2, which is the game's own "walked off an edge"
+and not "jumped"; X still advancing while he falls until the game clamps it at 1549
+against the screen edge, camera origin 1280 and screen X 13; player state `$06` on frame
+1379, a life gone on 1380, reset on 1382. The two live enemy slots sit 101 and 125
+pixels *behind* him the whole way down, so nothing touches him.
+
+Five traps came out of measuring the jump rather than the hole.
+
+- **The game takes its time about a pit, and the delay is itself a signal.** He leaves
+  the ground on frame 1100 and the state leaves `$08` on 1379 — 279 frames. A state
+  change ten frames after a landing is a different event, and neither one shows up in a
+  position. So a caller that wants the game's verdict has to wait for it, which is why
+  the sweep watches each sample for 420 frames and not 200: at 200 a death in the hole
+  and a jump still in the air print the same line, and the first version of this table
+  could not tell them apart.
+- **There is no `has_fallen_off_screen`, and DirtSim's terminal test does not
+  transfer.** The Y byte is the low byte of a position that keeps counting, so it wraps
+  every 256 pixels of a fall — the timeline above walks it twice on the way down. A
+  comparison against 224 is true for about eight frames in every sixty-four and false
+  for the rest. `SmbState::is_dying` is the test that does transfer, and it is DirtSim's
+  own decode: `$06` and `$0b` both mean a life is going, and the life counter lags both.
+- **Track the apex only while the game says he is rising.** Same wrap: a jump that ends
+  in the pit otherwise reports its apex off the third lap of the fall.
+- **A landing with one foot on the far lip is standing to the game and in the hole to
+  the map.** The longest jump the envelope allows comes down at 1414, thirteen pixels
+  short of the far edge at 1427, and a cell lookup calls that the hole. The game calls it
+  standing, because his box is `[x, x + 14)` (SMB-017) and its right edge reaches the
+  solid cell at 1427 — and he then walks on to 1429 still grounded. A sweep scored off
+  the picture fails the one press that works, so every sample is scored by what the game
+  allows *after* the landing.
+- **A is only a cause if he left the ground on the frame A went down.** He is already
+  airborne on frame 1100, so a press after that is a jump requested during a fall. The
+  one sample whose A goes down while he is still in the air — press 20, a few frames
+  before he comes down — gets no jump at all: the game takes the press and does not
+  spend it when he lands. The sweep refuses any sample where the ground left first.
+
+Then the envelope, from a full-speed run, A held for N frames:
+
+    hold  takeoff         apex  head  landing          air  span  rose
+       4  f1069@1299      y138    96  f1094@1361        25    62    38
+      20  f1069@1299      y101    96  f1115@1414        46   115    75
+
+Held 4 frames the jump carries 62 pixels, he lands at 1361 and walks off at 1374
+anyway. Held 20 it rises 75 pixels, stays airborne 46 frames and carries 115. Held 8,
+12 and 16 he never lands at all: the game takes his life at the bottom of the fall, on
+frames 1376, 1381 and 1386, with the two enemies still behind him.
+
+The hole is not 48 pixels of jump away, though. The far edge is at 1427 and the box the
+game stops him against is `[x, x + 14)` (SMB-017), so the last pixel he occupies is 13
+past his position and a landing at 1414 already stands on it — thirteen pixels short of
+the edge the picture draws. A jump taken at 1299 therefore has to carry 115, and the
+envelope gives 115. That is the whole margin, and it is why the commit window starts on
+the frame it starts on rather than somewhere comfortably before.
+
+Then the sweep, which asks the other half: not how far a jump carries, but which frame is
+worth spending one on. A goes down on frame 1000 + N and is held for the twenty frames the
+envelope says is enough, two frames at a time from 20 to 140, every sample scored by the
+game over the next 420 frames:
+
+    press  takeoff        apex  head  landing          air  span  rose
+       22  f1023@1184     y90     96  f1080@1326        57   142    86
+       32  f1033@1209    y144     96  f1053@1259        20    50    32
+       52  f1053@1259    y101     32  f1098@1371        45   112    75
+       66  f1067@1294    y101     96       -            -     -    75
+       68  f1069@1299    y101     96  f1115@1414        46   115    75
+       98  f1099@1374    y101     96  f1144@1486        45   112    75
+
+A on presses 68 to 98 inclusive gets him across, thirty-one frames wide, and every other
+press in the sweep is the game saying no. The sweep steps by two, so the true edges are
+within one frame of those numbers. Thirty-one frames at two and a half pixels a frame is
+seventy-eight pixels of approach — wide enough to be a skill rather than a reflex, narrow
+enough that a bot which jumps on sight of the hole is still jumping too early.
+
+Below the window the presses fall into three kinds. From 22 to 52 the jump lands short and
+he walks off the near lip on frame 1099 at 1374 — the same frame, to the frame, that the
+fixed input reached it. From 54 to 66 it is the same jump that crosses, apex y101 and a
+hundred and fifteen pixels of carry, taken fifteen pixels earlier, so it arrives at 1379:
+the hole's own near edge, and he comes down in it, which the game only admits 279 frames
+later. From 100 on A goes down while he is already in the air and the game never spends
+the press. Presses 24 to 28 are the sweep's accident: they land him on a raised surface at
+y112 where two enemies stand at +7 and +46 pixels, and that run ends for a reason with
+nothing to do with the pit.
+
+The `head` column is the picture's answer to the same question, read off the nametable —
+clear air above his head on the frame he leaves the ground, capped at the twelve rows the
+lookup reaches. It is there because the button is not the variable. Held the same twenty
+frames, the jump rises 86 pixels from a takeoff at 1184, 32 from one at 1209 and 75 from
+one at 1259. The rise is cut across the same stretch of level the headroom reads 32
+across, the two columns offset by the twenty-odd pixels he covers while rising: the
+headroom is read where he is when the button goes down, and the rise is decided where he
+is when he reaches the top. Either way the conclusion is Phase 3's, not Phase 4's — an envelope measured at one
+frame is a statement about that frame and not about the button, and a skill that carries a
+single jump height is wrong about most of the level it has to cross.
+
+The same sweep from the committed cut at 1167 has nothing to sweep: sixty-one presses, and
+none of them leaves the ground, because he has been off it for sixty-seven frames before
+the first sample is taken. That is SMB-019's rule in one line of output.
+
+That makes the stop the first thing in this project that is a skill's problem rather
+than the model's. Nothing refused him at the pit, so there was never a lesson for a
+ledger to hold; the model has been able to say "no floor for 48 pixels, eight ahead"
+since trap 9 landed, and says it correctly. What was missing was a bot that spends a
+jump on the right frame, and a gym cut where the frame is still in front of it.
 
 ## Rollout and search
 
@@ -481,8 +644,15 @@ and timer state (`kClosedLossTranspositionRamByteAddrs` in `SmbDfsSearch.h`),
 with a 5,000-node budget.
 
 Reward and termination transfer unchanged: 0.5 per unit of new absolute X, 1000
-for a level clear, a no-progress timeout at 1800 gameplay frames, and a
-below-screen terminal test at player screen Y above 224.
+for a level clear, and a no-progress timeout at 1800 gameplay frames. The
+below-screen terminal test does not: it compares the player's Y byte against 224, and
+that byte is the low byte of a position that keeps counting, so read this way it wraps
+every 256 pixels of a fall — above 224 for about eight frames in every sixty-four
+while he is falling, below it for the rest. DirtSim can afford that because a reward
+model averages over thousands of frames; a bot deciding whether to jump cannot. The
+test that transfers is the game's own, the player state leaving `$08`, and it is slow:
+measured on the pit at 1379 he leaves the ground on frame 1100 and the state only goes
+on 1379.
 
 ## Proposed shape here
 
@@ -529,38 +699,31 @@ free of a filesystem, clock, thread and renderer.
   the cold and warm starts are two gyms with one tape, and a verdict cannot quietly
   depend on which. What is still missing is a way to *persist* a ledger, so a lesson
   learned in one run is available to the next one at all.
-- Whatever ends the run at the camera limit is not a cell the model can name. Three
-  lives in a row end at absolute X 1544 and 1553. Absolute X holds at 1544 for 213
-  frames before the first life is taken, and in every frame of that window sampled at
-  all the player's cell is screen column 29, the last column the screen has, with his
-  row walking down and round the grid and his speed (+4, +4): he is falling, not
-  blocked. No refusal is recorded there and no orange dot is drawn, and the model's
-  picture of the frame does not change by a single dot across the whole window, which
-  is what a locked camera looks like from inside the overlay. Whether the thing that
-  takes the life is a pit at the edge of what the camera will scroll to or a ledge the
-  reader cannot see is the question the first gym was built to ask, and the gym has
-  now answered the half it can: `camera-limit` and `camera-limit-remembering` both
-  measure `Stuck` at absolute X 1544 after 120 frames with zero refusals, so the stop
-  is not a wall the model forgot and not a wall it could have remembered. What the
-  object actually is — a pit at the edge of what the camera will scroll to, or a ledge
-  drawn with artwork the load-bearing set has never seen — is still unmeasured, because
-  answering it needs a reading of cells the camera will not show, which is Phase 4's
-  arbitrary-level start rather than a gym.
+- The stop that has ended every run of 1-1 is named: a pit 48 pixels wide at world
+  pixel 1379, read off the picture, with the game's own fall and death behind it. See
+  *The pit at 1379* above. What is missing is the other half. The reader can see the
+  hole and the envelope says what a jump carries, but the policy asks `gap_ahead` only
+  while it is grounded and only over `REACH_COLUMNS`, five columns or 40 pixels, and at
+  the last frame the base policy stands on anything the pit is 115 pixels ahead. Both
+  rulers — the screen-indexed one the policy uses and the exact world-pixel one — agree
+  that there is nothing in reach at that frame, so the model is not wrong, it is
+  silent, and nothing in the tree yet turns "a hole 48 wide, 115 ahead, at full
+  running speed" into "A goes down on frame 1068". That is Phase 3's first skill.
 
 How far that leaves this from a player, measured rather than judged: the bot has
 never finished a level at all, and 1-1 is the only level whose tiles it can read
 and the only place it can start. It has three macro-actions written inline in an
 example where DirtSim has eleven, no reward or termination wiring, no item or block
 state, five enemy slots because that is all the game keeps live, a sideways
-solidity model that knows only what one bot has already walked into, no answer for
-the thing at the camera limit, and one golden hash — the frame one tape starts on — so a
-core change that quietly alters SMB is caught where a gym happens to stand and is still
-invisible everywhere else.
+solidity model that knows only what one bot has already walked into, no skill that
+acts on a hole it can already see, and three golden hashes — the frames three tapes
+start on — so a core change that quietly alters SMB is caught where a gym happens to
+stand and is still invisible everywhere else.
 
 ## What is in the tree now
 
-One model in four layers, one policy, one harness, two gyms, six drivers, three
-optional tests and one film cutter.
+One model in four layers, one policy, one harness, three gyms, seven drivers, eleven
+tests that all skip when the cartridge is absent, and one film cutter.
 
 | File | Layer | Role |
 | --- | --- | --- |
@@ -573,7 +736,7 @@ optional tests and one film cutter.
 | `crates/smb-ai/src/gym.rs` | instrument | tape, replay, objective, frame budget, verdict |
 | `crates/smb-ai/src/gyms.rs` | instrument | the gyms this project has actually needed |
 | `crates/smb-model/examples/{probe,tiles,rollout}.rs` | | read-side exploration: decoded state, the tile grid and the pixel comparison, branch and rewind |
-| `crates/smb-ai/examples/{bot,solidity,gym}.rs` | | the bot and its overlay films, the A/B that tells memory from reaction, the tape recorder |
+| `crates/smb-ai/examples/{bot,solidity,gym,limit}.rs` | | the bot and its overlay films, the A/B that tells memory from reaction, the tape recorder, the instrument that asks a stop what it actually is |
 | `tools/nes-reference/film-smb-run.py` | | cuts films, clips and a contact sheet from a `--shots` directory, and checks the overlay survived the encoder |
 
 The reader left `engine-nes/tests/support` when its second consumer arrived, which is
@@ -619,9 +782,10 @@ Observed on x86-64 Linux with a release build:
   second including checkpoint restore, comfortably above the 60 fps the kiosk needs.
   Its lookahead section reports the slot-stability numbers quoted above.
 - `bot` runs the reader-only policy plus the refusal ledger to absolute X 1553, losing
-  three lives at the same place near the camera limit before the game ends the run. It
-  waits for the level load to hand the player over (trap 8) before it starts, and says
-  which of "stuck", "out of lives" or "cleared the level" ended the run. The one
+  three lives at the same place — the pit the camera limit turned out to be — before the
+  game ends the run. It waits for the level load to hand the player over (trap 8) before
+  it starts, and says which of "stuck", "out of lives" or "cleared the level" ended the
+  run. The one
   refusal it learns, at absolute X 594, teaches two cells and carries it past the pipe
   that stopped the same policy with an empty ledger at 899.
 - `solidity` runs the four passes behind the A/B table above and prints, for both
@@ -629,8 +793,16 @@ Observed on x86-64 Linux with a release build:
   the tail itself collected and the furthest absolute X, all from one checkpoint state
   captured 120 frames after the refusal was learned.
 - `gym` replays every committed gym and says whether each still measures the verdict it
-  carries; both camera-limit gyms do. `gym --record 1167` cuts a tape instead, and
-  prints the run-up, the golden hash and the verdict measured from it.
+  carries; all three do. `gym --record FRAME [NAME]` cuts a tape instead, and prints the
+  run-up, the golden hash and the verdict measured from it — which is how `pit-1379` got
+  its bytes, and why it has no hand-typed ones.
+- `limit [FRAME]` is the instrument behind the pit section: it cuts a run-up to any frame
+  with the base policy, checkpoints the end of it, and asks the same question of the game
+  and of the picture — what the policy knew as it approached, what the state bytes say the
+  game was doing, what the support row under and ahead of him is drawn from, how far a
+  jump carries from each frame it could start on, and what the game allowed afterwards.
+  Sixty-six jumps per run, each rewound to the end of the tape rather than replayed from
+  power-on, and each watched for 420 frames because the game takes its time about a pit.
 
 ## Where the films live
 

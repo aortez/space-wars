@@ -25,6 +25,7 @@ fn candidate(name: &str) -> Option<Gym> {
     match name {
         "camera-limit" => Some(gyms::CAMERA_LIMIT),
         "camera-limit-remembering" => Some(gyms::CAMERA_LIMIT_REMEMBERING),
+        "pit-1379" => Some(gyms::PIT_1379),
         _ => None,
     }
 }
@@ -38,7 +39,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     if args.first().map(String::as_str) == Some("--record") {
         return record(&rom, &args[1..]);
     }
-    for gym in [gyms::CAMERA_LIMIT, gyms::CAMERA_LIMIT_REMEMBERING] {
+    for gym in [
+        gyms::CAMERA_LIMIT,
+        gyms::CAMERA_LIMIT_REMEMBERING,
+        gyms::PIT_1379,
+    ] {
         println!("{:26} {}", gym.name, gym.objective);
         match gym.run(&rom) {
             Ok(verdict) => {

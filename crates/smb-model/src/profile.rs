@@ -91,9 +91,6 @@ pub const SETUP_SCRIPT_END_FRAME: u64 = 300;
 
 pub const SETUP_FAILURE_FRAME: u64 = 500;
 
-// The evaluator's terminal test: below the visible screen means lost.
-pub const BELOW_SCREEN_Y: u8 = 224;
-
 /// A decoded enemy slot. `delta_x` is signed distance from the player inside
 /// the 512-pixel nametable period, which is what the PPU and the game both see.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -136,6 +133,14 @@ impl SmbState {
     /// set. A policy started on `is_playing` spends its first two seconds pushing
     /// at a world that has not handed him over, and any stuck detector measured in
     /// frames reads that as the bot giving up.
+    ///
+    /// This is also how a fall into a pit reports itself, and it is slow: measured on
+    /// the pit at world pixel 1379 he leaves the ground on frame 1100 and the state
+    /// only leaves `$08` on frame 1379, so a caller that wants a verdict has to wait
+    /// for the game to give one rather than infer it from a Y byte. There is no
+    /// `has_fallen_off_screen` beside this on purpose: `screen_y` wraps every 256
+    /// pixels of a fall, so DirtSim's terminal test against 224 is true for about
+    /// eight frames in every sixty-four while he is falling and false for the rest.
     pub fn is_in_control(&self) -> bool {
         self.is_playing() && self.player_state == STATE_NORMAL
     }
@@ -144,8 +149,17 @@ impl SmbState {
         self.float_state == FLOAT_GROUNDED && self.player_state == STATE_NORMAL
     }
 
-    pub fn has_fallen_off_screen(&self) -> bool {
-        self.screen_y > BELOW_SCREEN_Y
+    /// Whether this frame has cost him a life.
+    ///
+    /// Not the same question as the state byte read on its own, and DirtSim decodes
+    /// it as its own value for the same reason. Two different bytes mean dying, and
+    /// the life counter lags both: measured here, falling down the pit at world pixel
+    /// 1379 puts `$06` in the byte a frame before the counter moves, and a Goomba at
+    /// world pixel 1236 puts `$0b` there and never moves the counter at all on that
+    /// frame. A caller that waits for the counter is late, and one that compares
+    /// against `$06` alone misses a death outright.
+    pub fn is_dying(&self) -> bool {
+        matches!(self.player_state, STATE_PLAYER_DIES | STATE_DYING)
     }
 }
 

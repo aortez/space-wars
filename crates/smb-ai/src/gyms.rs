@@ -101,3 +101,84 @@ pub const CAMERA_LIMIT_REMEMBERING: Gym = Gym {
     },
     ..CAMERA_LIMIT
 };
+
+/// The run-up the pit gym starts from: the base policy from power-on to frame 1040,
+/// which is absolute X 1226 at full running speed, mid-jump, upstream of the pit.
+///
+/// He is in the air on that frame rather than on the ground — the base policy jumps on
+/// its own way — and comes down on frame 1060 at absolute X 1276, a hundred pixels of
+/// level short of the lip he walks off on frame 1100.
+///
+/// Recorded, not authored — `gym --record 1040 pit-1379` cut it and replayed it
+/// before printing it. It is the same run the camera-limit tape is running through,
+/// stopped 127 frames earlier, and it is committed separately rather than derived
+/// because a tape is the bytes that produced a verdict, not an expression.
+const PIT_1379_TAPE: Tape = Tape {
+    cartridge: smb_model::cartridge::SMB_IDENTITY,
+    runs: Cow::Borrowed(&[
+        (0x00, 119), // NONE
+        (0x08, 1),   // START
+        (0x00, 167), // NONE: the level is still being placed
+        (0x82, 119), // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 10),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 23),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 3),   // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 33),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 68),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 12),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 35),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 9),   // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 74),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 10),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 73),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 38),  // B|RIGHT
+        (0x83, 6),   // A|B|RIGHT
+    ]),
+    frame: 1040,
+    golden_hash: engine_nes::StateHash {
+        version: 3,
+        value: 0x2197_cfcb_e64d_892a,
+    },
+};
+
+/// The same stop cut upstream of the fall, so that a skill has something to do about
+/// it.
+///
+/// `camera-limit` is cut at frame 1167, which measurement has since put *inside* the
+/// fall: he leaves the ground on frame 1100 and that tape starts 67 frames later, so
+/// the frame the jump had to start on is already behind the start state and no policy
+/// can be measured against it — its verdict can only ever be `Stuck`, however good the
+/// bot gets. This tape stops 153 pixels short of the pit's near edge, which makes it
+/// the first start state here a bot can win from rather than only fail on.
+///
+/// The objective stays at 1600 and now discriminates rather than merely sits past the
+/// stop: a pit fall ends with absolute X clamped at 1549 by the screen edge, so
+/// reaching 1600 means he crossed rather than fell.
+///
+/// Measured, the base policy still loses from here — `Stuck` after 248 frames at
+/// absolute X 1544 — so the gym is an unsolved problem and not a formality. What it
+/// takes is known: a jump started between 28 and 58 frames in.
+pub const PIT_1379: Gym = Gym {
+    name: "pit-1379",
+    seed: LedgerSeed::Cold,
+    tape: PIT_1379_TAPE,
+    recorded: Verdict {
+        outcome: Outcome::Stuck,
+        frames: 248,
+        furthest_x: 1544,
+        refusals: 0,
+    },
+    ..CAMERA_LIMIT
+};

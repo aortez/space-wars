@@ -337,3 +337,110 @@ question except the one it was cut for; that claim gets tested in Phase 3, where
 skill is measured against a gym rather than against a whole level. The camera limit
 stays unexplained, and this entry narrows why: answering *what* it is needs a reading of
 cells the camera will not show, which is Phase 4's arbitrary-level start, not a gym.
+
+## SMB-019 — 2026-11-21 — A gym is cut upstream of the failure, not at it
+
+Phase 1's unnamed stop has a name, and it is not a wall: the level has a pit from
+absolute X 1379 to 1427, and the run that looked pinned to the edge of a locked camera
+is a death in it. The decision is about where a gym's tape ends. A gym is cut at the
+last frame its objective is still winnable from, not at the frame it fails on, and a
+jump is scored by what the game allows after the landing rather than by what the tile
+map says about the cell he came down on.
+
+Rationale: a start state inside the failure measures the absence of a skill and nothing
+else. `camera-limit` is cut at frame 1167 and he left the ground on 1100, so the frame
+the jump had to start on is sixty-seven frames behind the start state before a bot has
+pressed anything; its verdict is `Stuck` for every policy that ever runs it, and a gym
+whose verdict cannot change is a recording rather than an instrument. Cutting upstream
+is also what makes an objective mean something: 1600 sat past the old stop and
+discriminated nothing, and a pit fall clamps absolute X at 1549 against the screen edge,
+so from the new cut 1600 is reachable only by crossing. Scoring by the game rather than
+by the map is the same argument one level down. The jump that works comes down at 1414,
+thirteen pixels inside a hole the map says ends at 1427, and a cell lookup calls that the
+hole; the game calls it a landing, because his box is `[x, x + 14)` (SMB-017) and its
+right edge reaches the solid cell at 1427, and he then walks on to 1429 still grounded. A
+sweep scored off the picture fails the one press that works.
+
+Evidence: read by world pixel from the last frame the game called grounded, the support
+row stops and starts again — `--` in every row it looks at, so the cells draw nothing and
+this is the level's hole rather than the load-bearing set's blindness — 48 pixels wide,
+six cells, starting eight pixels ahead of him, the ground returning at 1427 wearing the
+same `$b4`/`$b5` artwork. The game's own side agrees: walked off at 1376 in float state 2
+on frame 1100, X clamped at 1549, state `$06` on 1379, a life gone on 1380, reset on 1382,
+with both live enemy slots 101 and 125 pixels *behind* him the whole way down. The commit
+rule then comes out exact: the far edge is 1427, the box reaches 14 pixels past his
+position, so a landing at 1414 or further stands on it, and a jump taken at 1299 has to
+carry 115 — which is what the envelope measures from that frame, 115 pixels in 46 frames
+of air. Every sample the sweep reports lands where that arithmetic says it should: the
+presses that carry 112 from a takeoff at or past 1302 cross, the ones that arrive at 1371
+or 1379 fall, and the presses past 60 frames into a run-up cut at 1040 cause no jump at
+all because A goes down while he is already in the air and the game never spends it. The
+window is 28 to 58 frames in from that cut, thirty-one frames wide, and the same
+run-up stopped at 1000 reports the same thirty-one frames at 68 to 98, which is the
+instrument saying the cut moved and the level did not. From the committed 1167 no press
+in the sweep leaves the ground at all.
+
+Consequence: this supersedes the last claim of SMB-018. Answering *what* the camera limit
+is did not need Phase 4's arbitrary-level start, because the pit is inside the screen the
+camera is already drawing and reading it needed only the world-pixel lookup SMB-017 had
+already forced out of the grid. Phase 1's stop is named and it is not a solidity problem:
+nothing refused him, so the two camera-limit gyms' zero refusals were correct all along
+and the ledger was never the gap. That moves the stop to Phase 3 as its first skill, and
+the skill arrives specified by measurement rather than by design. `camera-limit` stays
+committed and unwinnable on purpose — it is the record of what an overlay could see, and
+the two cuts together are the difference between a start state that can be measured and
+one that can only be reported. `has_fallen_off_screen` is deleted rather than fixed: the
+byte it compared is the low byte of a position that keeps counting, so it wraps every 256
+pixels of a fall and DirtSim's terminal test is true for about eight frames in every
+sixty-four. `SmbState::is_dying` takes its place and is DirtSim's own decode — `$06` and
+`$0b` both mean a life is going, and the life counter lags both.
+
+## SMB-020 — 2026-11-21 — An instrument rewinds to the end of a tape, and a test pins that a rewind is a replay
+
+The `limit` example keeps one machine and one checkpoint and rewinds to it between
+samples instead of replaying its run-up per question, and `gyms` carries a test that
+requires the two to land on the same bits.
+
+Rationale: the commit sweep asks sixty-one questions of one run-up. Replaying the tape
+per question was correct and slow enough that the sweep had been stepped by four frames
+to fit inside a work session, and a sweep that steps by four can walk straight over a
+window three frames wide — which is the exact thing it is looking for. A checkpoint is
+the cheap fix and it is not free: `restore` returns what `checkpoint` captured and
+nothing else, so a section that forgets to rewind measures the frame the previous section
+stopped on, silently, with plausible numbers. That is the failure worth a test rather
+than a comment, because it is invisible in the result. Frame zero is not the interesting
+comparison — a restore always agrees with its own checkpoint there — so the test plays
+forty frames past the end of the tape first, restores, requires the tape's own golden
+hash, and only then compares sixty frames of the rewound machine against sixty frames of
+a fresh replay, absolute X on every frame and the hash at the end.
+
+Evidence: sixty-one samples now cost one run-up of replay rather than sixty-one of them,
+which at the committed tape's 1040 frames is 63,440 frames of replay avoided for the
+1,040 actually paid; the whole instrument — a bot run, a state timeline, a support map
+and sixty-six jumps, each watched up to 420 frames — runs in four and a half minutes on
+this machine with the cartridge, where stepping by four and replaying per sample did not
+finish inside a sitting. The sweep found a commit window thirty-one frames wide, so the
+step had to come down to two frames to resolve it at all, and it did once the run-up
+stopped being paid per question. What the finer step bought is visible in the result: the
+same level read from two cuts reports the same window, thirty-one frames wide, at 28 to
+58 frames in from a run-up stopped at 1040 and at 68 to 98 from one stopped at 1000 —
+which are the same frames, 1068 to 1098. A sample taken at absolute frame 1069 from the
+1040 tape and the same sample taken from the 1000 tape agree on every column the
+instrument prints: takeoff at 1299, apex y101, headroom 96, landing on frame 1115 at
+1414, forty-six frames of air, one hundred and fifteen pixels of carry, across on frame
+1121 at 1429. Two different tapes, two different checkpoints, one level. The rewind test
+is DirtSim's `ReplayFromRootIsDeterministic` moved from a replay to a restore, and it is
+the check that the checkpoint carries every timer and enemy slot the run-up touched
+rather than the ones the core happened to notice.
+
+Consequence: Phase 2's speed claim is met and, for the first time in this project,
+measured — SMB-018 closed with "nothing has asked the harness a question except the one
+it was cut for", and sixty-one questions is the answer to that. The standing discipline
+is that a harness which rewinds has its rewind pinned by a test, because the alternative
+failure mode is a plausible wrong number rather than a crash. It also changes how the
+instrument is used: `limit [FRAME]` now answers the same two questions at any cut,
+because the envelope is measured at the press the sweep finds rather than at a press
+named by hand, and a named press is a press that only makes sense at the cut it was named
+for — press 68 is the commit point of a run-up stopped at 1000 and is inside the pit of
+one stopped at 1040, where the envelope section used to print five jumps that had never
+happened.

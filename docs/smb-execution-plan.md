@@ -12,8 +12,8 @@ moves. Where it disagrees with the mission's ordering, it says so.
 | Phase | What it produces | Why it sits here | Where it stands |
 | --- | --- | --- | --- |
 | 0 seam | where the model lives, what a skill may ask | cheapest moment to decide; touches every later file | done: both crates exist |
-| 1 solidity | L3, learned from the game's reactions | turns every later failure from mystery into a named hole | met, with one stop it cannot name |
-| 2 gyms | the harness, not the gyms | turns every later iteration from minutes into seconds | met: one gym, cut from a real stop |
+| 1 solidity | L3, learned from the game's reactions | turns every later failure from mystery into a named hole | met; the stop it could not name turned out not to be a wall |
+| 2 gyms | the harness, not the gyms | turns every later iteration from minutes into seconds | met: three gyms, one of them winnable |
 | 3 skills | the library, and a scripted bot that finishes a level | the unit everything else is measured in | next |
 | 4 breadth | arbitrary-level start, 32-level inventory | generality is only testable once the model makes a claim | not started |
 | 5 search | A* over skills | needs a cost model and a baseline to be compared against | not started |
@@ -22,7 +22,10 @@ moves. Where it disagrees with the mission's ordering, it says so.
 The two instrument phases are the only ones with anything to show for themselves,
 which is what this ordering asked for. Nothing here has made Mario go further on
 its own: Phase 1 moved him from 899 to 1553 by deleting a rule, and Phase 2 moved
-him nowhere at all and cost six replays to find that out.
+him nowhere at all and cost six replays to find that out. What Phase 2's instrument
+has since bought is an explanation rather than distance: the stop every run ends at
+is a pit, the reader had been able to see it the whole time, and there is now a
+measured window for the jump that clears it.
 
 ## The ordering principle
 
@@ -130,6 +133,11 @@ with no artwork attached to it. Three lives in a row now end at the camera limit
 absolute X 1553, where he is falling rather than blocked, so nothing can be attributed
 to a cell and the model has nothing to say. That is the first gym.
 
+It is also, it turns out, not a solidity problem at all. Phase 2's instrument named the
+stop — a pit 48 pixels wide at world pixel 1379 — and nothing was ever refused there
+because nothing resisted him. The ledger was never the gap; a policy that spends a jump
+was.
+
 ## Phase 2 - The gym harness
 
 Deliberately earlier than the mission's order, which lists gyms after the skill
@@ -165,11 +173,19 @@ input, and the first pair measured the finding described in
 [the reader](nes-world-model-reader.md): at the camera limit the ledger changes nothing,
 because nothing there was ever refused.
 
-What the phase promised and has not yet delivered is the *speed*, because nothing has
-asked a question of it except the one question it was cut for. Its claim is that a
-question about one pipe costs the frames between the tape and the pipe instead of a
-ninety-second level run; the first real test of that is Phase 3, where a skill gets
-measured against a gym instead of against 1-1.
+What the phase promised is the *speed*, and it has now been measured, though not on the
+question the plan predicted. Sweeping one decision across sixty-one frames of
+opportunity costs one run-up plus one window per sample rather than sixty-one run-ups,
+because the instrument rewinds to the end of the tape with `checkpoint`/`restore` instead
+of replaying it: the 1000-frame run-up is paid once. The claim holds for an instrument.
+Phase 3 is where a *skill* gets the same test.
+
+The phase's other lesson arrived with the second and third gyms, and it is the one the
+plan did not have: **a gym is cut upstream of the failure, not at it.** `camera-limit`
+was cut inside the fall it was built to ask about, so its verdict could only ever be
+`Stuck` no matter who played it, and the pair cut from it measured a difference that
+could not have mattered. `pit-1379` is the same run stopped 153 pixels short of the hole
+and is the first start state in this repository a bot can win from.
 
 ## Phase 3 - Skills, then a scripted bot that finishes a level
 
@@ -183,6 +199,13 @@ Envelopes are measured because both of the failures in this project that looked
 like model bugs were envelopes: a one-frame A press is a hop that clears nothing,
 and setting a hold after the frame's buttons were built landed A one frame late and
 changed the run by more than two thousand pixels.
+
+The first skill is already specified by measurement rather than by design. The pit at
+absolute X 1379 is 48 pixels wide and the game's box reaches 14 pixels past his position,
+so a landing at 1414 or further stands on the far lip; from a run-up cut at frame 1040 the
+commit window is presses 28 to 58, thirty-one frames wide, and a jump held twenty frames
+from a takeoff at 1299 carries the 115 pixels the margin needs. `pit-1379` is that
+situation with a verdict attached, and it is unsolved.
 
 Exit: a scripted bot finishes 1-1 end to end, and each skill has a measured height,
 duration and run-up beside it.
@@ -231,12 +254,12 @@ is scheduled.
 
 ## Two gaps to close on the way
 
-- **Golden state hashes.** One now exists: the frame the camera-limit tape starts on,
-  asserted by every gym test that replays it, which is what makes that gym durable
-  across core work on a machine that has the cartridge. It is still only one, and it is
-  a hash of a state only a cartridge can produce, so a core change that quietly alters
-  SMB stays invisible on a machine that does not. The cheap remaining half is a
-  boot-to-gameplay hash taken from a built-in image rather than `data/roms/smb.nes`.
+- **Golden state hashes.** Three now exist, one per committed tape, each asserted by the
+  gym tests that replay it, which is what makes those gyms durable across core work on a
+  machine that has the cartridge. They are still all hashes of states only a cartridge
+  can produce, so a core change that quietly alters SMB stays invisible on a machine that
+  does not. The cheap remaining half is a boot-to-gameplay hash taken from a built-in
+  image rather than `data/roms/smb.nes`.
 - **Clips with every claim.** `tools/nes-reference/film-smb-run.py` already turns a
   run into films, clips and an event sheet. A claim about what a bot did should
   arrive with footage of it doing it.
@@ -257,6 +280,18 @@ than one pipe.
   committed, never typed in.
 - A gym names the ledger it starts with. A verdict that depends on unrecorded host-side
   state is not a measurement.
+- A gym is cut upstream of the failure, not at it. If no input from the start state can
+  reach the objective, the gym reports the same verdict whoever plays it and measures
+  nothing.
+- An instrument that rewinds has its rewind pinned by a test. A restore that quietly
+  loses a timer moves every sample it takes and still prints plausible numbers.
+- An envelope is measured per frame, not per button. The same hold rises three different
+  heights a few pixels apart, so one number is wrong about most of the level.
 - Search budgets nodes and frames, not seconds.
+- A test wait bounds progress, not wall clock. A shared runner legitimately runs the
+  same job on one worker when it is busy, and a deadline reads that throttle as a
+  hang, so load decides the verdict. `engine-client`'s training test flaked this way
+  and was mistaken for non-deterministic keyboard input; a wait on a gym sweep will
+  flake the same way for the same reason.
 - The core keeps no game knowledge, so everything from the profile up stays host
   side.
