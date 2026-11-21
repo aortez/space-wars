@@ -10,6 +10,8 @@ members = [
     "crates/engine-soil",
     "crates/engine-terrain",
     "crates/engine-water",
+    "crates/smb-ai",
+    "crates/smb-model",
     "crates/spacewars-ai",
     "crates/engine-client",
     "crates/spacewars-control",
@@ -90,6 +92,8 @@ engine-rapier = { path = "crates/engine-rapier" }
 engine-soil = { path = "crates/engine-soil" }
 engine-terrain = { path = "crates/engine-terrain" }
 engine-water = { path = "crates/engine-water" }
+smb-ai = { path = "crates/smb-ai" }
+smb-model = { path = "crates/smb-model" }
 spacewars-ai = { path = "crates/spacewars-ai" }
 spacewars-control = { path = "crates/spacewars-control" }
 scenario-garden-lab = { path = "scenarios/garden-lab" }

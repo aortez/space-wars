@@ -242,7 +242,7 @@ Three things follow that a reader has to get right:
 - **The nametable is a sliding ring buffer, not a level map, and a bounded one.**
   SMB rewrites nametable columns as the camera scrolls and the pair of tables
   wraps every 512 pixels, so the leftmost columns of page 0 end up holding content
-  from X = 512 and beyond. `world_model_rollout` watches every slot the camera
+  from X = 512 and beyond. `smb-model`'s `rollout` watches every slot the camera
   passes over: over 320 playing frames to absolute X 705, 1,652 of 1,792 slots
   (92%) kept one tile id the whole time, and of the 144 changes seen in a slot the
   player could still see, 140 were at column 31, the edge the camera is exposing,
@@ -263,15 +263,15 @@ that reads as a goomba (type 6) 110 pixels ahead, then 10, then gone.
 
 ## Driving a bot off the reader
 
-`crates/engine-nes/examples/world_model_bot.rs` is the reader's first consumer: a
-policy that decides every frame from the reader alone. It senses the tile grid, its
-own cell from the feet offset, and the enemy slots, and knows nothing about 1-1's
-shape beyond the load-bearing ids the reader learned by watching. The policy is the
-simplest one that model supports: run right, and jump a hole, an enemy or a cell the
-model can call a wall. Since Phase 1 the last of those includes cells the game has
-already refused to let him through, which the reader cannot see at all. It lives next
-to the reader, in `tests/support/smb_world_model.rs`, so that the example and the
-optional test cannot drift apart on what "acting on the model" means.
+`crates/smb-ai/examples/bot.rs` is the reader's first consumer: a policy that decides
+every frame from the reader alone. It senses the tile grid, its own cell from the feet
+offset, and the enemy slots, and knows nothing about 1-1's shape beyond the
+load-bearing ids the reader learned by watching. The policy is the simplest one that
+model supports: run right, and jump a hole, an enemy or a cell the model can call a
+wall. Since Phase 1 the last of those includes cells the game has already refused to
+let him through, which the reader cannot see at all. It lives in `smb-ai`'s `policy`
+module rather than in the example, so that the example, the optional test and the gym
+harness cannot drift apart on what "acting on the model" means.
 
 Measured on 1-1, release build, repeatable to the frame:
 
@@ -342,7 +342,7 @@ wrong at first.
   the PPU's own mirroring from the world coordinate instead of through a column number.
 
 Whether that counts as memory or only as reaction needs an A/B whose single variable is
-the memory, so `world_model_solidity` runs four passes: learn one refusal; take a
+the memory, so `smb-ai`'s `solidity` runs four passes: learn one refusal; take a
 checkpoint from a cold run 120 frames *after* it; restore that checkpoint and run the
 tail with an empty ledger; restore the same checkpoint and run the same tail holding the
 first pass's refusals. Both tails start from the same bits, and the thing they differ on
@@ -429,6 +429,45 @@ what one level holds the player up on, and an underground area is drawn with ids
 never saw. Measuring it needs a way to start a run in 1-2, which the reader does not
 have yet.
 
+### The first gym, and what it measured
+
+Phase 2's harness is what turns that stop into a question that costs seconds: a tape
+from power-on to frame 1167, an objective, a frame budget and a verdict. The tape is 32
+button runs, cut by `cargo run -p smb-ai --example gym -- --record 1167`, which
+replays what it recorded before printing it, so the run-up committed is the run-up that
+produced the verdict printed beside it. It ends on state hash `v3:a73cebb1ed214d50`
+with absolute X holding at 1544 and the game still holding the controller. That hash is
+this project's first golden hash: a core change that moves SMB out from under the tape
+now fails as `tape replayed to … where it was recorded at …: the core moved, not the
+bot`, in those words, rather than as a strange result two hundred frames later.
+
+Phase 1's loose end is in the type: a start state is the machine's frame *and* what the
+model remembers, and only one of them survives a checkpoint, so a gym names which of
+the two it carries (`LedgerSeed`) and the two become two gyms rather than one gym with
+a hidden input.
+
+| Gym | Model memory it starts with | Verdict |
+| --- | --- | --- |
+| `camera-limit` | nothing: the run-up's refusals are wiped | `Stuck` after 120 frames, absolute X 1544, 0 refusals |
+| `camera-limit-remembering` | the run-up's one refusal, rebuilt by watching the replay | `Stuck` after 120 frames, absolute X 1544, 0 refusals |
+
+Same tape, same buttons, same budget; the only difference is what the model arrives
+knowing. Measured, that difference is nothing, and that is the finding rather than a
+null result: the thing at the camera limit never refused him, so there was never a
+lesson for a ledger to hold. A model whose only source of walls is the game's own
+refusals cannot be warm about a stop it was never given, which puts the next hole in
+sharper terms than the overlay did: a wall has to be readable from the picture *before*
+contact, not only remembered after it.
+
+`replaying_the_same_tape_twice_lands_on_the_same_bits` is DirtSim's
+`ReplayFromRootIsDeterministic` transplanted: replay one tape twice, run 60 frames of a
+single button from each landing, and require the same absolute X on every frame and the
+same final hash. It is here because a gym that drifts by a frame measures nothing, and
+because it is the check that a bot's buttons reach the game in the order they were
+decided: the core latches a controller on the game's own strobe, so an input that
+arrived at the wrong moment inside a frame would surface as two replays of one tape
+disagreeing.
+
 ## Rollout and search
 
 `checkpoint` plus `restore` is enough for planning: DirtSim's DFS stores one
@@ -485,8 +524,11 @@ free of a filesystem, clock, thread and renderer.
   row holds at a height it was never refused at.
 - The model's memory is not part of a checkpoint. `Resistance` lives host-side, so
   `restore` returns the machine to a frame and leaves the model wherever the caller
-  left it, so the A/B above has to carry the ledger across the restore itself. A gym's
-  verdict therefore depends on a second input its tape does not carry yet.
+  left it, so the A/B above has to carry the ledger across the restore itself. The gym
+  harness names the consequence instead of hiding it: `LedgerSeed` is part of a gym, so
+  the cold and warm starts are two gyms with one tape, and a verdict cannot quietly
+  depend on which. What is still missing is a way to *persist* a ledger, so a lesson
+  learned in one run is available to the next one at all.
 - Whatever ends the run at the camera limit is not a cell the model can name. Three
   lives in a row end at absolute X 1544 and 1553. Absolute X holds at 1544 for 213
   frames before the first life is taken, and in every frame of that window sampled at
@@ -496,7 +538,14 @@ free of a filesystem, clock, thread and renderer.
   picture of the frame does not change by a single dot across the whole window, which
   is what a locked camera looks like from inside the overlay. Whether the thing that
   takes the life is a pit at the edge of what the camera will scroll to or a ledge the
-  reader cannot see is the first question worth a gym.
+  reader cannot see is the question the first gym was built to ask, and the gym has
+  now answered the half it can: `camera-limit` and `camera-limit-remembering` both
+  measure `Stuck` at absolute X 1544 after 120 frames with zero refusals, so the stop
+  is not a wall the model forgot and not a wall it could have remembered. What the
+  object actually is — a pit at the edge of what the camera will scroll to, or a ledge
+  drawn with artwork the load-bearing set has never seen — is still unmeasured, because
+  answering it needs a reading of cells the camera will not show, which is Phase 4's
+  arbitrary-level start rather than a gym.
 
 How far that leaves this from a player, measured rather than judged: the bot has
 never finished a level at all, and 1-1 is the only level whose tiles it can read
@@ -504,81 +553,84 @@ and the only place it can start. It has three macro-actions written inline in an
 example where DirtSim has eleven, no reward or termination wiring, no item or block
 state, five enemy slots because that is all the game keeps live, a sideways
 solidity model that knows only what one bot has already walked into, no answer for
-the thing at the camera limit, and no golden hashes, so a core change that quietly
-alters SMB is still invisible without a cartridge to boot.
+the thing at the camera limit, and one golden hash — the frame one tape starts on — so a
+core change that quietly alters SMB is caught where a gym happens to stand and is still
+invisible everywhere else.
 
 ## What is in the tree now
 
-One reader, five drivers, one optional test, one film cutter.
+One model in four layers, one policy, one harness, two gyms, six drivers, three
+optional tests and one film cutter.
 
-| File | Role |
-| --- | --- |
-| `crates/engine-nes/tests/support/smb_world_model.rs` | The reader: RAM map, setup policy, PPU snapshot, tile decode, background reconstruction |
-| `crates/engine-nes/tests/smb_world_model.rs` | Optional test that asserts the reader against a real cartridge |
-| `crates/engine-nes/examples/world_model_probe.rs` | Prints decoded state while Mario walks right |
-| `crates/engine-nes/examples/world_model_tiles.rs` | Prints the tile grid, the player's cell and the pixel comparison |
-| `crates/engine-nes/examples/world_model_rollout.rs` | Nametable dump, checkpoint/branch/rewind with throughput, and how far ahead of the camera the reader can see |
-| `crates/engine-nes/examples/world_model_bot.rs` | A policy that acts on the reader alone, how far that gets, and PNGs of the run with the model's own beliefs drawn on |
-| `crates/engine-nes/examples/world_model_solidity.rs` | The A/B that tells memory from reaction: learn one refusal, checkpoint from a cold run, restore the same state twice, once with the ledger and once without |
-| `tools/nes-reference/film-smb-run.py` | Cuts films, clips and an event contact sheet out of a `--shots` directory, and checks the overlay survived the encoder |
+| File | Layer | Role |
+| --- | --- | --- |
+| `crates/smb-model/src/profile.rs` | L1 | the RAM map, its decoders, the setup script, the handover rule |
+| `crates/smb-model/src/frame.rs` | L2 | PPU snapshot, tile grid, pattern hashes, the feet offset, background reconstruction |
+| `crates/smb-model/src/resistance.rs` | L3 | the refusal signature and the ledger keyed on artwork |
+| `crates/smb-model/src/affordances.rs` | L4 | gap, wall, enemy in reach: what a body can act on right now |
+| `crates/smb-model/src/cartridge.rs` | - | the pinned image, the loader, `SPACEWARS_SMB_ROM` |
+| `crates/smb-ai/src/policy.rs` | L5 | the base policy and the frame-exact envelope it acts through |
+| `crates/smb-ai/src/gym.rs` | instrument | tape, replay, objective, frame budget, verdict |
+| `crates/smb-ai/src/gyms.rs` | instrument | the gyms this project has actually needed |
+| `crates/smb-model/examples/{probe,tiles,rollout}.rs` | | read-side exploration: decoded state, the tile grid and the pixel comparison, branch and rewind |
+| `crates/smb-ai/examples/{bot,solidity,gym}.rs` | | the bot and its overlay films, the A/B that tells memory from reaction, the tape recorder |
+| `tools/nes-reference/film-smb-run.py` | | cuts films, clips and a contact sheet from a `--shots` directory, and checks the overlay survived the encoder |
 
-The reader sits under `tests/`, not `src/`, on purpose: `engine-nes` holds no
-game knowledge, so the SMB address map belongs on the host side of that
-boundary. The examples reach it with `#[path]`, which is why the module carries
-one `#![allow(dead_code)]` — each build uses only part of the map.
+The reader left `engine-nes/tests/support` when its second consumer arrived, which is
+the gate SMB-006 set and SMB-016 named a destination for: `smb-model` depends on
+`engine-nes` and nothing else, `smb-ai` holds the players, and the core still holds no
+game knowledge. The address map moved to the host side of that boundary rather than
+into the emulator, so a reader bug is still nobody's excuse for a core change.
 
-The drivers are exploration scaffolding, not a supported interface. The test is
-the part with a contract.
+Every driver takes an optional cartridge path and otherwise reads `cartridge::path`,
+which is `SPACEWARS_SMB_ROM` or `data/roms/smb.nes`, so one command line works on a
+machine whose image lives elsewhere.
 
 ```sh
-cargo run --release --locked -p engine-nes --example world_model_probe \
-  -- data/roms/smb.nes 700
-cargo run --release --locked -p engine-nes --example world_model_tiles \
-  -- data/roms/smb.nes 900 30
-cargo run --release --locked -p engine-nes --example world_model_rollout \
-  -- data/roms/smb.nes
-cargo run --release --locked -p engine-nes --example world_model_bot \
-  -- data/roms/smb.nes 9000
-cargo run --release --locked -p engine-nes --example world_model_solidity \
-  -- data/roms/smb.nes
-cargo run --release --locked -p engine-nes --example world_model_bot \
-  -- data/roms/smb.nes 2400 --shots /tmp/smb-film --overlay --every 2
+cargo run --release --locked -p smb-model --example probe -- data/roms/smb.nes 700
+cargo run --release --locked -p smb-model --example tiles -- data/roms/smb.nes 900 30
+cargo run --release --locked -p smb-model --example rollout
+cargo run --release --locked -p smb-ai --example bot -- data/roms/smb.nes 9000
+cargo run --release --locked -p smb-ai --example solidity
+cargo run --release --locked -p smb-ai --example gym
+cargo run --release --locked -p smb-ai --example bot -- data/roms/smb.nes 2400 --shots /tmp/smb-film --overlay --every 2
 python3 tools/nes-reference/film-smb-run.py /tmp/smb-film --clip 600-700 --clip 830-920
 ```
 
-The last one writes a PNG per frame, with the reader's green, orange, red and blue
-dots in a second copy of each, which is the fastest way to see what the model
+The second-to-last line writes a PNG per frame, with the reader's green, orange, red
+and blue dots in a second copy of each, which is the fastest way to see what the model
 believes and, on the next pass, what it has learned.
 
 Observed on x86-64 Linux with a release build:
 
-- `world_model_probe` reaches gameplay on frame 120, reads world `0-0` (1-1),
-  walks absolute X from 47 to 295, sees a goomba (type 6) 110 pixels ahead and
-  then 10, and drops lives from 2 to 1 when Mario dies in player state `0x0B`.
-- `world_model_tiles` decodes a grounded frame's 32x28 grid, puts Mario on
-  ground tile `$b5` at tile `(5,25)` with hill decoration in the two rows his
-  body occupies, confirms the mid-air tile is `$24` with an all-zero pattern,
-  and reconstructs the background from the nametables and CHR with `0` wrong
-  pixels out of 51,136 compared. Passing a third argument samples later frames,
-  where the camera is moving and the residual described above appears.
-- `world_model_rollout` branches four 120-frame rollouts from one checkpoint
-  and gets four different outcomes (idle, run into a pit, run and jump, jump in
-  place) and reproduces the root state hash exactly on every `restore`. Its
-  frames-per-second figure swings with machine load, so treat it as an order of
-  magnitude: several hundred frames per second including checkpoint restore,
-  comfortably above the 60 fps the kiosk needs. Its lookahead section reports the
-  slot-stability numbers quoted above.
-- `world_model_bot` runs the reader-only policy plus the refusal ledger to absolute
-  X 1553, losing three lives at the same place near the camera limit before the game
-  ends the run. It waits for
-  the level load to hand the player over (trap 8) before it starts, and says which
-  of "stuck", "out of lives" or "cleared the level" ended the run. The one refusal
-  it learns, at absolute X 594, teaches two cells and carries it past the pipe that
-  stopped the same policy with an empty ledger at 899.
-- `world_model_solidity` runs the four passes behind the A/B table above and prints,
-  for both tails, the first cell the ledger calls a wall that the tile ids do not,
-  the refusals the tail itself collected and the furthest absolute X, all from one
-  checkpoint state captured 120 frames after the refusal was learned.
+- `probe` reaches gameplay on frame 120, reads world `0-0` (1-1), walks absolute X
+  from 47 to 295, sees a goomba (type 6) 110 pixels ahead and then 10, and drops lives
+  from 2 to 1 when Mario dies in player state `0x0B`.
+- `tiles` decodes a grounded frame's 32x28 grid, puts Mario on ground tile `$b5` at
+  tile `(5,25)` with hill decoration in the two rows his body occupies, confirms the
+  mid-air tile is `$24` with an all-zero pattern, and reconstructs the background from
+  the nametables and CHR with `0` wrong pixels out of 51,136 compared. Passing a third
+  argument samples later frames, where the camera is moving and the residual described
+  above appears.
+- `rollout` branches four 120-frame rollouts from one checkpoint and gets four
+  different outcomes (idle, run into a pit, run and jump, jump in place) and reproduces
+  the root state hash exactly on every `restore`. Its frames-per-second figure swings
+  with machine load, so treat it as an order of magnitude: several hundred frames per
+  second including checkpoint restore, comfortably above the 60 fps the kiosk needs.
+  Its lookahead section reports the slot-stability numbers quoted above.
+- `bot` runs the reader-only policy plus the refusal ledger to absolute X 1553, losing
+  three lives at the same place near the camera limit before the game ends the run. It
+  waits for the level load to hand the player over (trap 8) before it starts, and says
+  which of "stuck", "out of lives" or "cleared the level" ended the run. The one
+  refusal it learns, at absolute X 594, teaches two cells and carries it past the pipe
+  that stopped the same policy with an empty ledger at 899.
+- `solidity` runs the four passes behind the A/B table above and prints, for both
+  tails, the first cell the ledger calls a wall that the tile ids do not, the refusals
+  the tail itself collected and the furthest absolute X, all from one checkpoint state
+  captured 120 frames after the refusal was learned.
+- `gym` replays every committed gym and says whether each still measures the verdict it
+  carries; both camera-limit gyms do. `gym --record 1167` cuts a tape instead, and
+  prints the run-up, the golden hash and the verdict measured from it.
 
 ## Where the films live
 
@@ -618,7 +670,7 @@ Any of them is re-cut from the cartridge in two commands, the run that writes th
 series and the cut:
 
 ```sh
-cargo run --release --locked -p engine-nes --example world_model_bot \
+cargo run --release --locked -p smb-ai --example bot \
   -- data/roms/smb.nes 9000 --shots data/shots/ledger --overlay --every 2
 python3 tools/nes-reference/film-smb-run.py data/shots/ledger \
   --clip 600-700 --clip 830-920 --clip 1330-1400
@@ -629,30 +681,35 @@ films, the contact sheet and the three clips, byte for byte, and the cutter's ow
 check reports every dot count going in and coming out the same. That is the point: a
 film that cannot be re-cut from a commit is a screenshot with a claim attached to it.
 
-## Optional cartridge test
+## Optional cartridge tests
 
-Every other test in this crate drives a `test_rom` builder, so semantic reads
+Every other test in the workspace drives a `test_rom` builder, so semantic reads
 of a shipped game had no regression net: the mapper tests use generated ROMs,
 the reference hashes are opaque rather than meaningful, and the only semantic
 game-state assertion anywhere was
 `scenarios/falling/src/lib.rs::observation_has_a_stable_decodable_v1_shape`.
 
-`crates/engine-nes/tests/smb_world_model.rs` closes that, and it is optional by
-necessity rather than preference: `.gitignore` keeps all of `data/` out of the
-repository, so no cartridge is checked in and CI has nothing to boot. The test
-skips with a one-line note when the image is absent, and passes in 0.00s:
+Three test files close that, one per layer that can be wrong:
+`crates/smb-model/tests/reader.rs` for the reading,
+`crates/smb-ai/tests/solidity.rs` for what the model concludes from it, and
+`crates/smb-ai/tests/gyms.rs` for the harness that replays it. All three are
+optional by necessity rather than preference: `.gitignore` keeps all of `data/`
+out of the repository, so no cartridge is checked in and CI has nothing to boot.
+Each skips with a one-line note when the image is absent, and passes in 0.00s:
 
 ```sh
-cargo test --locked -p engine-nes --test smb_world_model          # skips without a ROM
+cargo test --locked -p smb-model -p smb-ai            # skips without a ROM
 SPACEWARS_SMB_ROM=/path/to/smb.nes \
-  cargo test --locked -p engine-nes --test smb_world_model        # runs with one
+  cargo test --locked -p smb-model -p smb-ai          # runs with one
 ```
 
-It defaults to `data/roms/smb.nes` resolved from `CARGO_MANIFEST_DIR`, so it
-works from any working directory. With the cartridge present the four tests take
-about 18 seconds in a debug build, nearly all of it the bot-driven test running
-two thousand frames of the policy, which is emulator frames rather than
-assertions.
+The default is `data/roms/smb.nes` resolved from `CARGO_MANIFEST_DIR`, so it
+works from any working directory. With the cartridge present the ten tests take
+about 95 seconds in a debug build, nearly all of it emulator frames: the reader
+test 15 s, the solidity pair 37 s, and the gym tests 41 s, which is six replays of
+a 1167-frame tape because a gym's whole claim is that a replay lands where it was
+recorded. The gym figure swings with machine load, from 41 s to 50 s here, so treat
+these as orders of magnitude and never as a budget.
 
 What each one pins down:
 
@@ -678,7 +735,7 @@ What each one pins down:
   400-frame sweep repeats the terrain-versus-scenery split on every grounded
   frame rather than only the sampled one.
 - **`the_tile_that_stops_the_player_is_not_one_the_reader_calls_solid`** — plays
-  the shared reader-driven policy rather than a scripted input, waits for 120
+  the shared `BaseBot` rather than a scripted input, waits for 120
   frames that cover no new ground, and reads the first cell ahead that draws
   anything in the rows his body occupies. The game has stopped him; the tile that
   did it is not in the load-bearing set and `wall_ahead` says nothing is there.
@@ -687,18 +744,39 @@ What each one pins down:
   side, because it waits for the level load to hold for eight consecutive frames
   before it starts, and the run it measures is the one the document reports.
 
-The test **fails closed on a different ROM revision** rather than misreading
-it: it checks the cartridge's SHA-256 against the image the map was verified
-against, so `smb2.nes` or a different `smb.nes` header reports
+- **`remembering_a_refusal_names_a_wall_the_tile_ids_do_not`** — the A/B above, as
+  a regression test: one checkpoint state, two tails, and the ledger as the only
+  difference between them. It asserts the restore is exact before it asserts
+  anything about memory, because a leaky restore would produce the same "the warm
+  tail did better" result for the wrong reason.
+- **`a_committed_tape_replays_to_the_bits_it_was_recorded_at`** — every committed
+  gym's tape lands on its golden hash, on the frame it claims, with the player in
+  control in 1-1 at the absolute X its recorded verdict says. This is the golden
+  hash doing its job: a core change that moves SMB fails here, by name.
+- **`replaying_the_same_tape_twice_lands_on_the_same_bits`** — DirtSim's
+  `ReplayFromRootIsDeterministic`: one tape replayed twice, 60 frames of one button
+  from each landing, same absolute X every frame, same final hash.
+- **`every_committed_gym_still_measures_the_verdict_it_carries`** — iterates the
+  list of committed gyms, so a gym cannot join it with a verdict nobody re-measured.
+- **`remembering_the_run_up_changes_nothing_at_the_camera_limit`** — the cold and
+  warm pair, and the finding that they agree.
+- **`a_tape_that_does_not_hold_fails_as_itself`** — a truncated tape, a tape on
+  another cartridge, and a replay that lands one bit away, each reported as
+  `ShortTape`, `WrongCartridge` and `Drifted` rather than as a strange verdict.
+
+The tests **fail closed on a different ROM revision** rather than misreading
+it: they check the cartridge's SHA-256 against the image the map was verified
+against, and `cartridge::machine` refuses any image whose identity is not the
+pinned one, so `smb2.nes` or a different `smb.nes` header reports
 `cartridge is not the revision this RAM map was verified against` instead of
 returning plausible nonsense. That covers the first item under Gaps.
 
 Still missing, in the order they would pay off:
 
 1. A committed boot-to-gameplay state hash and fixed-input hash, so a core
-   change that silently alters SMB is caught even without a cartridge. The
-   hashes above are asserted only against each other, not against a golden
-   value, because the ROM that produces them is not in the repository.
+   change that silently alters SMB is caught even without a cartridge. The tape
+   above is a golden hash, but a hash of a state only a cartridge can produce, so
+   it catches a core change on the machine that has the ROM and nowhere else.
 2. A cartridge-profile module keyed on canonical cartridge identity, so the map
    is data rather than a test support file.
 3. A versioned semantic payload on `NesObservation` for a bot to consume.

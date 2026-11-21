@@ -183,9 +183,9 @@ jobs:
       - name: Check Rust formatting
         run: cargo fmt --all -- --check
       - name: Test core and scenarios
-        run: cargo test --locked -p engine-nes -p scenario-falling -p scenario-nes --all-targets
+        run: cargo test --locked -p engine-nes -p smb-model -p smb-ai -p scenario-falling -p scenario-nes --all-targets
       - name: Lint NES core and scenarios
-        run: cargo clippy --locked -p engine-nes -p scenario-falling -p scenario-nes --all-targets --no-deps -- -D warnings
+        run: cargo clippy --locked -p engine-nes -p smb-model -p smb-ai -p scenario-falling -p scenario-nes --all-targets --no-deps -- -D warnings
       - name: Exercise bundled-ROM release benchmark
         run: cargo run --locked --release -p scenario-falling --bin falling-benchmark -- 120 10
 
@@ -741,7 +741,7 @@ jobs:
         with:
           toolchain: '1.89.0'
       - name: Test core and scenarios
-        run: cargo test --locked -p engine-nes -p scenario-falling -p scenario-nes --all-targets
+        run: cargo test --locked -p engine-nes -p smb-model -p smb-ai -p scenario-falling -p scenario-nes --all-targets
       - name: Check Windows client
         run: cargo check --locked -p engine-client --all-targets
 

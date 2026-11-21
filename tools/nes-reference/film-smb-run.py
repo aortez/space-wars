@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cut films, clips and an event contact sheet out of a world_model_bot --shots directory."""
+"""Cut films, clips and an event contact sheet out of smb-ai's bot --shots directory."""
 import argparse
 from fractions import Fraction
 import glob
@@ -173,7 +173,7 @@ def verify(png,film,index,scale):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('shots',type=Path,help="a directory written by world_model_bot --shots DIR --overlay")
+    parser.add_argument('shots',type=Path,help="a directory written by smb-ai's bot example with --shots DIR --overlay")
     parser.add_argument('--out',type=Path,help='where to write; defaults to the shots directory')
     parser.add_argument('--name',help='output basename; defaults to the shots directory name')
     parser.add_argument('--every',type=int,default=2,help="the --every the bot ran with, so the plain film keeps real time")
@@ -186,7 +186,7 @@ def main():
     parser.add_argument('--no-verify',action='store_true',help='skip decoding a film frame back')
     args=parser.parse_args()
     shots=Path(args.shots)
-    assert shots.is_dir(), '%s is not a directory; run world_model_bot with --shots first'%shots
+    assert shots.is_dir(), '%s is not a directory; run smb-ai\'s bot example with --shots first'%shots
     out=args.out or shots
     out.mkdir(parents=True,exist_ok=True)
     name=args.name or shots.name

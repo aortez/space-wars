@@ -1,6 +1,6 @@
 //! Tile-frame world-model reader: the terrain a bot has to plan over.
 //!
-//! The RAM map in `world_model_probe.rs` gives object positions; terrain is
+//! The RAM map in `probe.rs` gives object positions; terrain is
 //! not in RAM, it is in the PPU. This rebuilds the 32x28 tile grid that is
 //! actually on screen by decoding the scroll latch, walking the nametables
 //! through the cartridge's own mirroring, and identifying each tile by a hash
@@ -10,34 +10,33 @@
 //! It then proves the decode by reconstructing the background pixel by pixel
 //! and comparing it with the framebuffer the core really rendered.
 //!
-//! The decode lives in `tests/support/smb_world_model.rs`, shared with the
-//! optional `smb_world_model` test.
+//! The decode lives in `smb-model`'s `frame` layer, shared with the optional
+//! `reader` test and with every bot. A cartridge path is optional: the default is
+//! `cartridge::path`, which is `SPACEWARS_SMB_ROM` or `data/roms/smb.nes`.
 
-use std::{collections::HashMap, env, error::Error, fs, path::PathBuf};
+use std::{collections::HashMap, env, error::Error, path::PathBuf};
 
-#[path = "../tests/support/smb_world_model.rs"]
-mod smb;
+use smb_model::cartridge;
+use smb_model::frame::{
+    is_blank_tile, is_load_bearing, label, player_surface_row_from_sprites, player_tile,
+    reconstruct_background, scroll_x, scroll_y, snapshot, sprite_covered_cells, tile_at, tile_grid,
+};
+use smb_model::profile::read_state;
 
 use engine_nes::ControllerButtons;
-use smb::{
-    is_blank_tile, is_load_bearing, label, player_surface_row_from_sprites, player_tile,
-    read_state, reconstruct_background, scroll_x, scroll_y, snapshot, sprite_covered_cells,
-    tile_at, tile_grid,
-};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = env::args().skip(1);
-    let rom_path = PathBuf::from(
-        args.next()
-            .ok_or("usage: world_model_tiles ROM [FRAMES] [SETTLE]")?,
-    );
+    let chosen = args.next().map(PathBuf::from);
     let frames: u64 = args.next().unwrap_or_else(|| "420".to_owned()).parse()?;
     // How long to keep running after gameplay before sampling. Varying this
     // samples different camera positions and sprite layouts.
     let settle_frames: u64 = args.next().unwrap_or_else(|| "30".to_owned()).parse()?;
 
-    let rom = fs::read(&rom_path)?;
-    let (mut machine, gameplay_frame) = smb::boot_to_gameplay(&rom)?;
+    let Some(rom) = cartridge::read_from(chosen)? else {
+        return Ok(());
+    };
+    let (mut machine, gameplay_frame) = smb_model::profile::boot_to_gameplay(&rom)?;
     println!("frame {gameplay_frame}: gameplay");
 
     // Sample once Mario is standing on something, so the terrain decoded under
@@ -71,18 +70,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     for &tile in &tiles {
         let next = u16::try_from(vocabulary.len())? + 1;
         vocabulary
-            .entry(smb::pattern_hash(smb::pattern_bytes(&frame, tile)))
+            .entry(smb_model::frame::pattern_hash(
+                smb_model::frame::pattern_bytes(&frame, tile),
+            ))
             .or_insert(next);
     }
     let token = |tile: u8| -> Result<u16, Box<dyn Error>> {
-        let hash = smb::pattern_hash(smb::pattern_bytes(&frame, tile));
+        let hash = smb_model::frame::pattern_hash(smb_model::frame::pattern_bytes(&frame, tile));
         Ok(*vocabulary
             .get(&hash)
             .ok_or("vocabulary built from these tiles above")?)
     };
 
     let mut line = String::new();
-    for (row, grid_row) in tiles.chunks_exact(smb::TILE_COLUMNS).enumerate() {
+    for (row, grid_row) in tiles
+        .chunks_exact(smb_model::frame::TILE_COLUMNS)
+        .enumerate()
+    {
         for &tile in grid_row {
             if is_blank_tile(&frame, tile) {
                 line.push_str(" ..");
@@ -160,7 +164,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 /// the transparency mask with what the PPU drew. Palette is ignored on purpose:
 /// the attribute table recolours a pattern without changing its shape.
 fn check_against_framebuffer(
-    frame: &smb::PpuBytes,
+    frame: &smb_model::frame::PpuBytes,
     machine: &engine_nes::NesMachine,
 ) -> Result<(), Box<dyn Error>> {
     let Some(framebuffer) = machine.ppu().framebuffer() else {

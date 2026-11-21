@@ -4,9 +4,10 @@
 //! Every decision is made from the decoded model: the tile grid, the player's own
 //! cell from the feet offset, the enemy slots. Nothing about level 1-1's shape is
 //! hardcoded, only the load-bearing tile ids the reader learned by watching what
-//! the game holds the player up on. The base policy itself lives with the reader,
-//! in `tests/support/smb_world_model.rs`, so that the optional test and this
-//! example cannot disagree about what "acting on the model" means.
+//! the game holds the player up on. The base policy itself lives in `policy`, so
+//! that this example, the optional tests and the gym harness cannot disagree about
+//! what "acting on the model" means. A cartridge path is optional: the default is
+//! `cartridge::path`, which is `SPACEWARS_SMB_ROM` or `data/roms/smb.nes`.
 //!
 //! That policy is the simplest one the model supports: run right, jump a hole or an
 //! enemy the reader can see. Measured on 1-1 it reaches absolute X 899 and then
@@ -45,17 +46,17 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[path = "../tests/support/smb_world_model.rs"]
-mod smb;
+use smb_ai::policy::run_right_buttons;
+use smb_model::affordances::{WALL_LOOK_COLUMNS, wall_ahead};
+use smb_model::frame::{
+    PpuBytes, TILE_CELLS, TILE_COLUMNS, TILE_ROWS, TOP_CROP_PIXELS, is_blank_tile, is_load_bearing,
+    pattern_bytes, pattern_hash, player_tile, scroll_x, snapshot, tile_at, tile_grid,
+};
+use smb_model::profile::{MODE_END_GAME, boot_to_gameplay, read_state, wait_for_handover};
+use smb_model::resistance::{Motion, Resistance, Side};
 
 use engine_nes::{
     ControllerButtons, FRAME_HEIGHT, FRAME_PIXELS, FRAME_WIDTH, NesMachine, write_rgb888,
-};
-use smb::{
-    MODE_END_GAME, Motion, PpuBytes, Resistance, Side, TILE_CELLS, TILE_COLUMNS, TILE_ROWS,
-    TOP_CROP_PIXELS, WALL_LOOK_COLUMNS, boot_to_gameplay, is_blank_tile, is_load_bearing,
-    pattern_bytes, pattern_hash, player_tile, read_state, run_right_buttons, scroll_x, snapshot,
-    tile_at, tile_grid, wait_for_handover, wall_ahead,
 };
 
 /// Frames without any new ground covered before the run is called over.
@@ -156,9 +157,7 @@ fn paint_model(
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = env::args().skip(1);
-    let rom_path = PathBuf::from(args.next().ok_or(
-        "usage: world_model_bot ROM [FRAMES] [--keep-going] [--shots DIR] [--overlay] [--every N]",
-    )?);
+    let chosen = args.next().map(PathBuf::from);
     let mut keep_going = false;
     let mut overlay = false;
     let mut shots = None;
@@ -200,7 +199,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         })
         .transpose()?;
 
-    let rom = fs::read(&rom_path)?;
+    let Some(rom) = smb_model::cartridge::read_from(chosen)? else {
+        return Ok(());
+    };
     let (mut machine, gameplay_frame) = boot_to_gameplay(&rom)?;
     println!(
         "frame {gameplay_frame}: gameplay; policy = run right, jump what the reader sees          and what the game has already refused to let him through"

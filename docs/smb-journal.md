@@ -288,3 +288,52 @@ that. And a refusal only ever names a drawn cell, so the thing that now takes th
 lives in a row at the camera limit, where he is falling rather than blocked and no
 artwork is involved, sits outside the model entirely: that is the first gym Phase 2 is
 asked to build.
+
+## SMB-018 — 2026-11-21 — A gym is a recorded tape that replays itself, and it names what the model remembers
+
+Phase 2's harness, and the three calls that make it an instrument rather than a
+replay feature. A committed gym stores a tape — the cartridge's identity, the button
+latch values held for a run of frames, and the frame id the gym starts on — and the
+state is re-derived by replaying it. A tape is always produced by `Gym::record`, which
+replays what it just recorded before handing it back, so the bytes that get committed
+are the bytes that produced the verdict printed beside them. And a gym carries a
+`LedgerSeed` saying whether the model starts having been refused or not, because that
+is host-side state no checkpoint can hold.
+
+Rationale: a savestate silently mismatches exactly when the core changes, which is the
+moment a gym is most worth having; a tape fails loudly instead, and the failure is
+named — `WrongCartridge`, `ShortTape` and `Drifted` each say which of the three things
+that can be wrong is wrong, rather than surfacing as a strange result two hundred
+frames on. Recording rather than authoring is the same discipline one level up: an
+authored run-up is a guess about what the bot did, and a gym built on a guess measures
+a situation the model may never meet, which is why Phase 6 defers invented levels for
+the same reason. Pinning the frame id rather than deriving it from the run lengths is
+what makes a carelessly truncated tape report `ShortTape` instead of quietly starting
+somewhere else. `LedgerSeed` is SMB-017's loose end faced rather than papered over:
+`restore` returns the machine and leaves `Resistance` wherever the caller left it, so a
+verdict that does not say which ledger it ran with is not reproducible, and the honest
+fix was to make the two start states two gyms.
+
+Evidence: the first tape is 32 button runs to frame 1167, ending on state hash
+`v3:a73cebb1ed214d50` with absolute X holding at 1544 and the game still holding the
+controller, and it is the project's first golden hash. The pair cut from it measures
+identically — `Stuck` after 120 frames at absolute X 1544 with zero refusals, cold and
+warm alike — and the agreement is the result: the thing at the camera limit never
+refused him, so there was never a lesson for a ledger to hold, which means a wall has to
+be readable from the picture before contact and not only remembered after it.
+`replaying_the_same_tape_twice_lands_on_the_same_bits` is DirtSim's
+`ReplayFromRootIsDeterministic` transplanted, and it is the check that a bot's buttons
+reach the game in the order they were decided: the core latches a controller on the
+game's own strobe, so an input landing at the wrong moment inside a frame would show up
+as two replays of one tape disagreeing.
+
+Consequence: this fires SMB-006's gate and completes SMB-016's move — L1 through L4 are
+now `crates/smb-model`, the policy and the harness are `crates/smb-ai`, the five
+`world_model_*` examples and the optional test went with them, and the core still holds
+no game knowledge. Two of the plan's standing disciplines are new since this entry:
+tapes are recorded and never typed in, and a gym names its ledger. What the phase
+promised and has not delivered is the speed, because nothing has asked the harness a
+question except the one it was cut for; that claim gets tested in Phase 3, where a
+skill is measured against a gym rather than against a whole level. The camera limit
+stays unexplained, and this entry narrows why: answering *what* it is needs a reading of
+cells the camera will not show, which is Phase 4's arbitrary-level start, not a gym.

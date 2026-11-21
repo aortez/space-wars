@@ -1,0 +1,17 @@
+[package]
+name = "smb-model"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Super Mario Bros. world model: one cartridge's state, read out of the engine-nes core"
+
+# The model depends on the core and nothing else, which is what lets the examples,
+# the optional test, the client and the bots all ask one reader rather than three.
+[dependencies]
+engine-nes = { workspace = true }
+
+# Only the checks quote a SHA-256; the model itself binds to the core's identity.
+[dev-dependencies]
+sha2 = { workspace = true }

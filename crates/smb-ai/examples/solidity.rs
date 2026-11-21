@@ -32,17 +32,17 @@
 //! grounded and gained no ground, next to the cells that motion was refused by. Read
 //! it before changing the ledger's condition or the body reach.
 
-use std::{env, error::Error, fs, path::PathBuf};
+use std::{env, error::Error, path::PathBuf};
 
-#[path = "../tests/support/smb_world_model.rs"]
-mod smb;
+use smb_ai::policy::run_right_buttons;
+use smb_model::affordances::{WALL_LOOK_COLUMNS, wall_ahead};
+use smb_model::frame::{
+    PpuBytes, pattern_bytes, pattern_hash, player_tile, scroll_x, snapshot, tile_grid,
+};
+use smb_model::profile::{boot_to_gameplay, read_state, wait_for_handover};
+use smb_model::resistance::{Motion, Refusal, Resistance, Side, cell_beyond, leading_pixel};
 
 use engine_nes::{ControllerButtons, MachineCheckpoint, NesMachine};
-use smb::{
-    Motion, PpuBytes, Refusal, Resistance, Side, WALL_LOOK_COLUMNS, boot_to_gameplay, cell_beyond,
-    leading_pixel, pattern_bytes, pattern_hash, player_tile, read_state, run_right_buttons,
-    scroll_x, snapshot, tile_grid, wait_for_handover, wall_ahead,
-};
 
 /// Frames between the refusal and the checkpoint the two memory passes start from.
 /// Long enough that the refusal is behind him and short enough that what it taught
@@ -268,10 +268,7 @@ fn at(when: Option<(u64, u16)>) -> String {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = env::args().skip(1);
-    let rom_path = PathBuf::from(
-        args.next()
-            .ok_or("usage: world_model_solidity ROM [FRAMES] [--signature]")?,
-    );
+    let chosen = args.next().map(PathBuf::from);
     let mut signature = false;
     let mut frames = None;
     for arg in args {
@@ -282,7 +279,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     let frames: u64 = frames.unwrap_or(1200);
-    let rom = fs::read(&rom_path)?;
+    let Some(rom) = smb_model::cartridge::read_from(chosen)? else {
+        return Ok(());
+    };
     let (mut machine, gameplay_frame) = boot_to_gameplay(&rom)?;
     let handed_over = wait_for_handover(&mut machine)?;
     println!("frame {gameplay_frame}: gameplay, frame {handed_over}: handed over");

@@ -5,23 +5,26 @@
 //! then walks Mario right and prints the decoded RAM map every second. This is
 //! the read side of a bot: everything a policy would sense.
 //!
-//! The address map and decoders live in `tests/support/smb_world_model.rs`,
-//! shared with the optional `smb_world_model` test.
+//! The address map and decoders live in `smb-model`'s `profile` layer, shared
+//! with the optional `reader` test and with every bot. A cartridge path is
+//! optional: the default is `cartridge::path`, which is `SPACEWARS_SMB_ROM` or
+//! `data/roms/smb.nes`.
 
-use std::{env, error::Error, fs, path::PathBuf};
+use std::{env, error::Error, path::PathBuf};
 
-#[path = "../tests/support/smb_world_model.rs"]
-mod smb;
+use smb_model::cartridge;
+use smb_model::profile::{FLOAT_GROUNDED, FLOAT_JUMPING, boot_to_gameplay, read_state};
 
 use engine_nes::ControllerButtons;
-use smb::{FLOAT_GROUNDED, FLOAT_JUMPING, boot_to_gameplay, read_state};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = env::args().skip(1);
-    let rom_path = PathBuf::from(args.next().ok_or("usage: world_model_probe ROM [FRAMES]")?);
+    let chosen = args.next().map(PathBuf::from);
     let frames: u64 = args.next().unwrap_or_else(|| "700".to_owned()).parse()?;
 
-    let rom = fs::read(&rom_path)?;
+    let Some(rom) = cartridge::read_from(chosen)? else {
+        return Ok(());
+    };
     let (mut machine, gameplay_frame) = boot_to_gameplay(&rom)?;
     println!("frame {gameplay_frame}: reached gameplay (game mode $0770 = 0x01)");
 

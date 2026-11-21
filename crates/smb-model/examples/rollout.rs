@@ -12,19 +12,19 @@
 //! changes while the player can still see it. That is what bounds lookahead, and
 //! it is why a level map has to be keyed by absolute X rather than by slot.
 //!
-//! The reader it drives lives in `tests/support/smb_world_model.rs`, shared
-//! with the optional `smb_world_model` test.
+//! The reader it drives is `smb-model` itself, the same one the optional
+//! `reader` test and the bots use. A cartridge path is optional: the default is
+//! `cartridge::path`, which is `SPACEWARS_SMB_ROM` or `data/roms/smb.nes`.
 
-use std::{error::Error, fs, time::Instant};
+use std::{error::Error, path::PathBuf, time::Instant};
 
-#[path = "../tests/support/smb_world_model.rs"]
-mod smb;
+use smb_model::cartridge;
+use smb_model::frame::{TILE_COLUMNS, TILE_ROWS, scroll_x, snapshot, tile_id_at};
+use smb_model::profile::{
+    LIVES, PLAYER_STATE, STATE_NORMAL, X_PAGE, X_SCREEN, absolute_x, boot_to_gameplay, read_state,
+};
 
 use engine_nes::ControllerButtons;
-use smb::{
-    LIVES, PLAYER_STATE, STATE_NORMAL, TILE_COLUMNS, TILE_ROWS, X_PAGE, X_SCREEN, absolute_x,
-    boot_to_gameplay, read_state, scroll_x, snapshot, tile_id_at,
-};
 
 /// Nametable columns in the 512-pixel horizontal period. SMB scrolls across a
 /// vertically mirrored pair, so the period is two tables of 32 columns.
@@ -33,12 +33,10 @@ const SLOT_ROWS: usize = TILE_ROWS;
 const SLOT_COUNT: usize = SLOT_COLUMNS * SLOT_ROWS;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let rom = fs::read(
-        std::env::args()
-            .nth(1)
-            .as_deref()
-            .unwrap_or("data/roms/smb.nes"),
-    )?;
+    let chosen = std::env::args().nth(1).map(PathBuf::from);
+    let Some(rom) = cartridge::read_from(chosen)? else {
+        return Ok(());
+    };
 
     // ---- 1. Level geometry straight out of the nametables -------------------
     let (mut machine, gameplay_frame) = boot_to_gameplay(&rom)?;

@@ -9,15 +9,20 @@ Unlike the mission, this document names files, flags and current gaps on purpose
 it is about the tree as it stands, and it is expected to be edited as the work
 moves. Where it disagrees with the mission's ordering, it says so.
 
-| Phase | What it produces | Why it sits here |
-| --- | --- | --- |
-| 0 seam | where the model lives, what a skill may ask | cheapest moment to decide; touches every later file |
-| 1 solidity | L3, learned from the game's reactions | turns every later failure from mystery into a named hole |
-| 2 gyms | the harness, not the gyms | turns every later iteration from minutes into seconds |
-| 3 skills | the library, and a scripted bot that finishes a level | the unit everything else is measured in |
-| 4 breadth | arbitrary-level start, 32-level inventory | generality is only testable once the model makes a claim |
-| 5 search | A* over skills | needs a cost model and a baseline to be compared against |
-| 6 fabrication | levels we author | should be aimed at holes that turned out to be real |
+| Phase | What it produces | Why it sits here | Where it stands |
+| --- | --- | --- | --- |
+| 0 seam | where the model lives, what a skill may ask | cheapest moment to decide; touches every later file | done: both crates exist |
+| 1 solidity | L3, learned from the game's reactions | turns every later failure from mystery into a named hole | met, with one stop it cannot name |
+| 2 gyms | the harness, not the gyms | turns every later iteration from minutes into seconds | met: one gym, cut from a real stop |
+| 3 skills | the library, and a scripted bot that finishes a level | the unit everything else is measured in | next |
+| 4 breadth | arbitrary-level start, 32-level inventory | generality is only testable once the model makes a claim | not started |
+| 5 search | A* over skills | needs a cost model and a baseline to be compared against | not started |
+| 6 fabrication | levels we author | should be aimed at holes that turned out to be real | not started |
+
+The two instrument phases are the only ones with anything to show for themselves,
+which is what this ordering asked for. Nothing here has made Mario go further on
+its own: Phase 1 moved him from 899 to 1553 by deleting a rule, and Phase 2 moved
+him nowhere at all and cost six replays to find that out.
 
 ## The ordering principle
 
@@ -29,11 +34,11 @@ mystery because no layer owns it.
 
 ## Phase 0 - Decide the seam, not the API
 
-Decided, and nothing moved yet. The reader stays in
-`crates/engine-nes/tests/support/smb_world_model.rs`, reached by `#[path]`, until
-the first consumer outside `engine-nes` needs it. That consumer is the Phase 2 gym
-harness, and when it arrives L1 through L4 move to a new `crates/smb-model` and L5
-through L7 start in `crates/smb-ai`.
+Decided, and now carried out: the gate SMB-006 set fired when the Phase 2 harness
+arrived, and the reader left `engine-nes/tests/support`. L1 through L4 are
+`crates/smb-model`, L5 and the harness are `crates/smb-ai`, and the five
+`world_model_*` examples and the optional test went with them, renamed to
+`probe`, `tiles`, `rollout`, `bot`, `solidity` and `gym`. SMB-018 records the move.
 
 That is the split this repository already uses for its own game: the world in
 `scenario-spacewars`, the players in `spacewars-ai`. Here the cartridge is the
@@ -87,7 +92,9 @@ the optional test, and both are small. After the skill library exists, moving th
 reader is a refactor across everything.
 
 **Discipline:** nothing is promoted out of `tests/support` until a second consumer
-needs it. That rule is what keeps this from becoming a framework.
+needs it. That rule is what keeps this from becoming a framework, and it is the
+reason the move happened at Phase 2 rather than at Phase 0, when promoting the
+reader would have been a framework with one user.
 
 ## Phase 1 - Solidity from the game's own reactions
 
@@ -146,6 +153,23 @@ things, the machine's frame and the model's memory of what it has been refused, 
 tape has to say which of the two it carries. Restoring the frame and handing over a cold
 ledger is a different gym from restoring the frame and handing over the lessons an
 earlier run learned, and the difference between them is the experiment worth running.
+
+**Met, and the harness is library code rather than an example.** `Gym::run` replays a
+tape and reports a verdict; `Gym::record` cuts a new one and replays it before handing
+it back, so the bytes about to be committed are the bytes that produced the verdict
+printed beside them. That is why a tape is recorded and never authored: an authored
+run-up is a guess about what the bot did, and a gym whose run-up is a guess measures a
+situation nobody met. A gym names its `LedgerSeed`, so the two start states Phase 1
+split are two `const`s with one tape between them rather than one gym with a hidden
+input, and the first pair measured the finding described in
+[the reader](nes-world-model-reader.md): at the camera limit the ledger changes nothing,
+because nothing there was ever refused.
+
+What the phase promised and has not yet delivered is the *speed*, because nothing has
+asked a question of it except the one question it was cut for. Its claim is that a
+question about one pipe costs the frames between the tape and the pipe instead of a
+ninety-second level run; the first real test of that is Phase 3, where a skill gets
+measured against a gym instead of against 1-1.
 
 ## Phase 3 - Skills, then a scripted bot that finishes a level
 
@@ -207,9 +231,12 @@ is scheduled.
 
 ## Two gaps to close on the way
 
-- **Golden state hashes.** There are none for SMB, so a core change that quietly
-  alters the game is invisible without booting a cartridge. A hash per gym, recorded
-  and asserted, is what makes gyms durable across core work, and it is cheap now.
+- **Golden state hashes.** One now exists: the frame the camera-limit tape starts on,
+  asserted by every gym test that replays it, which is what makes that gym durable
+  across core work on a machine that has the cartridge. It is still only one, and it is
+  a hash of a state only a cartridge can produce, so a core change that quietly alters
+  SMB stays invisible on a machine that does not. The cheap remaining half is a
+  boot-to-gameplay hash taken from a built-in image rather than `data/roms/smb.nes`.
 - **Clips with every claim.** `tools/nes-reference/film-smb-run.py` already turns a
   run into films, clips and an event sheet. A claim about what a bot did should
   arrive with footage of it doing it.
@@ -226,7 +253,10 @@ than one pipe.
 - A failure is recorded as a hole in a named layer, and the layer is named in the
   test that pins it.
 - Nothing is abstracted until a second consumer needs it.
-- Gyms store tapes, not savestates.
+- Gyms store tapes, not savestates, and a tape is recorded and replayed before it is
+  committed, never typed in.
+- A gym names the ledger it starts with. A verdict that depends on unrecorded host-side
+  state is not a measurement.
 - Search budgets nodes and frames, not seconds.
 - The core keeps no game knowledge, so everything from the profile up stays host
   side.

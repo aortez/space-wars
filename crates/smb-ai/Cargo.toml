@@ -1,0 +1,18 @@
+[package]
+name = "smb-ai"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Bots, gyms and search over the Super Mario Bros. world model"
+
+[dependencies]
+engine-nes = { workspace = true }
+smb-model = { workspace = true }
+
+# The bot example draws its own frames, and the tests quote a SHA-256 for the
+# cartridge; neither is something a bot needs at runtime.
+[dev-dependencies]
+png = { workspace = true }
+sha2 = { workspace = true }
