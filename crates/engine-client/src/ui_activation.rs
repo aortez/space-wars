@@ -405,6 +405,41 @@ mod tests {
         );
     }
 
+    /// Activating a control on either Clock settings page focuses the index
+    /// where the inventory names it; the launcher's Back takes no index.
+    /// Both pages change the setting named at the focused index, so a
+    /// control's name and the setting it changes can't drift apart.
+    #[test]
+    fn clock_targets_focus_where_the_inventory_names_them() {
+        let target = |control: &str| {
+            activation_target(control, false, false)
+                .or_else(|| activation_target(&format!("{control}.next"), false, false))
+                .unwrap_or_else(|| panic!("{control} has no activation target"))
+                .focus
+        };
+        for (index, control) in crate::ui_inventory::PAUSE_CLOCK_FOCUS_ORDER
+            .iter()
+            .enumerate()
+        {
+            assert_eq!(
+                target(control),
+                ActivationFocus::PauseClock(index as i32),
+                "{control}"
+            );
+        }
+        for (index, control) in crate::ui_inventory::LAUNCHER_CLOCK_FOCUS_ORDER
+            .iter()
+            .enumerate()
+            .filter(|(_, control)| **control != "launcher.settings.back")
+        {
+            assert_eq!(
+                target(control),
+                ActivationFocus::LauncherSettings(Some(index as i32)),
+                "{control}"
+            );
+        }
+    }
+
     #[test]
     fn settings_targets_select_the_visible_row_and_direction() {
         assert_eq!(

@@ -882,34 +882,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "Fonts",
                 true,
             ));
-            &[
-                "launcher.settings.renderer",
-                "launcher.settings.raster-scale",
-                "launcher.settings.clock.time-format",
-                "launcher.settings.clock.digit-slide",
-                "launcher.settings.clock.event-profile",
-                "launcher.settings.clock.falling",
-                "launcher.settings.clock.color-cycle",
-                "launcher.settings.clock.meltdown",
-                "launcher.settings.clock.duck",
-                "launcher.settings.clock.marquee",
-                "launcher.settings.clock.marquee-preset",
-                "launcher.settings.clock.rain",
-                "launcher.settings.clock.show-date",
-                "launcher.settings.clock.crow",
-                "launcher.settings.clock.explosion",
-                "launcher.settings.clock.fonts",
-                "launcher.settings.clock.aquarium",
-                "launcher.settings.clock.cell-swap",
-                "launcher.settings.clock.grass",
-                "launcher.settings.clock.slot-machine",
-                "launcher.settings.clock.spider",
-                "launcher.settings.clock.coins",
-                "launcher.settings.clock.tanks",
-                "launcher.settings.clock.lamps",
-                "launcher.settings.clock.theme",
-                "launcher.settings.back",
-            ]
+            &LAUNCHER_CLOCK_FOCUS_ORDER
         }
         "surface-expedition"
         | "spacewars-terrain"
@@ -1310,34 +1283,7 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
     }
     UiInventory {
         selected_control: selected_from_index(
-            &[
-                "pause.clock.time-format",
-                "pause.clock.event-profile",
-                "pause.clock.falling",
-                "pause.clock.color-cycle",
-                "pause.clock.preview-event",
-                "pause.clock.back",
-                "pause.clock.preview",
-                "pause.clock.meltdown",
-                "pause.clock.duck",
-                "pause.clock.marquee",
-                "pause.clock.marquee-preset",
-                "pause.clock.digit-slide",
-                "pause.clock.rain",
-                "pause.clock.show-date",
-                "pause.clock.crow",
-                "pause.clock.explosion",
-                "pause.clock.fonts",
-                "pause.clock.aquarium",
-                "pause.clock.cell-swap",
-                "pause.clock.grass",
-                "pause.clock.slot-machine",
-                "pause.clock.spider",
-                "pause.clock.coins",
-                "pause.clock.tanks",
-                "pause.clock.lamps",
-                "pause.clock.theme",
-            ],
+            &PAUSE_CLOCK_FOCUS_ORDER,
             context.ingame_clock_focus_index,
         ),
         controls,
@@ -1352,6 +1298,68 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
             .or_else(|| context.scenario_error.clone()),
     }
 }
+
+/// The Clock's pause page controls by focus index. The page changes the
+/// setting the control at its focused index names.
+pub(crate) const PAUSE_CLOCK_FOCUS_ORDER: [&str; 26] = [
+    "pause.clock.time-format",
+    "pause.clock.event-profile",
+    "pause.clock.falling",
+    "pause.clock.color-cycle",
+    "pause.clock.preview-event",
+    "pause.clock.back",
+    "pause.clock.preview",
+    "pause.clock.meltdown",
+    "pause.clock.duck",
+    "pause.clock.marquee",
+    "pause.clock.marquee-preset",
+    "pause.clock.digit-slide",
+    "pause.clock.rain",
+    "pause.clock.show-date",
+    "pause.clock.crow",
+    "pause.clock.explosion",
+    "pause.clock.fonts",
+    "pause.clock.aquarium",
+    "pause.clock.cell-swap",
+    "pause.clock.grass",
+    "pause.clock.slot-machine",
+    "pause.clock.spider",
+    "pause.clock.coins",
+    "pause.clock.tanks",
+    "pause.clock.lamps",
+    "pause.clock.theme",
+];
+
+/// The launcher's Clock settings by focus index, Back last. The launcher
+/// changes the setting the control at its focused index names.
+pub(crate) const LAUNCHER_CLOCK_FOCUS_ORDER: [&str; 26] = [
+    "launcher.settings.renderer",
+    "launcher.settings.raster-scale",
+    "launcher.settings.clock.time-format",
+    "launcher.settings.clock.digit-slide",
+    "launcher.settings.clock.event-profile",
+    "launcher.settings.clock.falling",
+    "launcher.settings.clock.color-cycle",
+    "launcher.settings.clock.meltdown",
+    "launcher.settings.clock.duck",
+    "launcher.settings.clock.marquee",
+    "launcher.settings.clock.marquee-preset",
+    "launcher.settings.clock.rain",
+    "launcher.settings.clock.show-date",
+    "launcher.settings.clock.crow",
+    "launcher.settings.clock.explosion",
+    "launcher.settings.clock.fonts",
+    "launcher.settings.clock.aquarium",
+    "launcher.settings.clock.cell-swap",
+    "launcher.settings.clock.grass",
+    "launcher.settings.clock.slot-machine",
+    "launcher.settings.clock.spider",
+    "launcher.settings.clock.coins",
+    "launcher.settings.clock.tanks",
+    "launcher.settings.clock.lamps",
+    "launcher.settings.clock.theme",
+    "launcher.settings.back",
+];
 
 fn selected_from_index(ids: &[&str], index: i32) -> Option<String> {
     usize::try_from(index)

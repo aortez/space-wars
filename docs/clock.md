@@ -3402,7 +3402,17 @@ Animation randomness uses a separate per-event seed, never the schedule's RNG.
 
 The catalog declares each event's trigger (`periodic` or `time-change`), affected area and timing. Add a kind, its
 settings/launcher control, catalog entry, and an enum implementation when adding
-an event; keep shared lifecycle tests and add event-specific tests. Finishing or
+an event; keep shared lifecycle tests and add event-specific tests. Its setting
+also goes in the client's Clock settings table,
+`crates/engine-client/src/clock_settings_table.rs`, under the kind's name, which
+is also its control's name on both settings pages. The table says once what the
+setting's values are (Off and On, or Off and a choice, as Rain and Crow have)
+and how it changes `ClockSettings`, and both pages step it through the table.
+Each page still places the control by hand: in its grid in `ui/main.slint`, its
+focus order in `ui_inventory.rs`, its activation target in `ui_activation.rs`
+and, on the pause page, its moves in `ui_navigation.rs`. Tests check that the
+focus orders name every setting in the table and that activation agrees with
+them. Finishing or
 resizing drops the active event and restores the latest face and base palette;
 residents of the run's physics arena stay through a resize, as below.
 Restart/relaunch constructs a fresh scenario. There is no plugin framework and
