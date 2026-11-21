@@ -29,17 +29,57 @@ mystery because no layer owns it.
 
 ## Phase 0 - Decide the seam, not the API
 
-The reader lives in `crates/engine-nes/tests/support/smb_world_model.rs` and the
-examples reach it with `#[path]`. That is honest for scaffolding and fatal for a
-library with several consumers. Decide one thing: which host-side module owns L1
-through L4, and what a skill is allowed to ask it.
+Decided, and nothing moved yet. The reader stays in
+`crates/engine-nes/tests/support/smb_world_model.rs`, reached by `#[path]`, until
+the first consumer outside `engine-nes` needs it. That consumer is the Phase 2 gym
+harness, and when it arrives L1 through L4 move to a new `crates/smb-model` and L5
+through L7 start in `crates/smb-ai`.
 
-`scenario-nes` stays cartridge-agnostic and `engine-nes` keeps no game knowledge,
-so the answer is a host-side profile-and-model module above both, following the
-precedent of `scenarios/falling`, which decodes a versioned observation from
-cartridge RAM. Decide the boundary; do not design the API. The API should grow out
-of the pipe in Phase 1, and an interface designed before a bot has cleared anything
-is a guess with types on it.
+That is the split this repository already uses for its own game: the world in
+`scenario-spacewars`, the players in `spacewars-ai`. Here the cartridge is the
+world, so the two new crates are a model of it and the players of it. Neither is a
+scenario, and neither joins `scenarios/`.
+
+| Layer | Owner | Why there |
+| --- | --- | --- |
+| core | `engine-nes` | hardware only; already true, and it stays true |
+| profile, frame, ground truth, affordances | `smb-model` | one cartridge's knowledge: above the core, below the bots |
+| skills, route, game, gyms, search | `smb-ai` | the consumer that decides whether the model is any good |
+| frame and action envelope, observation | `scenario-nes` | cartridge-agnostic: it may host a model, never name one |
+
+`smb-model` depends on `engine-nes` and nothing else, which is what lets the
+examples, the optional test, the client and the bots all ask one reader rather than
+three. It borrows the machine and never writes it; the only code allowed to patch
+cartridge RAM is Phase 4's arbitrary-level start and Phase 6's fabricated level,
+and both are named for what they patch. Both crates join the workspace members and
+the NES CI job's package list, which is where the reader's checks already run.
+
+**What a skill may ask.** Skills speak affordance vocabulary only, so a skill's
+entire question set is four questions:
+
+- where my body is, how fast it is moving, which way it faces, whether it is
+  standing, and whether the player is in control of it at all;
+- whether a named cell resists, at a body height, from a side, and what is drawn
+  there;
+- which affordance holds right now, each naming the cell it is about: gap, wall,
+  ledge, obstruction in reach, pipe mouth, stair, item;
+- whether the world has changed in a way that ends this skill's postcondition.
+
+A skill may not ask for an address, a tile number, a pattern hash or a PPU
+register. Those are profile and frame vocabulary, and a skill that reaches for them
+has stopped being portable to a fabricated level or a second cartridge. The
+interface itself stays undesigned: those four questions are the boundary, and the
+signatures should come out of the pipe in Phase 1.
+
+**Identity.** A profile binds to the core's own `CartridgeIdentity`, a length and a
+hash over the image, because that is what a running machine can answer cheaply, and
+it refuses to answer at all for a cartridge the profile was not written for. The
+SHA-256 stays what documents and tests quote, because that is what a person can
+check against a file.
+
+**Deferred, with its trigger named.** `scenario-nes`'s observation grows an
+optional profile payload when the client wants to draw the model. Nothing on the
+host consumes an observation today, so the payload would be a shape with no user.
 
 This is first because it is the only decision that touches every file that comes
 after, and because it is cheap exactly now: there are two consumers, the bot and

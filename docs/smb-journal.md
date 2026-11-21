@@ -229,3 +229,26 @@ refactor across everything.
 Consequence: the API grows out of the pipe in Phase 1, and nothing is promoted out of
 `tests/support` until a second consumer needs it, which is SMB-006's rule applied
 forward.
+
+## SMB-016 — 2026-11-21 — The model and the players get separate crates above the core
+
+Phase 0's answer: the profile through the affordances will live in `crates/smb-model`,
+which depends on `engine-nes` and nothing else; the skills, the route, the gyms and the
+search will live in `crates/smb-ai`. `scenario-nes` keeps the frame and action envelope
+and names no cartridge. The reader itself stays where SMB-006 put it until the gym
+harness asks for it.
+
+Rationale: for this game the cartridge is the world, so the two crates are a model of
+it and the players of it, which is the division this repository already draws between
+`scenario-spacewars` and `spacewars-ai`. Neither belongs in `scenarios/`, because
+neither is a scenario. The client is the third candidate and the wrong one: it cannot
+become the model's owner because a test and an example cannot depend on it, and a
+model that grows inside a renderer is a model that gets rewritten the first time the
+renderer changes.
+
+Consequence: a skill's whole question set is four questions about body, resistance,
+affordance and postcondition, and a skill that asks for an address, a tile number, a
+pattern hash or a register is out of contract. It also gives SMB-006's gate a named
+destination and a named trigger, so the reader still sitting in `tests/support` is a
+plan being followed rather than a smell, and it leaves the observation's profile
+payload deferred until the client wants to draw the model.
