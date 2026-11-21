@@ -271,7 +271,7 @@ check because these diagnostic continuations suppress subsequent subject moves.
 ### First aiming review, 2026-10-11
 
 Source identities and results (`docs/data/tank-aiming-20261011.json`, in git history), with
-[complete commands, shot records and traces](data/tank-aiming-traces-20261011.json.gz),
+complete commands, shot records and traces (`docs/data/tank-aiming-traces-20261011.json.gz`, in git history),
 record 74 replay-checked desktop runs. Their damage predates the armor of
 #331; the [calibration review](#calibration-review-2026-11-15) reran the
 fixed-tank cases. All material audits passed. All 36 retained
