@@ -35,7 +35,7 @@ use smb_model::profile::{
 };
 use smb_model::resistance::Motion;
 
-use crate::policy::BaseBot;
+use crate::policy::{BaseBot, Bot};
 
 /// Which of the two start states a gym carries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -48,6 +48,32 @@ pub enum LedgerSeed {
     /// its own actually looks like.
     Warm,
 }
+
+/// Who plays a gym, given the model memory the tape brought.
+///
+/// A named function pointer rather than a trait object in the `Gym`, because a gym is a
+/// `const` that a table of gyms holds and a test iterates, and because a verdict printed
+/// beside no name is a number nobody can re-run. The seed still arrives through the
+/// argument: the tape decides what the model remembers, and this decides what the player
+/// does about it. Phase 3's script and Phase 5's search are two of these beside each
+/// other on the same tape, which is the comparison the mission asks for.
+#[derive(Clone, Copy, Debug)]
+pub struct Driver {
+    /// What a transcript calls this player.
+    pub name: &'static str,
+    pub player: fn(BaseBot) -> Box<dyn Bot>,
+}
+
+/// The reflex, for a gym that is measuring the reflex.
+pub fn reflex(bot: BaseBot) -> Box<dyn Bot> {
+    Box::new(bot)
+}
+
+/// [`reflex`] with a name attached, which is what a gym holds.
+pub const REFLEX: Driver = Driver {
+    name: "reflex",
+    player: reflex,
+};
 
 /// A recorded run-up: the buttons that get a gym to where it starts.
 ///
@@ -213,6 +239,10 @@ pub struct Gym {
     pub objective: Objective,
     pub seed: LedgerSeed,
     pub tape: Tape,
+    /// The player this gym measures. Two gyms that differ only here are the same start
+    /// state asked of two players, which is the only comparison that says a library is
+    /// worth anything.
+    pub driver: Driver,
     /// Frames after the tape.
     pub frame_budget: u64,
     /// Frames without a new furthest absolute X before the run is called
@@ -237,9 +267,10 @@ impl Gym {
     pub fn run_with(&self, tape: &Tape, rom: &[u8]) -> Result<Verdict, GymError> {
         let Start {
             mut machine,
-            mut bot,
+            bot,
             frame: _,
         } = tape.replay(rom, self.seed)?;
+        let mut player = (self.driver.player)(bot);
         let opened = read_state(&machine);
         let started_at = (opened.world, opened.level);
         let lives = opened.lives;
@@ -274,10 +305,10 @@ impl Gym {
                     break;
                 }
             }
-            let buttons = bot.buttons(&machine);
+            let buttons = player.buttons(&machine);
             machine.run_frame([buttons, ControllerButtons::NONE])?;
             let produced = read_state(&machine);
-            if bot.observe(&produced, &machine, at_frame).is_some() {
+            if player.observe(&produced, &machine, at_frame).is_some() {
                 refusals += 1;
             }
         }
@@ -292,11 +323,16 @@ impl Gym {
     /// Cut a new tape for this gym by running the base policy from power-on to
     /// `until`, and measure the verdict that start state produces.
     ///
-    /// The run-up is the setup script the profile already defines, then the policy,
+    /// The run-up is the setup script the profile already defines, then the reflex,
     /// because a tape that starts at the handover would be a tape whose first three
     /// hundred frames nobody recorded: replaying it from power-on would press the
     /// policy's buttons where the game was still expecting a Start press and land
     /// somewhere else entirely.
+    ///
+    /// The run-up is always the reflex's, whatever [`Gym::driver`] this gym measures.
+    /// That is on purpose: a tape cut by the player being tested would start the gym
+    /// past the frames that player is supposed to solve, and a gym whose start state
+    /// already contains its own answer measures nothing.
     ///
     /// The tape is replayed once before it is handed back. That costs a second
     /// run-up and buys the only check that matters at this moment: the bytes that

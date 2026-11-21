@@ -12,6 +12,7 @@
 //! | [`policy`] | the base policy, and the frame-by-frame envelope it acts through |
 //! | [`gym`] | a start state, an objective, a frame budget and a verdict |
 //! | [`gyms`] | the gyms this project has actually needed |
+//! | [`skills`] | measured behaviours, and the scripted bot that strings them together |
 //!
 //! A gym stores a tape rather than a savestate, so a core change that moves the game
 //! fails loudly at the tape instead of quietly moving the goalposts. See
@@ -23,3 +24,4 @@
 pub mod gym;
 pub mod gyms;
 pub mod policy;
+pub mod skills;

@@ -14,18 +14,20 @@ moves. Where it disagrees with the mission's ordering, it says so.
 | 0 seam | where the model lives, what a skill may ask | cheapest moment to decide; touches every later file | done: both crates exist |
 | 1 solidity | L3, learned from the game's reactions | turns every later failure from mystery into a named hole | met; the stop it could not name turned out not to be a wall |
 | 2 gyms | the harness, not the gyms | turns every later iteration from minutes into seconds | met: three gyms, one of them winnable |
-| 3 skills | the library, and a scripted bot that finishes a level | the unit everything else is measured in | next |
+| 3 skills | the library, and a scripted bot that finishes a level | the unit everything else is measured in | started: two measured skills, and the script wins `pit-1379` |
 | 4 breadth | arbitrary-level start, 32-level inventory | generality is only testable once the model makes a claim | not started |
 | 5 search | A* over skills | needs a cost model and a baseline to be compared against | not started |
 | 6 fabrication | levels we author | should be aimed at holes that turned out to be real | not started |
 
-The two instrument phases are the only ones with anything to show for themselves,
-which is what this ordering asked for. Nothing here has made Mario go further on
-its own: Phase 1 moved him from 899 to 1553 by deleting a rule, and Phase 2 moved
-him nowhere at all and cost six replays to find that out. What Phase 2's instrument
-has since bought is an explanation rather than distance: the stop every run ends at
-is a pit, the reader had been able to see it the whole time, and there is now a
-measured window for the jump that clears it.
+The two instrument phases were the only ones with anything to show for themselves
+for most of this, which is what the ordering asked for: Phase 1 moved him from 899 to
+1553 by deleting a rule, and Phase 2 moved him nowhere at all and cost six replays to
+find that out. What Phase 2's instrument bought was an explanation rather than
+distance — the stop every run ends at is a pit, the reader had been able to see it the
+whole time, and there is a measured window for the jump that clears it — and Phase 3
+has since spent that explanation: a two-skill script crosses the pit and reaches
+absolute X 1599 on the tape where the reflex stops at 1544, which is the first
+distance in this project that a library rather than a deleted rule produced.
 
 ## The ordering principle
 
@@ -200,15 +202,26 @@ like model bugs were envelopes: a one-frame A press is a hop that clears nothing
 and setting a hold after the frame's buttons were built landed A one frame late and
 changed the run by more than two thousand pixels.
 
-The first skill is already specified by measurement rather than by design. The pit at
-absolute X 1379 is 48 pixels wide and the game's box reaches 14 pixels past his position,
-so a landing at 1414 or further stands on the far lip; from a run-up cut at frame 1040 the
-commit window is presses 28 to 58, thirty-one frames wide, and a jump held twenty frames
-from a takeoff at 1299 carries the 115 pixels the margin needs. `pit-1379` is that
-situation with a verdict attached, and it is unsolved.
+The first skill was specified by measurement before it was written, and the
+measurement turned out to be about the reading rather than about the jump. The pit at
+absolute X 1379 is 48 pixels wide and the game's box reaches 14 pixels past his
+position, so a landing at 1414 or further stands on the far lip; from a run-up cut at
+frame 1040 the commit window is thirty-one frames wide, and the jump that clears it
+carries 118 pixels measured from the last frame he stands on anything, not the 115
+measured from the takeoff — three pixels and one frame apart, which is most of the
+margin. `pit-1379` is that situation with a verdict attached, and the script now wins
+it: `Met` on frame 151 at absolute X 1599, against the same gym's `Stuck` at 1544 under
+the reflex, one field of the gym different.
+
+What that is not yet is a library. Two skills exist, one of them load-bearing for a
+reason nobody predicted — the ablation crosses the pit without the hop and dies on the
+koopas 286 pixels past it — and the exit below still asks for a bot that finishes 1-1,
+which needs a skill for every other thing 1-1 does.
 
 Exit: a scripted bot finishes 1-1 end to end, and each skill has a measured height,
-duration and run-up beside it.
+duration and run-up beside it. Add to that what the ablation taught: each skill also
+needs a gym that fails without it, because a skill can be measured, correct, and
+load-bearing for a situation its own gym is not named after.
 
 ## Phase 4 - Every level
 
@@ -287,6 +300,11 @@ than one pipe.
   loses a timer moves every sample it takes and still prints plausible numbers.
 - An envelope is measured per frame, not per button. The same hold rises three different
   heights a few pixels apart, so one number is wrong about most of the level.
+- A button claim is a frame claim. The buttons handed to a frame are the caller's and
+  nothing keeps them; `$074A` is the game's copy, and the test that compares the two is
+  what makes an envelope's carry mean anything.
+- A skill is not in the library until a gym fails without it. Measuring an envelope says
+  what a behaviour does; only an ablation says what the level needed it for.
 - Search budgets nodes and frames, not seconds.
 - A test wait bounds progress, not wall clock. A shared runner legitimately runs the
   same job on one worker when it is busy, and a deadline reads that throttle as a

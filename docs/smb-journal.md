@@ -444,3 +444,105 @@ named by hand, and a named press is a press that only makes sense at the cut it 
 for — press 68 is the commit point of a run-up stopped at 1000 and is inside the pit of
 one stopped at 1040, where the envelope section used to print five jumps that had never
 happened.
+
+## SMB-021 — 2026-11-21 — The picture ends two pixels short of a long jump's landing
+
+A skill is a named behaviour with a precondition in affordance terms, a postcondition,
+and a button program measured to the frame; `clear-gap` and `hop-obstacle` are the first
+two, and `pit-1379` is met under the script that strings them together.
+
+Rationale: Phase 3's first skill was specified by measurement before it was written, and
+the measurement turned out to be about the reading rather than about the jump. The
+envelope was re-measured at one-frame resolution from the committed tape and the carry is
+a range: the same twenty frames of A carry 118 pixels from the frame the envelope is
+pinned to, 117 one frame earlier, and a flat 115 from every frame from thirty on, so the
+115 the plan quoted — measured from the takeoff at 1299 — and the 118 the envelope carries
+are the same jump three pixels and one frame apart. The near edge came out the same way:
+press 26, whose last grounded frame is 1291, falls in, and press 27 at 1294 comes down at
+1411 and stands, which puts the game's edge between them and the rule's edge, read at the
+last pixel of the box, at 1293. Judging a landing by the position byte instead of by the
+box refuses every jump the game allows, since the shortest crossing the sweep scored left
+him at 1414 over a hole whose ground returns at 1424 and it stood. Then the thing the
+design had no answer for: at running speed the camera pins him at screen column 126 or 127
+and the reader reaches thirty-two columns, so the picture stops 128 or 129 pixels past his
+position and the long jump's box comes down at 131. The direct probe — is the last pixel
+of the box over something load-bearing — has no answer there, and the first version of
+this library asked nothing else, refused every long jump it was offered, and walked into
+the pit. So the landing is asked two ways: the pixel first, and where the picture has run
+out, the hole's own far edge, which is the same reading taken from a pixel inside the
+window rather than two outside it. Probing at 129 instead alternates between an answer and
+none as the fine scroll moves, which is the edge itself flickering and not a tile the
+reader lost. Two smaller rules came out of running it rather than designing it. A long
+jump that lands with one foot on the lip leaves him standing at 1414 inside a hole whose
+ground returns at 1424 — standing to the game, in the hole to the map — and the hole
+reading from there is a nine-pixel hole still ahead, so the script asked for a second long
+jump from inside the hole it had just crossed; the postcondition is now asked before the
+precondition, and a claim the world has already granted cancels the start. And the
+arbitration is order plus `Wait`, where `Wait` passes the frame on rather than holding it,
+because a commit window has a near edge and a skill that cannot say "not yet" is the base
+policy.
+
+Evidence: `pit-1379` is `Met` on frame 151 at absolute X 1599 with no death under
+`skills::SCRIPT` and `Stuck` after 248 frames at 1544 under the reflex, one field of the
+gym apart, and `gym` re-measures both against the verdicts the gyms carry. The script
+commits at absolute X 1296, inside the window the game scored at 1294 to 1371, and 1296 is
+the first frame the far lip is inside the camera's window at all. The hop's envelope
+measures 65 pixels of carry, 25 of air and 39 of rise from fifteen frames in, and its
+headroom reads 32 while its rise is 39 — he takes it under the brick row and is twenty
+pixels past the row's end by the top — which is why headroom is recorded as the context a
+number was taken in and not as a requirement. The ablation is the part that changed a
+design assumption: with `hop-obstacle` removed the pit is still crossed, from the first
+frame the far lip is readable, and the run stops dead at 1526 on a pair of koopas 286
+pixels past the gym's name; with it restored the hop fires twice, at frame 1055 on a
+koomba twenty-two pixels ahead where the run did not need it and at 1147 at forty-three
+where it did, and the gym is met. Twelve tests hold it, seven of which need no cartridge
+at all because a `Situation` can be written by hand.
+
+Consequence: Phase 3 is started rather than next, and its exit grew a clause — a skill is
+not in the library until a gym fails without it, because a skill can be measured, correct,
+and load-bearing for a situation its own gym is not named after. The hop's real gym is
+enemies on flat ground and does not exist yet. The bigger consequence is a standing limit
+on the model: at running speed this reader can never *see* a long jump's landing, only
+infer it from the hole being crossed, so a level whose far lip is not the ground return —
+a ledge over a pit, a platform standing in a hole — is not a wider look away, it is the
+level memory Phase 6 is about. One pixel of the landing rule is still open, too: a landing
+at 1410 has never been pressed, and the reader's cell-aligned far edge at 1424 and the
+instrument's pixel-exact lip at 1427 disagree by three, with the measured window as the
+only arbiter between them.
+
+## SMB-022 — 2026-11-21 — The game's own input byte is where a button claim gets checked
+
+`$074A` joins the RAM map and a test compares it, frame by frame, against the buttons each
+frame was handed.
+
+Rationale: every envelope in this project is a claim about what a button program did, and
+the claim is only worth the frame the button arrived on. The buttons are a host-side
+argument to `run_frame` that nothing keeps, so nothing in the tree could see that
+assumption — the plan already records a hold built after the frame's buttons had been
+assembled landing A one frame late and moving a run by more than two thousand pixels, with
+every decoded state along the way looking reasonable, because the state is the game's and
+the buttons were the caller's. The question arrived from the other side first:
+`engine-client`'s training test flaked on a shared runner and was reported as possible
+non-deterministic keyboard input, and it was not — the waits around the keyboard dispatch
+counted down from a fixed number of seconds while a busy runner legitimately runs the same
+job on one worker, so runner load reached the verdict first. That fix bounds the waits on
+the job's own progress counters. The NES side deserved the same look rather than the same
+conclusion, because there the input is the measurement.
+
+Evidence: the game keeps its own copy of player 1's buttons at `$074A`, written inside the
+frame from the port the frame was handed, in the order the controller shifts them out — A
+in the high bit down to Right in the low one, the reverse of `ControllerButtons`, so the
+decode reverses it; asking A and Right reads `$81`, asking Left reads `$02`, asking Select
+and Right reads `$21`, and reversing reproduces all three. Measured against a pattern that
+touches all eight buttons and both edges of each, from the handover: before a frame runs
+the byte still holds the previous frame's ask, and after the frame runs it holds that
+frame's ask exactly, on every frame, held or released, for sixty frames. The alignment
+every envelope above assumes is therefore pinned rather than assumed.
+
+Consequence: the input path has a regression net, and the byte is where a response probe
+can compare an ask against a take before it starts timing a jump, which is what DirtSim's
+probe does (`gameInputCopiedFrameId` in `NesSuperMarioBrosResponseProbe.cpp`) and the shape
+Phase 5's search will want when it asks whether a macro-action did anything. It also
+settles what "the keyboard is non-deterministic" was worth: on the client side, nothing —
+it was a wall-clock deadline; on the emulator side, nothing measurable, and now a test
+would say so if that ever stops being true.

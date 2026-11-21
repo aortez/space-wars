@@ -14,21 +14,8 @@
 
 use std::{env, error::Error};
 
-use smb_ai::{gym::Gym, gyms};
+use smb_ai::gyms;
 use smb_model::cartridge;
-
-/// The gyms this example knows how to record, beside the committed ones.
-///
-/// Recording needs an objective and a budget to measure a verdict under, and those
-/// are the gym's, not the tape's, so a new gym is named here before it can be cut.
-fn candidate(name: &str) -> Option<Gym> {
-    match name {
-        "camera-limit" => Some(gyms::CAMERA_LIMIT),
-        "camera-limit-remembering" => Some(gyms::CAMERA_LIMIT_REMEMBERING),
-        "pit-1379" => Some(gyms::PIT_1379),
-        _ => None,
-    }
-}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let Some(rom) = cartridge::read()? else {
@@ -39,12 +26,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     if args.first().map(String::as_str) == Some("--record") {
         return record(&rom, &args[1..]);
     }
-    for gym in [
-        gyms::CAMERA_LIMIT,
-        gyms::CAMERA_LIMIT_REMEMBERING,
-        gyms::PIT_1379,
-    ] {
-        println!("{:26} {}", gym.name, gym.objective);
+    for gym in gyms::ALL {
+        println!(
+            "{:26} {}  player {}",
+            gym.name, gym.objective, gym.driver.name
+        );
         match gym.run(&rom) {
             Ok(verdict) => {
                 let same = verdict == gym.recorded;
@@ -71,7 +57,7 @@ fn record(rom: &[u8], args: &[String]) -> Result<(), Box<dyn Error>> {
             Err(_) => name = arg.clone(),
         }
     }
-    let Some(gym) = candidate(&name) else {
+    let Some(gym) = gyms::by_name(&name) else {
         return Err(format!("no gym named {name} to record").into());
     };
     let cut = gym.record(rom, until)?;
@@ -87,6 +73,7 @@ fn record(rom: &[u8], args: &[String]) -> Result<(), Box<dyn Error>> {
         cut.furthest_x_before
     );
     println!("// measured from that start state: {:?}", cut.verdict);
+    println!("// the run-up is always the reflex's, whatever player this gym measures.");
     println!("// replay the tape with a {:?} ledger.", gym.seed);
     println!("runs: Cow::Borrowed(&[");
     for (mask, count) in cut.tape.runs.iter() {

@@ -22,7 +22,7 @@ use smb_model::frame::{
 };
 use smb_model::profile::{
     FLOAT_JUMPING, MODE_PLAYING, SETUP_START_FRAME, STATE_NORMAL, SmbState, boot_to_gameplay,
-    read_state,
+    buttons_the_game_read, read_state, wait_for_handover,
 };
 
 /// The one ROM revision this address map was verified against, as the SHA-256 a
@@ -365,4 +365,69 @@ fn the_tile_frame_rebuilds_the_background_the_ppu_actually_drew() {
         carried * 10 >= grounded * 9,
         "the feet row should be load-bearing on nine in ten grounded frames,          got {carried} of {grounded}",
     );
+}
+
+/// A press pattern that reaches every button and both edges of every button.
+///
+/// Held presses matter as much as single frames: an envelope is a hold, and a copy
+/// that updated on the transition but not while a button stayed down would look
+/// correct through half of any real run.
+fn press_pattern(frame: u64) -> ControllerButtons {
+    let right = ControllerButtons::RIGHT;
+    match frame % 12 {
+        0..=4 => right | ControllerButtons::A,
+        5 => right | ControllerButtons::A | ControllerButtons::B,
+        6 => ControllerButtons::NONE,
+        7 => ControllerButtons::LEFT,
+        8 => right | ControllerButtons::B,
+        9 => right | ControllerButtons::SELECT,
+        10 => right | ControllerButtons::START,
+        _ => right | ControllerButtons::DOWN,
+    }
+}
+
+/// The assumption under every measured envelope, pinned.
+///
+/// A skill's carry is a claim about what twenty frames of A did, and the claim is
+/// only worth the frame the A arrived on. The buttons are a host-side argument to
+/// `run_frame` that nothing else in the tree keeps, so the only way to check the
+/// alignment is to ask the game: `$074A` is its own copy of what player 1 is holding,
+/// and it is written inside the frame, from the port the frame was handed.
+///
+/// So the two assertions below are the whole input path in one line each. Before a
+/// frame runs, the byte still holds the previous frame's ask — the copy has not
+/// happened yet, which is why reading it early is not the same as reading it late.
+/// After the frame runs, it holds this frame's ask exactly, on every frame, including
+/// the frame a button is released and the frames a button is held.
+///
+/// This is DirtSim's `gameInputCopied` check, which will not time a jump response
+/// until the game's input mask has moved to what it asked for. Here it is a test
+/// rather than a probe, because the thing it protects is a measurement already
+/// committed to a document.
+#[test]
+fn the_game_takes_the_input_a_frame_was_handed_on_that_frame() {
+    let Some(rom) = cartridge::read_or_skip() else {
+        return;
+    };
+    assert_pinned_revision(&rom);
+    let (mut machine, _) = boot_to_gameplay(&rom).expect("setup script should reach normal play");
+    wait_for_handover(&mut machine).expect("the game should hand the player over");
+
+    let mut asked = ControllerButtons::NONE;
+    for _ in 0..60 {
+        assert_eq!(
+            buttons_the_game_read(&machine),
+            asked,
+            "the game's input byte moved before the frame that was handed it ran, so the              copy is not inside the frame",
+        );
+        asked = press_pattern(machine.ppu().frame_id());
+        machine
+            .run_frame([asked, ControllerButtons::NONE])
+            .expect("frame should run");
+        assert_eq!(
+            buttons_the_game_read(&machine),
+            asked,
+            "the game did not take the buttons its frame was handed",
+        );
+    }
 }

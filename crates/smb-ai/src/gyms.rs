@@ -10,7 +10,10 @@
 
 use std::borrow::Cow;
 
-use crate::gym::{Gym, LedgerSeed, Objective, Outcome, Tape, Verdict};
+use crate::{
+    gym::{self, Gym, LedgerSeed, Objective, Outcome, Tape, Verdict},
+    skills,
+};
 
 /// The run-up both camera-limit gyms start from: the base policy from power-on to
 /// frame 1167, which is the frame absolute X has just stopped moving at 1544 while
@@ -72,6 +75,7 @@ pub const CAMERA_LIMIT: Gym = Gym {
     name: "camera-limit",
     objective: Objective::ReachX { at_least: 1600 },
     seed: LedgerSeed::Cold,
+    driver: gym::REFLEX,
     tape: CAMERA_LIMIT_TAPE,
     frame_budget: 600,
     stall_frames: 120,
@@ -92,14 +96,18 @@ pub const CAMERA_LIMIT: Gym = Gym {
 /// camera limit never refused him and so was never available to be remembered.
 pub const CAMERA_LIMIT_REMEMBERING: Gym = Gym {
     name: "camera-limit-remembering",
+    objective: CAMERA_LIMIT.objective,
     seed: LedgerSeed::Warm,
+    tape: CAMERA_LIMIT_TAPE,
+    driver: CAMERA_LIMIT.driver,
+    frame_budget: CAMERA_LIMIT.frame_budget,
+    stall_frames: CAMERA_LIMIT.stall_frames,
     recorded: Verdict {
         outcome: Outcome::Stuck,
         frames: 120,
         furthest_x: 1544,
         refusals: 0,
     },
-    ..CAMERA_LIMIT
 };
 
 /// The run-up the pit gym starts from: the base policy from power-on to frame 1040,
@@ -167,18 +175,41 @@ const PIT_1379_TAPE: Tape = Tape {
 /// stop: a pit fall ends with absolute X clamped at 1549 by the screen edge, so
 /// reaching 1600 means he crossed rather than fell.
 ///
-/// Measured, the base policy still loses from here — `Stuck` after 248 frames at
-/// absolute X 1544 — so the gym is an unsolved problem and not a formality. What it
-/// takes is known: a jump started between 28 and 58 frames in.
+/// Measured both ways from the same bits: the reflex still loses here — `Stuck` after
+/// 248 frames at absolute X 1544, the hole doing what it did to it — and the script of
+/// [`skills::SCRIPT`] crosses on frame 151. The two numbers are the same tape with one
+/// field changed, which is the only kind of evidence that a library is worth the frames
+/// it costs.
+///
+/// The verdict this gym carries is the script's, because a gym's recorded verdict is
+/// what its own driver does; `tests/skills.rs` pins the reflex's alongside it so neither
+/// half of the pair can rot on its own.
 pub const PIT_1379: Gym = Gym {
     name: "pit-1379",
+    objective: CAMERA_LIMIT.objective,
     seed: LedgerSeed::Cold,
     tape: PIT_1379_TAPE,
+    driver: skills::SCRIPTED,
+    frame_budget: CAMERA_LIMIT.frame_budget,
+    stall_frames: CAMERA_LIMIT.stall_frames,
     recorded: Verdict {
-        outcome: Outcome::Stuck,
-        frames: 248,
-        furthest_x: 1544,
+        outcome: Outcome::Met,
+        frames: 151,
+        // The harness reads the objective before it reads the position, so the frame
+        // that satisfies `at_least: 1600` reports the X it stood on one frame earlier.
+        furthest_x: 1599,
         refusals: 0,
     },
-    ..CAMERA_LIMIT
 };
+
+/// Every committed gym, in the order a transcript prints them.
+pub const ALL: [Gym; 3] = [CAMERA_LIMIT, CAMERA_LIMIT_REMEMBERING, PIT_1379];
+
+/// The gym a command line means, by the name it carries.
+///
+/// The examples take a gym name from `argv`, so the table lives here beside the gyms
+/// rather than in one example's `match`: a name only one of them knows is a name that
+/// quietly runs the wrong gym and prints a verdict for it anyway.
+pub fn by_name(name: &str) -> Option<Gym> {
+    ALL.into_iter().find(|gym| gym.name == name)
+}

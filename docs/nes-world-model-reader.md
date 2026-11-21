@@ -92,6 +92,7 @@ Valid for `Super Mario Bros. (JU) (PRG0) [!]`. All addresses are CPU RAM.
 | `$000F-$0013` | Five enemy-slot active flags |
 | `$0016-$001A` | Five enemy-slot type ids |
 | `$006E-$0072`, `$0087-$008B`, `$00CF-$00D3` | Enemy X page, X on screen, Y on screen |
+| `$074A` | Buttons the game believes player 1 is holding, in controller shift order (A in bit 7 down to Right in bit 0) |
 
 DirtSim reports only the two nearest enemies by squared distance, which keeps
 the sense vector fixed-width.
@@ -631,6 +632,114 @@ ledger to hold; the model has been able to say "no floor for 48 pixels, eight ah
 since trap 9 landed, and says it correctly. What was missing was a bot that spends a
 jump on the right frame, and a gym cut where the frame is still in front of it.
 
+### The first skill, and what measuring it took
+
+Phase 3's first entry exists, and it wins its gym. `crates/smb-ai/src/skills.rs` holds
+two named behaviours — `clear-gap` and `hop-obstacle` — over two measured envelopes, and
+`pit-1379` now carries the script's verdict: `Met` on frame 151 at absolute X 1599 with
+no death, where the same gym under the base reflex is `Stuck` after 248 frames at 1544.
+One field of the gym differs between those two runs — its driver. The tape, the
+objective, the ledger seed and the budget are the same bits.
+
+| Envelope | A held | Air | Carry | Rise | Headroom | Measured from |
+| --- | --- | --- | --- | --- | --- | --- |
+| `long-jump` | 20 frames | 46 | 118 px | 75 px | 96 px | `pit-1379`, 28 frames in |
+| `hop` | 4 frames | 25 | 65 px | 39 px | 32 px | `pit-1379`, 15 frames in |
+
+`skills::measure` produced every number in that table by replaying the tape, running a
+run-up, pressing, and watching where he left the ground and where he stood on something
+again. It is the instrument a future skill gets measured with, which is why it is code
+rather than a table someone typed.
+
+Four things came out of the measuring that the design did not predict.
+
+**A carry is a range, so an envelope names the frame it was measured from.** The same
+twenty frames of A carry 118 pixels from the frame `long-jump` is pinned to, 117 one
+frame earlier, and a flat 115 from every frame from thirty on: one frame of flight
+either way, which is three pixels of landing. The 115 this document quoted for the pit
+is the same jump measured from the *takeoff* rather than from the last frame he stood on
+anything, and the three pixels between the two numbers are the frame in between. A skill
+reads its envelope against the position it is standing on, so which frame a number was
+taken from is part of the number.
+
+**A landing is judged by the last pixel of the box, and one pixel of that is still open.**
+The shortest crossing the commit sweep scored came down with him at absolute X 1414 over a
+hole whose ground returns at 1424, and it stood, so a landing judged on the position byte
+alone refuses every jump the game allows. The sweep re-run at one-frame resolution put the
+game's own edge between a landing at 1409, which falls, and one at 1411, which stands. The
+box reaches fourteen pixels past his position, so the pixel that can be inside a cell and
+counted is `x + 13`, and that answers both the way the cartridge does: 1411 + 13 = 1424,
+which is the ground, and 1409 + 13 = 1422, which is the hole. A landing at 1410 has never
+been pressed, so one pixel of ambiguity is open here and is recorded rather than argued.
+It sits beside a second, larger one: the reader's cell-aligned far edge is 1424 and the
+instrument that walks pixels puts the lip at 1427. The measured window is the arbiter
+between them, and the last-pixel convention reproduces both of its bracketed points.
+
+**The picture ends two pixels short of a long jump's landing.** At running speed the
+camera pins him at screen column 126 or 127 and the reader reaches thirty-two columns, so
+the picture stops one hundred and twenty-eight or one hundred and twenty-nine pixels past
+his position. The long jump's box comes down at one hundred and thirty-one. The direct
+question — is the last pixel of the box over something load-bearing — has no answer there,
+and the first version of the library asked nothing else and refused every long jump it was
+offered and walked into the pit. The fallback is the hole's own reading: a hole whose far
+edge the picture showed has already said where the ground comes back, and a box that
+reaches past that pixel is on ground. Probing one pixel earlier instead, at the last
+readable column, alternates between an answer and none as the fine scroll moves, which is
+the edge itself flickering. What that costs is a standing limit, not a workaround: at
+running speed this model can never *see* a long jump's landing, only infer it from the
+hole it is crossing, so a level whose far lip is not the ground return — a ledge over a
+pit, a platform standing in a hole — needs the level memory Phase 6 is about rather than
+a wider look.
+
+**A skill has to ask whether the world has already granted its postcondition.** A long
+jump that comes down with one foot on the far lip leaves him standing at absolute X 1414
+over a hole whose ground returns at 1424 — standing to the game and in the hole to the
+map — and the hole reading from there is a nine-pixel hole still ahead of him. Without
+that check the script asked for a second long jump on the frame it landed, from inside the
+hole it had just crossed, and survived only because the jump happened to carry.
+
+**And the ablation says the hop is load-bearing somewhere other than where the gym is
+named.** Take `hop-obstacle` out of the script and the pit is still crossed, from the
+first frame the far lip is readable at absolute X 1296; the run then stops dead at 1526,
+two hundred and eighty-six pixels past the pit, on a pair of koopas. Put the hop back and
+it fires twice — frame 1055 at a koomba twenty-two pixels ahead, where this run did not
+need it, and frame 1147 at forty-three, where it did — and the gym is met at 1600. The
+enemy the base policy flinched at, the one the pit tape's jump was spent on, is not the
+hop's reason; the koopas past the lip are. Phase 3's exit asks each skill for a measured
+envelope beside it, and what this adds is that it should also ask for a gym that fails
+without it, which for the hop means enemies on flat ground and is not in the tree.
+
+The script is not allowed to be lucky: `tests/skills.rs` requires it to commit inside the
+window the game scored, 1294 to 1371, and it commits at 1296 — the first frame the far lip
+is inside the camera's window at all, which is the first frame anything reading the screen
+could have made this decision.
+
+### The frame a button arrives on
+
+`engine-client`'s training test flaked on a shared runner and was reported as possible
+non-deterministic keyboard input. It was not. The waits around the keyboard dispatch
+counted down from a fixed number of seconds, and a busy runner legitimately runs the same
+job on one worker, so runner load decided the verdict before the keyboard was reached; the
+waits now watch the job's own progress counters.
+
+The class of bug is real on the NES side, though, and nothing in this tree could see it.
+The buttons are a host-side argument to `run_frame` that nothing keeps, and the plan
+already records a hold built after the frame's buttons had been assembled landing A one
+frame late and moving a run by more than two thousand pixels, with every decoded state
+along the way looking reasonable — because the state is the game's and the buttons were
+the caller's. The comparison needs the game's own copy, and it keeps one at `$074A`,
+written inside the frame from the port the frame was handed, in the order the controller
+shifts buttons out: A in the high bit down to Right in the low one, the reverse of
+`ControllerButtons`, so the decode reverses it.
+
+Measured against a press pattern that touches all eight buttons and both edges of each,
+from the handover: before a frame runs the byte still holds the previous frame's ask, and
+after the frame runs it holds that frame's ask exactly, on every frame, held or released,
+for sixty frames. So the alignment every envelope above assumes is pinned by a test
+(`the_game_takes_the_input_a_frame_was_handed_on_that_frame`) rather than assumed, and the
+byte is where a response probe can compare an ask against a take the way DirtSim's does
+before it starts timing a jump.
+
 ## Rollout and search
 
 `checkpoint` plus `restore` is enough for planning: DirtSim's DFS stores one
@@ -699,31 +808,33 @@ free of a filesystem, clock, thread and renderer.
   the cold and warm starts are two gyms with one tape, and a verdict cannot quietly
   depend on which. What is still missing is a way to *persist* a ledger, so a lesson
   learned in one run is available to the next one at all.
-- The stop that has ended every run of 1-1 is named: a pit 48 pixels wide at world
-  pixel 1379, read off the picture, with the game's own fall and death behind it. See
-  *The pit at 1379* above. What is missing is the other half. The reader can see the
-  hole and the envelope says what a jump carries, but the policy asks `gap_ahead` only
-  while it is grounded and only over `REACH_COLUMNS`, five columns or 40 pixels, and at
-  the last frame the base policy stands on anything the pit is 115 pixels ahead. Both
-  rulers — the screen-indexed one the policy uses and the exact world-pixel one — agree
-  that there is nothing in reach at that frame, so the model is not wrong, it is
-  silent, and nothing in the tree yet turns "a hole 48 wide, 115 ahead, at full
-  running speed" into "A goes down on frame 1068". That is Phase 3's first skill.
+- The stop that ended every run of 1-1 is named and crossed: a pit 48 pixels wide at
+  world pixel 1379, read off the picture, with a measured envelope over it and a script
+  that commits inside the window the game scored. See *The first skill* above. What is
+  still missing is the rest of the level. The base policy asks `gap_within_reach` only
+  while it is grounded and only over five columns, and the script that crosses asks
+  `gap_ahead` over twenty-four, which at running speed is past the picture's own edge —
+  so the crossing works because the hole reports its far lip, and it would stop working
+  on a hole whose far lip is not the ground return. Two skills is also two skills: no
+  pipe, no stair, no gap to drop into, no flagpole, no enemy on flat ground the hop has
+  a gym for, and one tape at one cut has ever been run under them.
 
 How far that leaves this from a player, measured rather than judged: the bot has
 never finished a level at all, and 1-1 is the only level whose tiles it can read
 and the only place it can start. It has three macro-actions written inline in an
 example where DirtSim has eleven, no reward or termination wiring, no item or block
 state, five enemy slots because that is all the game keeps live, a sideways
-solidity model that knows only what one bot has already walked into, no skill that
-acts on a hole it can already see, and three golden hashes — the frames three tapes
+solidity model that knows only what one bot has already walked into, two skills that
+between them cross one hole and hop one enemy, and three golden hashes — the frames three tapes
 start on — so a core change that quietly alters SMB is caught where a gym happens to
 stand and is still invisible everywhere else.
 
 ## What is in the tree now
 
-One model in four layers, one policy, one harness, three gyms, seven drivers, eleven
-tests that all skip when the cartridge is absent, and one film cutter.
+One model in four layers, one policy, a two-entry skill library, one harness, three
+gyms, eight drivers, twenty-four tests — seventeen of them skipped when the cartridge is
+absent, the seven that hold the skill rules needing no game at all — and one film
+cutter.
 
 | File | Layer | Role |
 | --- | --- | --- |
@@ -732,11 +843,14 @@ tests that all skip when the cartridge is absent, and one film cutter.
 | `crates/smb-model/src/resistance.rs` | L3 | the refusal signature and the ledger keyed on artwork |
 | `crates/smb-model/src/affordances.rs` | L4 | gap, wall, enemy in reach: what a body can act on right now |
 | `crates/smb-model/src/cartridge.rs` | - | the pinned image, the loader, `SPACEWARS_SMB_ROM` |
-| `crates/smb-ai/src/policy.rs` | L5 | the base policy and the frame-exact envelope it acts through |
+| `crates/smb-ai/src/policy.rs` | L5 | the base policy, the `Bot` seam every player shares, and the frame-exact envelope it acts through |
+| `crates/smb-ai/src/skills.rs` | L5.5 | two measured envelopes, the skills that spend them, the script, and the instrument that measures an envelope from a tape |
 | `crates/smb-ai/src/gym.rs` | instrument | tape, replay, objective, frame budget, verdict |
 | `crates/smb-ai/src/gyms.rs` | instrument | the gyms this project has actually needed |
 | `crates/smb-model/examples/{probe,tiles,rollout}.rs` | | read-side exploration: decoded state, the tile grid and the pixel comparison, branch and rewind |
-| `crates/smb-ai/examples/{bot,solidity,gym,limit}.rs` | | the bot and its overlay films, the A/B that tells memory from reaction, the tape recorder, the instrument that asks a stop what it actually is |
+| `crates/smb-ai/examples/{bot,solidity,gym,film,limit}.rs` | | the bot and its overlay films, the A/B that tells memory from reaction, the tape recorder, the films a gym's own driver was measured under, the instrument that asks a stop what it actually is |
+| `crates/smb-model/tests/reader.rs` | | the optional cartridge test: the RAM map, the tile frame, a frame-exact restore, and the frame a button arrives on |
+| `crates/smb-ai/tests/{gyms,solidity,skills}.rs` | | a gym's verdict is what its driver does, the A/B that tells memory from reaction, and the skill rules and their ablation |
 | `tools/nes-reference/film-smb-run.py` | | cuts films, clips and a contact sheet from a `--shots` directory, and checks the overlay survived the encoder |
 
 The reader left `engine-nes/tests/support` when its second consumer arrived, which is
@@ -758,6 +872,10 @@ cargo run --release --locked -p smb-ai --example solidity
 cargo run --release --locked -p smb-ai --example gym
 cargo run --release --locked -p smb-ai --example bot -- data/roms/smb.nes 2400 --shots /tmp/smb-film --overlay --every 2
 python3 tools/nes-reference/film-smb-run.py /tmp/smb-film --clip 600-700 --clip 830-920
+
+# A gym film: the tape, the ledger and the player all come off the gym.
+cargo run --release --locked -p smb-ai --example film -- pit-1379 data/shots/pit-cross 200
+python3 tools/nes-reference/film-smb-run.py data/shots/pit-cross
 ```
 
 The second-to-last line writes a PNG per frame, with the reader's green, orange, red
@@ -820,11 +938,19 @@ tool writes its output into that directory unless `--out` says otherwise:
 | `<run>-clip-<lo>-<hi>.mp4` | an overlay clip over emulator frames `lo` to `hi` |
 | `<run>-events.png` | every event still in the order they happened, legend printed |
 
-Three runs are worth keeping. `reader-only` is the honest one, 2,283 frames, stopped
+Four runs are worth keeping. `reader-only` is the honest one, 2,283 frames, stopped
 against the pipe at absolute X 899. `reflex` is the reaction rule that was deleted,
 8,168 frames, reaching 2601 and dying twice; it stays because it is the evidence for
 SMB-008, not a current build. `ledger` is the current one, 2,380 frames, absolute X
 1553 and two deaths, and it is the only series whose overlay includes orange.
+`pit-cross` is 200 frames of the `pit-1379` tape under the script, from the tape's own
+frame 1040, and it is the first film here of a bot crossing the pit on purpose: four
+`event-jump` stills, the hop at 1266, the crossing jump at 1331, the hop at the koopas at
+1494, and one more past the objective at 1646. It has no `model-*` series and no overlay
+clip because it is a gym film rather than a `bot` film: `film` replays a gym's tape and
+hands the machine to the driver that gym names, so the run on screen is the run the
+verdict was measured from, and it writes one PNG a frame instead of two. Re-cutting it
+reproduces all two hundred frames and all four stills byte for byte.
 
 The clips that carry the argument are `reader-only-clip-1600-1802`, the pipe, where
 the row under his feet is green and the three rows ahead are red, which is trap 7

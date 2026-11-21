@@ -11,7 +11,9 @@
 //! envelope bugs, so the hold lives here rather than in whatever is driving.
 
 use engine_nes::{ControllerButtons, NesMachine};
-use smb_model::affordances::{ENEMY_TRIGGER_PIXELS, WALL_LOOK_COLUMNS, gap_ahead, wall_ahead};
+use smb_model::affordances::{
+    ENEMY_TRIGGER_PIXELS, WALL_LOOK_COLUMNS, gap_within_reach, wall_ahead,
+};
 use smb_model::frame::{TILE_CELLS, player_tile, scroll_x, snapshot, tile_grid};
 use smb_model::profile::{SmbState, read_state};
 use smb_model::resistance::{Motion, Refusal, Resistance};
@@ -43,7 +45,9 @@ pub fn run_right_buttons(
         .min()
         .unwrap_or(i16::MAX);
     if state.is_grounded()
-        && (wall || gap_ahead(tiles, column, row).is_some() || enemy_ahead <= ENEMY_TRIGGER_PIXELS)
+        && (wall
+            || gap_within_reach(tiles, column, row).is_some()
+            || enemy_ahead <= ENEMY_TRIGGER_PIXELS)
     {
         *hold_a = JUMP_HOLD_FRAMES;
     }
@@ -53,6 +57,65 @@ pub fn run_right_buttons(
         *hold_a -= 1;
     }
     buttons
+}
+
+/// What any player of this game does on a frame, whether it is the reflex below, a
+/// script of measured skills, or Phase 5's search.
+///
+/// Three calls and nothing else, because the harness has to be able to swap a player
+/// without knowing what it knows: `buttons` reads the machine and returns one latch
+/// value, `observe` is the game's answer to that value, and `learn` is the same answer
+/// for a frame whose buttons came from somewhere else — a gym replays a recorded
+/// latch value rather than asking a policy, and still has to tell its model what the
+/// game did with it.
+///
+/// The gym harness drives this trait, so a skill library and a search are measured by
+/// the same instrument that measures the reflex, on the same tapes.
+pub trait Bot {
+    /// Buttons for this frame, read from the machine as it stands.
+    fn buttons(&mut self, machine: &NesMachine) -> ControllerButtons;
+
+    /// What the game did with the last frame's buttons.
+    fn observe(
+        &mut self,
+        produced: &SmbState,
+        machine: &NesMachine,
+        at_frame: u64,
+    ) -> Option<Refusal>;
+
+    /// The same, for a frame decided by something other than [`Bot::buttons`].
+    fn learn(
+        &mut self,
+        asked: Motion,
+        produced: &SmbState,
+        machine: &NesMachine,
+        at_frame: u64,
+    ) -> Option<Refusal>;
+}
+
+impl Bot for BaseBot {
+    fn buttons(&mut self, machine: &NesMachine) -> ControllerButtons {
+        Self::buttons(self, machine)
+    }
+
+    fn observe(
+        &mut self,
+        produced: &SmbState,
+        machine: &NesMachine,
+        at_frame: u64,
+    ) -> Option<Refusal> {
+        Self::observe(self, produced, machine, at_frame)
+    }
+
+    fn learn(
+        &mut self,
+        asked: Motion,
+        produced: &SmbState,
+        machine: &NesMachine,
+        at_frame: u64,
+    ) -> Option<Refusal> {
+        Self::learn(self, asked, produced, machine, at_frame)
+    }
 }
 
 /// The base policy with the model's memory of solidity under it.

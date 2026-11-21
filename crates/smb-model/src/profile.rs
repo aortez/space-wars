@@ -53,6 +53,15 @@ pub const ENEMY_X_SCREEN: [u16; 5] = [0x0087, 0x0088, 0x0089, 0x008A, 0x008B];
 
 pub const ENEMY_Y_SCREEN: [u16; 5] = [0x00CF, 0x00D0, 0x00D1, 0x00D2, 0x00D3];
 
+/// The buttons the game itself believes player 1 is holding.
+///
+/// Every other address here is the game's opinion about the world. This one is its
+/// opinion about the controller, and it is the only place the frame a button
+/// actually arrived on can be read: the buttons handed to
+/// [`engine_nes::NesMachine::run_frame`] are a host-side argument that vanishes when
+/// the call returns.
+pub const BUTTONS_P1: u16 = 0x074A;
+
 // Player modes at `PLAYER_STATE`.
 pub const STATE_LEFTMOST: u8 = 0x00;
 
@@ -188,6 +197,36 @@ pub fn read_state(machine: &NesMachine) -> SmbState {
         screen_x: peek(X_SCREEN),
         screen_y: peek(Y_SCREEN),
     }
+}
+
+/// What the game says it was asked to do, as opposed to what a caller asked.
+///
+/// The byte is in the order the controller's serial register shifts buttons out — A
+/// in the high bit down to Right in the low one — which is the reverse of
+/// [`ControllerButtons`], so the decode reverses it. Measured against a press
+/// pattern that touches all eight: asking A and Right reads `$81`, asking Left reads
+/// `$02`, asking Select and Right reads `$21`, and reversing reproduces all three.
+///
+/// The reason to carry it is that every envelope in this project is a claim about
+/// what a button program did, and such a claim is only worth the assumption under it:
+/// that the buttons handed to a frame are the buttons the game acted on *that* frame.
+/// Nothing in the tree could see that assumption. The execution plan records a bug
+/// where a hold set after the frame's buttons had been built landed A one frame late
+/// and moved a run by more than two thousand pixels, and every decoded state along the
+/// way looked reasonable, because the state is the game's and the buttons were the
+/// caller's. This byte is where the two are compared, which is DirtSim's response
+/// probe doing exactly that: it refuses to time a jump response until the game's own
+/// input mask has moved to what it asked for (`gameInputCopiedFrameId` in
+/// `NesSuperMarioBrosResponseProbe.cpp`).
+///
+/// Read from RAM rather than from the port, because reading `$4016` shifts the
+/// register and would disturb the game.
+///
+/// `tests/reader.rs` is the consumer today, and it is the check: the byte equals the
+/// buttons the frame was handed, on that frame, once the game has handed the player
+/// over.
+pub fn buttons_the_game_read(machine: &NesMachine) -> ControllerButtons {
+    ControllerButtons::from_bits(machine.bus().peek(BUTTONS_P1).reverse_bits())
 }
 
 /// The DirtSim setup script: nothing until frame 120, one Start press there.

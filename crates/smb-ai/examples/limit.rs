@@ -32,7 +32,7 @@ use smb_ai::{
     policy::BaseBot,
 };
 use smb_model::{
-    affordances::{ENEMY_TRIGGER_PIXELS, REACH_COLUMNS, SUPPORT_ROWS, gap_ahead},
+    affordances::{ENEMY_TRIGGER_PIXELS, REACH_COLUMNS, SUPPORT_ROWS, gap_ahead, gap_within_reach},
     cartridge,
     frame::{
         PpuBytes, is_blank_tile, is_load_bearing, player_tile, scroll_x, snapshot,
@@ -187,7 +187,7 @@ fn bot_run(run: &mut Rewind) -> Result<(), Box<dyn Error>> {
             absolute_x: state.absolute_x,
             column,
             row,
-            grid_gap: gap_ahead(&tiles, column, row),
+            grid_gap: gap_within_reach(&tiles, column, row),
             exact_gap: exact_gap_ahead(&frame, origin, &state, row),
             jumped: buttons.contains(ControllerButtons::A),
             grounded: state.is_grounded(),
@@ -337,15 +337,14 @@ impl Row {
     }
 }
 
-/// The same question [`gap_ahead`] answers, asked of world pixels instead of screen
-/// cells, over the same reach and the same support rows.
+/// The same question [`gap_within_reach`] answers, through the model's exact reader,
+/// so that the two columns below differ only in the channel and not in two local
+/// copies of "what counts as ground". The answer comes back in pixels and is rounded
+/// up to the cell it falls in, which is the cell the grid answer is about.
 fn exact_gap_ahead(frame: &PpuBytes, origin: u16, state: &SmbState, row: i16) -> Option<i16> {
-    (1..=REACH_COLUMNS).find(|&step| {
-        let x = state.absolute_x + u16::try_from(step * 8).unwrap_or(0);
-        !(0..=SUPPORT_ROWS).any(|drop| {
-            tile_at_world_pixel(frame, origin, x, row + drop).is_some_and(is_load_bearing)
-        })
-    })
+    let gap = gap_ahead(frame, origin, state.absolute_x, row, REACH_COLUMNS)?;
+    let pixels = gap.near_x.saturating_sub(state.absolute_x);
+    i16::try_from(pixels.div_ceil(8)).ok()
 }
 
 /// A gap's column as the cell it is about, so the two answers can be read side by side.
