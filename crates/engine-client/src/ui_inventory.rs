@@ -20,6 +20,7 @@ pub(crate) struct ScreenVisibility {
     pub(crate) ingame_menu: bool,
     pub(crate) ingame_controls: bool,
     pub(crate) ingame_clock: bool,
+    pub(crate) clock_page: crate::clock_menu::Page,
     pub(crate) clock_fonts: bool,
     pub(crate) game_over: bool,
 }
@@ -74,7 +75,7 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
     } else if visibility.ingame_menu && visibility.sound {
         UiScreen::PauseSound
     } else if visibility.ingame_menu && visibility.ingame_clock {
-        UiScreen::PauseClock
+        visibility.clock_page.screen()
     } else if visibility.ingame_controls {
         UiScreen::PauseControls
     } else if visibility.ingame_menu {
@@ -124,8 +125,8 @@ pub(crate) struct UiInventoryContext {
     pub(crate) launcher_settings_focus_index: i32,
     pub(crate) launcher_controls_focus_index: i32,
     pub(crate) ingame_menu_focus_index: i32,
-    pub(crate) ingame_clock_focus_index: i32,
-    pub(crate) clock_preview: String,
+    pub(crate) clock_controls: Vec<UiControl>,
+    pub(crate) clock_selected: Option<String>,
     pub(crate) clock_controls_pending: bool,
     pub(crate) clock_settings_error: Option<String>,
     pub(crate) game_over_focus_index: i32,
@@ -352,7 +353,9 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
             error: context.scenario_error.clone(),
         },
         UiScreen::PauseMain => pause_main_inventory(context),
-        UiScreen::PauseClock => pause_clock_inventory(context),
+        UiScreen::PauseClock | UiScreen::PauseClockLook | UiScreen::PauseClockEvents => {
+            pause_clock_inventory(context)
+        }
         UiScreen::LauncherClockFonts | UiScreen::PauseClockFonts => UiInventory {
             selected_control: context
                 .font_controls
@@ -1112,180 +1115,15 @@ fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
     }
 }
 
+/// The Clock Controls page showing: its rows' controls, with the focused row
+/// selected. None of them take a press while the host applies a change.
 fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
-    let mut controls = Vec::new();
-    push_choice(
-        &mut controls,
-        "pause.clock.time-format",
-        &context.clock_time_format,
-    );
-    push_choice(
-        &mut controls,
-        "pause.clock.event-profile",
-        &context.clock_event_profile,
-    );
-    controls.push(
-        UiControl::new("pause.clock.falling", "Falling", true).with_value(
-            if context.clock_falling_enabled {
-                "On"
-            } else {
-                "Off"
-            },
-        ),
-    );
-    controls.push(
-        UiControl::new("pause.clock.color-cycle", "Color Cycle", true).with_value(
-            if context.clock_color_cycle_enabled {
-                "On"
-            } else {
-                "Off"
-            },
-        ),
-    );
-    push_choice(
-        &mut controls,
-        "pause.clock.preview-event",
-        &context.clock_preview,
-    );
-    controls.push(
-        UiControl::new("pause.clock.meltdown", "Meltdown", true).with_value(
-            if context.clock_meltdown_enabled {
-                "On"
-            } else {
-                "Off"
-            },
-        ),
-    );
-    controls.push(UiControl::new("pause.clock.back", "Back", true));
-    controls.push(UiControl::new("pause.clock.duck", "Duck", true).with_value(
-        if context.clock_duck_enabled {
-            "On"
-        } else {
-            "Off"
-        },
-    ));
-    controls.push(
-        UiControl::new("pause.clock.marquee", "Marquee", true).with_value(
-            if context.clock_marquee_enabled {
-                "On"
-            } else {
-                "Off"
-            },
-        ),
-    );
-    push_choice(
-        &mut controls,
-        "pause.clock.marquee-preset",
-        &context.clock_marquee_preset,
-    );
-    controls.push(UiControl::new(
-        "pause.clock.preview",
-        "Preview & Resume",
-        true,
-    ));
-    controls.push(
-        UiControl::new("pause.clock.digit-slide", "Digit Slide", true).with_value(
-            if context.clock_digit_slide_enabled {
-                "On"
-            } else {
-                "Off"
-            },
-        ),
-    );
-    controls.push(
-        UiControl::new("pause.clock.cell-swap", "Cell Swap", true).with_value(
-            if context.clock_cell_swap_enabled {
-                "On"
-            } else {
-                "Off"
-            },
-        ),
-    );
-    controls.push(
-        UiControl::new("pause.clock.slot-machine", "Slot Machine", true).with_value(
-            if context.clock_slot_machine_enabled {
-                "On"
-            } else {
-                "Off"
-            },
-        ),
-    );
-    controls.push(
-        UiControl::new("pause.clock.spider", "Spider", true).with_value(
-            if context.clock_spider_enabled {
-                "On"
-            } else {
-                "Off"
-            },
-        ),
-    );
-    controls.push(
-        UiControl::new("pause.clock.coins", "Coins", true).with_value(
-            if context.clock_coins_enabled {
-                "On"
-            } else {
-                "Off"
-            },
-        ),
-    );
-    controls.push(
-        UiControl::new("pause.clock.tanks", "Tanks", true).with_value(
-            if context.clock_tanks_enabled {
-                "On"
-            } else {
-                "Off"
-            },
-        ),
-    );
-    controls.push(
-        UiControl::new("pause.clock.grass", "Grass", true).with_value(
-            if context.clock_grass_enabled {
-                "On"
-            } else {
-                "Off"
-            },
-        ),
-    );
-    push_choice(&mut controls, "pause.clock.rain", &context.clock_rain);
-    controls.push(
-        UiControl::new("pause.clock.crow", "Crow water tolerance", true)
-            .with_value(&context.clock_crow),
-    );
-    controls.push(
-        UiControl::new("pause.clock.explosion", "Explosion", true).with_value(
-            if context.clock_explosion_enabled {
-                "On"
-            } else {
-                "Off"
-            },
-        ),
-    );
-    controls.push(
-        UiControl::new("pause.clock.show-date", "Show Date", true)
-            .with_value(if context.clock_show_date { "On" } else { "Off" }),
-    );
-    controls.push(UiControl::new("pause.clock.fonts", "Fonts", true));
-    controls
-        .push(UiControl::new("pause.clock.lamps", "Lamps", true).with_value(&context.clock_lamps));
-    controls
-        .push(UiControl::new("pause.clock.theme", "Theme", true).with_value(&context.clock_theme));
-    controls.push(
-        UiControl::new("pause.clock.aquarium", "Aquarium", true).with_value(
-            if context.clock_aquarium_enabled {
-                "On"
-            } else {
-                "Off"
-            },
-        ),
-    );
+    let mut controls = context.clock_controls.clone();
     for control in &mut controls {
         control.enabled = !context.clock_controls_pending;
     }
     UiInventory {
-        selected_control: selected_from_index(
-            &PAUSE_CLOCK_FOCUS_ORDER,
-            context.ingame_clock_focus_index,
-        ),
+        selected_control: context.clock_selected.clone(),
         controls,
         actions: if context.clock_controls_pending {
             vec![]
@@ -1298,37 +1136,6 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
             .or_else(|| context.scenario_error.clone()),
     }
 }
-
-/// The Clock's pause page controls by focus index. The page changes the
-/// setting the control at its focused index names.
-pub(crate) const PAUSE_CLOCK_FOCUS_ORDER: [&str; 26] = [
-    "pause.clock.time-format",
-    "pause.clock.event-profile",
-    "pause.clock.falling",
-    "pause.clock.color-cycle",
-    "pause.clock.preview-event",
-    "pause.clock.back",
-    "pause.clock.preview",
-    "pause.clock.meltdown",
-    "pause.clock.duck",
-    "pause.clock.marquee",
-    "pause.clock.marquee-preset",
-    "pause.clock.digit-slide",
-    "pause.clock.rain",
-    "pause.clock.show-date",
-    "pause.clock.crow",
-    "pause.clock.explosion",
-    "pause.clock.fonts",
-    "pause.clock.aquarium",
-    "pause.clock.cell-swap",
-    "pause.clock.grass",
-    "pause.clock.slot-machine",
-    "pause.clock.spider",
-    "pause.clock.coins",
-    "pause.clock.tanks",
-    "pause.clock.lamps",
-    "pause.clock.theme",
-];
 
 /// The launcher's Clock settings by focus index, Back last. The launcher
 /// changes the setting the control at its focused index names.
@@ -1581,6 +1388,7 @@ mod tests {
                 ingame_controls: true,
                 game_over: true,
                 ingame_clock: true,
+                clock_page: crate::clock_menu::Page::Top,
                 clock_fonts: false,
                 training: false,
                 genomes: false,
@@ -1734,47 +1542,6 @@ mod tests {
                 ["launcher.settings.back", "launcher.settings.start"]
             );
         }
-    }
-
-    /// Every index the Clock page's navigation can reach must name one control,
-    /// or a focused row reports nothing and the page cannot say where it is.
-    #[test]
-    fn pause_clock_focus_order_names_every_reachable_index() {
-        let mut reachable = vec![0];
-        let mut visited = 0;
-        while visited < reachable.len() {
-            let current = reachable[visited];
-            for action in [
-                UiAction::Up,
-                UiAction::Down,
-                UiAction::Left,
-                UiAction::Right,
-            ] {
-                let next = crate::ui_navigation::moved_clock_selection(current, action);
-                if !reachable.contains(&next) {
-                    reachable.push(next);
-                }
-            }
-            visited += 1;
-        }
-        let mut context = context("clock");
-        let mut named = Vec::new();
-        for focus in &reachable {
-            context.ingame_clock_focus_index = *focus;
-            named.push(
-                pause_clock_inventory(&context)
-                    .selected_control
-                    .unwrap_or_else(|| panic!("clock focus {focus} names no control")),
-            );
-        }
-        let mut unique = named.clone();
-        unique.sort();
-        unique.dedup();
-        assert_eq!(
-            unique.len(),
-            reachable.len(),
-            "two reachable indices share one control"
-        );
     }
 
     /// Confirm leaves the settings page only on its final index, so the focus
@@ -1974,7 +1741,6 @@ mod tests {
                 UiScreen::LauncherTouchTest,
                 UiScreen::Gameplay,
                 UiScreen::PauseMain,
-                UiScreen::PauseClock,
                 UiScreen::PauseSound,
             ] {
                 assert_inventory_is_activatable(screen, &context);
@@ -1996,29 +1762,40 @@ mod tests {
     }
 
     #[test]
-    fn clock_controls_report_live_values_selection_and_pending_availability() {
+    fn clock_controls_report_their_page_selection_and_pending_availability() {
         let mut context = context("clock");
-        context.ingame_clock_focus_index = 3;
-        context.clock_preview = "Color Cycle".into();
-        let inventory = inventory_for_screen(UiScreen::PauseClock, &context);
+        context.clock_controls = vec![
+            UiControl::new("pause.clock.falling", "Falling", true).with_value("On"),
+            UiControl::new("pause.clock.falling.play", "Play", true),
+            UiControl::new("pause.clock.back", "Back", true),
+        ];
+        context.clock_selected = Some("pause.clock.falling".into());
+        let inventory = inventory_for_screen(UiScreen::PauseClockEvents, &context);
         assert_eq!(
             inventory.selected_control.as_deref(),
-            Some("pause.clock.color-cycle")
+            Some("pause.clock.falling")
         );
-        assert_eq!(inventory.controls.len(), 31);
-        assert!(inventory.controls.iter().all(|control| control.enabled));
+        assert_eq!(inventory.controls, context.clock_controls);
+        assert_eq!(inventory.actions, UiAction::ALL.to_vec());
         context.clock_controls_pending = true;
-        let pending = inventory_for_screen(UiScreen::PauseClock, &context);
+        let pending = inventory_for_screen(UiScreen::PauseClockEvents, &context);
         assert!(pending.controls.iter().all(|control| !control.enabled));
         assert!(pending.actions.is_empty());
-        assert_eq!(
-            classify_screen(ScreenVisibility {
-                ingame_menu: true,
-                ingame_clock: true,
-                ..Default::default()
-            }),
-            UiScreen::PauseClock
-        );
+        for page in [
+            crate::clock_menu::Page::Top,
+            crate::clock_menu::Page::Look,
+            crate::clock_menu::Page::Events,
+        ] {
+            assert_eq!(
+                classify_screen(ScreenVisibility {
+                    ingame_menu: true,
+                    ingame_clock: true,
+                    clock_page: page,
+                    ..Default::default()
+                }),
+                page.screen()
+            );
+        }
     }
 
     #[test]

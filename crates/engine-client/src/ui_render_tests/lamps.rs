@@ -13,8 +13,8 @@ use crate::{
     thruster_visual_tests::{raster, svg, write_png},
 };
 use engine_common::{
-    ClockEventKind, ClockEventProfile, ClockLampActivity, ClockLampBrainState, ClockLampSide,
-    ClockSettings, RenderPrimitive, Scenario,
+    ClockEventProfile, ClockLampActivity, ClockLampBrainState, ClockLampSide, ClockSettings,
+    RenderPrimitive, Scenario,
 };
 use scenario_clock::{
     ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario, ClockState,
@@ -275,19 +275,13 @@ fn lamps_render_rest_track_present_and_outage_and_come_back_at_target_sizes() {
             );
             assert_eq!(ui.get_launcher_clock_lamps(), "Lively");
             assert_eq!(ui.get_launcher_clock_event_profile(), "Demo");
-            ui.set_clock_event_labels(
-                Rc::new(slint::VecModel::from(
-                    ClockEventKind::ALL
-                        .iter()
-                        .map(|kind| kind.label().into())
-                        .collect::<Vec<_>>(),
-                ))
-                .into(),
-            );
             if live {
                 ui.set_ingame_menu_visible(true);
                 ui.set_ingame_clock_visible(true);
-                ui.set_ingame_clock_focus_index(24);
+                crate::clock_menu::show(&ui, crate::clock_menu::Page::Look, Some("lamps"));
+                // The list scrolls to the row in a change handler, which runs
+                // with the timers.
+                slint::platform::update_timers_and_animations();
             } else {
                 ui.set_launcher_visible(true);
                 ui.set_launcher_settings_visible(true);

@@ -3,6 +3,12 @@
 export struct DeviceInfoRow { id: string, label: string, value: string }
 export struct ControllerRow { id: string, label: string }
 export struct NetworkRow { id: string, label: string, detail: string, badge: string, enabled: bool }
+export enum SettingsRowKind { choice, switch, page, heading }
+// One row of a SettingsList. A choice shows its value between ‹ and ›, a
+// switch shows On or Off, a page shows a summary of what it opens, and a
+// heading names the rows below it. A playable row ends in a Play button.
+// Headings are shorter than rows, so each row says how many come before it.
+export struct SettingsListRow { id: string, label: string, value: string, help: string, kind: SettingsRowKind, playable: bool, enabled: bool, headings-before: int }
 export struct ScoreboardRow { player: string, controller: string, wins: string, losses: string, draws: string, won: bool }
 export struct TrainingPoint { best: float, median: float }
 
@@ -425,6 +431,199 @@ component ChoiceRow inherits Rectangle {
     }
 }
 
+// One row of a SettingsList: a choice between ‹ and ›, a switch, or a page
+// that opens with ›, and on a playable row a Play button at the end. A tap on
+// the row itself goes to `activated`.
+component SettingsListItem inherits Rectangle {
+    in property <SettingsListRow> item;
+    in property <bool> selected: false;
+    in property <bool> enabled: true;
+    callback previous();
+    callback next();
+    callback activated();
+    callback play();
+    property <bool> choice: root.item.kind == SettingsRowKind.choice;
+    property <bool> switch: root.item.kind == SettingsRowKind.switch;
+    property <length> label-width: Math.min(self.width * 0.42, 190px);
+    // The value's room ends before the Play button, where there is one.
+    property <length> value-end: root.item.playable ? self.width - 61px : self.width;
+
+    background: row-touch.pressed || root.selected ? #122f44 : #10141f;
+    border-color: row-touch.pressed || root.selected ? #80d8ff : #424a5a;
+    border-width: row-touch.pressed || root.selected ? 3px : 1px;
+    border-radius: 6px;
+    opacity: root.enabled ? 1 : 0.5;
+
+    // Taps here and on the switch count as use, as they do on a MenuButton.
+    row-touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.down) {
+                UserActivity.pointer-held = true;
+                UserActivity.notify();
+            } else if (event.kind == PointerEventKind.up || event.kind == PointerEventKind.cancel) {
+                UserActivity.pointer-held = false;
+                UserActivity.notify();
+            }
+        }
+        clicked => {
+            if (!UserActivity.notify()) { root.activated(); }
+        }
+    }
+    Text {
+        x: 14px; width: root.label-width - 18px; height: parent.height;
+        text: root.item.label; color: root.selected ? #ffffff : #d9e1ec;
+        font-size: 15px; font-weight: root.selected ? 700 : 500;
+        vertical-alignment: center; overflow: elide;
+    }
+    if root.choice: MenuButton {
+        x: root.label-width; y: 3px; width: 46px; height: parent.height - 6px;
+        text: "‹"; enabled: root.enabled;
+        activated => { root.previous(); }
+    }
+    if root.choice: Text {
+        x: root.label-width + 50px; width: root.value-end - root.label-width - 100px; height: parent.height;
+        text: root.item.value; color: #ffffff; font-size: 15px; font-weight: 600;
+        horizontal-alignment: center; vertical-alignment: center; overflow: elide;
+    }
+    if root.choice: MenuButton {
+        x: root.value-end - 49px; y: 3px; width: 46px; height: parent.height - 6px;
+        text: "›"; enabled: root.enabled;
+        activated => { root.next(); }
+    }
+    // A switch is a pill that reads On or Off, lit when On, and a tap on it
+    // flips it.
+    if root.switch: Rectangle {
+        x: root.value-end - 90px; y: (parent.height - 32px) / 2; width: 78px; height: 32px;
+        background: switch-touch.pressed ? #236e96 : root.item.value == "On" ? #174f70 : #242c3b;
+        border-radius: 16px;
+        Text {
+            width: parent.width; height: parent.height;
+            text: root.item.value;
+            color: root.item.value == "On" ? #80d8ff : #c7d0dc;
+            font-size: 15px; font-weight: 600;
+            horizontal-alignment: center; vertical-alignment: center;
+        }
+        switch-touch := TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: pointer;
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.down) {
+                    UserActivity.pointer-held = true;
+                    UserActivity.notify();
+                } else if (event.kind == PointerEventKind.up || event.kind == PointerEventKind.cancel) {
+                    UserActivity.pointer-held = false;
+                    UserActivity.notify();
+                }
+            }
+            clicked => {
+                if (!UserActivity.notify()) { root.next(); }
+            }
+        }
+    }
+    if root.item.kind == SettingsRowKind.page: Text {
+        x: root.label-width; width: parent.width - root.label-width - 44px; height: parent.height;
+        text: root.item.value; color: #9fb4cc; font-size: 13px;
+        horizontal-alignment: right; vertical-alignment: center; overflow: elide;
+    }
+    if root.item.kind == SettingsRowKind.page: Text {
+        x: parent.width - 38px; width: 26px; height: parent.height;
+        text: "›"; color: #80d8ff; font-size: 26px;
+        horizontal-alignment: center; vertical-alignment: center;
+    }
+    // Play, a word rather than a symbol, which the kiosk's fonts may lack.
+    // On the selected row it is lit, since A / Enter presses it there.
+    if root.item.playable: MenuButton {
+        x: parent.width - 55px; y: 3px; width: 52px; height: parent.height - 6px;
+        text: "Play"; text-size: 14px; text-padding: 4px; primary: true;
+        selected: root.selected; enabled: root.enabled;
+        activated => { root.play(); }
+    }
+}
+
+// A page of settings as one column of rows that scrolls to keep the focused
+// row in view, with a bar on the right while there is more to see. Headings
+// never take focus.
+component SettingsList inherits Rectangle {
+    in property <[SettingsListRow]> rows;
+    in property <int> focus-index: -1;
+    in property <bool> enabled: true;
+    in property <length> row-height: 44px;
+    in property <length> heading-height: 28px;
+    in property <length> gap: 4px;
+    callback previous(int);
+    callback next(int);
+    callback activated(int);
+    callback play(int);
+
+    pure function row-top(index: int) -> length {
+        (index - root.rows[index].headings-before) * (root.row-height + root.gap)
+            + root.rows[index].headings-before * (root.heading-height + root.gap)
+    }
+    pure function row-size(index: int) -> length {
+        root.rows[index].kind == SettingsRowKind.heading ? root.heading-height : root.row-height
+    }
+
+    list := Flickable {
+        x: 0px; y: 0px;
+        width: parent.width - 10px;
+        height: parent.height;
+        viewport-width: self.width;
+        viewport-height: root.rows.length == 0 ? 0px : root.row-top(root.rows.length - 1) + root.row-size(root.rows.length - 1);
+        property <int> focus-index: root.focus-index;
+        property <length> scroll-limit: Math.max(0px, self.viewport-height - self.height);
+        // A group's first row brings its heading into view with it.
+        function reveal-focus() {
+            if self.focus-index >= 0 && self.focus-index < root.rows.length {
+                let first = self.focus-index > 0 && root.rows[self.focus-index - 1].kind == SettingsRowKind.heading ? self.focus-index - 1 : self.focus-index;
+                let top = root.row-top(first);
+                let bottom = root.row-top(self.focus-index) + root.row-height;
+                if -self.viewport-y > top { self.viewport-y = -top; }
+                if -self.viewport-y + self.height < bottom { self.viewport-y = self.height - bottom; }
+            }
+            self.viewport-y = Math.max(-self.scroll-limit, Math.min(0px, self.viewport-y));
+        }
+        changed focus-index => { self.reveal-focus(); }
+        changed scroll-limit => { self.reveal-focus(); }
+        init => { self.reveal-focus(); }
+        for row[index] in root.rows: Rectangle {
+            y: root.row-top(index);
+            width: parent.width;
+            height: root.row-size(index);
+            if row.kind == SettingsRowKind.heading: Text {
+                x: 4px; y: 0px; width: parent.width - 4px; height: parent.height - 4px;
+                text: row.label; color: #80d8ff; font-size: 13px; font-weight: 700;
+                vertical-alignment: bottom;
+            }
+            if row.kind == SettingsRowKind.heading: Rectangle {
+                y: parent.height - 2px; width: parent.width; height: 1px;
+                background: #344255;
+            }
+            if row.kind != SettingsRowKind.heading: SettingsListItem {
+                width: parent.width; height: parent.height;
+                item: row;
+                selected: root.focus-index == index;
+                enabled: root.enabled && row.enabled;
+                previous => { root.previous(index); }
+                next => { root.next(index); }
+                activated => { root.activated(index); }
+                play => { root.play(index); }
+            }
+        }
+    }
+    if list.scroll-limit > 0px: Rectangle {
+        x: parent.width - 4px; width: 3px; height: parent.height;
+        background: #283a50;
+        Rectangle {
+            width: parent.width;
+            height: Math.max(12px, parent.height * list.height / list.viewport-height);
+            y: (parent.height - self.height) * Math.min(1, Math.max(0, -list.viewport-y / list.scroll-limit));
+            background: #80d8ff;
+        }
+    }
+}
+
 component TouchTestTarget inherits Rectangle {
     in property <string> text;
     in property <bool> hit: false;
@@ -594,8 +793,6 @@ export component MainWindow inherits Window {
     in-out property <int> ingame-menu-focus-index: 0;
     in-out property <bool> ingame-clock-visible: false;
     in-out property <int> ingame-clock-focus-index: 0;
-    in-out property <int> clock-preview-index: 0;
-    in property <[string]> clock-event-labels;
     in-out property <bool> clock-controls-pending: false;
     in property <string> clock-settings-error: "";
     in-out property <string> launcher-match-length: "10 min";
@@ -816,8 +1013,24 @@ export component MainWindow inherits Window {
     callback launcher-quit();
     callback ingame-resume();
     callback ingame-clock-open();
-    callback ingame-clock-adjust(int, int);
-    callback ingame-clock-preview();
+    // The Clock's settings pages: which one shows, "top", "look" or "events",
+    // each page's rows, and what a row's ‹ ›, a tap on it, its Play button,
+    // and Back ask for.
+    in property <string> clock-menu-page: "top";
+    in property <[SettingsListRow]> clock-menu-top-rows;
+    in property <[SettingsListRow]> clock-menu-look-rows;
+    in property <[SettingsListRow]> clock-menu-events-rows;
+    out property <[SettingsListRow]> clock-menu-rows: root.clock-menu-page == "look" ? root.clock-menu-look-rows
+        : root.clock-menu-page == "events" ? root.clock-menu-events-rows
+        : root.clock-menu-top-rows;
+    callback clock-menu-adjust(int, int);
+    callback clock-menu-activate(int);
+    callback clock-menu-play(int);
+    callback clock-menu-back();
+    // How tall the page's rows are, for the panel to fit them: rows of 44 px
+    // and headings of 28 px, 4 px apart, as SettingsList draws them.
+    property <int> clock-menu-headings: root.clock-menu-rows.length == 0 ? 0 : root.clock-menu-rows[root.clock-menu-rows.length - 1].headings-before;
+    property <length> clock-menu-list-height: (root.clock-menu-rows.length - root.clock-menu-headings) * 48px + root.clock-menu-headings * 32px - 4px;
     callback clock-settings-applied();
     callback sound-open();
     callback device-info-open();
@@ -1183,7 +1396,10 @@ export component MainWindow inherits Window {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             width: root.width < 632px ? root.width - 32px : 600px;
-            height: root.ingame-controls-visible || root.ingame-clock-visible ? (root.height < 456px ? root.height - 24px : 432px) : root.pizza-event-available ? 390px : 326px;
+            // A Clock page's panel fits its rows, up to the full height in
+            // portrait, where a long list has room for most of them, and
+            // 520 px in landscape.
+            height: root.ingame-clock-visible ? Math.min(root.height > root.width ? root.height - 24px : Math.min(root.height - 24px, 520px), 176px + root.clock-menu-list-height) : root.ingame-controls-visible ? (root.height < 456px ? root.height - 24px : 432px) : root.pizza-event-available ? 390px : 326px;
             background: #080a12f7;
             border-color: #596273;
             border-width: 1px;
@@ -1192,7 +1408,7 @@ export component MainWindow inherits Window {
             Text {
                 x: 24px;
                 y: 18px;
-                text: root.ingame-clock-visible ? "Clock Controls" : root.ingame-controls-visible ? "Controls" : "Paused";
+                text: !root.ingame-clock-visible ? (root.ingame-controls-visible ? "Controls" : "Paused") : root.clock-menu-page == "look" ? "Clock Controls › Look" : root.clock-menu-page == "events" ? "Clock Controls › Events" : "Clock Controls";
                 color: #ffffff;
                 font-size: 26px;
                 font-weight: 700;
@@ -1423,337 +1639,57 @@ export component MainWindow inherits Window {
                 horizontal-alignment: center;
             }
 
-            // A conditional item tree keeps these controls out of the large
-            // root initializer. Values/focus remain in MainWindow across opens.
-            if root.ingame-clock-visible: Rectangle {
+            // The Clock's settings, one page at a time, with Back after the
+            // page's rows in the focus order. A conditional item tree keeps
+            // these controls out of the large root initializer.
+            if root.ingame-clock-visible: clock-page := Rectangle {
                 x: 24px;
                 y: 62px;
                 width: parent.width - 48px;
                 height: parent.height - 80px;
                 background: transparent;
+                property <bool> top: root.clock-menu-page == "top";
+                property <int> rows: root.clock-menu-rows.length;
+                property <int> focused: root.ingame-clock-focus-index;
 
-                // Time, the profile, the lamps and fonts, in the grid's type.
-                // The buttons are narrow, the more so on a narrow display, so
-                // the profile keeps room for its longest value, Demo. Each
-                // place takes one condition, so the layout audit measures it.
-                MenuButton {
+                SettingsList {
                     x: 0px;
                     y: 0px;
-                    width: parent.width < 450px ? 64px : 88px;
-                    height: 44px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    text-padding: 6px;
-                    text: "Time\n" + root.launcher-clock-time-format;
-                    selected: root.ingame-clock-focus-index == 0;
+                    width: parent.width;
+                    height: parent.height - 96px;
+                    rows: root.clock-menu-rows;
+                    focus-index: clock-page.focused;
                     enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(0, 1); }
-                }
-                ChoiceRow {
-                    x: parent.width < 450px ? 72px : 96px;
-                    y: 0px;
-                    width: parent.width < 450px ? parent.width - 216px : parent.width - 288px;
-                    height: 44px;
-                    label: parent.width < 500px ? "" : "Profile";
-                    label-fraction: parent.width < 500px ? 0 : 0.25;
-                    value: root.launcher-clock-event-profile;
-                    selected: root.ingame-clock-focus-index == 1;
-                    enabled: !root.clock-controls-pending;
-                    previous => { root.ingame-clock-adjust(1, -1); }
-                    next => { root.ingame-clock-adjust(1, 1); }
-                }
-                MenuButton {
-                    x: parent.width < 450px ? parent.width - 136px : parent.width - 184px;
-                    y: 0px;
-                    width: parent.width < 450px ? 64px : 88px;
-                    height: 44px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    text-padding: 6px;
-                    text: "Lamps\n" + root.launcher-clock-lamps;
-                    selected: root.ingame-clock-focus-index == 24;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(24, 1); }
-                }
-                MenuButton {
-                    x: parent.width < 450px ? parent.width - 64px : parent.width - 88px;
-                    y: 0px;
-                    width: parent.width < 450px ? 64px : 88px;
-                    height: 44px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    text-padding: 6px;
-                    text: "Fonts";
-                    selected: root.ingame-clock-focus-index == 16;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.clock-fonts-open(); }
-                }
-                MenuButton {
-                    x: 0px;
-                    y: 46px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    text-padding: 6px;
-                    width: (parent.width - 40px) / 5;
-                    height: 44px;
-                    text: "Rain\n" + (root.launcher-clock-rain-enabled ? root.launcher-clock-rain-amount : "Off");
-                    selected: root.ingame-clock-focus-index == 12;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(12, 1); }
-                }
-                MenuButton {
-                    x: (parent.width + 10px) / 5;
-                    y: 46px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    text-padding: 6px;
-                    width: (parent.width - 40px) / 5;
-                    height: 44px;
-                    text: "Date\n" + (root.launcher-clock-show-date ? "On" : "Off");
-                    selected: root.ingame-clock-focus-index == 13;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(13, 1); }
-                }
-                MenuButton {
-                    x: 2 * (parent.width + 10px) / 5;
-                    y: 46px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    text-padding: 6px;
-                    width: (parent.width - 40px) / 5;
-                    height: 44px;
-                    text: "Cell Swap\n" + (root.launcher-clock-cell-swap-enabled ? "On" : "Off");
-                    selected: root.ingame-clock-focus-index == 18;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(18, 1); }
-                }
-                MenuButton {
-                    x: 3 * (parent.width + 10px) / 5;
-                    y: 46px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    text-padding: 6px;
-                    width: (parent.width - 40px) / 5;
-                    height: 44px;
-                    text: "Grass\n" + (root.launcher-clock-grass-enabled ? "On" : "Off");
-                    selected: root.ingame-clock-focus-index == 19;
-                    activated => { root.ingame-clock-adjust(19, 1); }
-                }
-                MenuButton {
-                    x: 4 * (parent.width + 10px) / 5;
-                    y: 46px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    text-padding: 6px;
-                    width: (parent.width - 40px) / 5;
-                    height: 44px;
-                    text: "Slot Machine\n" + (root.launcher-clock-slot-machine-enabled ? "On" : "Off");
-                    selected: root.ingame-clock-focus-index == 20;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(20, 1); }
-                }
-                MenuButton {
-                    x: 0px;
-                    y: 92px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    text-padding: 6px;
-                    width: (parent.width - 40px) / 5;
-                    height: 44px;
-                    text: "Falling\n" + (root.launcher-clock-falling-enabled ? "On" : "Off");
-                    selected: root.ingame-clock-focus-index == 2;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(2, 1); }
-                }
-                MenuButton {
-                    x: (parent.width + 10px) / 5;
-                    y: 92px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    text-padding: 6px;
-                    width: (parent.width - 40px) / 5;
-                    height: 44px;
-                    text: "Colors\n" + (root.launcher-clock-color-cycle-enabled ? "On" : "Off");
-                    selected: root.ingame-clock-focus-index == 3;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(3, 1); }
-                }
-                MenuButton {
-                    x: 2 * (parent.width + 10px) / 5;
-                    y: 92px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    text-padding: 6px;
-                    width: (parent.width - 40px) / 5;
-                    height: 44px;
-                    text: "Meltdown\n" + (root.launcher-clock-meltdown-enabled ? "On" : "Off");
-                    selected: root.ingame-clock-focus-index == 7;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(7, 1); }
-                }
-                MenuButton {
-                    x: 3 * (parent.width + 10px) / 5;
-                    y: 92px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    text-padding: 6px;
-                    width: (parent.width - 40px) / 5;
-                    height: 44px;
-                    text: "Duck\n" + (root.launcher-clock-duck-enabled ? "On" : "Off");
-                    selected: root.ingame-clock-focus-index == 8;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(8, 1); }
-                }
-                MenuButton {
-                    x: 4 * (parent.width + 10px) / 5;
-                    y: 92px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    text-padding: 6px;
-                    width: (parent.width - 40px) / 5;
-                    height: 44px;
-                    text: "Digit Slide\n" + (root.launcher-clock-digit-slide-enabled ? "On" : "Off");
-                    selected: root.ingame-clock-focus-index == 11;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(11, 1); }
-                }
-                ChoiceRow {
-                    y: 138px;
-                    x: 0px;
-                    width: parent.width - 196px;
-                    height: 44px;
-                    label: parent.width < 480px ? "" : "Preview";
-                    label-fraction: parent.width < 480px ? 0 : 0.22;
-                    value: root.clock-event-labels[root.clock-preview-index];
-                    selected: root.ingame-clock-focus-index == 4;
-                    enabled: !root.clock-controls-pending;
-                    previous => { root.ingame-clock-adjust(4, -1); }
-                    next => { root.ingame-clock-adjust(4, 1); }
-                }
-                MenuButton {
-                    x: parent.width - 188px;
-                    y: 138px;
-                    width: 90px;
-                    height: 44px;
-                    text: "Crow\n" + (root.launcher-clock-crow-enabled ? root.launcher-clock-crow-water-tolerance : "Off");
-                    selected: root.ingame-clock-focus-index == 14;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(14, 1); }
-                }
-                MenuButton {
-                    x: parent.width - 90px;
-                    y: 138px;
-                    width: 90px;
-                    height: 44px;
-                    text: "Explosion\n" + (root.launcher-clock-explosion-enabled ? "On" : "Off");
-                    text-padding: 6px;
-                    selected: root.ingame-clock-focus-index == 15;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(15, 1); }
-                }
-                // Five event switches followed by a full-width recipe row.
-                MenuButton {
-                    x: 0px;
-                    y: 184px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    width: (parent.width - 32px) / 5;
-                    height: 44px;
-                    text: "Marquee\n" + (root.launcher-clock-marquee-enabled ? "On" : "Off");
-                    text-padding: 6px;
-                    selected: root.ingame-clock-focus-index == 9;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(9, 1); }
-                }
-                MenuButton {
-                    x: (parent.width - 32px) / 5 + 8px;
-                    y: 184px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    width: (parent.width - 32px) / 5;
-                    height: 44px;
-                    text: "Aquarium\n" + (root.launcher-clock-aquarium-enabled ? "On" : "Off");
-                    text-padding: 6px;
-                    selected: root.ingame-clock-focus-index == 17;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(17, 1); }
-                }
-                MenuButton {
-                    x: 2 * (parent.width - 32px) / 5 + 16px;
-                    y: 184px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    width: (parent.width - 32px) / 5;
-                    height: 44px;
-                    text: "Spider\n" + (root.launcher-clock-spider-enabled ? "On" : "Off");
-                    text-padding: 6px;
-                    selected: root.ingame-clock-focus-index == 21;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(21, 1); }
-                }
-                MenuButton {
-                    x: 3 * (parent.width - 32px) / 5 + 24px;
-                    y: 184px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    width: (parent.width - 32px) / 5;
-                    height: 44px;
-                    text: "Coins\n" + (root.launcher-clock-coins-enabled ? "On" : "Off");
-                    text-padding: 6px;
-                    selected: root.ingame-clock-focus-index == 22;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(22, 1); }
-                }
-                MenuButton {
-                    x: 4 * (parent.width - 32px) / 5 + 32px;
-                    y: 184px;
-                    text-size: parent.width < 450px ? 12px : 14px;
-                    width: (parent.width - 32px) / 5;
-                    height: 44px;
-                    text: "Tanks\n" + (root.launcher-clock-tanks-enabled ? "On" : "Off");
-                    text-padding: 6px;
-                    selected: root.ingame-clock-focus-index == 23;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(23, 1); }
-                }
-                ChoiceRow {
-                    x: 0px;
-                    y: 230px;
-                    width: parent.width - 98px;
-                    height: 44px;
-                    label: "Recipe";
-                    label-fraction: 0.25;
-                    value: root.launcher-clock-marquee-preset;
-                    selected: root.ingame-clock-focus-index == 10;
-                    enabled: !root.clock-controls-pending;
-                    previous => { root.ingame-clock-adjust(10, -1); }
-                    next => { root.ingame-clock-adjust(10, 1); }
-                }
-                // Theme ends the recipe's row, as Crow and Explosion end the
-                // preview's, in a size that shows Christmas whole.
-                MenuButton {
-                    x: parent.width - 90px;
-                    y: 230px;
-                    width: 90px;
-                    height: 44px;
-                    text-size: 14px;
-                    text-padding: 6px;
-                    text: "Theme\n" + root.launcher-clock-theme;
-                    selected: root.ingame-clock-focus-index == 25;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-adjust(25, 1); }
+                    previous(index) => { root.clock-menu-adjust(index, -1); }
+                    next(index) => { root.clock-menu-adjust(index, 1); }
+                    activated(index) => { root.clock-menu-activate(index); }
+                    play(index) => { root.clock-menu-play(index); }
                 }
                 Text {
-                    y: 276px;
+                    x: 0px;
+                    y: parent.height - 90px;
                     width: parent.width;
-                    height: 20px;
-                    text: root.clock-controls-pending ? "Applying…" : root.settings-save-pending ? "Saving settings…" : root.clock-settings-error != "" ? root.clock-settings-error : root.ingame-clock-focus-index == 25 ? root.clock-theme-help : "Saved. Preview runs now, even if Off.";
+                    height: 36px;
+                    text: root.clock-controls-pending ? "Applying…"
+                        : root.settings-save-pending ? "Saving settings…"
+                        : root.clock-settings-error != "" ? root.clock-settings-error
+                        : clock-page.focused < clock-page.rows ? root.clock-menu-rows[clock-page.focused].help
+                        : clock-page.top ? "Back to the pause menu." : "Back to Clock Controls.";
                     color: root.clock-settings-error != "" ? #ffb0a0 : #80d8ff;
                     font-size: 13px;
+                    wrap: word-wrap;
                     overflow: elide;
+                    vertical-alignment: center;
                 }
                 MenuButton {
                     x: 0px;
-                    y: parent.height - 54px;
-                    width: (parent.width - 10px) / 2;
-                    height: 54px;
+                    y: parent.height - 48px;
+                    width: parent.width;
+                    height: 48px;
                     text: "Back";
-                    selected: root.ingame-clock-focus-index == 5;
+                    selected: clock-page.focused == clock-page.rows;
                     enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-visible = false; }
-                }
-                MenuButton {
-                    x: (parent.width + 10px) / 2;
-                    y: parent.height - 54px;
-                    width: (parent.width - 10px) / 2;
-                    height: 54px;
-                    text: "Preview & Resume";
-                    selected: root.ingame-clock-focus-index == 6;
-                    enabled: !root.clock-controls-pending;
-                    activated => { root.ingame-clock-preview(); }
+                    activated => { root.clock-menu-back(); }
                 }
             }
         }

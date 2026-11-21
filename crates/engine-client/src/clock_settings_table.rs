@@ -8,112 +8,277 @@ use engine_common::{
 };
 
 use crate::ui_navigation;
+use Section::{Digits, HowOften, Look, Room, Visitors};
 
-/// One Clock setting: the values it takes and how it reads and writes them.
+/// One Clock setting: what it is called, the values it takes and how it reads
+/// and writes them.
 pub(crate) trait ClockSetting: Sync {
-    /// The control name after `pause.clock.` or `launcher.settings.clock.`.
-    fn id(&self) -> &'static str;
+    /// The setting's name, label, place on the pages and help line.
+    fn about(&self) -> &About;
     /// Every value's label, in the order Right steps through them.
     fn labels(&self) -> Vec<&'static str>;
     /// The current value's place in that order.
     fn index(&self, settings: &ClockSettings) -> usize;
     /// Takes the value at `index`, leaving everything else as it was.
     fn choose(&self, settings: &mut ClockSettings, index: usize);
+
+    /// The control name after `pause.clock.` or `launcher.settings.clock.`.
+    fn id(&self) -> &'static str {
+        self.about().id
+    }
+
+    /// Whether the setting is just Off or On, which the pages show as a
+    /// switch.
+    fn is_switch(&self) -> bool {
+        false
+    }
 }
 
-/// The settings: how the Clock looks and how often events come, then the
-/// events by group.
+/// What a setting is called and where its row appears, apart from its values.
+pub(crate) struct About {
+    /// The control name after `pause.clock.` or `launcher.settings.clock.`.
+    pub(crate) id: &'static str,
+    /// The row's name on the settings pages.
+    pub(crate) label: &'static str,
+    /// Where the row appears.
+    pub(crate) section: Section,
+    /// One line on what the setting does, shown while its row is focused.
+    pub(crate) help: &'static str,
+}
+
+const fn about(
+    id: &'static str,
+    label: &'static str,
+    section: Section,
+    help: &'static str,
+) -> About {
+    About {
+        id,
+        label,
+        section,
+        help,
+    }
+}
+
+/// Where a setting's row appears: on the Look page, or on the Events page,
+/// first or under one of its headings.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Section {
+    Look,
+    HowOften,
+    Digits,
+    Visitors,
+    Room,
+}
+
+impl Section {
+    /// The heading over the section's rows, if it has one.
+    pub(crate) const fn heading(self) -> Option<&'static str> {
+        match self {
+            Self::Look | Self::HowOften => None,
+            Self::Digits => Some("Digits"),
+            Self::Visitors => Some("Visitors"),
+            Self::Room => Some("Room"),
+        }
+    }
+}
+
+/// The settings in the order the pages list them: the Look page's, then the
+/// Events page's, how often first and then the events by group, alphabetical
+/// within each.
 pub(crate) static SETTINGS: [&dyn ClockSetting; 22] = [
     &Choice::<ClockTimeFormat> {
-        id: "time-format",
+        about: about("time-format", "Time", Look, "24-hour or 12-hour digits."),
         value: |settings| &mut settings.time_format,
     },
     &Switch {
-        id: "show-date",
+        about: about(
+            "show-date",
+            "Date",
+            Look,
+            "The weekday and date, in a quiet line above the digits.",
+        ),
         on: |settings| &mut settings.show_date,
     },
     &Choice::<ClockThemeChoice> {
-        id: "theme",
+        about: about(
+            "theme",
+            "Theme",
+            Look,
+            "Auto: Christmas on December nights, 6 pm to 6 am.",
+        ),
         value: |settings| &mut settings.theme,
     },
     &Choice::<ClockLampMode> {
-        id: "lamps",
+        about: about(
+            "lamps",
+            "Lamps",
+            Look,
+            "Lively lamps follow what goes on; Steady lamps stay at rest.",
+        ),
         value: |settings| &mut settings.lamps,
     },
     &Choice::<ClockEventProfile> {
-        id: "event-profile",
+        about: about(
+            "event-profile",
+            "How often",
+            HowOften,
+            "Off: no automatic events. Calm waits 45–75 s between events; Demo 6–10 s.",
+        ),
         value: |settings| &mut settings.event_profile,
     },
-    // Events that change the digits.
     &Switch {
-        id: "cell-swap",
+        about: about(
+            "cell-swap",
+            "Cell Swap",
+            Digits,
+            "Lit cells shuffle or swap places, then settle back.",
+        ),
         on: |settings| &mut settings.events.cell_swap,
     },
     &Switch {
-        id: "coins",
+        about: about(
+            "coins",
+            "Coins",
+            Digits,
+            "Lit cells turn to coins that drop and pile up, and a magpie takes a few.",
+        ),
         on: |settings| &mut settings.events.coins,
     },
     &Switch {
-        id: "color-cycle",
+        about: about(
+            "color-cycle",
+            "Color Cycle",
+            Digits,
+            "The digits change color for six seconds.",
+        ),
         on: |settings| &mut settings.events.color_cycle,
     },
     &Switch {
-        id: "digit-slide",
+        about: about(
+            "digit-slide",
+            "Digit Slide",
+            Digits,
+            "Changed digits roll into place when the minute changes.",
+        ),
         on: |settings| &mut settings.events.digit_slide,
     },
     &Switch {
-        id: "explosion",
+        about: about(
+            "explosion",
+            "Explosion",
+            Digits,
+            "The digits burst apart and bounce, then reform.",
+        ),
         on: |settings| &mut settings.events.explosion,
     },
     &Switch {
-        id: "falling",
+        about: about(
+            "falling",
+            "Falling",
+            Digits,
+            "The digits fall to the floor, then reform.",
+        ),
         on: |settings| &mut settings.events.falling,
     },
     &Switch {
-        id: "marquee",
+        about: about(
+            "marquee",
+            "Marquee",
+            Digits,
+            "The digits move and light up in a 12-second show. Recipe picks which.",
+        ),
         on: |settings| &mut settings.events.marquee,
     },
     &Choice::<ClockMarqueePreset> {
-        id: "marquee-preset",
+        about: about(
+            "marquee-preset",
+            "Recipe",
+            Digits,
+            "Which Marquee show plays. Random picks one each time.",
+        ),
         value: |settings| &mut settings.marquee_preset,
     },
     &Switch {
-        id: "meltdown",
+        about: about(
+            "meltdown",
+            "Meltdown",
+            Digits,
+            "The digits melt into pools that drain away, then reform.",
+        ),
         on: |settings| &mut settings.events.meltdown,
     },
     &Switch {
-        id: "slot-machine",
+        about: about(
+            "slot-machine",
+            "Slot Machine",
+            Digits,
+            "The digits spin like reels and stop on the time.",
+        ),
         on: |settings| &mut settings.events.slot_machine,
     },
-    // Visitors.
     &OffOr::<ClockCrowWaterTolerance> {
-        id: "crow",
+        about: about(
+            "crow",
+            "Crow",
+            Visitors,
+            "A crow lands and hops on the digits. Shy crows avoid rain, Hardy ones don't, and Varied mixes them.",
+        ),
         on: |settings| &mut settings.events.crow,
         value: |settings| &mut settings.crow_water_tolerance,
     },
     &Switch {
-        id: "duck",
+        about: about(
+            "duck",
+            "Duck",
+            Visitors,
+            "A duck runs along the floor, jumping what's in its way.",
+        ),
         on: |settings| &mut settings.events.duck,
     },
     &Switch {
-        id: "spider",
+        about: about(
+            "spider",
+            "Spider",
+            Visitors,
+            "A spider drops in on a silk line and climbs and swings on the digits.",
+        ),
         on: |settings| &mut settings.events.spider,
     },
     &Switch {
-        id: "tanks",
+        about: about(
+            "tanks",
+            "Tanks",
+            Visitors,
+            "Two tanks duel on hills below the time.",
+        ),
         on: |settings| &mut settings.events.tanks,
     },
-    // Events in the room.
     &Switch {
-        id: "aquarium",
+        about: about(
+            "aquarium",
+            "Aquarium",
+            Room,
+            "Fish swim through the Clock, with the time still readable.",
+        ),
         on: |settings| &mut settings.events.aquarium,
     },
     &Switch {
-        id: "grass",
+        about: about(
+            "grass",
+            "Grass",
+            Room,
+            "Soil settles on the floor and grass grows in it.",
+        ),
         on: |settings| &mut settings.events.grass,
     },
     &OffOr::<ClockRainAmount> {
-        id: "rain",
+        about: about(
+            "rain",
+            "Rain",
+            Room,
+            "Showers fill pools that drain away. Light to Heavy sets how hard; Varied changes it.",
+        ),
         on: |settings| &mut settings.events.rain,
         value: |settings| &mut settings.rain_amount,
     },
@@ -146,13 +311,17 @@ fn read<T: Copy>(settings: &ClockSettings, field: fn(&mut ClockSettings) -> &mut
 
 /// Off or On.
 struct Switch {
-    id: &'static str,
+    about: About,
     on: fn(&mut ClockSettings) -> &mut bool,
 }
 
 impl ClockSetting for Switch {
-    fn id(&self) -> &'static str {
-        self.id
+    fn about(&self) -> &About {
+        &self.about
+    }
+
+    fn is_switch(&self) -> bool {
+        true
     }
 
     fn labels(&self) -> Vec<&'static str> {
@@ -170,13 +339,13 @@ impl ClockSetting for Switch {
 
 /// One of a type's values.
 struct Choice<T: 'static> {
-    id: &'static str,
+    about: About,
     value: fn(&mut ClockSettings) -> &mut T,
 }
 
 impl<T: Choices> ClockSetting for Choice<T> {
-    fn id(&self) -> &'static str {
-        self.id
+    fn about(&self) -> &About {
+        &self.about
     }
 
     fn labels(&self) -> Vec<&'static str> {
@@ -199,14 +368,14 @@ impl<T: Choices> ClockSetting for Choice<T> {
 /// Off, or one of a type's values. Turning it off keeps the value, so the
 /// saved settings still hold it for when it is on again.
 struct OffOr<T: 'static> {
-    id: &'static str,
+    about: About,
     on: fn(&mut ClockSettings) -> &mut bool,
     value: fn(&mut ClockSettings) -> &mut T,
 }
 
 impl<T: Choices> ClockSetting for OffOr<T> {
-    fn id(&self) -> &'static str {
-        self.id
+    fn about(&self) -> &About {
+        &self.about
     }
 
     fn labels(&self) -> Vec<&'static str> {
@@ -391,6 +560,31 @@ mod tests {
         }
     }
 
+    /// Rain and Crow keep their amount and tolerance while Off, so a step back
+    /// turns them on again as they were.
+    #[test]
+    fn rain_and_crow_keep_their_value_while_off() {
+        for (id, last) in [("rain", "Heavy"), ("crow", "Hardy")] {
+            let setting = find(id).unwrap();
+            let labels = setting.labels();
+            let mut on = ClockSettings::default();
+            while labels[setting.index(&on)] != last {
+                on = stepped(setting, on, 1);
+            }
+            let off = stepped(setting, on, 1);
+            assert_eq!(labels[setting.index(&off)], "Off", "{id}");
+            assert_eq!(
+                ClockSettings {
+                    events: on.events,
+                    ..off
+                },
+                on,
+                "{id} lost its value"
+            );
+            assert_eq!(stepped(setting, off, -1), on, "{id}");
+        }
+    }
+
     /// Each event's setting goes by the event's name, which
     /// `stepping_a_setting_changes_only_its_own_fields` relies on.
     #[test]
@@ -453,23 +647,23 @@ mod tests {
     /// code on each page.
     #[test]
     fn both_pages_offer_every_setting_in_the_table() {
+        use crate::clock_menu::{self, Page};
         let table = SETTINGS
             .iter()
             .map(|setting| setting.id())
             .collect::<BTreeSet<_>>();
-        for (order, prefix, others) in [
-            (
-                &crate::ui_inventory::PAUSE_CLOCK_FOCUS_ORDER[..],
-                "pause.clock.",
-                &["preview-event", "back", "preview", "fonts"][..],
-            ),
-            (
-                &crate::ui_inventory::LAUNCHER_CLOCK_FOCUS_ORDER[..],
-                "launcher.settings.clock.",
-                &["fonts"][..],
-            ),
+        let pause = [Page::Top, Page::Look, Page::Events]
+            .into_iter()
+            .flat_map(|page| clock_menu::rows(page, &ClockSettings::default()))
+            .filter(|row| row.kind != crate::SettingsRowKind::Heading)
+            .map(|row| format!("pause.clock.{}", row.id))
+            .collect::<Vec<_>>();
+        let launcher = crate::ui_inventory::LAUNCHER_CLOCK_FOCUS_ORDER.map(str::to_owned);
+        for (controls, prefix, others) in [
+            (&pause[..], "pause.clock.", &["look", "events", "fonts"][..]),
+            (&launcher[..], "launcher.settings.clock.", &["fonts"][..]),
         ] {
-            let names = order
+            let names = controls
                 .iter()
                 .filter_map(|control| control.strip_prefix(prefix))
                 .collect::<Vec<_>>();

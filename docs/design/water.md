@@ -1134,7 +1134,7 @@ SPACEWARS_CLOCK_ARTIFACTS=/tmp/clock-water-captures \
 SPACEWARS_CLOCK_WATER_LAB=1 cargo run --release -p engine-client -- --scenario clock
 ```
 
-For the last command, choose **Clock Controls → Preview Event: Meltdown → Preview**.
+For the last command, choose **Clock Controls → Events → Meltdown → Play**.
 The test renderer produces normal and collecting-pool PNGs at 800×480, 480×800,
 1024×768 and 1280×720. The simulation fixture verifies an upper stepped bed,
 observable in-flight water, collection without loss, pause, cleanup and resize.
@@ -1319,7 +1319,7 @@ SPACEWARS_CLOCK_WATER_LAB=displacement cargo run --release -p engine-client -- -
 SPACEWARS_CLOCK_WATER_LAB=displacement-control cargo run --release -p engine-client -- --scenario clock
 ```
 
-Select **Clock Controls → Preview Event: Meltdown → Preview**. Both modes show
+Select **Clock Controls → Events → Meltdown → Play**. Both modes show
 the same closed tank, orange box, yellow floating ball and dashed initial-level
 line. The box is **kinematically controlled**, not falling freely: it waits one
 second, lowers over 1.5 seconds, holds for 1.5 seconds, then withdraws over 1.5
@@ -1436,7 +1436,7 @@ SPACEWARS_CLOCK_WATER_LAB=floating-control cargo run --release -p engine-client 
 SPACEWARS_CLOCK_WATER_LAB=sinking cargo run --release -p engine-client -- --scenario clock
 ```
 
-Use **Clock Controls → Preview Event: Meltdown → Preview** as before. `floating`
+Use **Clock Controls → Events → Meltdown → Play** as before. `floating`
 drops an orange box of density 0.55; `floating-control` repeats the same setup
 without its displacement feedback. `sinking` uses a red box of density 1.8.
 Fluid density is 1.0. The yellow observer ball still responds through one-way
@@ -1545,7 +1545,7 @@ cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- -
 cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- --rotating-control
 ```
 
-Choose **Clock Controls → Preview Event: Meltdown → Preview & Resume**. The
+Choose **Clock Controls → Events → Meltdown → Play**. The
 orange box starts tilted 0.65 radians with angular velocity -0.8 radians/second,
 off-center above the existing tank. Density, geometry, drag and gravity match
 the locked floating fixture. `rotating-control` disables only displacement
@@ -1692,7 +1692,7 @@ cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- -
 cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- --multiple-control
 ```
 
-Choose **Clock Controls → Preview Event: Meltdown → Preview & Resume**. The
+Choose **Clock Controls → Events → Meltdown → Play**. The
 orange density-0.55 box and yellow density-0.55 ball float; the red density-1.8
 box drops onto the orange one and sinks. All three contribute displacement in
 `multiple`; `multiple-control` keeps identical geometry and initial motion but
@@ -1823,7 +1823,7 @@ cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- -
 cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- --spilling-control
 ```
 
-Choose **Clock Controls → Preview Event: Meltdown → Preview & Resume**. The
+Choose **Clock Controls → Events → Meltdown → Play**. The
 upper basin starts exactly at its right-hand lip; the collector starts empty.
 An orange floating box, yellow floating ball and red sinking box all move through
 Rapier, with no prescribed piston motion. Their complete poses are submitted to

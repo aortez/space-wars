@@ -16,7 +16,6 @@ enum ActivationFocus {
     Autostart(i32),
     DeviceInfo,
     PauseControls,
-    PauseClock(i32),
     ClockFonts(i32),
     GameOver(i32),
     Gameplay,
@@ -64,6 +63,18 @@ pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
         window.invoke_controllers_command(control_id.into());
         return true;
     }
+    // Clock Controls name their controls from the page's rows: focus the row,
+    // then press there as a key would.
+    if window.get_ingame_clock_visible()
+        && !window.get_clock_fonts_visible()
+        && let Some((_, index, action)) = crate::clock_menu::targets(window)
+            .into_iter()
+            .find(|(control, _, _)| control.id == control_id)
+    {
+        window.set_ingame_clock_focus_index(index);
+        handle_ui_action(window, action);
+        return true;
+    }
     let Some(target) = activation_target(
         control_id,
         window.get_scenario_benchmark_available(),
@@ -98,7 +109,6 @@ pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
         ),
         ActivationFocus::Sound(index) => window.set_sound_focus_index(index),
         ActivationFocus::Autostart(index) => window.set_autostart_focus_index(index),
-        ActivationFocus::PauseClock(index) => window.set_ingame_clock_focus_index(index),
         ActivationFocus::ClockFonts(index) => window.set_clock_font_focus(index),
         ActivationFocus::GameOver(index) => window.set_game_over_focus_index(index),
     }
@@ -219,38 +229,7 @@ fn activation_target(
         "pause.benchmark" => pause_main(2),
         "pause.controls" => pause_main(2 + i32::from(benchmark_available)),
         "launcher.settings.clock.fonts" => launcher_settings(Some(15), UiAction::Confirm),
-        "pause.clock.fonts" => pause_clock(16, UiAction::Confirm),
         "pause.clock" => pause_main(4),
-        "pause.clock.time-format.previous" => pause_clock(0, UiAction::Left),
-        "pause.clock.time-format.next" => pause_clock(0, UiAction::Right),
-        "pause.clock.event-profile.previous" => pause_clock(1, UiAction::Left),
-        "pause.clock.event-profile.next" => pause_clock(1, UiAction::Right),
-        "pause.clock.falling" => pause_clock(2, UiAction::Confirm),
-        "pause.clock.color-cycle" => pause_clock(3, UiAction::Confirm),
-        "pause.clock.meltdown" => pause_clock(7, UiAction::Confirm),
-        "pause.clock.duck" => pause_clock(8, UiAction::Confirm),
-        "pause.clock.marquee" => pause_clock(9, UiAction::Confirm),
-        "pause.clock.digit-slide" => pause_clock(11, UiAction::Confirm),
-        "pause.clock.marquee-preset.previous" => pause_clock(10, UiAction::Left),
-        "pause.clock.marquee-preset.next" => pause_clock(10, UiAction::Right),
-        "pause.clock.rain.previous" => pause_clock(12, UiAction::Left),
-        "pause.clock.rain.next" => pause_clock(12, UiAction::Right),
-        "pause.clock.show-date" => pause_clock(13, UiAction::Confirm),
-        "pause.clock.crow" => pause_clock(14, UiAction::Confirm),
-        "pause.clock.explosion" => pause_clock(15, UiAction::Confirm),
-        "pause.clock.aquarium" => pause_clock(17, UiAction::Confirm),
-        "pause.clock.cell-swap" => pause_clock(18, UiAction::Confirm),
-        "pause.clock.grass" => pause_clock(19, UiAction::Confirm),
-        "pause.clock.slot-machine" => pause_clock(20, UiAction::Confirm),
-        "pause.clock.spider" => pause_clock(21, UiAction::Confirm),
-        "pause.clock.coins" => pause_clock(22, UiAction::Confirm),
-        "pause.clock.tanks" => pause_clock(23, UiAction::Confirm),
-        "pause.clock.lamps" => pause_clock(24, UiAction::Confirm),
-        "pause.clock.theme" => pause_clock(25, UiAction::Confirm),
-        "pause.clock.preview-event.previous" => pause_clock(4, UiAction::Left),
-        "pause.clock.preview-event.next" => pause_clock(4, UiAction::Right),
-        "pause.clock.back" => pause_clock(5, UiAction::Confirm),
-        "pause.clock.preview" => pause_clock(6, UiAction::Confirm),
         "pause.return-to-launcher" => pause_main(3 + i32::from(benchmark_available)),
         "pause.controls.back" => ActivationTarget {
             focus: ActivationFocus::PauseControls,
@@ -367,13 +346,6 @@ const fn pause_main(index: i32) -> ActivationTarget {
     }
 }
 
-const fn pause_clock(index: i32, action: UiAction) -> ActivationTarget {
-    ActivationTarget {
-        focus: ActivationFocus::PauseClock(index),
-        action,
-    }
-}
-
 const fn game_over(index: i32) -> ActivationTarget {
     ActivationTarget {
         focus: ActivationFocus::GameOver(index),
@@ -405,28 +377,18 @@ mod tests {
         );
     }
 
-    /// Activating a control on either Clock settings page focuses the index
-    /// where the inventory names it; the launcher's Back takes no index.
-    /// Both pages change the setting named at the focused index, so a
-    /// control's name and the setting it changes can't drift apart.
+    /// Activating a control on the launcher's Clock settings focuses the
+    /// index where the inventory names it; Back takes no index. The page
+    /// changes the setting named at the focused index, so a control's name and
+    /// the setting it changes can't drift apart.
     #[test]
-    fn clock_targets_focus_where_the_inventory_names_them() {
+    fn launcher_clock_targets_focus_where_the_inventory_names_them() {
         let target = |control: &str| {
             activation_target(control, false, false)
                 .or_else(|| activation_target(&format!("{control}.next"), false, false))
                 .unwrap_or_else(|| panic!("{control} has no activation target"))
                 .focus
         };
-        for (index, control) in crate::ui_inventory::PAUSE_CLOCK_FOCUS_ORDER
-            .iter()
-            .enumerate()
-        {
-            assert_eq!(
-                target(control),
-                ActivationFocus::PauseClock(index as i32),
-                "{control}"
-            );
-        }
         for (index, control) in crate::ui_inventory::LAUNCHER_CLOCK_FOCUS_ORDER
             .iter()
             .enumerate()

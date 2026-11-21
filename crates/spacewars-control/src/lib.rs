@@ -86,6 +86,10 @@ pub enum UiScreen {
     PauseControls,
     #[serde(rename = "pause.clock")]
     PauseClock,
+    #[serde(rename = "pause.clock-look")]
+    PauseClockLook,
+    #[serde(rename = "pause.clock-events")]
+    PauseClockEvents,
     #[serde(rename = "pause.clock-fonts")]
     PauseClockFonts,
     #[serde(rename = "game-over")]
@@ -119,6 +123,8 @@ impl UiScreen {
             Self::PauseNetwork => "pause.network",
             Self::PauseControls => "pause.controls",
             Self::PauseClock => "pause.clock",
+            Self::PauseClockLook => "pause.clock-look",
+            Self::PauseClockEvents => "pause.clock-events",
             Self::PauseClockFonts => "pause.clock-fonts",
             Self::GameOver => "game-over",
         }
@@ -635,6 +641,8 @@ mod tests {
             (UiScreen::PauseInfo, "pause.info"),
             (UiScreen::PauseControls, "pause.controls"),
             (UiScreen::PauseClock, "pause.clock"),
+            (UiScreen::PauseClockLook, "pause.clock-look"),
+            (UiScreen::PauseClockEvents, "pause.clock-events"),
             (UiScreen::GameOver, "game-over"),
         ];
 

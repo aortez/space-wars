@@ -4,14 +4,15 @@
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
-use engine_common::{ClockEventKind, ClockSettings, Settings};
-use slint::ComponentHandle;
+use engine_common::{ClockSettings, Settings};
+use slint::{ComponentHandle, Model};
 use spacewars_control::UiAction;
 
-use crate::{MainWindow, clock_settings_table, host, ui_navigation};
+use crate::{MainWindow, SettingsRowKind, clock_menu, clock_settings_table, host};
 
 pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     crate::clock_fonts::publish(window, settings.fonts);
+    clock_menu::publish(window, &settings);
     window.set_launcher_clock_show_date(settings.show_date);
     window.set_launcher_clock_time_format(
         crate::clock_time_format_label(settings.time_format).into(),
@@ -50,12 +51,6 @@ pub(crate) fn install(
     writer: crate::settings_writer::SettingsWriter,
 ) {
     crate::clock_fonts::install(window, Rc::clone(&controls));
-    window.set_clock_event_labels(slint::ModelRc::new(slint::VecModel::from(
-        ClockEventKind::ALL
-            .into_iter()
-            .map(|event| slint::SharedString::from(event.label()))
-            .collect::<Vec<_>>(),
-    )));
     let weak = window.as_weak();
     let open_controls = Rc::clone(&controls);
     window.on_ingame_clock_open(move || {
@@ -67,60 +62,65 @@ pub(crate) fn install(
             return;
         }
         open_controls.borrow_mut().request_pause();
-        window.set_ingame_clock_focus_index(0);
         window.set_ingame_controls_visible(false);
         window.set_ingame_clock_visible(true);
     });
 
     let weak = window.as_weak();
     let adjust_controls = Rc::clone(&controls);
-    window.on_ingame_clock_adjust(move |index, delta| {
+    window.on_clock_menu_adjust(move |index, delta| {
         let Some(window) = weak.upgrade() else { return };
-        if window.get_install_fenced() {
-            return;
-        }
-        if !window.get_ingame_clock_visible() || window.get_clock_controls_pending() {
+        if !takes_input(&window) {
             return;
         }
         window.set_ingame_clock_focus_index(index);
-        if index == 4 {
-            window.set_clock_preview_index(ui_navigation::moved_selection(
-                window.get_clock_preview_index(),
-                ClockEventKind::ALL.len() as i32,
-                delta,
-            ));
+        let Some(setting) =
+            clock_menu::row(&window, index).and_then(|row| clock_settings_table::find(&row.id))
+        else {
             return;
-        }
+        };
         let mut controls = adjust_controls.borrow_mut();
         let Some(state) = controls.clock_state() else {
             return;
         };
-        let Some(settings) = adjusted_settings(state.settings, index, delta) else {
-            return;
-        };
+        let settings = clock_settings_table::stepped(setting, state.settings, delta);
         if controls.request_clock_settings(settings) {
             window.set_clock_controls_pending(true);
         }
     });
 
     let weak = window.as_weak();
-    window.on_ingame_clock_preview(move || {
+    let play_controls = Rc::clone(&controls);
+    window.on_clock_menu_play(move |index| {
         let Some(window) = weak.upgrade() else { return };
-        if window.get_install_fenced() {
+        if !takes_input(&window) {
             return;
         }
-        if !window.get_ingame_clock_visible() || window.get_clock_controls_pending() {
-            return;
-        }
-        let Some(event) = usize::try_from(window.get_clock_preview_index())
-            .ok()
-            .and_then(|index| ClockEventKind::ALL.get(index))
-            .copied()
+        window.set_ingame_clock_focus_index(index);
+        let Some(event) =
+            clock_menu::row(&window, index).and_then(|row| clock_menu::event(&row.id))
         else {
             return;
         };
-        if controls.borrow_mut().request_clock_preview(event) {
+        if play_controls.borrow_mut().request_clock_preview(event) {
             window.set_clock_controls_pending(true);
+        }
+    });
+
+    let weak = window.as_weak();
+    window.on_clock_menu_activate(move |index| {
+        let Some(window) = weak.upgrade() else { return };
+        if takes_input(&window) {
+            window.set_ingame_clock_focus_index(index);
+            clock_menu::open_row(&window, index);
+        }
+    });
+
+    let weak = window.as_weak();
+    window.on_clock_menu_back(move || {
+        let Some(window) = weak.upgrade() else { return };
+        if takes_input(&window) {
+            clock_menu::back(&window);
         }
     });
 
@@ -166,170 +166,54 @@ pub(crate) fn log_settings_change(previous: ClockSettings, next: ClockSettings, 
         "Clock settings changed.");
 }
 
-/// `settings` with the setting at pause-page `index` moved `delta` places, or
-/// `None` where the control at `index` changes no setting.
-fn adjusted_settings(settings: ClockSettings, index: i32, delta: i32) -> Option<ClockSettings> {
-    let control = crate::ui_inventory::PAUSE_CLOCK_FOCUS_ORDER.get(usize::try_from(index).ok()?)?;
-    let setting = clock_settings_table::find(control.strip_prefix("pause.clock.")?)?;
-    Some(clock_settings_table::stepped(setting, settings, delta))
+/// Whether Clock Controls take a tap or a press now: showing, and not
+/// waiting on the host to apply a change.
+fn takes_input(window: &MainWindow) -> bool {
+    !window.get_install_fenced()
+        && window.get_ingame_clock_visible()
+        && !window.get_clock_controls_pending()
 }
 
+/// Shows Clock Controls from the pause menu, on the page and row they were
+/// left on.
 pub(crate) fn open(window: &MainWindow) {
     if window.get_ingame_menu_visible() && window.get_launcher_scenario() == "clock" {
         window.set_ingame_controls_visible(false);
-        window.set_ingame_clock_focus_index(0);
         window.set_ingame_clock_visible(true);
     }
 }
 
+/// A press on Clock Controls. Up and Down move between the rows and Back.
+/// Left and Right change a row's setting, and Right opens a page. A / Enter
+/// plays an event's row, opens a page, steps a setting on, or presses Back.
+/// Back goes up a page, Controls closes them, and Start resumes.
 pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
     if window.get_clock_controls_pending() {
         return;
     }
     let index = window.get_ingame_clock_focus_index();
-    if index == 16 && matches!(action, UiAction::Confirm | UiAction::Left | UiAction::Right) {
-        window.invoke_clock_fonts_open();
-        return;
-    }
+    let row = clock_menu::row(window, index);
     match action {
         UiAction::Up | UiAction::Down => {
-            window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(index, action))
+            let rows = window.get_clock_menu_rows().iter().collect::<Vec<_>>();
+            window.set_ingame_clock_focus_index(clock_menu::moved_focus(&rows, index, action));
         }
-        UiAction::Left | UiAction::Right => {
-            // Switches and the two actions hand the arrows to navigation.
-            // Selectors adjust, and so do Time, Date, Lamps and Theme, whose
-            // rows the navigation table keeps them on.
-            if matches!(
-                index,
-                2 | 3 | 5 | 6 | 7 | 8 | 9 | 11 | 15 | 17 | 18 | 19 | 20 | 21 | 22 | 23
-            ) {
-                window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(
-                    index, action,
-                ));
-            } else {
-                window.invoke_ingame_clock_adjust(
-                    index,
-                    if action == UiAction::Left { -1 } else { 1 },
-                );
+        UiAction::Left | UiAction::Right => match row.map(|row| row.kind) {
+            Some(SettingsRowKind::Choice | SettingsRowKind::Switch) => window
+                .invoke_clock_menu_adjust(index, if action == UiAction::Left { -1 } else { 1 }),
+            Some(SettingsRowKind::Page) if action == UiAction::Right => {
+                clock_menu::open_row(window, index)
             }
-        }
-        UiAction::Confirm if index <= 4 || matches!(index, 7..=15 | 17..=25) => {
-            window.invoke_ingame_clock_adjust(index, 1)
-        }
-        UiAction::Confirm if index == 6 => window.invoke_ingame_clock_preview(),
-        UiAction::Confirm | UiAction::Back | UiAction::Controls => {
-            window.set_ingame_clock_visible(false)
-        }
+            _ => {}
+        },
+        UiAction::Confirm => match row {
+            None => clock_menu::back(window),
+            Some(row) if row.playable => window.invoke_clock_menu_play(index),
+            Some(row) if row.kind == SettingsRowKind::Page => clock_menu::open_row(window, index),
+            Some(_) => window.invoke_clock_menu_adjust(index, 1),
+        },
+        UiAction::Back => clock_menu::back(window),
+        UiAction::Controls => window.set_ingame_clock_visible(false),
         UiAction::Start => window.invoke_ingame_resume(),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use engine_common::ClockRainAmount;
-
-    #[test]
-    fn lamps_control_switches_only_the_lamps_both_ways() {
-        use engine_common::ClockLampMode;
-        let original = ClockSettings::default();
-        assert_eq!(original.lamps, ClockLampMode::Lively);
-        for delta in [1, -1] {
-            let steady = adjusted_settings(original, 24, delta).unwrap();
-            assert_eq!(steady.lamps, ClockLampMode::Steady);
-            assert_eq!(
-                ClockSettings {
-                    lamps: original.lamps,
-                    ..steady
-                },
-                original
-            );
-            assert_eq!(adjusted_settings(steady, 24, delta).unwrap(), original);
-        }
-    }
-
-    #[test]
-    fn theme_control_cycles_the_choices_both_ways_and_changes_nothing_else() {
-        use engine_common::ClockThemeChoice::{Auto, Christmas, Normal};
-        let original = ClockSettings::default();
-        assert_eq!(original.theme, Auto);
-        for (delta, order) in [
-            (1, [Normal, Christmas, Auto]),
-            (-1, [Christmas, Normal, Auto]),
-        ] {
-            let mut settings = original;
-            for choice in order {
-                settings = adjusted_settings(settings, 25, delta).unwrap();
-                assert_eq!(settings.theme, choice);
-                assert_eq!(
-                    ClockSettings {
-                        theme: original.theme,
-                        ..settings
-                    },
-                    original
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn date_control_changes_only_visibility_and_toggles_back() {
-        let original = ClockSettings::default();
-        let enabled = adjusted_settings(original, 13, 1).unwrap();
-        assert_eq!(
-            enabled,
-            ClockSettings {
-                show_date: true,
-                ..original
-            }
-        );
-        assert_eq!(adjusted_settings(enabled, 13, -1), Some(original));
-    }
-
-    #[test]
-    fn crow_choice_cycles_both_ways_and_preserves_tolerance_while_disabled() {
-        use engine_common::ClockCrowWaterTolerance;
-        let original = ClockSettings::default();
-        let mut settings = original;
-        for tolerance in [ClockCrowWaterTolerance::Shy, ClockCrowWaterTolerance::Hardy] {
-            settings = adjusted_settings(settings, 14, 1).unwrap();
-            assert!(settings.events.crow);
-            assert_eq!(settings.crow_water_tolerance, tolerance);
-        }
-        settings = adjusted_settings(settings, 14, 1).unwrap();
-        assert!(!settings.events.crow);
-        assert_eq!(
-            settings.crow_water_tolerance,
-            ClockCrowWaterTolerance::Hardy
-        );
-        let backwards = adjusted_settings(settings, 14, -1).unwrap();
-        assert!(backwards.events.crow);
-        assert_eq!(
-            backwards.crow_water_tolerance,
-            ClockCrowWaterTolerance::Hardy
-        );
-        assert_eq!(adjusted_settings(settings, 14, 1), Some(original));
-    }
-
-    #[test]
-    fn rain_choice_cycles_both_ways_and_preserves_amount_while_disabled() {
-        let original = ClockSettings::default();
-        let mut settings = original;
-        for amount in [
-            ClockRainAmount::Light,
-            ClockRainAmount::Medium,
-            ClockRainAmount::Heavy,
-        ] {
-            settings = adjusted_settings(settings, 12, 1).unwrap();
-            assert!(settings.events.rain);
-            assert_eq!(settings.rain_amount, amount);
-        }
-        settings = adjusted_settings(settings, 12, 1).unwrap();
-        assert!(!settings.events.rain);
-        assert_eq!(settings.rain_amount, ClockRainAmount::Heavy);
-        let backwards = adjusted_settings(settings, 12, -1).unwrap();
-        assert!(backwards.events.rain);
-        assert_eq!(backwards.rain_amount, ClockRainAmount::Heavy);
-        assert_eq!(adjusted_settings(settings, 12, 1), Some(original));
     }
 }
