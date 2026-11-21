@@ -635,7 +635,7 @@ impl Recipients for Field {
             .collect()
     }
 
-    fn tissue(&self, key: u64) -> Option<(Region, Section)> {
+    fn region(&self, key: u64) -> Option<(Region, Section)> {
         let section = Section::new(0.5 * self.scale, self.depth * self.scale);
         Some((*self.moss.get(&key)?, section))
     }

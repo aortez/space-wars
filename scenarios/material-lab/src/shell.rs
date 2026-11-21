@@ -233,7 +233,7 @@ impl Recipients for Field {
             .collect()
     }
 
-    fn tissue(&self, key: u64) -> Option<(Region, Section)> {
+    fn region(&self, key: u64) -> Option<(Region, Section)> {
         if !self.admits(Recipient::Tissue(key)) {
             return None;
         }

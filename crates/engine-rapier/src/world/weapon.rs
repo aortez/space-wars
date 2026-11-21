@@ -5,10 +5,13 @@
 //! divides blasts and beams.
 //!
 //! Tissue belongs to the host, which keeps it and charges it through
-//! [`Recipients`]. Bodies are charged through the materials registered with
-//! the world's loading response. A shot's body is not bound to a loading
-//! region, so the contact response refuses the batches it arrives in, as it
-//! refuses any unbound contact, and leaves the shot's hit to its source.
+//! [`Recipients`]. A body is charged through the material registered for it
+//! with the world's loading response, or through the region the host keeps
+//! for it. A host keeps its own regions where the contact response cannot
+//! run, and decides when its policy shields a recipient. A shot's body is not
+//! bound to a loading region, so the contact response refuses the batches it
+//! arrives in, as it refuses any unbound contact, and leaves the shot's hit to
+//! its source.
 
 use super::loading::RegionToken;
 use super::{BodyId, BodyKind, BodyMotion, CollisionGroups, PhysicsId, PhysicsWorld};
@@ -25,8 +28,14 @@ use std::collections::{BTreeMap, BTreeSet};
 /// Something a weapon's energy can reach.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Recipient {
-    /// Tissue that the host keys, keeps and charges.
+    /// Tissue that the host keys, keeps and charges, which no collider stands
+    /// for, such as a blade of grass. Shots and beams pass through it.
     Tissue(u64),
+    /// A body whose region the host keys, keeps and charges, such as a ship's
+    /// hull or a pilot on foot. It stops shots and beams as any body does. The
+    /// bodies of one entity that share a key, such as a rover's chassis and
+    /// wheels, are one recipient.
+    Body { key: u64, entity: PhysicsId },
     /// A region registered with the world's loading response, which the world
     /// charges.
     Region(RegionToken),
@@ -39,6 +48,7 @@ impl Recipient {
     fn entity(self) -> Option<PhysicsId> {
         match self {
             Recipient::Tissue(_) => None,
+            Recipient::Body { entity, .. } => Some(entity),
             Recipient::Region(token) => Some(token.id.entity),
             Recipient::Unmodeled(body) => Some(body.entity),
         }
@@ -56,20 +66,42 @@ pub struct Reachable {
     pub thickness: f32,
 }
 
-/// The host's side of a delivery: what lies near a weapon, and the tissue the
-/// host keeps.
+/// The host's side of a delivery: what lies near a weapon, the regions the
+/// host keeps, and its policy on who may be charged.
 pub trait Recipients {
     /// The circles whose edges lie within `radius` of `center` that the host
-    /// admits: the tissue a shot or a beam may pass, and the tissue and bodies
-    /// a blast may meet. Shots and beams use only the tissue; the world's
-    /// contacts and ray casts find the bodies that stop them. The host bounds
-    /// the set. A recipient with a circle the reach geometry refuses is
-    /// refused whole.
+    /// admits: the tissue a shot may pass, and the tissue and bodies a blast
+    /// or a beam may meet. A shot passes only the tissue; the world's contacts
+    /// find the body that stops it. A beam asks for its whole range, meets
+    /// what lies across its path in the order it reaches it, and ends on the
+    /// first solid surface its ray cast meets. That surface's recipient takes
+    /// the part of the beam its own circles within the range cover, or all
+    /// that reaches it if it has none, so a body's circles should cover its
+    /// colliders. The host bounds the set. A recipient with a circle the
+    /// reach geometry refuses is refused whole, but a beam first leaves out
+    /// the other recipients' circles it cannot meet.
     fn near(&self, center: Vec2, radius: f32) -> Vec<Reachable>;
-    /// A tissue's region, with the capacity it has left, and its section.
-    fn tissue(&self, key: u64) -> Option<(Region, Section)>;
-    /// Charges a tissue with the work a delivery consumed from it.
+    /// The region the host keeps under `key`, for tissue or a body, with the
+    /// capacity it has left, and its section.
+    fn region(&self, key: u64) -> Option<(Region, Section)>;
+    /// Charges the region the host keeps under `key` with the work a delivery
+    /// consumed from it.
     fn absorb(&mut self, key: u64, work: f32);
+    /// The key of the region the host keeps for `body`, if it keeps one. A
+    /// body bound to a material registered with the world's loading response
+    /// is charged there instead. Keys share one space with tissue's: a key
+    /// names one region, kept for tissue or for bodies but not both. The
+    /// bodies of one entity that share a key are one recipient.
+    fn body(&self, _body: BodyId) -> Option<u64> {
+        None
+    }
+    /// Whether the host's policy shields `recipient` from weapons for now, as
+    /// it might shield a pilot just after ejection. A shielded recipient still
+    /// stops what any recipient would stop, and the energy that meets it is
+    /// reported as excluded rather than charged.
+    fn protected(&self, _recipient: Recipient) -> bool {
+        false
+    }
 }
 
 /// A payload's energy, how far its blast reaches and the height of its front.
@@ -101,8 +133,8 @@ pub struct ShotSpec {
     pub protected: Option<PhysicsId>,
 }
 
-/// A beam to arm: its pulses, the width and height of its cross-section, its
-/// range and what stops it.
+/// A beam to arm: its pulses, the width and height of its cross-section, and
+/// what stops it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BeamSpec {
     pub id: SourceId,
@@ -110,11 +142,22 @@ pub struct BeamSpec {
     pub pulses: Pulses,
     pub width: f32,
     pub height: f32,
-    pub range: f32,
     /// The groups whose solid colliders stop the beam, as for a ray cast.
     pub collision_groups: CollisionGroups,
     /// An entity the beam passes through without charging, such as its firer.
     pub protected: Option<PhysicsId>,
+}
+
+/// One pulse of a beam to fire: from `start` along `direction`, as far as
+/// `range`, which may be how far the beam has grown, carrying `energy`, at
+/// most the beam's pulse energy, such as less for a beam that weakens with
+/// range.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Pulse {
+    pub start: Vec2,
+    pub direction: Vec2,
+    pub range: f32,
+    pub energy: f32,
 }
 
 /// Why energy that met a recipient was not delivered.
@@ -247,6 +290,9 @@ struct Shot {
     blast: Option<Blast>,
     protected: Option<PhysicsId>,
     keys: Keys,
+    /// The tissue it passed while the host shielded it, which it does not
+    /// meet again.
+    shielded: BTreeSet<Recipient>,
 }
 
 #[derive(Debug)]
@@ -255,7 +301,6 @@ struct Beam {
     pulse: f32,
     width: f32,
     height: f32,
-    range: f32,
     collision_groups: CollisionGroups,
     protected: Option<PhysicsId>,
     keys: Keys,
@@ -421,6 +466,7 @@ impl Weapons {
                 blast: spec.blast,
                 protected: spec.protected,
                 keys: Keys::default(),
+                shielded: BTreeSet::new(),
             },
         );
         Ok(())
@@ -451,7 +497,7 @@ impl Weapons {
         if self.shots.contains_key(&spec.id) || self.beams.contains_key(&spec.id) {
             return Err(WeaponError::Exists);
         }
-        if !(length_ok(spec.width) && length_ok(spec.height) && positive(spec.range)) {
+        if !(length_ok(spec.width) && length_ok(spec.height)) {
             return Err(MaterialError::InvalidGeometry.into());
         }
         let source = Source::new(SourceSpec {
@@ -468,7 +514,6 @@ impl Weapons {
                 pulse: spec.pulses.energy,
                 width: spec.width,
                 height: spec.height,
-                range: spec.range,
                 collision_groups: spec.collision_groups,
                 protected: spec.protected,
                 keys: Keys::default(),
@@ -589,71 +634,127 @@ impl Weapons {
         Ok(())
     }
 
-    /// Fires one pulse of a beam from `start` along `direction`, to the first
-    /// solid surface of its collision groups within its range.
+    /// Fires one pulse of a beam to the first solid surface of its collision
+    /// groups within the pulse's range.
     pub fn fire(
         &mut self,
         world: &mut PhysicsWorld,
         id: SourceId,
-        start: Vec2,
-        direction: Vec2,
+        pulse: Pulse,
         recipients: &mut impl Recipients,
     ) -> Result<(), WeaponError> {
         let beam = self.beams.get_mut(&id).ok_or(WeaponError::UnknownSource)?;
-        if !point_ok(start) || !point_ok(direction) || direction.length_squared() <= f32::EPSILON {
+        let Pulse {
+            start,
+            direction,
+            range,
+            energy,
+        } = pulse;
+        if !point_ok(start)
+            || !point_ok(direction)
+            || direction.length_squared() <= f32::EPSILON
+            || !positive(range)
+        {
             return Err(MaterialError::InvalidGeometry.into());
+        }
+        if !(energy.is_finite() && (0.0..=beam.pulse).contains(&energy)) {
+            return Err(MaterialError::InvalidLoad.into());
         }
         let hit = world.cast_ray(
             start,
             direction,
             RayCastOptions {
-                max_distance: beam.range,
+                max_distance: range,
                 solid: true,
                 include_sensors: false,
                 collision_groups: beam.collision_groups,
                 exclude_entity: beam.protected,
             },
         );
-        let end = hit.map_or(start + direction.normalized() * beam.range, |hit| hit.point);
-        let half = (end - start).length() * 0.5;
+        let axis = direction.normalized();
+        let end = hit.map_or(start + axis * range, |hit| hit.point);
+        let length = (end - start).length();
+        let stop = hit.and_then(|hit| hard(world, &*recipients, hit.collider));
+        // The beam passes through its protected entity and meets the rest of
+        // what the host lists across its range: each circle across its path
+        // that begins in front of the surface it stops on, and each of the
+        // stop's own circles that begins within the range, however far past
+        // the surface it lies. Other circles are left out before they are
+        // checked, unless they cannot be placed: a center that is not finite,
+        // or a radius that is negative or not finite. A stop the host lists no
+        // circles for takes all that passes the rest.
+        let protected = beam.protected;
+        let half = 0.5 * beam.width;
         let (front, invalid) = Front::new(
             recipients
-                .near(start.midpoint(end), half + beam.width * 0.5)
+                .near(start + axis * (0.5 * range), 0.5 * (range + beam.width))
                 .into_iter()
-                .filter(|circle| matches!(circle.recipient, Recipient::Tissue(_)))
+                .filter(|circle| {
+                    if protected.is_some() && circle.recipient.entity() == protected {
+                        return false;
+                    }
+                    if Some(circle.recipient) == stop
+                        || !(point_ok(circle.center)
+                            && circle.radius.is_finite()
+                            && circle.radius >= 0.0)
+                    {
+                        return true;
+                    }
+                    let offset = circle.center - start;
+                    let along = offset.dot(axis);
+                    let across = (offset.x * axis.y - offset.y * axis.x).abs();
+                    along + circle.radius > 0.0
+                        && along - circle.radius < length
+                        && across - circle.radius < half
+                })
                 .collect(),
         );
-        let path = beam_reach(start, end, beam.width, beam.height, &front.targets)?;
+        let along = |target: &Target| (target.center - start).dot(axis);
+        let stops = |target: &Target| Some(front.recipients[target.key as usize]) == stop;
+        let circled =
+            front.targets.iter().any(stops) || stop.is_some_and(|stop| invalid.contains(&stop));
+        let targets: Vec<Target> = front
+            .targets
+            .iter()
+            .filter(|target| !stops(target) || along(target) - target.radius < range)
+            .copied()
+            .collect();
+        let far = targets
+            .iter()
+            .filter(|target| stops(target))
+            .map(|target| along(target) + target.radius)
+            .fold(length, f32::max);
+        let path = beam_reach(start, start + axis * far, beam.width, beam.height, &targets)?;
         let mut entries = Vec::new();
         let mut events = refused(id, Part::Beam, invalid);
         for reach in path.reaches {
             let recipient = front.recipients[reach.key as usize];
             match entry(world, recipients, recipient, reach.width, reach.coupling) {
-                Some(entry) => entries.push(entry),
-                None => events.push(WeaponEvent::Excluded {
+                Ok(entry) => entries.push(entry),
+                Err(reason) => events.push(WeaponEvent::Excluded {
                     source: id,
                     part: Part::Beam,
                     recipient,
-                    reason: Exclusion::Unmodeled,
-                    energy: beam.pulse * reach.coupling,
+                    reason,
+                    energy: energy * reach.coupling,
                 }),
             }
         }
         let body = hit.and_then(|hit| world.collider_body(hit.collider));
-        if let Some(recipient) = hit.and_then(|hit| hard(world, hit.collider)) {
+        if let Some(recipient) = stop.filter(|_| !circled) {
             match entry(world, recipients, recipient, beam.width, path.through) {
-                Some(entry) => entries.push(entry),
-                None => events.push(WeaponEvent::Excluded {
+                Ok(entry) => entries.push(entry),
+                Err(reason) => events.push(WeaponEvent::Excluded {
                     source: id,
                     part: Part::Beam,
                     recipient,
-                    reason: Exclusion::Unmodeled,
-                    energy: beam.pulse * path.through,
+                    reason,
+                    energy: energy * path.through,
                 }),
             }
         }
         let shares = shares(&mut beam.keys, &entries);
-        let delivered = beam.source.pulse(&shares);
+        let delivered = beam.source.pulse_of(energy, &shares);
         drop(shares);
         self.events.extend(events);
         self.deliver(world, recipients, id, Part::Beam, entries, delivered);
@@ -713,7 +814,7 @@ impl Weapons {
             ..
         } in contacts
         {
-            let Some(recipient) = hard(world, other) else {
+            let Some(recipient) = hard(world, &*recipients, other) else {
                 continue;
             };
             if stopped {
@@ -747,7 +848,17 @@ impl Weapons {
                     point,
                 });
             }
-            self.hit(world, shot, recipient, load);
+            if recipients.protected(recipient) {
+                self.events.push(WeaponEvent::Excluded {
+                    source: id,
+                    part: Part::Kinetic,
+                    recipient,
+                    reason: Exclusion::Protected,
+                    energy: load.energy(),
+                });
+            } else {
+                self.hit(world, recipients, shot, recipient, load);
+            }
         }
         if stopped {
             self.burst(world, shot, end, recipients);
@@ -783,10 +894,43 @@ impl Weapons {
             let Recipient::Tissue(key) = recipient else {
                 continue;
             };
-            let Some((region, section)) = recipients.tissue(key) else {
+            let Some((region, section)) = recipients.region(key) else {
                 continue;
             };
+            if shot.shielded.contains(&recipient) {
+                continue;
+            }
             let face = Face::new(2.0 * shot.radius.min(front.radii[index]), section);
+            if recipients.protected(recipient) {
+                // A shielded pass is refused as the pass would be, and not
+                // made.
+                let offered = shot
+                    .source
+                    .offered(shot.keys.of(recipient), &region, speed)
+                    .and_then(|energy| {
+                        face.validate()?;
+                        Ok(energy)
+                    });
+                match offered {
+                    Ok(energy) => {
+                        shot.shielded.insert(recipient);
+                        self.events.push(WeaponEvent::Excluded {
+                            source: id,
+                            part: Part::Kinetic,
+                            recipient,
+                            reason: Exclusion::Protected,
+                            energy,
+                        });
+                    }
+                    Err(error) => self.events.push(WeaponEvent::Refused {
+                        source: id,
+                        part: Part::Kinetic,
+                        recipient,
+                        error,
+                    }),
+                }
+                continue;
+            }
             match shot
                 .source
                 .pass(shot.keys.of(recipient), &region, face, speed)
@@ -814,16 +958,18 @@ impl Weapons {
     fn hit(
         &mut self,
         world: &mut PhysicsWorld,
+        recipients: &mut impl Recipients,
         shot: &mut Shot,
         recipient: Recipient,
         load: Impact,
     ) {
         let id = shot.source.id();
         let material = match recipient {
-            Recipient::Region(token) => world.loading_material(token).map(|m| (token, m)),
+            Recipient::Region(token) => world.loading_material(token),
+            Recipient::Body { key, .. } => recipients.region(key),
             _ => None,
         };
-        let Some((token, (region, section))) = material else {
+        let Some((region, section)) = material else {
             self.events.push(WeaponEvent::Excluded {
                 source: id,
                 part: Part::Kinetic,
@@ -841,7 +987,7 @@ impl Weapons {
         });
         match result {
             Ok(outcome) => {
-                absorb_region(world, token, outcome.consumed[1]);
+                absorb(world, recipients, recipient, outcome.consumed[1]);
                 self.events.push(WeaponEvent::Delivered {
                     source: id,
                     part: Part::Kinetic,
@@ -900,12 +1046,12 @@ impl Weapons {
                 continue;
             }
             match entry(world, recipients, recipient, reach.width, reach.coupling) {
-                Some(entry) => entries.push(entry),
-                None => self.events.push(WeaponEvent::Excluded {
+                Ok(entry) => entries.push(entry),
+                Err(reason) => self.events.push(WeaponEvent::Excluded {
                     source: id,
                     part: Part::Payload,
                     recipient,
-                    reason: Exclusion::Unmodeled,
+                    reason,
                     energy,
                 }),
             }
@@ -965,15 +1111,26 @@ impl Weapons {
     }
 }
 
-/// The recipient a collider stands for: its registered region, or its body
-/// outside the material model.
-fn hard(world: &PhysicsWorld, collider: ColliderId) -> Option<Recipient> {
+/// The recipient a collider stands for: its registered region, the region
+/// the host keeps for its body, or its body outside the material model.
+fn hard(
+    world: &PhysicsWorld,
+    recipients: &impl Recipients,
+    collider: ColliderId,
+) -> Option<Recipient> {
     if let Some(binding) = world.loading_binding(collider)
         && world.loading_material(binding.region).is_some()
     {
         return Some(Recipient::Region(binding.region));
     }
-    world.collider_body(collider).map(Recipient::Unmodeled)
+    let body = world.collider_body(collider)?;
+    Some(match recipients.body(body) {
+        Some(key) => Recipient::Body {
+            key,
+            entity: body.entity,
+        },
+        None => Recipient::Unmodeled(body),
+    })
 }
 
 /// Refusals of the recipients whose circles the reach geometry refused.
@@ -989,21 +1146,26 @@ fn refused(id: SourceId, part: Part, recipients: Vec<Recipient>) -> Vec<WeaponEv
         .collect()
 }
 
-/// A recipient's share of a front, if it can take one: tissue the host keeps,
-/// or a region with a registered material.
+/// A recipient's share of a front, if it can take one: a region the host
+/// keeps, or a region with a registered material. Otherwise why it takes
+/// none: the host's policy shields it, or it is outside the material model.
 fn entry(
     world: &PhysicsWorld,
     recipients: &impl Recipients,
     recipient: Recipient,
     width: f32,
     coupling: f32,
-) -> Option<Entry> {
+) -> Result<Entry, Exclusion> {
+    if recipients.protected(recipient) {
+        return Err(Exclusion::Protected);
+    }
     let (region, section) = match recipient {
-        Recipient::Tissue(key) => recipients.tissue(key)?,
-        Recipient::Region(token) => world.loading_material(token)?,
-        Recipient::Unmodeled(_) => return None,
-    };
-    Some(Entry {
+        Recipient::Tissue(key) | Recipient::Body { key, .. } => recipients.region(key),
+        Recipient::Region(token) => world.loading_material(token),
+        Recipient::Unmodeled(_) => None,
+    }
+    .ok_or(Exclusion::Unmodeled)?;
+    Ok(Entry {
         recipient,
         region,
         face: Face::new(width, section),
@@ -1030,7 +1192,9 @@ fn absorb(
     work: f32,
 ) {
     match recipient {
-        Recipient::Tissue(key) if work > 0.0 => recipients.absorb(key, work),
+        Recipient::Tissue(key) | Recipient::Body { key, .. } if work > 0.0 => {
+            recipients.absorb(key, work)
+        }
         Recipient::Region(token) => absorb_region(world, token, work),
         _ => {}
     }

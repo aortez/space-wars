@@ -143,11 +143,19 @@ such as the tissue within a blast's radius and the bodies its physics reports.
 
 `Weapons` holds the live sources of one `PhysicsWorld` and delivers them through
 the laws above. The host keeps its tissue and answers for it through the
-`Recipients` trait: the circles near a point that it admits, each tissue's
-region and section, and the work to charge. Bodies are charged through the
-materials registered with the world's
-[loading response](material-native-response.md). A `Recipient` is one of the
-host's tissues, a registered region, or a body outside the material model.
+`Recipients` trait: the circles near a point that it admits, the region and
+section it keeps under each key, and the work to charge. A body is charged
+through the material registered for it with the world's
+[loading response](material-native-response.md), or through a region the host
+keeps for it, which `Recipients::body` names by a key from the same space as
+the tissue's. A key names one region, kept for tissue or for bodies but not
+both. A host keeps its own regions for bodies where the response cannot run, as
+in a world whose contacts it refuses, or where the host repairs them.
+A `Recipient` is one of the host's tissues, a body whose region the host keeps,
+a registered region, or a body outside the material model. Tissue is what no
+collider stands for, such as grass, which shots and beams pass through. A
+recipient whose collider stops them, such as a pilot on foot, is a body, and
+the host lists `Body` circles for it that cover its colliders.
 
 - **Shots.** The host inserts the shot's body, moving at its launch velocity,
   and `launch` takes it over: the body's mass and speed are the projectile's.
@@ -163,10 +171,11 @@ host's tissues, a registered region, or a body outside the material model.
   contact from both bodies' motion before the step, with the contact-effective
   mass of the shot's mass and the target's mass, inertia and lever arm; fixed
   and kinematic bodies are immovable. The patch is the shot's curvature against
-  a flat face. Its outcome charges the body's registered
-  material. The shot's body is not bound to a loading region, so the contact
-  response refuses the batch it arrives in, as it refuses any unbound contact,
-  and charges nothing for the shot. Physics resolves the shot's momentum.
+  a flat face. Its outcome charges the body's registered material, or the
+  region the host keeps for it. The shot's body is not bound to a loading
+  region, so the contact response refuses the batch it arrives in, as it
+  refuses any unbound contact, and charges nothing for the shot. Physics
+  resolves the shot's momentum.
   A host that sweeps its own projectiles, which need not be bodies, measures
   their hits the same way with `projectile_impact`, from the projectile's mass
   and velocity and the struck body's motion, recorded entering the step or
@@ -176,8 +185,18 @@ host's tissues, a registered region, or a body outside the material model.
   `detonate` releases it wherever the shot is, for a fuse the host decides on.
   A `Burst` event gives the center, so the host can push bodies and draw it.
 - **Beams.** `fire` traces one pulse by ray cast to the first solid surface of
-  the beam's collision groups within its range. The tissue along the way takes
-  its share, and the rest goes into the surface's material.
+  the beam's collision groups within the range the host gives the pulse,
+  which can grow pulse by pulse as a beam extends. The pulse carries the
+  energy the host gives it, at most the beam's pulse energy, so a beam can
+  weaken with range. The tissue and bodies the host admits across the path in
+  front of that surface take their shares and shadow what lies behind them,
+  as in a blast. The beam passes through its protected entity, and reaches
+  no other recipient past the surface it stops on. That surface's recipient
+  takes the part of the beam its own circles within the pulse's range cover,
+  however far past the surface they lie, and what they miss goes on past. The
+  bodies of one entity whose region the host keeps under one key are one
+  recipient, whichever of them the ray meets. A surface whose recipient has no
+  circles takes all that reaches it.
 - **Retirement.** A shot retires when it stops or its lifetime ends, and the
   module removes its body's entity once every shot has flown that step, so two
   shots that meet both stop. A beam retires after its last pulse. `retire` ends
@@ -197,13 +216,20 @@ shot that touches it, or a blast that reaches it, reports the energy as
 Collision filtering stays with the host: a shot collides as its body's
 colliders do, and a beam stops on the collision groups it was armed with.
 
-A body without a registered material, such as terrain, still stops shots and
-fronts. The energy it stops is reported as `Excluded` with the reason
-`Unmodeled` and is not charged, and so is the share of a blast or beam that
-reaches tissue the host keeps no region for. The tissue and registered bodies
-the same shot or front reaches take their shares regardless. A recipient with
-a circle the reach geometry refuses is refused with `InvalidGeometry`, and the
-rest of the front goes on without it.
+The host's own policy can shield any recipient for a while through
+`Recipients::protected`, such as a pilot just after ejection. A shielded
+recipient still stops what it would stop: a shot stops on a shielded body and
+bursts there, and a beam ends on it. The energy that meets it is reported as
+`Excluded` with the reason `Protected` and is not charged, a pass through
+shielded tissue included, which a shot meets once.
+
+A body with neither a registered material nor a region the host keeps for it,
+such as terrain, still stops shots and fronts. The energy it stops is reported
+as `Excluded` with the reason `Unmodeled` and is not charged, and so is the
+share of a blast or beam that reaches tissue the host keeps no region for. The
+tissue and bodies with regions that the same shot or front reaches take their
+shares regardless. A recipient with a circle the reach geometry refuses is
+refused with `InvalidGeometry`, and the rest of the front goes on without it.
 
 ### The terrain boundary
 
@@ -281,9 +307,9 @@ for any impact. Each part's `PartLedger` records its `budget`, the energy its
 recipients received (`delivered`), the irreversible work they took
 (`absorbed`), and the `excess` they could not take. A hard hit's excess
 includes the projectile's own: a shell spent on armor adds what it could not
-take. For the payload and the beam, `budget - delivered` is what never reached
-a recipient, and it is never negative: a share rounds down rather than past
-what is left.
+take. For the payload, `budget - delivered` is what never reached a recipient.
+For the beam it also holds what the host kept back from pulses it weakened.
+Neither is ever negative: a share rounds down rather than past what is left.
 
 The kinetic budget bounds the passes only. A hard hit is the ordinary impact
 the host measured from actual motion, and it can make more available than the
@@ -296,7 +322,15 @@ that fell gained speed.
 - A shot stops at its first hard contact. It does not ricochet or pierce a
   body, and its patch assumes a round shot against a flat face.
 - Fronts meet bodies as the circles the host admits for them, which may
-  overstate a long body's shadow.
+  overstate a long body's shadow. A beam's stop with circles takes only the
+  part of the beam they cover.
+- A beam's collision groups choose only the surface that ends its trace. A
+  body the host admits in front of that surface takes its share whatever the
+  groups, as in a blast.
+- A beam's trace ends at the surface its ray meets for every recipient but
+  the stop. The stop's own circles past that surface take their part of a
+  wide beam even through another recipient beside the ray and behind the
+  surface, which the beam does not reach.
 - A shot's body is its own entity. The module removes the entity when the shot
   retires.
 - A shot launched after `prepare` sweeps from its launch, but a hit in that
@@ -322,7 +356,10 @@ that fell gained speed.
 - a crowd of 10,000 blades, which never takes more than the budget has left;
 - brittle twigs, which keep all their work, taking the budget and never more,
   at a speed where the last share would round up in `f32`;
-- duplicate pass reports and a second hard-hit callback, both refused;
+- duplicate pass reports and a second hard-hit callback, both refused, and
+  the energy a pass would offer, refused as the pass would be;
+- a pulse carrying part of the beam's energy, the rest never reaching a
+  recipient, and pulses past that energy refused;
 - one release divided among a crowd as it would go to one recipient, released
   once, with couplings past one and duplicate recipients refused, and shares
   whose `f32` rounding would pass the payload held to it;
@@ -407,7 +444,32 @@ world. It covers:
   one with its share reported, and running out at their range;
 - a recipient with a circle the reach geometry refuses, refused while the beam
   and the shot reach the rest;
-- tissue the host keeps no region for, its beam and blast shares reported.
+- tissue the host keeps no region for, its beam and blast shares reported;
+- a plate whose armor the host keeps, hit as a registered plate is and charged
+  the same work;
+- a blade and a plate the host shields: the shot passes the blade, meeting it
+  once, and stops and bursts on the plate, neither charged;
+- a shielded blade already passed, or on a face the geometry refuses, refused
+  as an unshielded one would be;
+- a beam ending on a body the host keeps, charged with all that reaches it,
+  and still ending there, uncharged, while the host shields it;
+- a beam stopping on a ball that covers half its width, reaching no tissue
+  past it;
+- a ball off the ray taking its part of a beam and shadowing a blade, with the
+  plate behind taking the rest;
+- a rover's region over two bodies, one recipient whichever the ray meets,
+  taking what its circles within the pulse's range cover;
+- what a beam cannot deliver, to a shielded plate and tissue with no region,
+  reported at each share, the shares adding up to the pulse;
+- a stop with a circle the geometry refuses, a blade with a circle at no
+  finite place and a blade with a negative radius, each refused whole while
+  the rest of the beam delivers, and bad circles the beam cannot meet, not
+  refused;
+- a ball whose circle begins past the surface the ray meets, given nothing by
+  a pulse that ends before the circle and the part the circle covers by a
+  longer one;
+- a pulse reaching only as far as its range and carrying the energy the host
+  gives it, with no range, or energy past the beam's pulse, refused.
 
 `scenarios/scorched-earth/src/armor/tests.rs` and `host/tests.rs` cover
 Scorched's shells:
