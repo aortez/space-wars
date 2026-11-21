@@ -48,14 +48,23 @@ fn a_shell_charges_the_tank_it_hits_once_then_bursts_once() {
             )
             .unwrap();
         assert_eq!(hit.collider.entity, state.tanks[0].body.entity);
-        let mut source = shell(7, Some(99), 30.0);
+        let mut shot = Shell {
+            owner: 1,
+            position: hit.point + Vec2::Y,
+            velocity: Vec2::new(0.0, -30.0),
+            age: 10,
+            flight: None,
+            source: shell(7, Some(99), 30.0),
+            keys: Keys::default(),
+        };
         let struck = state.duel.strike(
             &mut state.physics,
-            Vec2::new(0.0, -30.0),
-            &mut source,
+            &mut NoRecipients,
+            &mut shot,
             hit.point,
             &hit,
         );
+        let mut source = shot.source;
         let ledger = source.ledger();
         assert!(ledger.kinetic.absorbed > 0.0, "sprung={suspension}");
         assert!(ledger.payload.absorbed > 0.0);
@@ -92,6 +101,7 @@ fn a_hit_from_a_shell_nobody_fired_draws_no_answer() {
         age: 10,
         flight: None,
         source: shell(500, None, 30.0),
+        keys: Default::default(),
     });
     let impacts = state.impacts;
     for _ in 0..60 {
@@ -118,7 +128,14 @@ fn a_burst_between_the_tanks_divides_one_payload() {
     let mut source = charge(1, None);
     let absorbed = state
         .duel
-        .release_payload(&state.physics, at + Vec2::X * 3.0, &mut source);
+        .release_payload(
+            &state.physics,
+            &mut NoRecipients,
+            at + Vec2::X * 3.0,
+            &mut source,
+            &mut Keys::default(),
+        )
+        .absorbed;
     assert!(absorbed[0] > 0.0);
     assert!((absorbed[0] - absorbed[1]).abs() < 0.01 * absorbed[0]);
     let ledger = source.ledger().payload;
@@ -173,6 +190,7 @@ fn a_shell_stopped_by_terrain_reports_its_hit_without_charging_it() {
         age: 10,
         flight: None,
         source: shell(500, None, 20.0),
+        keys: Default::default(),
     });
     let impacts = state.impacts;
     for _ in 0..300 {

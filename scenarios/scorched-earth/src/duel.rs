@@ -1,4 +1,5 @@
 use super::*;
+use engine_rapier::world::weapon::Recipients;
 
 impl Duel {
     pub(crate) fn insert(
@@ -320,6 +321,7 @@ impl Duel {
             age: 0,
             flight: Some(flight),
             source: armor::shell(self.shots + 1, owner, velocity.length()),
+            keys: armor::Keys::default(),
         });
         self.tanks[player].next_shot = self.tick + 75;
         self.tanks[player].shots += 1;
@@ -434,6 +436,7 @@ impl Duel {
                     age: 10,
                     flight: None,
                     source: armor::shell(self.shots + 1, None, velocity.length()),
+                    keys: armor::Keys::default(),
                 });
                 self.shots += 1;
             }
@@ -458,7 +461,11 @@ impl Duel {
         );
         drives
     }
-    pub(crate) fn finish_step(&mut self, physics: &mut PhysicsWorld) {
+    pub(crate) fn finish_step(
+        &mut self,
+        physics: &mut PhysicsWorld,
+        recipients: &mut impl Recipients,
+    ) {
         self.loose.sample_impact_contacts(physics);
         let mut finished = Vec::new();
         let placement = &self.placement;
@@ -481,6 +488,7 @@ impl Duel {
             let end = hit
                 .as_ref()
                 .map_or(shell.position + movement, |hit| hit.point);
+            armor::pass_tissue(placement, recipients, shell, end);
             if let Some(flight) = &mut shell.flight {
                 let target = placement.point_from_world(
                     physics
@@ -524,7 +532,7 @@ impl Duel {
         for (mut shell, point, kind, hit) in finished {
             let health = self.tanks.map(|tank| tank.health);
             if let Some(hit) = hit {
-                let struck = self.strike(physics, shell.velocity, &mut shell.source, point, &hit);
+                let struck = self.strike(physics, recipients, &mut shell, point, &hit);
                 self.notify_hits(shell.flight.is_some().then_some(shell.owner), health);
                 self.impact_events.push(host::Impact {
                     source: host::ShotSource {

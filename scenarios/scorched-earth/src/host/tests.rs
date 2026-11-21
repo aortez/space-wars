@@ -1,5 +1,8 @@
 use super::*;
+use engine_material::{SOFT_TISSUE, Section};
 use engine_rapier::world::physics_activity;
+use engine_rapier::world::weapon::{Reachable, Recipient};
+use std::collections::BTreeMap;
 
 fn world() -> PhysicsWorld {
     PhysicsWorld::new(PhysicsWorldConfig {
@@ -493,48 +496,268 @@ fn scaled_duels_drive_deform_and_replay_with_native_mass_accounting() {
     }
 }
 
+/// A hosted duel at `scale` whose tanks have settled and hold their fire.
+fn quiet(scale: f32) -> (HostedDuel, PhysicsWorld) {
+    let mut config = config(GrainShape::Hexagon);
+    config.cpu_driving = false;
+    let mut world = world();
+    world.set_gravity(Vec2::new(0.0, -GRAVITY * scale));
+    world.set_length_unit(scale);
+    let mut placement = Placement::new(1000..100_000, Budget::required(config));
+    placement.scale = scale;
+    let mut duel = HostedDuel::attach(&mut world, config, 42, placement).unwrap();
+    for tank in &mut duel.duel.tanks {
+        tank.next_shot = u64::MAX;
+    }
+    for _ in 0..90 {
+        step(&mut duel, &mut world);
+    }
+    (duel, world)
+}
+
+/// Where tank `slot` is, in the duel's units.
+fn tank_at(duel: &HostedDuel, world: &PhysicsWorld, slot: usize) -> Vec2 {
+    let body = duel.duel.tanks[slot].body;
+    duel.placement()
+        .point_from_world(world.motion(body).unwrap().position)
+}
+
+/// Drops a shell at `speed` from `height` above tank `slot` and steps until
+/// it strikes the tank, with `recipients` in its way.
+fn drop_shell(
+    duel: &mut HostedDuel,
+    world: &mut PhysicsWorld,
+    recipients: &mut impl Recipients,
+    slot: usize,
+    height: f32,
+    speed: f32,
+) {
+    duel.duel.shells.push(Shell {
+        owner: 1 - slot,
+        position: tank_at(duel, world, slot) + Vec2::Y * height,
+        velocity: Vec2::new(0.0, -speed),
+        age: 10,
+        flight: None,
+        source: armor::shell(500, None, speed),
+        keys: Default::default(),
+    });
+    let impacts = duel.duel.impacts;
+    for _ in 0..120 {
+        let drives = duel.prepare_step(world).unwrap();
+        world.step_with_surface_drives(DT, &drives);
+        duel.finish_step_with(world, recipients).unwrap();
+        if duel.duel.impacts > impacts {
+            let body = duel.duel.tanks[slot].body;
+            assert_eq!(duel.impacts()[0].collider.entity, body.entity);
+            return;
+        }
+    }
+    panic!("the shell never struck");
+}
+
 #[test]
 fn scaled_duels_take_the_same_damage_from_the_same_shell() {
     let mut lost = Vec::new();
     for scale in [1.0, 3.0] {
-        let mut config = config(GrainShape::Hexagon);
-        config.cpu_driving = false;
-        let mut world = world();
-        world.set_gravity(Vec2::new(0.0, -GRAVITY * scale));
-        world.set_length_unit(scale);
-        let mut placement = Placement::new(1000..100_000, Budget::required(config));
-        placement.scale = scale;
-        let mut duel = HostedDuel::attach(&mut world, config, 42, placement).unwrap();
-        for tank in &mut duel.duel.tanks {
-            tank.next_shot = u64::MAX;
-        }
-        for _ in 0..90 {
-            step(&mut duel, &mut world);
-        }
-        let body = duel.duel.tanks[0].body;
-        let tank = duel
-            .placement()
-            .point_from_world(world.motion(body).unwrap().position);
-        duel.duel.shells.push(Shell {
-            owner: 1,
-            position: tank + Vec2::Y * 6.0,
-            velocity: Vec2::new(0.0, -30.0),
-            age: 10,
-            flight: None,
-            source: armor::shell(500, None, 30.0),
-        });
-        let impacts = duel.duel.impacts;
-        for _ in 0..60 {
-            step(&mut duel, &mut world);
-            if duel.duel.impacts > impacts {
-                break;
-            }
-        }
-        assert_eq!(duel.impacts()[0].collider.entity, body.entity);
+        let (mut duel, mut world) = quiet(scale);
+        drop_shell(
+            &mut duel,
+            &mut world,
+            &mut armor::NoRecipients,
+            0,
+            6.0,
+            30.0,
+        );
         lost.push(100.0 - duel.duel.tanks[0].health);
     }
     assert!(lost[0] > 0.0);
     assert!((lost[0] - lost[1]).abs() < 0.01, "{lost:?}");
+}
+
+/// Moss the host keeps, and bodies outside the material model, in world
+/// units at `scale`.
+struct Field {
+    scale: f32,
+    /// The depth of every bed's section, a fifth of a unit unless a test
+    /// spoils it.
+    depth: f32,
+    circles: Vec<Reachable>,
+    moss: BTreeMap<u64, Region>,
+    /// Each tuft's charges: how many, and the work they came to.
+    charges: BTreeMap<u64, (u32, f32)>,
+}
+
+impl Field {
+    fn new(scale: f32) -> Self {
+        Self {
+            scale,
+            depth: 0.2,
+            circles: Vec::new(),
+            moss: BTreeMap::new(),
+            charges: BTreeMap::new(),
+        }
+    }
+
+    /// A bed of moss a unit across at `center`, in the duel's units, with
+    /// `volume` of tissue.
+    fn with_moss(mut self, duel: &HostedDuel, key: u64, center: Vec2, volume: f32) -> Self {
+        let region = Region::new(SOFT_TISSUE, volume * self.scale.powi(3)).unwrap();
+        self.moss.insert(key, region);
+        self.circles.push(Reachable {
+            recipient: Recipient::Tissue(key),
+            center: duel.placement().point_to_world(center),
+            radius: 0.5 * self.scale,
+            thickness: 0.5 * self.scale,
+        });
+        self
+    }
+
+    /// A body outside the material model as thick as a burst's front, at
+    /// `center` in the duel's units.
+    fn with_obstacle(mut self, duel: &HostedDuel, center: Vec2, radius: f32) -> Self {
+        let body = BodyId::new(PhysicsId::new(77_777), BodyRole::PRIMARY);
+        self.circles.push(Reachable {
+            recipient: Recipient::Unmodeled(body),
+            center: duel.placement().point_to_world(center),
+            radius: radius * self.scale,
+            thickness: 2.0 * self.scale,
+        });
+        self
+    }
+}
+
+impl Recipients for Field {
+    fn near(&self, center: Vec2, radius: f32) -> Vec<Reachable> {
+        self.circles
+            .iter()
+            .filter(|circle| circle.center.distance_to(center) - circle.radius <= radius)
+            .copied()
+            .collect()
+    }
+
+    fn tissue(&self, key: u64) -> Option<(Region, Section)> {
+        let section = Section::new(0.5 * self.scale, self.depth * self.scale);
+        Some((*self.moss.get(&key)?, section))
+    }
+
+    fn absorb(&mut self, key: u64, work: f32) {
+        self.moss.get_mut(&key).unwrap().absorb(work).unwrap();
+        let charge = self.charges.entry(key).or_default();
+        charge.0 += 1;
+        charge.1 += work;
+    }
+}
+
+#[test]
+fn a_shell_passes_the_hosts_moss_on_its_way_and_hits_as_it_would_without_it() {
+    let mut struck = Vec::new();
+    for moss in [false, true] {
+        let (mut duel, mut world) = quiet(1.0);
+        let tank = tank_at(&duel, &world, 1);
+        let mut field = Field::new(1.0);
+        if moss {
+            // Beyond the burst's reach.
+            field = field
+                .with_moss(&duel, 1, tank + Vec2::Y * 9.0, 0.1)
+                .with_moss(&duel, 2, tank + Vec2::Y * 11.0, 0.1);
+        }
+        drop_shell(&mut duel, &mut world, &mut field, 1, 14.0, 30.0);
+        if moss {
+            // Each tuft is charged once, though the shell crosses it over
+            // several steps.
+            assert_eq!(field.charges.keys().copied().collect::<Vec<_>>(), [1, 2]);
+            for (calls, work) in field.charges.values() {
+                assert_eq!(*calls, 1);
+                assert!(*work > 0.0);
+            }
+        }
+        let event = duel.impacts()[0];
+        struck.push((duel.duel.tanks[1].health, event.ledger.payload));
+    }
+    assert!(struck[0].0 < 100.0);
+    assert_eq!(struck[0], struck[1]);
+}
+
+#[test]
+fn a_burst_shares_its_payload_with_the_hosts_moss_and_stops_at_its_bodies() {
+    let (mut duel, mut world) = quiet(1.0);
+    let tank = tank_at(&duel, &world, 1);
+    let mut field = Field::new(1.0).with_moss(&duel, 1, tank + Vec2::new(3.0, 0.5), 20.0);
+    let mut open = duel.clone();
+    let mut flawed = duel.clone();
+    drop_shell(&mut duel, &mut world, &mut field, 1, 6.0, 30.0);
+    let event = duel.impacts()[0];
+    let (calls, work) = field.charges[&1];
+    assert_eq!(calls, 1);
+    assert!(work > 0.0);
+    assert!(field.moss[&1].integrity() > 0.0);
+    let payload = event.ledger.payload;
+    assert!(payload.delivered <= 28_000.0);
+    // The payload went to the tank's armor and the moss, and nowhere twice.
+    let armor = f64::from(event.absorbed[1]) - event.ledger.kinetic.absorbed;
+    assert!((armor + f64::from(work) - payload.absorbed).abs() < 0.1);
+    assert_eq!(event.unmodeled, 0.0);
+
+    // A host body between a burst and the tank stops what meets it first.
+    let center = tank - Vec2::X * 3.0;
+    let mut shielded = open.clone();
+    let release = |duel: &mut HostedDuel, recipients: &mut Field| {
+        duel.duel.release_payload(
+            &world,
+            recipients,
+            center,
+            &mut armor::charge(9, None),
+            &mut armor::Keys::default(),
+        )
+    };
+    let open = release(&mut open, &mut Field::new(1.0));
+    let mut obstacle = Field::new(1.0).with_obstacle(&duel, tank - Vec2::X * 2.4, 0.4);
+    let shielded = release(&mut shielded, &mut obstacle);
+    assert!(open.absorbed[1] > 0.0);
+    assert!(shielded.absorbed[1] < open.absorbed[1]);
+    assert_eq!(open.unmodeled, 0.0);
+    assert!(shielded.unmodeled > 0.0);
+
+    // Tissue the law refuses stops energy as a body does, and the tank still
+    // takes the share that passes it.
+    let mut spoiled = Field::new(1.0).with_moss(&duel, 2, tank - Vec2::X * 2.4, 20.0);
+    spoiled.depth = 0.0;
+    let flawed = release(&mut flawed, &mut spoiled);
+    assert!(flawed.absorbed[1] > 0.0);
+    assert!(flawed.absorbed[1] < open.absorbed[1]);
+    assert!(flawed.unmodeled > 0.0);
+    assert!(spoiled.charges.is_empty());
+}
+
+#[test]
+fn the_hosts_moss_loses_the_same_share_of_its_capacity_at_any_scale() {
+    let mut left = Vec::new();
+    for scale in [1.0, 3.0] {
+        let (mut duel, mut world) = quiet(scale);
+        let tank = tank_at(&duel, &world, 1);
+        // A bed a slow shell passes and the burst reaches, and one only
+        // reached.
+        let mut field = Field::new(scale)
+            .with_moss(&duel, 1, tank + Vec2::Y * 4.5, 20.0)
+            .with_moss(&duel, 2, tank + Vec2::new(4.5, 0.5), 20.0);
+        drop_shell(&mut duel, &mut world, &mut field, 1, 6.0, 2.0);
+        assert_eq!(field.charges[&1].0, 2);
+        left.push(
+            field
+                .moss
+                .values()
+                .map(|moss| moss.integrity())
+                .collect::<Vec<_>>(),
+        );
+    }
+    assert!(
+        left[0]
+            .iter()
+            .all(|&integrity| integrity > 0.0 && integrity < 1.0)
+    );
+    for (one, three) in left[0].iter().zip(&left[1]) {
+        assert!((one - three).abs() < 1e-4, "{left:?}");
+    }
 }
 
 #[test]
@@ -560,6 +783,7 @@ fn a_retired_tank_takes_no_share_and_its_airborne_shell_still_counts() {
         age: 10,
         flight: None,
         source: armor::shell(500, Some(firer.value()), 30.0),
+        keys: Default::default(),
     });
     duel.retire_tank(&mut world, 0).unwrap();
     let impacts = duel.duel.impacts;
