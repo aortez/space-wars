@@ -1682,6 +1682,7 @@ name = "engine-nes"
 version = "0.1.0"
 dependencies = [
  "png 0.17.16",
+ "sha2",
  "stats_alloc",
 ]
 

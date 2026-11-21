@@ -11,6 +11,7 @@ description = "Deterministic, platform-independent NES emulation core"
 
 [dev-dependencies]
 png.workspace = true
+sha2 = { workspace = true }
 stats_alloc = "0.1.10"
 
 [[example]]
@@ -48,3 +49,15 @@ path = "examples/state_benchmark.rs"
 [[example]]
 name = "mapper_benchmark"
 path = "examples/mapper_benchmark.rs"
+
+[[example]]
+name = "world_model_probe"
+path = "examples/world_model_probe.rs"
+
+[[example]]
+name = "world_model_rollout"
+path = "examples/world_model_rollout.rs"
+
+[[example]]
+name = "world_model_tiles"
+path = "examples/world_model_tiles.rs"
