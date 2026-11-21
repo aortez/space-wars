@@ -459,6 +459,45 @@ Observed on x86-64 Linux with a release build:
   the level load to hand the player over (trap 8) before it starts, and says which
   of "stuck", "out of lives" or "cleared the level" ended the run.
 
+## Where the films live
+
+Run artifacts stay out of the repository with the rest of `data/`, so the films
+this document reports are on the owner's workstation under `data/shots` and this
+paragraph is their record. A `--shots` directory holds the raw series and the film
+tool writes beside it:
+
+| Name | What it is |
+| --- | --- |
+| `data/shots/<run>/` | the raw PNG series, `frame-*` plain and `model-*` with the dots on |
+| `data/shots/<run>/event-<what>-f<frame>-x<x>.png` | a still at a moment: `jump`, `death`, `stuck`, `game-over` |
+| `<run>.mp4` | the plain series at 60/N, so it still runs in real time |
+| `<run>-model.mp4` | the same frames at 60 with the model's own beliefs dotted on |
+| `<run>-clip-<lo>-<hi>.mp4` | an overlay clip over emulator frames `lo` to `hi` |
+| `<run>-events.png` | every event still in the order they happened, legend printed |
+
+Two runs are worth keeping. `reader-only` is the honest one, 2,283 frames, stopped
+against the pipe at absolute X 899. `reflex` is the tuned one, 8,168 frames, reaching
+2601 and dying twice. The clips that carry the argument are
+`reader-only-clip-380-440`, the first jump; `reader-only-clip-1600-1802`, the pipe,
+where the row under his feet is green and the three rows ahead are red, which is trap
+7 without any prose; `reflex-clip-2480-2620`, the same pipe cleared; and
+`reflex-clip-990-1080`, a death. `sheet-moments.png` and the `hero-*.png` stills are
+one-off comparisons of the screen against the model at chosen frames.
+
+Any of them is re-cut from the cartridge in two commands, the run that writes the
+series and the cut:
+
+```sh
+cargo run --release --locked -p engine-nes --example world_model_bot \
+  -- data/roms/smb.nes 9000 --reflex --shots data/shots/reflex --overlay --every 2
+python3 tools/nes-reference/film-smb-run.py data/shots/reflex --clip 990-1080
+```
+
+Re-cutting `reader-only` from its existing series reproduces `reader-only.mp4`,
+`reader-only-model.mp4` and `reader-only-events.png` byte for byte, which is the
+point: a film that cannot be re-cut from a commit is a screenshot with a claim
+attached to it.
+
 ## Optional cartridge test
 
 Every other test in this crate drives a `test_rom` builder, so semantic reads
