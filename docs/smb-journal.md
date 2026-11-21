@@ -605,8 +605,11 @@ name itself reached 436; after the pixel and before the gate came down, 596. Fou
 hold the rules, and none of them needs a cartridge: the wall names a pixel the body is not
 already past, the hop leaves the pipe to the skill that can get over it, `clear-wall` starts
 where the landing gate cannot be answered, and a wall taller than the rise is nobody's
-frame. The films are `script-1-1.mp4` and two clips, one of the stairs and one of the
-flagpole.
+frame. The films are `script-1-1.mp4` and three clips — the stairs, the flagpole, and the
+walk to the castle that the level ends on — plus `script-1-1-events.png`, all twenty-nine
+event stills in order. The clear still that sheet ends on is the reason `bot` now writes
+`event-clear-*`: the module doc had promised that name since the first run and nothing had
+ever reached the frame that writes it.
 
 Consequence: the flagpole is the next gym, and it is a strange one — the obstacle is the
 level's exit, and the behaviour that fails on it is the one that succeeds everywhere else.

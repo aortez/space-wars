@@ -308,6 +308,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "  frame {:>5}: cleared world {}.{} at absolute X {} and landed in world {}.{}",
                 frame_id, start_level.0, start_level.1, furthest_x, state.world, state.level
             );
+            // The one frame a run of this project had never reached. The picture is
+            // already the next area's, so what the still holds is the ending rather
+            // than the jump that caused it; the jump is the `event-jump` still a few
+            // frames earlier and the film is what joins them.
+            if let (Some(dir), Some(picture)) = (&shots, capture(&machine)) {
+                let name = format!("event-clear-f{}-x{}.png", frame_id, furthest_x);
+                write_png(&dir.join(name), &picture)?;
+            }
             break;
         }
         if awaiting_respawn && state.absolute_x < RESPAWN_X {

@@ -1048,9 +1048,13 @@ frame 1040, and it is the first film here of a bot crossing the pit on purpose: 
 1494, and one more past the objective at 1646. `script-1-1` is the first run of anything
 here that finishes a level: 2,327 frames, the script from the handover to absolute X 3266,
 no death, twenty-six `event-jump` stills — one per behaviour it started, which is the
-transcript printed as pictures — and two refusal stills, the first pipe at 434 and the first
-stair at 2130. It is cut by `bot 2620 --script --shots data/shots/script-1-1` with no
-overlay, so the series is the plain one and the film is `script-1-1.mp4`.
+transcript printed as pictures — two refusal stills, the first pipe at 434 and the first
+stair at 2130, and one `event-clear` still on frame 2614. That last one is the only frame
+any run here has ever reached, and the PPU has already moved on to the next area by it, so
+what it holds is the ending rather than the jump that caused it; the jump is the
+`event-jump` still at frame 1961 and the film is what joins them. It is cut by
+`bot 2620 --script --shots data/shots/script-1-1` with no overlay, so the series is the
+plain one and the film is `script-1-1.mp4`.
 It has no `model-*` series and no overlay
 clip because it is a gym film rather than a `bot` film: `film` replays a gym's tape and
 hands the machine to the driver that gym names, so the run on screen is the run the
@@ -1064,11 +1068,15 @@ one frame later; `ledger-clip-830-920`, the second pipe jumped without ever
 being stopped by it, with no refusal event anywhere near it, which is the memory
 rather than the collision;
 and `ledger-clip-1330-1400`, the death at the camera limit that the model says nothing
-about at all. Two clips from the new run carry the current argument:
+about at all. Three clips from the new run carry the current argument:
 `script-1-1-clip-1340-1470` is the stairs at 2130 to 2240, three `clear-wall` jumps up a
 step each, which is the frame range the landing gate used to stand in front of for six
 hundred frames; `script-1-1-clip-1940-2300` is the flagpole — the jump into the twelve-row
-column at 3168, the slide, the walk to the castle, and the level ending. `sheet-moments.png` and the `hero-*.png` stills are one-off comparisons
+column at 3168 and the slide down a column no jump in the library gets over; and
+`script-1-1-clip-2300-2613` is the walk to the castle and the level ending, which is what
+the run's last three hundred frames turn out to be. `script-1-1-events.png` is all
+twenty-nine stills in the order they happened, the transcript as one picture.
+`sheet-moments.png` and the `hero-*.png` stills are one-off comparisons
 of the screen against the model at chosen frames. The two older runs were cut with
 `--out data/shots`, which is why their films sit beside their series; `ledger`'s sit
 inside it, where the tool puts them by default.
