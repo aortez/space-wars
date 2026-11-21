@@ -17,9 +17,10 @@ use sha2::{Digest as _, Sha256};
 mod smb;
 
 use smb::{
-    MODE_PLAYING, STATE_NORMAL, boot_to_gameplay, is_blank_tile, is_load_bearing,
-    player_surface_row_from_sprites, player_tile, read_state, reconstruct_background, scroll_x,
-    scroll_y, snapshot, sprite_covered_cells, tile_at, tile_grid,
+    BODY_ROWS, MODE_PLAYING, STATE_NORMAL, TRIGGER_COLUMNS, boot_to_gameplay, is_blank_tile,
+    is_load_bearing, player_surface_row_from_sprites, player_tile, read_state,
+    reconstruct_background, run_right_buttons, scroll_x, scroll_y, snapshot, sprite_covered_cells,
+    tile_at, tile_grid, wall_ahead,
 };
 
 /// The one ROM revision this address map was verified against. A different
@@ -376,5 +377,123 @@ fn the_tile_frame_rebuilds_the_background_the_ppu_actually_drew() {
     assert!(
         carried * 10 >= grounded * 9,
         "the feet row should be load-bearing on nine in ten grounded frames,          got {carried} of {grounded}",
+    );
+}
+
+/// The sideways direction, and the seventh decode trap. A tile the game holds him
+/// up on and a tile the game stops him against are different observations, and
+/// watching what carries him can only ever yield the first, so a load-bearing set
+/// derived that way cannot name a wall. This pins it by *playing*: run the
+/// reader-driven policy from `tests/support/smb_world_model.rs`, wait until the
+/// world stops returning the input, and read the tile that did it. The game says
+/// he is stopped; the reader says nothing solid is there.
+///
+/// The policy is the one the `world_model_bot` example runs, so this is the same
+/// run the document reports rather than a fourth hand-written script. It reaches
+/// the first pipe of 1-1 at absolute X 899 and stands there pushing right.
+#[test]
+fn the_tile_that_stops_the_player_is_not_one_the_reader_calls_solid() {
+    let Some(rom) = rom_image() else { return };
+    assert_pinned_revision(&rom);
+    let (mut machine, _) = boot_to_gameplay(&rom).expect("setup script should reach normal play");
+
+    // `$0770` says play before the game has handed him over. The level load holds
+    // him at absolute X 0 in player state 0x00 for about 150 frames, and through
+    // the first two of those the player bytes still hold the *previous* screen's
+    // values, so a single frame of "normal, grounded, at X 40" is the ghost of a
+    // level that is already gone. Wait for the state to hold instead of for it to
+    // flicker: a policy started on the mode byte spends its first two seconds
+    // pushing at a world that is not listening, and a frame-counted stall detector
+    // then reads the bot as giving up before it has moved.
+    let mut in_control_for = 0;
+    for _ in 0..300 {
+        let state = read_state(&machine);
+        in_control_for = if state.is_in_control() && state.is_grounded() {
+            in_control_for + 1
+        } else {
+            0
+        };
+        if in_control_for >= 8 {
+            break;
+        }
+        machine
+            .run_frame([
+                engine_nes::ControllerButtons::NONE,
+                engine_nes::ControllerButtons::NONE,
+            ])
+            .expect("frame should run");
+    }
+    assert!(
+        in_control_for >= 8,
+        "300 frames after the mode byte said play, the game still has not put the player in the \
+         level, so the setup script or the level load has changed"
+    );
+
+    // Frames without new ground before "stopped" is a real observation. A jump, a
+    // koopa walking into him and a ledge he reads as a hole each cost a few
+    // frames, so a frozen frame or two proves nothing.
+    const STALLED_FRAMES: u64 = 120;
+    // The measured run reaches the pipe inside two thousand frames; the rest is
+    // room for a core that decodes the same level a little differently.
+    const FRAME_LIMIT: u64 = 3000;
+
+    let mut furthest_x = 0;
+    let mut no_progress_for = 0;
+    let mut hold_a = 0;
+    let mut stalled: Option<(u16, u8, bool)> = None;
+    for _ in 1..=FRAME_LIMIT {
+        let state = read_state(&machine);
+        let frame = snapshot(&machine);
+        let origin_x = scroll_x(&frame);
+        let tiles = tile_grid(&frame, origin_x, 0);
+        let (column, row) = player_tile(&state, origin_x);
+        let buttons = run_right_buttons(&state, &machine, &tiles, column, row, &mut hold_a);
+        if state.absolute_x > furthest_x {
+            furthest_x = state.absolute_x;
+            no_progress_for = 0;
+        } else {
+            no_progress_for += 1;
+        }
+
+        if no_progress_for >= STALLED_FRAMES && state.is_grounded() {
+            // The same window the policy jumps on: the first cell ahead that draws
+            // anything at all in the rows his body occupies.
+            let ahead = (1..=TRIGGER_COLUMNS)
+                .flat_map(|step| (1..=BODY_ROWS).map(move |rise| (column + step, row - rise)))
+                .filter_map(|(column, row)| tile_at(&tiles, column, row))
+                .find(|tile| !is_blank_tile(&frame, *tile));
+            if let Some(tile) = ahead {
+                stalled = Some((furthest_x, tile, wall_ahead(&tiles, column, row)));
+                break;
+            }
+        }
+
+        machine
+            .run_frame([buttons, engine_nes::ControllerButtons::NONE])
+            .expect("frame should run");
+    }
+
+    let (x, tile, wall) = stalled.unwrap_or_else(|| {
+        panic!(
+            "{FRAME_LIMIT} frames of the reader-driven policy never stalled: furthest absolute \
+             X {furthest_x}, so either the policy got better or the level changed shape, and \
+             trap 7 of docs/nes-world-model-reader.md needs re-measuring"
+        )
+    });
+    assert!(
+        x > 500,
+        "the policy stalled at absolute X {x}, well short of the first pipe: the jump rule has \
+         stopped clearing the early pits, so this is no longer measuring a wall",
+    );
+    assert!(
+        !is_load_bearing(tile),
+        "the game stopped him at absolute X {x} on tile ${tile:02x}, which the reader calls \
+         load-bearing: the set has started to describe walls, so re-derive it and rewrite trap 7 \
+         in docs/nes-world-model-reader.md",
+    );
+    assert!(
+        !wall,
+        "`wall_ahead` called the cell at absolute X {x} solid while the load-bearing set called \
+         the same tile scenery: the reader contradicts itself",
     );
 }

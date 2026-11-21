@@ -12,6 +12,13 @@ decode, rollout and search design already exist in DirtSim's C++ NES
 subsystem. The work is a port plus a place to put it, not new hardware
 emulation.
 
+The reader built from it now drives a bot, and that is where the interesting part
+is: the same sense data walks Mario into a pipe at absolute X 899 and stops there,
+forever, with nothing wrong in the reading. Bolting a reaction rule onto that gets
+to 2601 and dies twice, and which of those two it is moves with one tuning
+constant. What a reader knows, what it cannot know from the picture, and what that
+costs are in "Driving a bot off the reader".
+
 ## Read surface the core already provides
 
 | Reader need | Existing API |
@@ -93,7 +100,7 @@ detected when `$0770` becomes 1, the setup script ends at frame 300 and a run
 that has not reached gameplay by frame 500 is a setup failure. The Rust
 examples use the same policy and reach gameplay on frame 120.
 
-## Tile-frame reader and six decode traps
+## Tile-frame reader and eight decode traps
 
 Terrain comes from the PPU, not RAM. The port reads the scroll latch, walks the
 nametables through the cartridge's own mirroring function, and identifies each
@@ -106,8 +113,9 @@ The decode was validated by reconstructing the background pixel by pixel from
 the nametables, the mirroring and the CHR pattern, and comparing the resulting
 transparency mask against the framebuffer the core actually rendered, with every
 cell a sprite touches set aside. At a static camera the reconstruction is exact:
-51,136 compared pixels, none wrong. Six traps came out of the decode, four
-from that pixel comparison and two from joining the terrain to the player.
+51,136 compared pixels, none wrong. Eight traps came out of it: four from that
+pixel comparison, two from joining the terrain to the player, one from driving
+a bot off the result, and one from starting a bot a frame too early.
 
 1. **SMB's blank-sky filler is tile `$24`, not `$00`.** A reader that treats
    only `$00` as empty sees a wall of solid tiles across the whole sky. Hashing
@@ -157,10 +165,35 @@ from that pixel comparison and two from joining the terrain to the player.
    reports scenery as terrain. Recording which id sat under his feet on frames
    the game called grounded, against which ids his body occupied, split the two
    with no overlap across 2583 frames: `$26` was a body tile on 2413 of them and
-   a feet tile on none, while the `$b4`/`$b5` ground, the `$60`-`$63` pipe tops
-   and bodies, and the `$45`, `$57` and `$58` solid blocks (each drawn as a lit
-   top edge over a filled body) only ever held his feet. A reader that derives
-   walkability from pixel coverage parks a bot inside a hill.
+   a feet tile on none, while the `$b4`/`$b5` ground, the `$60`-`$63` pipe tops,
+   and the `$45`, `$57` and `$58` solid blocks (each drawn as a lit top edge over a
+   filled body) only ever held his feet. A reader that derives walkability from
+   pixel coverage parks a bot inside a hill.
+7. **Standing on something and being stopped by it are different observations, and
+   a feet-row survey can only make the first.** `LOAD_BEARING_TILES` is learned by
+   recording which id sat under the player's feet on grounded frames, so it can
+   only ever contain surfaces. A pipe is `$60`-`$63` on its top row, which is in
+   the set, over `$64`-`$6a` for its body, which is not, so every row that
+   actually stops him reads as scenery. The bot built on this reader walks into a
+   pipe body at absolute X 899, is stopped by the game, and stands there pushing
+   right with `wall_ahead` false for 600 frames. Solidity is a relation over tile,
+   direction, player state and time, not a property of a tile id: a one-way
+   platform is solid from above and not from below, a `?` block changes id when
+   hit, and breakable and unbreakable bricks share a picture. Learning wall ids
+   needs a different experiment, walking into things, or the ROM's own collision
+   table.
+
+8. **`$0770` says play before the game has handed him over.** The mode byte flips
+   to `$01` on the first frame of a level load, and the load takes about 150 more
+   frames to place the level and put the player in it. Through the first two of
+   those the player bytes still hold the values from the screen that was showing
+   before, so one can read "state `$08`, grounded, absolute X 40, tile row 25" for
+   a level that has not loaded yet; the level then starts him at absolute X 0 in
+   state `$00`. A policy started on the mode byte spends its first two seconds
+   pushing at a world that is not listening, and a stuck detector counted in frames
+   reports that as the bot giving up before it moved. `SmbState::is_in_control`
+   waits for the state to hold for eight consecutive frames rather than for it to
+   flicker once.
 
 The attribute table is a separate channel again: 20 of 884 sprite-free cells in
 the sample frame render the same pattern under different palette indices. Tile
@@ -187,12 +220,19 @@ Three things follow that a reader has to get right:
 - **Terrain is not solidity.** Rows 23 and 24 above Mario's feet are opaque hill
   tiles he is standing inside, and the game does not care (trap 6). The
   load-bearing set is nine ids wide; the drawn set is thirty-six.
-- **The nametable is a sliding ring buffer, not a level map.** SMB rewrites
-  nametable columns as the camera scrolls and the pair of tables wraps every 512
-  pixels, so the leftmost columns of page 0 end up holding content from X = 512
-  and beyond. The reader sees the screen the camera is on, never the level. A bot
-  that wants a map has to accumulate windows across a rollout, and a bot that
-  wants "what is over the next hill" has to move the camera to find out.
+- **The nametable is a sliding ring buffer, not a level map, and a bounded one.**
+  SMB rewrites nametable columns as the camera scrolls and the pair of tables
+  wraps every 512 pixels, so the leftmost columns of page 0 end up holding content
+  from X = 512 and beyond. `world_model_rollout` watches every slot the camera
+  passes over: over 320 playing frames to absolute X 705, 1,652 of 1,792 slots
+  (92%) kept one tile id the whole time, and of the 144 changes seen in a slot the
+  player could still see, 140 were at column 31, the edge the camera is exposing,
+  which is new terrain arriving rather than old terrain edited. Only four landed in
+  a column he was looking at, which is what a hit `?` block looks like. So a reader
+  can trust terrain it has already seen, and it cannot see further than about one
+  screen ahead: "what is over the next hill" needs the camera moved to find out. Because the period is 512 pixels and that run reached
+  705, a slot is not a stable address for a level cell, and a map has to be keyed
+  by absolute X and stitched from windows.
 - **`$0086` is position within the 256-pixel page, not relative to the camera.**
   On-screen position needs `wrapped_delta(absolute_x, scroll_x)`; subtracting the
   scroll from the screen byte mixes two different origins.
@@ -201,6 +241,85 @@ The dynamic half is thinner than the terrain half. The game keeps five enemy
 slots live at once, so the reader sees at most five enemies, and only the ones
 the game has spawned, which is a screen or so ahead of the camera. In a probe run
 that reads as a goomba (type 6) 110 pixels ahead, then 10, then gone.
+
+## Driving a bot off the reader
+
+`crates/engine-nes/examples/world_model_bot.rs` is the reader's first consumer: a
+policy that decides every frame from the reader alone. It senses the tile grid, its
+own cell from the feet offset, and the enemy slots, and knows nothing about 1-1's
+shape beyond the load-bearing ids the reader learned by watching. The policy is the
+simplest one that model supports: run right, jump a hole or an enemy in reach. It
+lives next to the reader, in `tests/support/smb_world_model.rs`, so that the example
+and the optional test cannot drift apart on what "acting on the model" means.
+
+Measured on 1-1, release build, repeatable to the frame:
+
+| Policy | Furthest absolute X | How it ends |
+| --- | --- | --- |
+| reader only | 899 | pushes right against a pipe for 600 frames, no deaths |
+| reader plus a blocked-means-run-at-it reflex | 2601 | two deaths, then the game ends |
+
+The reflex is the cheapest thing that stands in for the missing wall ids: if the
+controller says right and the world will not move, the game is telling the bot that
+its model is wrong. It backs off for 24 frames, runs back, and jumps when something
+drawn appears within reach in the rows its body occupies. That signal is not "a
+wall", because opaque is not solid (trap 6); it is "something is there and the model
+cannot say what", which is the most an honest reading of the nametable offers.
+
+What it buys is distance, not reliability. `--reflex-look N` sets that reach, and the
+run moves by more than two thousand pixels with it:
+
+| `--reflex-look` | 3 | 4 | 5 | 6 | 7 | 8 | 9 and above |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| furthest absolute X | 595 | 723 | 899 | 899 | 2601 | 899 | 2601 |
+
+From 7 columns the answer stops changing, because the window is then wider than
+anything the level puts between the player and the obstruction. Nothing about the
+reader differs across that table. A reaction rule bolted onto a model with a hole in
+it is a lottery, and an earlier draft of this document, which reported the reflex
+clearing 1-1 at absolute X 3266, had drawn one winning ticket: that build pressed A
+one frame later than this one does, and what it won at the third pipe it lost at the
+first.
+
+Three findings belong to the bot rather than the reader, and all three were
+invisible from outside the run.
+
+- **A one-frame A press is a hop.** SMB's jump is variable-height. The first version
+  pressed A for a single frame, cleared nothing, and read as a model failure; the
+  same policy with A held for 20 frames went from absolute X 436 to 899 with no
+  change to the reader at all.
+- **The frame a press lands in is part of the action.** The reflex set its jump hold
+  after the frame's buttons had been built, so A reached the game one frame late.
+  That one frame is the difference between the two numbers in the table above, which
+  is a more useful result than either. An action space has to be specified to the
+  frame and measured, not assumed, and a decode gap and an action bug look identical
+  from outside.
+- **A bot pinned flat against a wall has no run-up.** Jumping straight from blocked
+  clears nothing; the reflex has to leave the wall before it can get over it.
+
+The reader-only run is the one worth keeping, and
+`the_tile_that_stops_the_player_is_not_one_the_reader_calls_solid` keeps it: it plays
+the policy, waits for 120 frames that cover no new ground, reads the first cell ahead
+that draws anything in the rows his body occupies, and asserts that the game stopped
+him on a tile the reader does not call load-bearing while `wall_ahead` said nothing
+was there. If the load-bearing set ever grows a wall, that test says so and points at
+trap 7.
+
+What the reader cannot see at 899 fits in one picture. `--shots DIR --overlay` writes
+a PNG of every frame with the model's own opinion dotted on: green where a cell is
+load-bearing, red where a cell draws something that is not, blue on the cell he is
+standing in. At the pipe the row under his feet is an unbroken line of green and the
+three rows of pipe in front of him are red, which is trap 7 without any of the prose.
+Frames are named for what was happening (`event-jump-*`, `event-death-*`,
+`event-stuck-*`, `event-game-over-*`), and `--every 2` thins the film to 30 fps for
+`ffmpeg -pattern_type glob`.
+
+An earlier draft reported this bot reaching world 1-2 and going blind there. The
+current code dies before the flagpole, so the blindness is an argument again rather
+than a measurement: the load-bearing set is 1-1's vocabulary, gathered by watching
+what one level holds the player up on, and an underground area is drawn with ids it
+never saw. Measuring it needs a way to start a run in 1-2, which the reader does not
+have yet.
 
 ## Rollout and search
 
@@ -253,9 +372,18 @@ free of a filesystem, clock, thread and renderer.
 - The DFS in DirtSim runs against a runtime with wall-clock pacing; the Rust
   host must drive it from the synchronous frame call instead.
 
+How far that leaves this from a player, measured rather than judged: the bot has
+never finished a level at all, and 1-1 is the only level whose tiles it can read
+and the only place it can start. It has three macro-actions written inline in an
+example where DirtSim has eleven, no reward or termination wiring, no item or block
+state, five enemy slots because that is all the game keeps live, no solidity model
+for the sideways direction, a reaction rule whose distance is a lottery on one
+tuning constant, and no golden hashes, so a core change that quietly alters SMB is
+still invisible without a cartridge to boot.
+
 ## What is in the tree now
 
-One reader, three drivers, one optional test.
+One reader, four drivers, one optional test.
 
 | File | Role |
 | --- | --- |
@@ -263,7 +391,8 @@ One reader, three drivers, one optional test.
 | `crates/engine-nes/tests/smb_world_model.rs` | Optional test that asserts the reader against a real cartridge |
 | `crates/engine-nes/examples/world_model_probe.rs` | Prints decoded state while Mario walks right |
 | `crates/engine-nes/examples/world_model_tiles.rs` | Prints the tile grid, the player's cell and the pixel comparison |
-| `crates/engine-nes/examples/world_model_rollout.rs` | Nametable dump plus checkpoint/branch/rewind with throughput |
+| `crates/engine-nes/examples/world_model_rollout.rs` | Nametable dump, checkpoint/branch/rewind with throughput, and how far ahead of the camera the reader can see |
+| `crates/engine-nes/examples/world_model_bot.rs` | A policy that acts on the reader alone, how far that gets, and PNGs of the run with the model's own beliefs drawn on |
 
 The reader sits under `tests/`, not `src/`, on purpose: `engine-nes` holds no
 game knowledge, so the SMB address map belongs on the host side of that
@@ -280,7 +409,16 @@ cargo run --release --locked -p engine-nes --example world_model_tiles \
   -- data/roms/smb.nes 900 30
 cargo run --release --locked -p engine-nes --example world_model_rollout \
   -- data/roms/smb.nes
+cargo run --release --locked -p engine-nes --example world_model_bot \
+  -- data/roms/smb.nes 9000
+cargo run --release --locked -p engine-nes --example world_model_bot \
+  -- data/roms/smb.nes 9000 --reflex
+cargo run --release --locked -p engine-nes --example world_model_bot \
+  -- data/roms/smb.nes 2400 --shots /tmp/smb-film --overlay --every 2
 ```
+
+The last one writes a PNG per frame, with the reader's green/red/blue dots in a
+second copy of each, which is the fastest way to see what the model believes.
 
 Observed on x86-64 Linux with a release build:
 
@@ -298,7 +436,16 @@ Observed on x86-64 Linux with a release build:
   place) and reproduces the root state hash exactly on every `restore`. Its
   frames-per-second figure swings with machine load, so treat it as an order of
   magnitude: several hundred frames per second including checkpoint restore,
-  comfortably above the 60 fps the kiosk needs.
+  comfortably above the 60 fps the kiosk needs. Its lookahead section reports the
+  slot-stability numbers quoted above.
+- `world_model_bot` runs the reader-only policy to absolute X 899, where it stops
+  against a pipe and prints the grid that explains why: the pipe's body tiles
+  `$68`/`$69` fill every row its body occupies and none of them is in the
+  load-bearing set, so `wall_ahead` is false while the game refuses to move him.
+  With `--reflex` the same sense data reaches 2601, dies twice and gets a game
+  over; how far it gets depends on `--reflex-look` as measured above. It waits for
+  the level load to hand the player over (trap 8) before it starts, and says which
+  of "stuck", "out of lives" or "cleared the level" ended the run.
 
 ## Optional cartridge test
 
@@ -320,8 +467,9 @@ SPACEWARS_SMB_ROM=/path/to/smb.nes \
 ```
 
 It defaults to `data/roms/smb.nes` resolved from `CARGO_MANIFEST_DIR`, so it
-works from any working directory. With the cartridge present the three tests
-take about 27 seconds in a debug build, which is emulator frames, not
+works from any working directory. With the cartridge present the four tests take
+about 18 seconds in a debug build, nearly all of it the bot-driven test running
+two thousand frames of the policy, which is emulator frames rather than
 assertions.
 
 What each one pins down:
@@ -347,6 +495,15 @@ What each one pins down:
   pixels, which is what would have caught the `v`-versus-`t` scroll trap; and a
   400-frame sweep repeats the terrain-versus-scenery split on every grounded
   frame rather than only the sampled one.
+- **`the_tile_that_stops_the_player_is_not_one_the_reader_calls_solid`** — plays
+  the shared reader-driven policy rather than a scripted input, waits for 120
+  frames that cover no new ground, and reads the first cell ahead that draws
+  anything in the rows his body occupies. The game has stopped him; the tile that
+  did it is not in the load-bearing set and `wall_ahead` says nothing is there.
+  That is trap 7 as a regression test: the day the set learns about walls, this
+  fails and says which section to rewrite. It also pins trap 8 from the other
+  side, because it waits for the level load to hold for eight consecutive frames
+  before it starts, and the run it measures is the one the document reports.
 
 The test **fails closed on a different ROM revision** rather than misreading
 it: it checks the cartridge's SHA-256 against the image the map was verified

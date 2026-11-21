@@ -132,6 +132,18 @@ impl SmbState {
         self.game_mode == MODE_PLAYING
     }
 
+    /// Whether the game has placed him in the level and is taking his input.
+    ///
+    /// `is_playing` alone does not answer that. `$0770` reads play from the first
+    /// frame of a level load, and for the ~150 frames after it he is pinned to
+    /// absolute X 0 in player state 0x00 while the level is placed and the scroll
+    /// set. A policy started on `is_playing` spends its first two seconds pushing
+    /// at a world that has not handed him over, and any stuck detector measured in
+    /// frames reads that as the bot giving up.
+    pub fn is_in_control(&self) -> bool {
+        self.is_playing() && self.player_state == STATE_NORMAL
+    }
+
     pub fn is_grounded(&self) -> bool {
         self.float_state == FLOAT_GROUNDED && self.player_state == STATE_NORMAL
     }
@@ -302,7 +314,12 @@ pub fn is_blank_tile(state: &PpuBytes, tile: u8) -> bool {
     pattern_bytes(state, tile).iter().all(|&byte| byte == 0)
 }
 
-/// Tile ids that carry the player's weight, as observed in level 1-1.
+/// Tile ids that have been seen carrying the player's weight, in level 1-1.
+///
+/// **This is not a solidity oracle and must not be used as one.** It answers one
+/// question, "is this the surface he is standing on", and it is only trustworthy
+/// there. See [`is_load_bearing`] for why the two directions of solidity cannot
+/// share a set.
 ///
 /// The nametable records what is drawn, not what is solid, and the two disagree
 /// in the worst possible direction for a bot: the hill and bush decoration is
@@ -311,18 +328,36 @@ pub fn is_blank_tile(state: &PpuBytes, tile: u8) -> bool {
 /// grounded, against the ids his body sat inside, split them cleanly. Over 2583
 /// grounded frames the two sets did not overlap once: `$26` was a body tile on
 /// 2413 of them and a feet tile on none, while the `$b4`/`$b5` ground, the
-/// `$60`-`$63` pipe tops and bodies and the `$45`, `$57` and `$58` solid blocks
-/// (each drawn as a lit top edge over a filled body) only ever held his feet.
+/// `$60`-`$63` pipe tops and the `$45`, `$57` and `$58` solid blocks (each drawn
+/// as a lit top edge over a filled body) only ever held his feet.
 ///
-/// Two honest limits. It is 1-1's vocabulary, gathered by observation rather
-/// than from the ROM's own collision tables, so underground and castle areas add
-/// ids this run never reached. And it is what was seen under his feet, not what
-/// is solid: `$b6` and `$b7` are the same ground pattern one row lower, which he
-/// can never stand on, so they are absent without being passable.
+/// Three limits, each of them a trap.
+///
+/// 1. It is 1-1's vocabulary, gathered by observation rather than from the ROM's
+///    own collision tables, so underground and castle areas add ids this run
+///    never reached.
+/// 2. It is what was seen under his feet, not what is solid. `$b6` and `$b7` are
+///    the same ground pattern one row lower, which he can never stand on, so
+///    they are absent without being passable.
+/// 3. Standing on something and being stopped by it are different observations,
+///    and this method can only make the first. A pipe is `$60`-`$63` on its top
+///    row, which is in the set, over `$64`-`$6a` for its body, which is not, so
+///    every row that actually stops him reads as scenery. The reader-driven bot
+///    in `world_model_bot` walks into a pipe body at absolute X 899, is stopped by
+///    the game, and stands there pushing right with `wall_ahead` false; the grid it
+///    prints at that frame is the evidence. Learning the wall ids needs a different
+///    experiment, walking into things, or the ROM's own collision table.
 pub const LOAD_BEARING_TILES: [u8; 9] = [0x45, 0x57, 0x58, 0x60, 0x61, 0x62, 0x63, 0xb4, 0xb5];
 
-/// Whether a tile has ever been seen holding the player up. The opposite of
-/// `is_blank_tile` is *not* this: see [`LOAD_BEARING_TILES`].
+/// Whether a tile has ever been seen holding the player up.
+///
+/// Neither half of "is this tile solid" is a property of a tile id alone. The
+/// opposite of [`is_blank_tile`] is not this, because the decoration is opaque
+/// and passable. And this is not "blocks him sideways", because a set learned by
+/// watching what he stands on cannot contain a wall he has only ever walked
+/// into: the pipe's top row is in here and its body is not. Solidity is a
+/// relation over tile, direction, player state and time, and used blocks change
+/// id when hit. Treat this as the narrow feet-row predicate it is.
 pub fn is_load_bearing(tile: u8) -> bool {
     LOAD_BEARING_TILES.contains(&tile)
 }
@@ -543,4 +578,92 @@ pub fn label(token: u16) -> String {
     let first = LABELS[usize::from(token / 36) % 36] as char;
     let second = LABELS[usize::from(token % 36) % 36] as char;
     format!("{first}{second}")
+}
+
+// A reader-driven policy, kept next to the reader so the bot example and the
+// optional test act on the same sense data and cannot drift apart. It is the
+// smallest policy that uses nothing the reader has not decoded.
+
+/// Columns right of the player to look for a hole. Roughly what a running jump
+/// carries, so anything further is not this policy's problem yet.
+pub const REACH_COLUMNS: i16 = 5;
+/// Rows below the feet row that still count as ground, so a ledge one step down is
+/// not read as a hole.
+pub const SUPPORT_ROWS: i16 = 2;
+/// Rows above the feet row that his body occupies: small Mario is two tiles tall.
+pub const BODY_ROWS: i16 = 2;
+/// How far ahead to look for something drawn before committing to a jump. The
+/// bot's reflex asks for a wider window than this; `obstruction_ahead` takes the
+/// reach as a parameter so that a caller can widen it without re-deriving what
+/// "draws something" means.
+pub const TRIGGER_COLUMNS: i16 = 3;
+/// Jump when an enemy is this close ahead, in pixels.
+pub const ENEMY_TRIGGER_PIXELS: i16 = 48;
+/// Frames to keep A down once a jump starts. SMB's jump is variable-height, so a
+/// one-frame press is a hop that clears nothing.
+pub const JUMP_HOLD_FRAMES: u64 = 20;
+
+/// Columns to the first cell ahead with nothing to land on, or `None` when every
+/// column in reach has support.
+pub fn gap_ahead(tiles: &[u8; TILE_CELLS], column: i16, row: i16) -> Option<i16> {
+    (1..=REACH_COLUMNS).find(|&step| {
+        !(0..=SUPPORT_ROWS)
+            .any(|drop| tile_at(tiles, column + step, row + drop).is_some_and(is_load_bearing))
+    })
+}
+
+/// Whether the model sees the next column as something to stand against. It
+/// cannot see a pipe: the pipe's body is not in the load-bearing set, so this
+/// reports false right up to the frame the game stops him.
+pub fn wall_ahead(tiles: &[u8; TILE_CELLS], column: i16, row: i16) -> bool {
+    (1..=BODY_ROWS).any(|rise| tile_at(tiles, column + 1, row - rise).is_some_and(is_load_bearing))
+}
+
+/// Columns to the first cell ahead that draws something in the rows his body
+/// occupies. Opaque is not solid, so this is not "a wall is coming": it is
+/// "something is there and the model cannot say what", which is the most an honest
+/// reading of the nametable offers, and enough to time a jump on.
+pub fn obstruction_ahead(
+    frame: &PpuBytes,
+    tiles: &[u8; TILE_CELLS],
+    column: i16,
+    row: i16,
+    within: i16,
+) -> Option<i16> {
+    (1..=within).find(|&step| {
+        (1..=BODY_ROWS).any(|rise| {
+            tile_at(tiles, column + step, row - rise).is_some_and(|t| !is_blank_tile(frame, t))
+        })
+    })
+}
+
+/// One frame of the base policy: run right, and jump a hole or an enemy the reader
+/// can see. `hold_a` carries a jump across frames, because releasing A on the frame
+/// he leaves the ground gives a hop rather than a jump.
+pub fn run_right_buttons(
+    state: &SmbState,
+    machine: &NesMachine,
+    tiles: &[u8; TILE_CELLS],
+    column: i16,
+    row: i16,
+    hold_a: &mut u64,
+) -> ControllerButtons {
+    let enemy_ahead = state
+        .enemies(machine)
+        .iter()
+        .filter(|enemy| enemy.delta_x > 0)
+        .map(|enemy| enemy.delta_x)
+        .min()
+        .unwrap_or(i16::MAX);
+    if state.is_grounded()
+        && (gap_ahead(tiles, column, row).is_some() || enemy_ahead <= ENEMY_TRIGGER_PIXELS)
+    {
+        *hold_a = JUMP_HOLD_FRAMES;
+    }
+    let mut buttons = ControllerButtons::RIGHT | ControllerButtons::B;
+    if *hold_a > 0 {
+        buttons |= ControllerButtons::A;
+        *hold_a -= 1;
+    }
+    buttons
 }

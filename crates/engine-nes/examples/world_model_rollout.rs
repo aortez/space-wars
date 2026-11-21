@@ -1,10 +1,16 @@
 //! World-model rollout check: can a planner branch this emulator forward from
-//! any frame and come back to it exactly?
+//! any frame and come back to it exactly, and how far ahead of the camera can it
+//! have already read the level?
 //!
 //! Boots Super Mario Bros., dumps the level geometry straight out of the
 //! nametables, then branches four macro-actions from one checkpoint and rewinds
 //! between each. A planner only works if the rewind is bit-exact, so every
 //! restore is checked against the root state hash.
+//!
+//! The last section answers the second question by watching every nametable slot
+//! the camera passes over: how often a slot's tile id changes, and how often it
+//! changes while the player can still see it. That is what bounds lookahead, and
+//! it is why a level map has to be keyed by absolute X rather than by slot.
 //!
 //! The reader it drives lives in `tests/support/smb_world_model.rs`, shared
 //! with the optional `smb_world_model` test.
@@ -15,7 +21,16 @@ use std::{error::Error, fs, time::Instant};
 mod smb;
 
 use engine_nes::ControllerButtons;
-use smb::{LIVES, PLAYER_STATE, X_PAGE, X_SCREEN, absolute_x, boot_to_gameplay, read_state};
+use smb::{
+    LIVES, PLAYER_STATE, STATE_NORMAL, TILE_COLUMNS, TILE_ROWS, X_PAGE, X_SCREEN, absolute_x,
+    boot_to_gameplay, read_state, scroll_x, snapshot, tile_id_at,
+};
+
+/// Nametable columns in the 512-pixel horizontal period. SMB scrolls across a
+/// vertically mirrored pair, so the period is two tables of 32 columns.
+const SLOT_COLUMNS: usize = 64;
+const SLOT_ROWS: usize = TILE_ROWS;
+const SLOT_COUNT: usize = SLOT_COLUMNS * SLOT_ROWS;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let rom = fs::read(
@@ -116,6 +131,97 @@ fn main() -> Result<(), Box<dyn Error>> {
         f64::from(rollouts * 120) / elapsed.as_secs_f64(),
     );
     println!("greedy best: {} reached x={}", best.1, best.0);
+
+    // ---- 3. How far ahead of the camera has the reader already seen? --------
+    machine.restore(&root)?;
+    let mut ids: Vec<Vec<u8>> = (0..SLOT_COUNT).map(|_| Vec::new()).collect();
+    let mut previous = vec![0u8; SLOT_COUNT];
+    let mut visited = vec![false; SLOT_COUNT];
+    let mut rewrites_by_column: std::collections::BTreeMap<usize, u32> =
+        std::collections::BTreeMap::new();
+    let mut sampled_frames = 0u64;
+    let mut furthest = 0u16;
+    let lives_at_start = read_state(&machine).lives;
+    for elapsed in 1..=1400u64 {
+        // Long hops on a fixed cadence: a policy that stops at the first pipe
+        // would only ever measure the first screen of level.
+        let mut action = ControllerButtons::RIGHT | ControllerButtons::B;
+        if elapsed % 60 < 20 {
+            action |= ControllerButtons::A;
+        }
+        let state = read_state(&machine);
+        if state.lives < lives_at_start {
+            println!(
+                "  stopped measuring at frame {elapsed}: died at absolute X {}",
+                state.absolute_x
+            );
+            break;
+        }
+        if !state.is_playing() || state.player_state != STATE_NORMAL {
+            // A transition rebuilds the whole nametable, which is not the game
+            // editing terrain the player can see.
+            machine.run_frame([action, ControllerButtons::NONE])?;
+            continue;
+        }
+        furthest = furthest.max(state.absolute_x);
+        let frame = snapshot(&machine);
+        let origin_x = scroll_x(&frame);
+        for row in 0..SLOT_ROWS {
+            for column in 0..TILE_COLUMNS {
+                let x = u16::try_from(column * 8 + 4).expect("screen fits in u16");
+                let y = u16::try_from(row * 8 + 12).expect("screen fits in u16");
+                let tile = tile_id_at(&frame, origin_x, 0, x, y);
+                let slot = usize::from((origin_x + x) % 512 / 8) + row * SLOT_COLUMNS;
+                if visited[slot] && previous[slot] != tile {
+                    *rewrites_by_column.entry(column).or_insert(0) += 1;
+                }
+                visited[slot] = true;
+                previous[slot] = tile;
+                if !ids[slot].contains(&tile) {
+                    ids[slot].push(tile);
+                }
+            }
+        }
+        machine.run_frame([action, ControllerButtons::NONE])?;
+        sampled_frames = elapsed;
+    }
+    let mut histogram: std::collections::BTreeMap<usize, u32> = std::collections::BTreeMap::new();
+    for (slot, seen) in ids.iter().enumerate() {
+        if visited[slot] {
+            *histogram.entry(seen.len()).or_insert(0) += 1;
+        }
+    }
+    let tracked: u32 = histogram.values().sum();
+    let stable = histogram.get(&1).copied().unwrap_or_default();
+    let rewrites: u32 = rewrites_by_column.values().sum();
+    let mut hottest: Vec<(u32, usize)> = rewrites_by_column
+        .iter()
+        .map(|(column, count)| (*count, *column))
+        .collect();
+    hottest.sort_unstable_by(|a, b| b.cmp(a));
+    let columns: Vec<String> = hottest
+        .iter()
+        .take(6)
+        .map(|(count, column)| format!("col {column}: {count}"))
+        .collect();
+    println!("\nlookahead, watching every nametable slot the camera passes over:");
+    println!(
+        "  {sampled_frames} sampled playing frames to absolute X {furthest}: {stable} of \
+         {tracked} slots ({:.0}%) kept one tile id the whole time",
+        f64::from(stable) / f64::from(tracked.max(1)) * 100.0,
+    );
+    println!("  distinct ids per slot: {histogram:?}");
+    println!(
+        "  {rewrites} changes were seen in a slot the player could still see, at {}; \
+         column {} is the edge the camera is exposing, so it is new terrain, not a rewrite",
+        columns.join(", "),
+        TILE_COLUMNS - 1,
+    );
+    println!(
+        "  a slot is not a stable address for a level cell: the period is 512 pixels and the run \
+         reached {furthest}, so {} slots held more than one id",
+        tracked - stable
+    );
 
     // Rewind to the root and confirm the machine is exactly where it started.
     machine.restore(&root)?;

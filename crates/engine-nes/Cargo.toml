@@ -61,3 +61,7 @@ path = "examples/world_model_rollout.rs"
 [[example]]
 name = "world_model_tiles"
 path = "examples/world_model_tiles.rs"
+
+[[example]]
+name = "world_model_bot"
+path = "examples/world_model_bot.rs"
