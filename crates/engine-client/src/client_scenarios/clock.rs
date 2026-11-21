@@ -177,7 +177,7 @@ fn live(
             rain_amount: settings.clock.rain_amount,
             crow_water_tolerance: settings.clock.crow_water_tolerance,
             lamps: settings.clock.lamps,
-            theme: theme_choice(std::env::var("SPACEWARS_CLOCK_THEME").ok().as_deref()),
+            theme: settings.clock.theme,
         },
         seed,
     );
@@ -199,17 +199,6 @@ fn duck_jump_profile(value: Option<&str>) -> Option<engine_common::ClockDuckJump
         Some("careful") => Some(engine_common::ClockDuckJumpProfile::Careful),
         Some("flowing") => Some(engine_common::ClockDuckJumpProfile::Flowing),
         _ => None,
-    }
-}
-
-/// A development preview of a theme ahead of its setting (#458); ordinary
-/// Clock keeps its Normal look.
-fn theme_choice(value: Option<&str>) -> engine_common::ClockThemeChoice {
-    use engine_common::ClockThemeChoice;
-    match value {
-        Some("auto") => ClockThemeChoice::Auto,
-        Some("christmas") => ClockThemeChoice::Christmas,
-        _ => ClockThemeChoice::Normal,
     }
 }
 
@@ -340,6 +329,7 @@ impl ClientScenario for ClockClientScenario {
             explosion: self.state.explosion_state(),
             coins: self.state.coins_state(),
             lamps: Some(self.state.lamps_state()),
+            theme: Some(self.state.theme_state()),
             tanks: self.state.tanks_state(),
             player_duck: self.state.player_duck_state(),
             automatic_events_suspended: self.state.automatic_events_suspended(),

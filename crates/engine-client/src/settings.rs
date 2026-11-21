@@ -738,6 +738,24 @@ enabled = true
     }
 
     #[test]
+    fn theme_is_auto_in_old_settings_and_round_trips_every_choice() {
+        use engine_common::ClockThemeChoice;
+        let mut settings: Settings =
+            toml::from_str("[clock]\nevent_profile = 'off'\nshow_date = true\nlamps = 'steady'\n")
+                .unwrap();
+        assert_eq!(settings.clock.theme, ClockThemeChoice::Auto);
+        assert!(settings.clock.show_date);
+        assert_eq!(settings.clock.lamps, engine_common::ClockLampMode::Steady);
+        for choice in ClockThemeChoice::ALL {
+            settings.clock.theme = choice;
+            let saved = toml::to_string(&settings).unwrap();
+            assert!(saved.contains(&format!("theme = \"{}\"", choice.label().to_lowercase())));
+            let loaded: Settings = toml::from_str(&saved).unwrap();
+            assert_eq!(loaded.clock, settings.clock);
+        }
+    }
+
+    #[test]
     fn pre_crow_settings_enable_the_visitor_without_changing_saved_choices() {
         let settings: Settings = toml::from_str("[clock]\nevent_profile = 'off'\nshow_date = true\n[clock.events]\nfalling = false\ncolor_cycle = false\nmeltdown = false\nduck = false\nmarquee = false\ndigit_slide = false\nrain = false\n").unwrap();
         assert!(settings.clock.events.crow);

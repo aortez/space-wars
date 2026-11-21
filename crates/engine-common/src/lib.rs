@@ -356,6 +356,8 @@ pub struct ClockSettings {
     /// Whether the corner lamps act on what they see, whatever the event
     /// profile; lively in old settings.
     pub lamps: ClockLampMode,
+    /// The look the Clock wears (#458); Auto in old settings.
+    pub theme: ClockThemeChoice,
 }
 
 /// How the corner lamps behave, apart from the events.
@@ -1259,6 +1261,22 @@ impl ClockLampTemperament {
             Self::Eager => "eager",
         }
     }
+}
+
+/// The theme on the face (#458). The choice is in the settings; this is what
+/// it comes to now.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ClockThemeState {
+    /// The theme the choice wears at the latest reading, which the face shows
+    /// or fades to.
+    pub theme: ClockTheme,
+    /// The theme Auto wears at the latest reading: a season's on its nights,
+    /// and Normal otherwise or with no usable date.
+    pub auto: ClockTheme,
+    /// Thousandths of the fade's half second gone since the theme last
+    /// changed: 1000 once it is over. A pause holds it.
+    pub fade_milli: u16,
 }
 
 /// The corner lamps: what each is doing, how many times the run's lamps have

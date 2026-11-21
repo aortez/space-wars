@@ -38,6 +38,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
                         crow_water_tolerance: ClockCrowWaterTolerance::ALL
                             [bits % ClockCrowWaterTolerance::ALL.len()],
                         lamps: ClockLampMode::ALL[(bits >> 3) % ClockLampMode::ALL.len()],
+                        theme: ClockThemeChoice::ALL[(bits >> 4) % ClockThemeChoice::ALL.len()],
                         marquee_message: "Hi, it's 12:34!".parse().unwrap(),
                         events: ClockEvents {
                             falling: bits & 1 != 0,
@@ -112,8 +113,8 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
         Some(ClockAction::Configure(longest))
     );
     let mut previous_version = payload.clone();
-    previous_version[0] = 13;
-    previous_version.remove(13);
+    previous_version[0] = 14;
+    previous_version.remove(14);
     assert_eq!(
         ClockAction::decode(&Action::scenario(kind, previous_version)),
         None
@@ -129,6 +130,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
         (9, 0xff),
         (12, 3),
         (13, 2),
+        (14, 3),
     ] {
         let mut bytes = payload.clone();
         bytes[offset] = invalid;
@@ -188,6 +190,7 @@ fn live_settings_preserve_falling_physics_and_reform_to_the_new_format() {
         rain_amount: ClockRainAmount::Varied,
         crow_water_tolerance: ClockCrowWaterTolerance::Varied,
         lamps: ClockLampMode::Steady,
+        theme: ClockThemeChoice::Christmas,
         marquee_message: ClockMarqueeMessage::default(),
     };
     ClockScenario::step(

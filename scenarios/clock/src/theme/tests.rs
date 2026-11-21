@@ -1,6 +1,6 @@
 use super::*;
 use crate::{ClockAction, ClockConfig, ClockDate, ClockScenario, ClockState};
-use engine_common::{Action, ClockEventKind, ClockEventProfile, Scenario};
+use engine_common::{Action, ClockEventKind, ClockEventProfile, ClockSettings, Scenario};
 use std::time::Duration;
 
 fn at(year: u16, month: u8, day: u8, hour: u8, minute: u8, second: u8) -> ClockReading {
@@ -235,29 +235,75 @@ fn steps(state: &mut ClockState, ticks: u32) {
     }
 }
 
+/// The settings `state` has, with `choice` for the theme: how the controls
+/// change the theme (#458).
+fn choose(state: &ClockState, choice: ClockThemeChoice) -> Action {
+    ClockAction::configure(ClockSettings {
+        theme: choice,
+        ..state.settings()
+    })
+}
+
 #[test]
-fn set_theme_carries_each_choice_and_refuses_anything_else() {
+fn the_state_reports_the_theme_what_auto_would_wear_and_the_fade() {
+    use ClockTheme::{Christmas, Normal};
+    use engine_common::ClockThemeState;
+    let report = |theme, auto, fade_milli| ClockThemeState {
+        theme,
+        auto,
+        fade_milli,
+    };
+    // On a December evening Auto would wear Christmas, while Normal holds.
+    let mut state = running(ClockThemeChoice::Normal, at(2026, 12, 24, 21, 0, 0));
+    assert_eq!(state.theme_state(), report(Normal, Christmas, 1000));
+    // Choosing Auto while paused heads for Christmas and holds the fade at
+    // its start until the Clock runs again.
+    let change = choose(&state, ClockThemeChoice::Auto);
+    ClockScenario::step(&mut state, &[change], Duration::ZERO);
+    assert_eq!(state.theme_state(), report(Christmas, Christmas, 0));
+    ClockScenario::step(&mut state, &[], Duration::ZERO);
+    assert_eq!(state.theme_state(), report(Christmas, Christmas, 0));
+    steps(&mut state, FADE_TICKS / 2);
+    assert_eq!(state.theme_state(), report(Christmas, Christmas, 500));
+    steps(&mut state, FADE_TICKS / 2);
+    assert_eq!(state.theme_state(), report(Christmas, Christmas, 1000));
+    // Without a time, Auto has no night to go by, and wears Normal, while a
+    // chosen Christmas still dresses the face.
+    ClockScenario::step(&mut state, &[ClockAction::set_time_unknown()], TICK);
+    assert_eq!(state.theme_state(), report(Normal, Normal, 33));
+    steps(&mut state, FADE_TICKS);
+    let change = choose(&state, ClockThemeChoice::Christmas);
+    ClockScenario::step(&mut state, &[change], TICK);
+    assert_eq!(state.theme_state(), report(Christmas, Normal, 33));
+    // By day, Christmas holds, and Auto goes back to Normal.
+    let day = ClockAction::set_reading(at(2026, 12, 25, 12, 0, 0));
+    ClockScenario::step(&mut state, &[day], TICK);
+    steps(&mut state, FADE_TICKS);
+    assert_eq!(state.theme_state(), report(Christmas, Normal, 1000));
+    let change = choose(&state, ClockThemeChoice::Auto);
+    ClockScenario::step(&mut state, &[change], TICK);
+    assert_eq!(state.theme_state(), report(Normal, Normal, 33));
+}
+
+#[test]
+fn the_settings_carry_each_theme_and_the_old_theme_action_is_refused() {
     for choice in ClockThemeChoice::ALL {
+        let settings = ClockSettings {
+            theme: choice,
+            ..ClockSettings::default()
+        };
         assert_eq!(
-            ClockAction::decode(&ClockAction::set_theme(choice)),
-            Some(ClockAction::SetTheme(choice))
+            ClockAction::decode(&ClockAction::configure(settings)),
+            Some(ClockAction::Configure(settings))
         );
     }
-    let Action::Scenario { kind, payload } = ClockAction::set_theme(ClockThemeChoice::Christmas)
-    else {
-        unreachable!()
-    };
-    let version = &payload[..2];
-    for payload in [
-        version.to_vec(),
-        [version, &[3]].concat(),
-        [version, &[2, 0]].concat(),
-        [&[0, 0], &payload[2..]].concat(),
-    ] {
+    // Kind 10 carried a theme on its own before the theme became a setting.
+    // It is not reused, so even its old shape means nothing now.
+    let version = crate::CLOCK_ACTION_VERSION.to_le_bytes();
+    for choice in [0, 1, 2] {
         assert_eq!(
-            ClockAction::decode(&Action::scenario(kind, payload.clone())),
-            None,
-            "{payload:?}"
+            ClockAction::decode(&Action::scenario(10, [&version[..], &[choice]].concat())),
+            None
         );
     }
 }
@@ -360,7 +406,8 @@ fn rapid_changes_of_theme_never_jump_and_settle_on_the_last() {
     let most = 1.5 / FADE_TICKS as f32;
     for tick in 0..40 {
         let choice = [ClockThemeChoice::Christmas, ClockThemeChoice::Normal][tick % 2];
-        ClockScenario::step(&mut state, &[ClockAction::set_theme(choice)], TICK);
+        let change = choose(&state, choice);
+        ClockScenario::step(&mut state, &[change], TICK);
         let lights = state.appearance().lights;
         assert!(
             (lights - last).abs() <= most,
@@ -368,11 +415,8 @@ fn rapid_changes_of_theme_never_jump_and_settle_on_the_last() {
         );
         last = lights;
     }
-    ClockScenario::step(
-        &mut state,
-        &[ClockAction::set_theme(ClockThemeChoice::Christmas)],
-        TICK,
-    );
+    let change = choose(&state, ClockThemeChoice::Christmas);
+    ClockScenario::step(&mut state, &[change], TICK);
     for tick in 1..FADE_TICKS {
         let lights = state.appearance().lights;
         assert!(lights < 1.0, "tick {tick}: {lights}");
@@ -386,7 +430,10 @@ fn rapid_changes_of_theme_never_jump_and_settle_on_the_last() {
 /// What a theme leaves alone, as the Clock reports it: the event running,
 /// its ID and age, the scheduler's deadline and cooldowns, the visitors, the
 /// arena and its bodies, the digits' surfaces, the lamps and a player's seat.
-fn world(state: &ClockState) -> String {
+/// Everything a theme must leave alone, as text: the events and their
+/// schedule, the arena and its residents, every event's and visitor's
+/// state, the plants, the lamps, the player and the face's content.
+pub(crate) fn world(state: &ClockState) -> String {
     let mut arena = state.arena_state();
     // How long a step took on this machine is no part of the world.
     if let Some(step) = arena.last_step.as_mut() {
@@ -424,10 +471,21 @@ fn world(state: &ClockState) -> String {
                 state.spider_state(),
             ),
             (
+                state.grass_state(),
+                state.rain_state(),
+                state.aquarium_state(),
+                state.slot_machine_state(),
+                state.cell_swap_state(),
+                state.digit_slide_state(),
+                state.floor_mode(),
+            ),
+            (
                 state.lamps_state(),
                 state.player_duck_session(),
                 state.display(),
                 state.segments(),
+                state.active_font(),
+                state.date_label(),
             ),
         )
     )
@@ -477,7 +535,7 @@ fn changes_of_theme_leave_the_world_as_it_would_have_been() {
         }
         let mut themed_actions = actions.clone();
         if let Some(&(_, choice)) = changes.iter().find(|(at, _)| *at == tick) {
-            themed_actions.push(ClockAction::set_theme(choice));
+            themed_actions.push(choose(&themed, choice));
             during.push(plain.event_kind());
         }
         // Every so often the host pauses for a few polls.

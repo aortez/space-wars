@@ -106,7 +106,7 @@ use layout::Layout;
 /// How long a spider's visit may go on past its budget on its way out.
 pub use spider::visit::EXIT_GRACE_TICKS as SPIDER_EXIT_GRACE_TICKS;
 
-pub const CLOCK_ACTION_VERSION: u16 = 14;
+pub const CLOCK_ACTION_VERSION: u16 = 15;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
@@ -115,14 +115,15 @@ pub const CLOCK_ACTION_NEXT_EVENT: u32 = 6;
 pub const CLOCK_ACTION_TOGGLE_PLAYER_DUCK: u32 = 7;
 pub const CLOCK_ACTION_PLAYER_DUCK_INPUT: u32 = 8;
 pub const CLOCK_ACTION_SET_TIME_UNKNOWN: u32 = 9;
-pub const CLOCK_ACTION_SET_THEME: u32 = 10;
+// Kind 10 carried a theme on its own (#457) until the theme became a setting
+// (#458). It is not reused.
 pub use player::ClockDuckInput;
 pub const CLOCK_OBSERVATION_VERSION: u16 = 2;
 
 const DEFAULT_ASPECT_RATIO: f32 = 800.0 / 480.0;
 const MIN_ASPECT_RATIO: f32 = 0.25;
 const MAX_ASPECT_RATIO: f32 = 4.0;
-const MAX_CONFIGURE_BYTES: usize = 14 + engine_common::MAX_CLOCK_MESSAGE_BYTES;
+const MAX_CONFIGURE_BYTES: usize = 15 + engine_common::MAX_CLOCK_MESSAGE_BYTES;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ClockReading {
@@ -174,9 +175,6 @@ pub enum ClockAction {
     /// The time's source can't vouch for the host's time. The face shows
     /// `--:--` until the next reading.
     SetTimeUnknown,
-    /// Wear this theme from now on (#457). Only the look changes, fading to
-    /// the theme the choice resolves to.
-    SetTheme(ClockThemeChoice),
     TriggerEvent(ClockEventKind),
     Configure(ClockSettings),
     PreviewEvent(ClockEventKind),
@@ -218,6 +216,7 @@ impl ClockAction {
         ]);
         payload.push(settings.crow_water_tolerance as u8);
         payload.push(settings.lamps as u8);
+        payload.push(settings.theme as u8);
         payload.extend_from_slice(settings.marquee_message.as_str().as_bytes());
         Action::scenario(CLOCK_ACTION_CONFIGURE, payload)
     }
@@ -253,12 +252,6 @@ impl ClockAction {
         )
     }
 
-    pub fn set_theme(choice: ClockThemeChoice) -> Action {
-        let mut payload = CLOCK_ACTION_VERSION.to_le_bytes().to_vec();
-        payload.push(choice as u8);
-        Action::scenario(CLOCK_ACTION_SET_THEME, payload)
-    }
-
     pub fn decode(action: &Action) -> Option<Self> {
         let Action::Scenario { kind, payload } = action else {
             return None;
@@ -276,10 +269,6 @@ impl ClockAction {
             }
             (CLOCK_ACTION_NEXT_EVENT, 2) => Some(Self::NextEvent),
             (CLOCK_ACTION_SET_TIME_UNKNOWN, 2) => Some(Self::SetTimeUnknown),
-            (CLOCK_ACTION_SET_THEME, 3) => ClockThemeChoice::ALL
-                .into_iter()
-                .find(|choice| *choice as u8 == payload[2])
-                .map(Self::SetTheme),
             (CLOCK_ACTION_SET_READING, 5) => {
                 ClockReading::new(payload[2], payload[3], payload[4]).map(Self::SetReading)
             }
@@ -301,7 +290,7 @@ impl ClockAction {
                 .into_iter()
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
-            (CLOCK_ACTION_CONFIGURE, 15..=MAX_CONFIGURE_BYTES)
+            (CLOCK_ACTION_CONFIGURE, 16..=MAX_CONFIGURE_BYTES)
                 if payload[8] <= 1 && payload[10] <= 1 =>
             {
                 Some(Self::Configure(ClockSettings {
@@ -344,8 +333,9 @@ impl ClockAction {
                     crow_water_tolerance: *ClockCrowWaterTolerance::ALL
                         .get(usize::from(payload[12]))?,
                     lamps: *ClockLampMode::ALL.get(usize::from(payload[13]))?,
+                    theme: *ClockThemeChoice::ALL.get(usize::from(payload[14]))?,
                     show_date: payload[8] != 0,
-                    marquee_message: std::str::from_utf8(&payload[14..]).ok()?.parse().ok()?,
+                    marquee_message: std::str::from_utf8(&payload[15..]).ok()?.parse().ok()?,
                 }))
             }
             _ => None,
@@ -477,8 +467,8 @@ pub struct ClockConfig {
     pub rain_amount: ClockRainAmount,
     pub crow_water_tolerance: ClockCrowWaterTolerance,
     pub lamps: ClockLampMode,
-    /// The look the Clock wears (#455). Fixtures choose one; until the Theme
-    /// setting arrives, ordinary Clock keeps its Normal look.
+    /// The look the Clock wears (#455). The client passes the saved choice
+    /// (#458); fixtures keep Normal unless they choose another.
     pub theme: ClockThemeChoice,
 }
 
@@ -960,6 +950,7 @@ impl ClockState {
             rain_amount: self.config.rain_amount,
             crow_water_tolerance: self.config.crow_water_tolerance,
             lamps: self.config.lamps,
+            theme: self.config.theme,
         }
     }
 
@@ -981,6 +972,8 @@ impl ClockState {
         self.config.rain_amount = settings.rain_amount;
         self.config.crow_water_tolerance = settings.crow_water_tolerance;
         self.config.lamps = settings.lamps;
+        // Only the look follows a new theme, fading after the step's actions.
+        self.config.theme = settings.theme;
         self.sync_event_schedule();
         if let Some(reading) = self.reading {
             self.apply_reading(reading, false);
@@ -1151,6 +1144,15 @@ impl ClockState {
     /// every event alike (#457).
     pub(crate) fn appearance(&self) -> theme::Appearance {
         self.look.drawn()
+    }
+    /// The theme on the face, for diagnostics (#458): the theme the choice
+    /// wears, the one Auto would, and how far the fade to it has come.
+    pub fn theme_state(&self) -> engine_common::ClockThemeState {
+        engine_common::ClockThemeState {
+            theme: self.theme(),
+            auto: theme::resolve(ClockThemeChoice::Auto, self.reading),
+            fade_milli: self.look.fade_milli(),
+        }
     }
     pub fn event_enabled(&self, kind: ClockEventKind) -> bool {
         self.config.events.enabled(kind)
@@ -2524,7 +2526,6 @@ impl Scenario for ClockScenario {
             match action {
                 ClockAction::SetReading(reading) => state.apply_reading(reading, !dt.is_zero()),
                 ClockAction::SetTimeUnknown => state.forget_time(),
-                ClockAction::SetTheme(choice) => state.config.theme = choice,
                 ClockAction::TriggerEvent(kind) => state.trigger_event(kind),
                 ClockAction::Configure(settings) => state.configure(settings),
                 ClockAction::PreviewEvent(kind) => state.preview_event(kind),
@@ -2533,9 +2534,9 @@ impl Scenario for ClockScenario {
                 ClockAction::PlayerDuckInput(input) => state.apply_player_duck_input(input),
             }
         }
-        // A reading or a choice may have changed the theme. Before the scene's
-        // first tick there is no look on show to fade from, so it takes the
-        // theme at once.
+        // A reading or the settings may have changed the theme. Before the
+        // scene's first tick there is no look on show to fade from, so it
+        // takes the theme at once.
         let theme = state.theme();
         if state.schedule.tick == 0 {
             state.look = theme::Look::settled(theme);

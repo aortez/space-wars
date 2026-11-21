@@ -26,6 +26,7 @@ pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     window.set_launcher_clock_crow_enabled(settings.events.crow);
     window.set_launcher_clock_crow_water_tolerance(settings.crow_water_tolerance.label().into());
     window.set_launcher_clock_lamps(settings.lamps.label().into());
+    window.set_launcher_clock_theme(settings.theme.label().into());
     window.set_launcher_clock_explosion_enabled(settings.events.explosion);
     window.set_launcher_clock_aquarium_enabled(settings.events.aquarium);
     window.set_launcher_clock_marquee_enabled(settings.events.marquee);
@@ -157,6 +158,7 @@ pub(crate) fn log_settings_change(previous: ClockSettings, next: ClockSettings, 
         old_rain = ?previous.rain_amount, new_rain = ?next.rain_amount,
         old_crow_water = ?previous.crow_water_tolerance, new_crow_water = ?next.crow_water_tolerance,
         old_lamps = ?previous.lamps, new_lamps = ?next.lamps,
+        old_theme = ?previous.theme, new_theme = ?next.theme,
         old_format = ?previous.time_format, new_format = ?next.time_format,
         old_show_date = previous.show_date, new_show_date = next.show_date,
         old_marquee = ?previous.marquee_preset, new_marquee = ?next.marquee_preset,
@@ -193,6 +195,15 @@ fn adjusted_settings(mut settings: ClockSettings, index: i32, delta: i32) -> Opt
             let current = modes.iter().position(|mode| *mode == settings.lamps)?;
             settings.lamps =
                 modes[ui_navigation::moved_selection(current as i32, modes.len() as i32, delta)
+                    as usize];
+        }
+        25 => {
+            let choices = engine_common::ClockThemeChoice::ALL;
+            let current = choices
+                .iter()
+                .position(|choice| *choice == settings.theme)?;
+            settings.theme =
+                choices[ui_navigation::moved_selection(current as i32, choices.len() as i32, delta)
                     as usize];
         }
         0 => {
@@ -270,8 +281,8 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
         }
         UiAction::Left | UiAction::Right => {
             // Switches and the two actions hand the arrows to navigation.
-            // Selectors adjust, and so do Time, Date and Lamps, whose rows
-            // the navigation table keeps them on.
+            // Selectors adjust, and so do Time, Date, Lamps and Theme, whose
+            // rows the navigation table keeps them on.
             if matches!(
                 index,
                 2 | 3 | 5 | 6 | 7 | 8 | 9 | 11 | 15 | 17 | 18 | 19 | 20 | 21 | 22 | 23
@@ -286,7 +297,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
                 );
             }
         }
-        UiAction::Confirm if index <= 4 || matches!(index, 7..=15 | 17..=24) => {
+        UiAction::Confirm if index <= 4 || matches!(index, 7..=15 | 17..=25) => {
             window.invoke_ingame_clock_adjust(index, 1)
         }
         UiAction::Confirm if index == 6 => window.invoke_ingame_clock_preview(),
@@ -318,6 +329,30 @@ mod tests {
                 original
             );
             assert_eq!(adjusted_settings(steady, 24, delta).unwrap(), original);
+        }
+    }
+
+    #[test]
+    fn theme_control_cycles_the_choices_both_ways_and_changes_nothing_else() {
+        use engine_common::ClockThemeChoice::{Auto, Christmas, Normal};
+        let original = ClockSettings::default();
+        assert_eq!(original.theme, Auto);
+        for (delta, order) in [
+            (1, [Normal, Christmas, Auto]),
+            (-1, [Christmas, Normal, Auto]),
+        ] {
+            let mut settings = original;
+            for choice in order {
+                settings = adjusted_settings(settings, 25, delta).unwrap();
+                assert_eq!(settings.theme, choice);
+                assert_eq!(
+                    ClockSettings {
+                        theme: original.theme,
+                        ..settings
+                    },
+                    original
+                );
+            }
         }
     }
 

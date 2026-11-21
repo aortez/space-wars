@@ -33,14 +33,27 @@ class ClockControlLayoutTests(unittest.TestCase):
     def test_the_pause_grid_keeps_its_height_with_six_rows(self):
         # Tanks made the lower row five switches and gave the recipe a row of
         # its own; rows of 44px hold the six in the height five of 48px took.
+        # Theme ends the recipe's row, as Crow and Explosion end the preview's.
         lines = SLINT.read_text().split('\n')
         [(start, end)] = [(start, end) for name, start, end in L.panels(lines) if name == 'ingame-clock']
         for width in L.WIDTHS:
             rows = {item[0]: item for item in L.boxes(lines, start, end, width)}
             self.assertEqual({rows[name][2] for name in ('Crow', 'Explosion')}, {138})
             self.assertEqual({rows[name][2] for name in ('Marquee', 'Aquarium', 'Spider', 'Coins', 'Tanks')}, {184})
-            self.assertEqual((rows['Recipe'][2], rows['Recipe'][3]), (230, width))
+            self.assertEqual((rows['Recipe'][2], rows['Recipe'][3]), (230, width - 98))
+            self.assertEqual(rows['Theme'][1:5], (width - 90, 230, 90, 44))
             self.assertEqual({item[4] for item in rows.values()}, {44})
+
+    def test_the_launcher_gives_time_date_lamps_theme_and_fonts_a_fifth_each(self):
+        # The five share their row as equal buttons, the width of the event
+        # switches' columns below them.
+        lines = SLINT.read_text().split('\n')
+        [(start, end)] = [(start, end) for name, start, end in L.panels(lines) if name == 'launcher-clock']
+        for width in L.WIDTHS:
+            row = sorted((item for item in L.boxes(lines, start, end, width) if item[2] == 52), key=lambda item: item[1])
+            self.assertEqual([item[0] for item in row], ['Time', 'Date', 'Lamps', 'Theme', 'Fonts'], width)
+            self.assertEqual({item[3] for item in row}, {(width - 32) / 5}, width)
+            self.assertEqual({item[6] for item in row}, {'MenuButton'}, width)
 
     def test_the_pause_page_measures_its_top_row_and_the_profile_shows_demo_whole(self):
         # Lamps joined Time, Profile and Fonts on the top row. Every place
@@ -66,7 +79,7 @@ class ClockControlLayoutTests(unittest.TestCase):
         # Give the recipe two fifths of its row, as it had before Tanks.
         source = SLINT.read_text()
         squeezed = source.replace('''                    y: 230px;
-                    width: parent.width;''', '''                    y: 230px;
+                    width: parent.width - 98px;''', '''                    y: 230px;
                     width: 2 * (parent.width - 24px) / 5;''', 1)
         self.assertNotEqual(source, squeezed)
         with tempfile.TemporaryDirectory() as directory:

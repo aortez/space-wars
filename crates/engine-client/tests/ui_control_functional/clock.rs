@@ -1030,6 +1030,14 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
             page.selected_control.as_deref(),
             Some("pause.clock.marquee-preset")
         );
+        // Theme ends the recipe's row: Down reaches it, and Up comes back.
+        page = harness.press_guarded(UiAction::Down, &page);
+        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.theme"));
+        page = harness.press_guarded(UiAction::Up, &page);
+        assert_eq!(
+            page.selected_control.as_deref(),
+            Some("pause.clock.marquee-preset")
+        );
         page = harness.change_clock_setting("pause.clock.marquee-preset.next", "Text spin", &page);
         let configured = harness.clock_state();
         assert_eq!(
@@ -1354,14 +1362,54 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
         page = harness.change_clock_setting("pause.clock.show-date", "On", &page);
+        assert_eq!(control_value(&page, "pause.clock.theme"), Some("Auto"));
+        page = harness.change_clock_setting("pause.clock.theme", "Normal", &page);
+        // A theme whose save fails still reaches the face, and the page says
+        // the save failed. An owned, empty directory at the destination forces
+        // the failure. Christmas turns the face whatever the date: paused, it
+        // heads for Christmas and holds its fade at the start.
+        let path = harness.run_path().join("config/settings.toml");
+        let backup = harness.run_path().join("config/settings-before-error.toml");
+        fs::rename(&path, &backup).unwrap();
+        fs::create_dir(&path).unwrap();
+        let pending = harness.activate_guarded("pause.clock.theme", &page);
+        harness.wait_clock_screen(UiScreen::PauseClock, pending.revision);
+        let failed = harness.clock_settings_settled();
+        assert!(failed.settings_error.is_some());
+        assert_eq!(
+            failed.settings.theme,
+            engine_common::ClockThemeChoice::Christmas
+        );
+        let theme = failed.theme.unwrap();
+        assert_eq!(
+            (theme.theme, theme.fade_milli),
+            (engine_common::ClockTheme::Christmas, 0)
+        );
+        page = harness.state();
+        assert_eq!(page.screen, UiScreen::PauseClock);
+        assert_eq!(control_value(&page, "pause.clock.theme"), Some("Christmas"));
+        assert!(page.error.is_some());
+        fs::remove_dir(&path).unwrap();
+        fs::rename(&backup, &path).unwrap();
+        // The next change, to the lamps, saves the theme with it, and leaves
+        // the fade where it was.
         assert_eq!(control_value(&page, "pause.clock.lamps"), Some("Lively"));
         page = harness.change_clock_setting("pause.clock.lamps", "Steady", &page);
-        let configured = harness.clock_state();
+        let configured = harness.clock_settings_settled();
+        assert_eq!(configured.settings_error, None);
+        let saved: engine_common::Settings =
+            toml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(saved.clock, configured.settings);
         assert!(configured.settings.show_date);
         assert_eq!(
             configured.settings.lamps,
             engine_common::ClockLampMode::Steady
         );
+        assert_eq!(
+            configured.settings.theme,
+            engine_common::ClockThemeChoice::Christmas
+        );
+        assert_eq!(configured.theme, failed.theme);
         assert!(configured.date.is_some() && configured.date_label.is_some());
         assert_eq!(configured.scenario_revision, initial.scenario_revision);
         assert_eq!(configured.event_id, paused.event_id);
@@ -1399,6 +1447,12 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         assert_eq!((color.body_count, color.collider_count), (0, 0));
         assert!(!color.paused);
         assert_eq!(color.settings, configured.settings);
+        // Running again, the face has faded to Christmas.
+        let theme = color.theme.unwrap();
+        assert_eq!(
+            (theme.theme, theme.fade_milli),
+            (engine_common::ClockTheme::Christmas, 1000)
+        );
         harness.capture_screenshot("clock-live-preview.png");
 
         // Controller-style navigation reaches the full-width Clock button.
@@ -1479,11 +1533,20 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
             control_value(&page, "launcher.settings.clock.lamps.next"),
             Some("Steady")
         );
+        assert_eq!(
+            control_value(&page, "launcher.settings.clock.theme.next"),
+            Some("Christmas")
+        );
         harness.activate_guarded("launcher.settings.start", &page);
         harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let relaunched = harness.clock_state();
         assert_ne!(relaunched.scenario_revision, restarted.scenario_revision);
         assert_eq!(relaunched.settings, configured.settings);
+        // A new run wears the saved theme.
+        assert_eq!(
+            relaunched.theme.unwrap().theme,
+            engine_common::ClockTheme::Christmas
+        );
         let saved: engine_common::Settings = toml::from_str(
             &fs::read_to_string(harness.run_path().join("config/settings.toml")).unwrap(),
         )
@@ -1506,6 +1569,19 @@ impl FunctionalHarness {
             .wait_for_clock_message(&request, TRANSITION_TIMEOUT);
         self.require_clock("clock message applied and saved", result)
     }
+    /// The Clock's state once its settings have saved or failed to.
+    fn clock_settings_settled(&mut self) -> ClockState {
+        let deadline = Instant::now() + TRANSITION_TIMEOUT;
+        loop {
+            let current = self.clock_state();
+            if !current.settings_pending {
+                return current;
+            }
+            assert!(Instant::now() < deadline, "the settings never settled");
+            thread::sleep(Duration::from_millis(10));
+        }
+    }
+
     fn change_clock_setting(&mut self, id: &str, value: &str, state: &UiState) -> UiState {
         let pending = self.activate_guarded(id, state);
         let applied = self.wait_clock_screen(UiScreen::PauseClock, pending.revision);

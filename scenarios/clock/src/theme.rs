@@ -11,7 +11,7 @@ use crate::ClockReading;
 use crate::presentation::effects::{DigitPalette, smoothstep};
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 /// The hour a season's night starts, on its evening.
 const EVENING: u8 = 18;
@@ -159,5 +159,10 @@ impl Look {
     /// One tick of the scene's own time.
     pub fn advance(&mut self) {
         self.tick = (self.tick + 1).min(FADE_TICKS);
+    }
+
+    /// Thousandths of the fade's time gone, 1000 once it is over.
+    pub fn fade_milli(self) -> u16 {
+        (self.tick * 1000 / FADE_TICKS) as u16
     }
 }
