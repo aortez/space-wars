@@ -44,6 +44,9 @@ def pngs(directory,pattern,by_frame=False):
 
 
 def upscale(scale):
+    """Nearest neighbour inside ffmpeg, which is not PIL's NEAREST: the two round a
+    pixel centre differently, so the same dot lands on a different pixel and any
+    agreement between them is a one-pixel argument. Compare rawvideo with rawvideo."""
     return 'scale=iw*%d:ih*%d:flags=neighbor'%(scale,scale)
 
 
@@ -101,9 +104,13 @@ def sheet(events,out,cols,scale):
     assert events, 'no event stills, so there is nothing to sheet'
     rows=-(-len(events)//cols)
     vf=''
+    # drawtext knows main_h, not ih: ih belongs to the scale filter, and an expression
+    # it cannot parse fails the whole chain with exit 234 and no useful message.
     if next((f for f in FONTS if os.path.exists(f)),None):
         vf+=(",drawtext=fontfile=%s:text='%%{n}':x=6:y=main_h-30:fontsize=28"%font()
              +":fontcolor=yellow:box=1:boxcolor=black@0.6")
+    # tile lays the first tile at (0,0) and tile c at x=c*(width+padding): padding is a
+    # gap between tiles, not a border, so adding it to the origin offsets every cell.
     vf+=',tile=%dx%d:padding=8:color=0x121216'%(cols,rows)
     encode_list(events,out,1.0,scale,24,vf=vf,extra=('-frames:v','1'))
     return rows
@@ -115,7 +122,8 @@ def font():
 
 def dots(buffer,scale):
     """Count the model's dots in a raw rgb24 frame, at the cell mapping paint_model
-    documents: column * 8 + 1 across, row * 8 + the status-bar crop + 1 down."""
+    documents: column * 8 + 1 across, row * 8 + the status-bar crop + 1 down. `scale`
+    is the upscale the series was cut at, not an extra one to apply on top of it."""
     width=256*scale
     counts=dict.fromkeys(DOTS,0)
     for column in range(COLUMNS):
@@ -136,6 +144,9 @@ def png_raw(path,scale):
 
 
 def film_raw(path,index):
+    """No upscale here on purpose. The film was cut at the scale it reports, so
+    scaling again moves the dots off the grid dots() indexes; a raw buffer shorter
+    than one frame is the tell that a scale crept in."""
     return raw(['ffmpeg','-v','error','-i',path,'-vf','select=eq(n\\,%d)'%index,'-frames:v','1',
                 '-f','rawvideo','-pix_fmt','rgb24','-'])
 
@@ -179,7 +190,9 @@ def main():
     written=[]
     if frames:
         # The bot thinned this series to every Nth frame, so the film runs at fps/N
-        # to stay in real time; the overlay series is every frame and does not.
+        # to stay in real time; the overlay series is every frame and does not. The
+        # parentheses on the name are load-bearing: / binds tighter than %, so
+        # out/'%s.mp4'%name formats a path object and raises.
         encode(frames,out/('%s.mp4'%name),args.fps/args.every,args.scale,args.crf)
         written.append(out/('%s.mp4'%name))
     if models:
