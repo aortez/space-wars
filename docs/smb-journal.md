@@ -1,0 +1,231 @@
+# Super Mario Bros. world-model decision journal
+
+[The mission](smb-mission.md) holds the direction,
+[the execution plan](smb-execution-plan.md) holds the order of work, and
+[the world-model reader](nes-world-model-reader.md) holds the measurements and the
+decode traps. This journal preserves the decisions themselves and why they were
+made, so that a choice is not relitigated by someone who only sees its result.
+
+Add entries chronologically with a stable ID, a date, the decision, the evidence
+and the consequence. Later decisions may supersede earlier ones; record the
+supersession rather than rewriting the original rationale. Routine edits, test
+output and film runs belong in Git and in run artifacts, not as a second task list
+here.
+
+Every entry below was decided on 2026-11-21, the day this work went from an
+investigation to a bot with films, so the entries are ordered by the order decided
+rather than by date. Entries that adopt or correct a DirtSim decision say which, and every figure
+quoted here was re-measured against this repository's cartridge.
+
+## SMB-001 — 2026-11-21 — Read the game out of the core instead of changing the core
+
+Build the world model above `engine-nes` using only channels the core already
+exposes: RAM, nametables, attribute tables, OAM, palette, the scroll latch,
+mirroring, frame timing, `checkpoint`/`restore` and `state_hash`. No emulator
+change.
+
+Rationale: every channel a semantic reader needs is already public, so an
+emulator change would add game knowledge to a component that is deliberately
+cartridge-agnostic and free of a filesystem, clock, thread and renderer. The
+in-repo precedent is `scenarios/falling`, which decodes a versioned observation
+from six RAM addresses.
+
+Consequence: the reader is host-side and the core stays an emulator. A reader bug
+can never be blamed on the core, and a core change that alters the game is the
+reader's problem to notice.
+
+## SMB-002 — 2026-11-21 — Identify a tile by its CHR pattern hash, never by its tile number
+
+Tiles are named by an FNV-1a hash of their 16-byte pattern.
+
+This adopts a DirtSim design, `NesTileFrame` and its tile tokenizer, and was
+verified here rather than assumed to transfer.
+
+Rationale: tile numbers are bank- and game-specific. SMB's blank-sky filler is
+`$24` and not `$00`, so a reader that trusts numbers sees a wall of solid tiles
+across the whole sky. A pattern hash makes emptiness a property of the pixels, and
+it survives a CHR bank switch and a different ROM revision.
+
+Consequence: the vocabulary is learned, so a port needs a frozen vocabulary or a
+documented rebuild step. This is an open gap, not a solved one.
+
+## SMB-003 — 2026-11-21 — Decode the scroll latch `t`, not the current address `v`
+
+The tile origin comes from the PPU's temporary address register.
+
+Evidence: `v`'s Y field increments on every visible scanline and is only reloaded
+during vblank, so read after `run_frame` it reports a nametable one table away from
+the one just rendered. Switching to `t` removed 57 shape mismatches, and the
+reconstruction is then exact at a static camera: 51,136 compared pixels, none
+wrong.
+
+Consequence: DirtSim's `NesTileFrame` decodes `v` and carries the same error. It is
+invisible in a tile vocabulary and a reward signal, which is why it survived there,
+and it only appears when the decode is checked against rendered pixels. That is the
+argument for pixel-level validation of a reader, not just behavioural validation.
+
+## SMB-004 — 2026-11-21 — The player's feet are 32 pixels below his stored Y
+
+`$00CE` is the top of a 32-pixel sprite bounding box, not the surface he stands on,
+so the standing row is `$00CE + 32` minus the status-bar crop.
+
+Evidence: two independent measurements agree. Sweeping every 8-pixel offset across
+2583 grounded frames leaves `+24` after the crop as the only row solid under the
+feet with the body's two rows clear, and the player's own OAM column ends on the row
+the constant predicts on 1008 of 1008 frames where his sprite is identifiable.
+
+Consequence: DirtSim's player-row helper subtracts only the crop and so sits four
+tile rows too high. It never bites there because that value anchors a
+player-relative window where a constant bias is absorbed by training, and it bites
+hard the moment a bot asks whether there is ground under it. A constant that a
+learning consumer can absorb is not the same as a constant a rule consumes.
+
+## SMB-005 — 2026-11-21 — Learn the load-bearing set from grounded frames, and accept what that can answer
+
+Terrain walkability is a learned set of nine tile ids, gathered by recording which
+id sat under the player's feet on frames the game called grounded, against which ids
+his body occupied.
+
+Evidence: the split has no overlap across 2583 frames. `$26` was a body tile on 2413
+of them and a feet tile on none, while the ground and pipe-top ids only ever held
+his feet. Opaque is not solid: SMB paints hills and bushes with fully opaque tiles
+and walks Mario through them.
+
+Consequence: the set can only ever contain surfaces, because that is the only
+experiment that produced it. See SMB-008 for what replaces it as the authority on
+walls; this remains the authority on floors.
+
+## SMB-006 — 2026-11-21 — The reader lives under `tests/support`, reached by `#[path]`
+
+The reader is not promoted into `engine-nes/src`.
+
+Rationale: the core holds no game knowledge, so the address map belongs on the host
+side of that boundary, and the part with a contract is the test, not the examples.
+The examples are exploration scaffolding and reach the reader with `#[path]`, which
+is why the module carries one `#![allow(dead_code)]`.
+
+Consequence: promotion is gated on a second consumer needing it, which is what keeps
+this from becoming a framework before it has a second user.
+
+## SMB-007 — 2026-11-21 — The cartridge test is optional and fails closed on a different revision
+
+`tests/smb_world_model.rs` skips with a note when no cartridge is present, and
+rejects a cartridge whose SHA-256 is not the image the map was verified against.
+
+Rationale: `data/` is gitignored, so CI has nothing to boot and an optional test is
+the only honest shape. A shipped profile must fail closed rather than return
+plausible nonsense: `smb2.nes` reports that it is not the verified revision.
+
+Consequence: the semantic reader has a regression net locally and none in CI, which
+is the cost of keeping cartridges out of the repository and is accepted knowingly.
+
+## SMB-008 — 2026-11-21 — Solidity will be measured from the game's reaction, not inferred from pictures
+
+Decided, not yet built. The reader will command a move, compare the motion asked for
+with the motion the core produced, and attribute the difference to the cell entered,
+at that body height, from that side.
+
+Evidence: the reader-only bot walks into a pipe at absolute X 899, is stopped by the
+game, and stands there for 600 frames with `wall_ahead` false, because the pipe body
+ids are neither load-bearing nor blank. The reaction rule bolted on instead of a
+solidity model moves the run between absolute X 595, 723, 899 and 2601 as one tuning
+constant changes, which is what tuning on top of a missing fact costs.
+
+Consequence: this supersedes SMB-005 as the authority on walls. The reaction rule is
+to be deleted rather than tuned when it lands. The known fallback, recorded so the
+phase cannot become a dead end, is to read the game's own collision result out of RAM
+if the velocity delta proves too noisy on eight-bit scaled speeds.
+
+## SMB-009 — 2026-11-21 — An action is specified to the frame
+
+A skill's action envelope is measured, and a press is recorded by the frame the
+button reaches the game rather than by a hold counter.
+
+Evidence: a one-frame A press is a hop that clears nothing; the same policy with A
+held 20 frames went from absolute X 436 to 899 with no change to the reader.
+Separately, a reflex rule that set its hold after the frame's buttons were built
+landed A one frame late, and the earlier claim that the reflex cleared 1-1 at X 3266
+had drawn one winning ticket with that bug in it.
+
+Consequence: a decode gap and an action bug look identical from outside a run, so an
+envelope is a measured property of a skill and not an implementation detail.
+
+## SMB-010 — 2026-11-21 — Wait for the level to hand the player over, not for the mode byte
+
+A policy starts after eight consecutive frames that are both in-control and
+grounded.
+
+Evidence: `$0770` flips to play on the first frame of a level load and the load takes
+about 150 more frames to place the level, and through the first two of those the
+player bytes still hold the previous screen's values. A bot started on the mode byte
+pushes at a world that is not listening, and a stuck detector counted in frames
+reports that as the bot giving up before it moved.
+
+Consequence: measured handover on this cartridge is frame 287, against gameplay mode
+at 120. Every run starts from the handover, and the stuck rule is only meaningful
+after it.
+
+## SMB-011 — 2026-11-21 — A film is evidence, so the tool decodes one back and recounts the overlay
+
+`tools/nes-reference/film-smb-run.py` writes films, clips and an event sheet, then
+decodes a frame out of the film it just wrote and counts the model's dots again.
+
+Rationale: a one-pixel mark is exactly what a lossy encoder discards, and a film that
+quietly lost the overlay still looks like a film. The tolerance is a tenth of the
+count, tight because the NES palette is full of browns one channel away from the red
+dot.
+
+Consequence: reported encodes are checkable rather than asserted; a run over the
+death at frames 990 to 1080 reports 29 load-bearing and 161 opaque dots in against
+29 and 159 out. The films themselves live under `data/shots` and are not committed.
+
+## SMB-012 — 2026-11-21 — The mission document carries no measurement
+
+`smb-mission.md` contains no digits, no command-line flags and no code identifiers,
+and a grep for them is part of its review.
+
+Rationale: the first draft mixed direction with reporting, and reporting is what
+rots. Frame numbers, flags and test counts are wrong within a week and none of them
+say what is being built.
+
+Consequence: measurements live in the reader investigation, which is the document
+whose job is to defend them, and the mission changes only when the direction does.
+
+## SMB-013 — 2026-11-21 — Build the gym harness before the skill library
+
+The plan puts the harness at Phase 2, ahead of the skill library, against the
+mission's own ordering.
+
+Rationale: instruments get built before the things they measure. A snapshot gym is a
+rewind point, an objective predicate, a budget and a verdict, and it is nearly free
+because the rewind is exact to the bit. Without it every later fact costs a whole
+level run to learn.
+
+Consequence: the plan states the disagreement rather than quietly reordering the
+mission, so the mission stays the direction and the plan stays the route.
+
+## SMB-014 — 2026-11-21 — A committed gym stores a tape, not a savestate
+
+A gym's durable form is a cartridge identity, an input prefix and a frame index, with
+the state re-derived when the gym runs.
+
+Rationale: a committed savestate silently mismatches when the core changes, which is
+precisely the moment a gym earns its keep. A tape fails loudly instead, and it
+documents itself.
+
+Consequence: gyms double as golden hashes for the cartridge, which is the gap that
+currently leaves a core change to SMB invisible without booting one.
+
+## SMB-015 — 2026-11-21 — Decide the seam before the API
+
+Phase 0 decides which host-side module owns the profile through the affordances, and
+what a skill may ask it. It does not design the interface.
+
+Rationale: an interface designed before a bot has cleared anything is a guess with
+types on it, and the decision is cheap only while there are two small consumers, the
+bot and the optional test. After the skill library exists, moving the reader is a
+refactor across everything.
+
+Consequence: the API grows out of the pipe in Phase 1, and nothing is promoted out of
+`tests/support` until a second consumer needs it, which is SMB-006's rule applied
+forward.
