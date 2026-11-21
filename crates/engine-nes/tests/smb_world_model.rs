@@ -11,16 +11,19 @@
 
 use std::{env, fs, path::PathBuf};
 
+use engine_nes::{MachineCheckpoint, NesMachine};
+
 use sha2::{Digest as _, Sha256};
 
 #[path = "support/smb_world_model.rs"]
 mod smb;
 
 use smb::{
-    BODY_ROWS, MODE_PLAYING, STATE_NORMAL, TRIGGER_COLUMNS, boot_to_gameplay, is_blank_tile,
-    is_load_bearing, player_surface_row_from_sprites, player_tile, read_state,
-    reconstruct_background, run_right_buttons, scroll_x, scroll_y, snapshot, sprite_covered_cells,
-    tile_at, tile_grid, wall_ahead,
+    BODY_ROWS, MODE_PLAYING, Motion, Refusal, Resistance, STATE_NORMAL, TRIGGER_COLUMNS,
+    WALL_LOOK_COLUMNS, boot_to_gameplay, is_blank_tile, is_load_bearing,
+    player_surface_row_from_sprites, player_tile, read_state, reconstruct_background,
+    run_right_buttons, scroll_x, scroll_y, snapshot, sprite_covered_cells, tile_at, tile_grid,
+    wait_for_handover, wall_ahead,
 };
 
 /// The one ROM revision this address map was verified against. A different
@@ -380,13 +383,16 @@ fn the_tile_frame_rebuilds_the_background_the_ppu_actually_drew() {
     );
 }
 
-/// The sideways direction, and the seventh decode trap. A tile the game holds him
-/// up on and a tile the game stops him against are different observations, and
-/// watching what carries him can only ever yield the first, so a load-bearing set
-/// derived that way cannot name a wall. This pins it by *playing*: run the
-/// reader-driven policy from `tests/support/smb_world_model.rs`, wait until the
-/// world stops returning the input, and read the tile that did it. The game says
-/// he is stopped; the reader says nothing solid is there.
+/// The sideways direction, and the seventh decode trap, in the form a model with no
+/// memory can be caught in. A tile the game holds him up on and a tile the game
+/// stops him against are different observations, and watching what carries him can
+/// only ever yield the first, so a load-bearing set derived that way cannot name a
+/// wall. This pins it by *playing*: run the reader-driven policy from
+/// `tests/support/smb_world_model.rs` with nothing remembered yet, wait until the
+/// world stops returning the input, and read the tile that did it. The game says he
+/// is stopped; the reader says nothing solid is there.
+///
+/// The test below is the other half, where the same cell does become a wall.
 ///
 /// The policy is the one the `world_model_bot` example runs, so this is the same
 /// run the document reports rather than a fourth hand-written script. It reaches
@@ -397,37 +403,7 @@ fn the_tile_that_stops_the_player_is_not_one_the_reader_calls_solid() {
     assert_pinned_revision(&rom);
     let (mut machine, _) = boot_to_gameplay(&rom).expect("setup script should reach normal play");
 
-    // `$0770` says play before the game has handed him over. The level load holds
-    // him at absolute X 0 in player state 0x00 for about 150 frames, and through
-    // the first two of those the player bytes still hold the *previous* screen's
-    // values, so a single frame of "normal, grounded, at X 40" is the ghost of a
-    // level that is already gone. Wait for the state to hold instead of for it to
-    // flicker: a policy started on the mode byte spends its first two seconds
-    // pushing at a world that is not listening, and a frame-counted stall detector
-    // then reads the bot as giving up before it has moved.
-    let mut in_control_for = 0;
-    for _ in 0..300 {
-        let state = read_state(&machine);
-        in_control_for = if state.is_in_control() && state.is_grounded() {
-            in_control_for + 1
-        } else {
-            0
-        };
-        if in_control_for >= 8 {
-            break;
-        }
-        machine
-            .run_frame([
-                engine_nes::ControllerButtons::NONE,
-                engine_nes::ControllerButtons::NONE,
-            ])
-            .expect("frame should run");
-    }
-    assert!(
-        in_control_for >= 8,
-        "300 frames after the mode byte said play, the game still has not put the player in the \
-         level, so the setup script or the level load has changed"
-    );
+    wait_for_handover(&mut machine).expect("the game should hand the player over");
 
     // Frames without new ground before "stopped" is a real observation. A jump, a
     // koopa walking into him and a ledge he reads as a hole each cost a few
@@ -447,7 +423,10 @@ fn the_tile_that_stops_the_player_is_not_one_the_reader_calls_solid() {
         let origin_x = scroll_x(&frame);
         let tiles = tile_grid(&frame, origin_x, 0);
         let (column, row) = player_tile(&state, origin_x);
-        let buttons = run_right_buttons(&state, &machine, &tiles, column, row, &mut hold_a);
+        // Nothing has been refused yet on this pass, which is the point: the
+        // ledger this test argues with is the empty one.
+        let wall = wall_ahead(&frame, origin_x, &state, &Resistance::default(), 0);
+        let buttons = run_right_buttons(&state, &machine, &tiles, column, row, wall, &mut hold_a);
         if state.absolute_x > furthest_x {
             furthest_x = state.absolute_x;
             no_progress_for = 0;
@@ -463,7 +442,7 @@ fn the_tile_that_stops_the_player_is_not_one_the_reader_calls_solid() {
                 .filter_map(|(column, row)| tile_at(&tiles, column, row))
                 .find(|tile| !is_blank_tile(&frame, *tile));
             if let Some(tile) = ahead {
-                stalled = Some((furthest_x, tile, wall_ahead(&tiles, column, row)));
+                stalled = Some((furthest_x, tile, wall));
                 break;
             }
         }
@@ -495,5 +474,268 @@ fn the_tile_that_stops_the_player_is_not_one_the_reader_calls_solid() {
         !wall,
         "`wall_ahead` called the cell at absolute X {x} solid while the load-bearing set called \
          the same tile scenery: the reader contradicts itself",
+    );
+}
+
+/// One pass of the base policy, for the memory A/B below.
+///
+/// The ledger is passed in rather than made here because the point is a pass that
+/// starts out holding another pass's memory, and it is written to as the pass runs
+/// because a model that learns as it goes is the only honest amnesiac: a run that
+/// cannot learn is not a run that does not yet know.
+struct Pass {
+    /// Every refusal the game made during the pass, in the order it made them.
+    refusals: Vec<Refusal>,
+    /// The first frame the ledger called a cell a wall and the tile ids did not.
+    /// The only number here that measures the ledger rather than the level.
+    ledger_wall: Option<(u64, u16)>,
+    /// The pass ran off the end of the level it started on, so anything past that
+    /// point is a different game's vocabulary.
+    left_level: bool,
+    /// The machine state as it stood on `Plan::checkpoint_at`, if that frame came.
+    checkpoint: Option<(u64, MachineCheckpoint)>,
+}
+
+/// How a pass should end and what it should remember on the way.
+struct Plan {
+    /// A ceiling, not a target: a pass also ends on its checkpoint or its refusal.
+    frames: u64,
+    /// End as soon as the game refuses him a move, so that refusal can be the thing
+    /// a later pass is handed.
+    stop_at_first_refusal: bool,
+    /// End on this frame id with the machine state as it stood there.
+    checkpoint_at: Option<u64>,
+}
+
+fn play(machine: &mut NesMachine, ledger: &mut Resistance, plan: &Plan) -> Pass {
+    let start = {
+        let state = read_state(machine);
+        (state.world, state.level)
+    };
+    let mut pass = Pass {
+        refusals: Vec::new(),
+        ledger_wall: None,
+        left_level: false,
+        checkpoint: None,
+    };
+    let mut hold_a = 0u64;
+    for _ in 0..plan.frames {
+        let frame_id = machine.ppu().frame_id();
+        let state = read_state(machine);
+        if (state.world, state.level) != start {
+            pass.left_level = true;
+            break;
+        }
+        if plan.checkpoint_at == Some(frame_id) {
+            pass.checkpoint = Some((frame_id, machine.checkpoint()));
+            break;
+        }
+        let frame = snapshot(machine);
+        let origin_x = scroll_x(&frame);
+        let tiles = tile_grid(&frame, origin_x, 0);
+        let (column, row) = player_tile(&state, origin_x);
+        let wall = wall_ahead(&frame, origin_x, &state, ledger, WALL_LOOK_COLUMNS);
+        if wall
+            && pass.ledger_wall.is_none()
+            // The same question with the ledger wiped, so a yes here is something
+            // this model was taught and not something the tile ids already carry.
+            && !wall_ahead(
+                &frame,
+                origin_x,
+                &state,
+                &Resistance::default(),
+                WALL_LOOK_COLUMNS,
+            )
+        {
+            pass.ledger_wall = Some((frame_id, state.absolute_x));
+        }
+        let buttons = run_right_buttons(&state, machine, &tiles, column, row, wall, &mut hold_a);
+        let asked = Motion::asked(&state, buttons);
+        machine
+            .run_frame([buttons, engine_nes::ControllerButtons::NONE])
+            .expect("frame should run");
+        let produced = read_state(machine);
+        let after = snapshot(machine);
+        if let Some(refusal) = ledger.observe(asked, &produced, &after, scroll_x(&after), frame_id)
+        {
+            pass.refusals.push(refusal);
+            if plan.stop_at_first_refusal {
+                break;
+            }
+        }
+    }
+    pass
+}
+
+/// Boot a cartridge and run it to the frame the game lets go of the player.
+fn handed_over(rom: &[u8]) -> NesMachine {
+    let (mut machine, _) = boot_to_gameplay(rom).expect("setup script should reach normal play");
+    wait_for_handover(&mut machine).expect("the game should hand the player over");
+    machine
+}
+
+/// Phase 1's claim, end to end: memory of a refusal is what turns scenery into a
+/// wall.
+///
+/// The test above is the cold reader's half of the problem. Nothing in the picture
+/// separates a pipe body from a cloud and no larger vocabulary will, because "stops
+/// him sideways" is not a property of the picture at all: it is something the game
+/// says only by refusing to move him. So the answer is a memory rather than a
+/// decoder. The buttons asked for a move, the core handed back no move, and the cell
+/// at the body's leading edge is what said no.
+///
+/// The claim needs an A/B whose only variable is that memory. Learn one refusal from
+/// the first pipe, then take a checkpoint from a cold run some seconds *after* it,
+/// and run the tail twice from that one state. Neither machine contains the refusal
+/// it starts with: for one of them the refusal is only in its past. The amnesiac tail
+/// has to be stopped by the next pipe before it can call it a wall; the remembering
+/// tail has to call the same artwork a wall before it arrives, and never be stopped
+/// at all. And because the wall it names is a different pipe further along, what it
+/// recognized is the artwork, not the place where it happened to be standing.
+#[test]
+fn remembering_a_refusal_names_a_wall_the_tile_ids_do_not() {
+    let Some(rom) = rom_image() else { return };
+    assert_pinned_revision(&rom);
+
+    // Frames between the refusal and the checkpoint both tails start from. Far
+    // enough back that the pipe which refused him is behind him and the next one is
+    // still ahead; close enough that the tail is the same level.
+    const RUNUP_FRAMES: u64 = 120;
+    // Room to reach the next pipe from that checkpoint. The measured events land
+    // about a hundred frames in, so the rest is room for a core that decodes the
+    // same level a little differently, and a pass ends on the level change anyway.
+    const TAIL_FRAMES: u64 = 300;
+    const LEARN_LIMIT: u64 = 3000;
+
+    // Pass 1: learn. The first thing 1-1 refuses him is the first pipe.
+    let mut learned = Resistance::default();
+    let mut machine = handed_over(&rom);
+    let discovery = play(
+        &mut machine,
+        &mut learned,
+        &Plan {
+            frames: LEARN_LIMIT,
+            stop_at_first_refusal: true,
+            checkpoint_at: None,
+        },
+    );
+    assert!(
+        !discovery.left_level,
+        "the model left 1-1 before the game refused it anything"
+    );
+    let refusal = discovery
+        .refusals
+        .first()
+        .expect("the game never refused the model a move, so there is nothing to remember");
+    let (refused_x, refused_frame) = (refusal.absolute_x, refusal.frame);
+    assert!(
+        refused_x > 300,
+        "the first refusal was at absolute X {refused_x}, which is the level load rather than          an obstacle",
+    );
+    assert!(
+        !learned.is_empty(),
+        "the game refused him at absolute X {refused_x} and the ledger still says nothing, so          the refusal was not attributed to a cell",
+    );
+
+    // Pass 2: a cold run to a checkpoint past the refusal. Cold, so the checkpoint
+    // is where the same policy would be if it had never been told anything.
+    let mut machine = handed_over(&rom);
+    let mut cold = Resistance::default();
+    let survey = play(
+        &mut machine,
+        &mut cold,
+        &Plan {
+            frames: refused_frame + 2 * RUNUP_FRAMES + LEARN_LIMIT,
+            stop_at_first_refusal: false,
+            checkpoint_at: Some(refused_frame + RUNUP_FRAMES),
+        },
+    );
+    let (root_frame, root) = survey
+        .checkpoint
+        .expect("the cold run never reached the checkpoint frame");
+    assert!(!survey.left_level, "the checkpoint is not in 1-1 any more");
+    // The survey pass stops on the checkpoint frame, so the live state is the root.
+    let root_hash = machine.state_hash();
+
+    // Tail A: the same state, nothing remembered. A ledger of its own, wiped: the
+    // survey pass learned as it went, and a tail that inherits that would be
+    // remembering the very refusal this side of the A/B is not supposed to have.
+    machine
+        .restore(&root)
+        .expect("the amnesiac tail should start from the checkpoint");
+    assert_eq!(
+        machine.state_hash(),
+        root_hash,
+        "restore has to be exact or the two tails are not the same start",
+    );
+    let mut amnesiac_ledger = Resistance::default();
+    let amnesiac = play(
+        &mut machine,
+        &mut amnesiac_ledger,
+        &Plan {
+            frames: TAIL_FRAMES,
+            stop_at_first_refusal: false,
+            checkpoint_at: None,
+        },
+    );
+
+    // Tail B: the same state, bit for bit, holding pass 1's refusals.
+    machine
+        .restore(&root)
+        .expect("the remembering tail should start from the checkpoint");
+    assert_eq!(
+        machine.state_hash(),
+        root_hash,
+        "and from the same bits as the amnesiac tail, at frame {root_frame}",
+    );
+    let mut remembering_ledger = Resistance::from_log(learned.log());
+    let remembered = play(
+        &mut machine,
+        &mut remembering_ledger,
+        &Plan {
+            frames: TAIL_FRAMES,
+            stop_at_first_refusal: false,
+            checkpoint_at: None,
+        },
+    );
+
+    assert!(
+        !amnesiac.left_level && !remembered.left_level,
+        "a tail left 1-1, so the two are no longer comparing the same obstacle",
+    );
+
+    // The amnesiac tail has to meet the wall for real, or its failure to see it
+    // coming would only mean the tail contains no wall.
+    let stopped = amnesiac
+        .refusals
+        .first()
+        .expect("the cold tail was never refused anything, so it proves nothing about memory");
+    assert!(
+        amnesiac
+            .ledger_wall
+            .is_none_or(|(frame, _)| frame >= stopped.frame),
+        "the cold model called a cell a wall at frame {}, before the game had refused it          anything at frame {}",
+        amnesiac.ledger_wall.map_or(0, |(frame, _)| frame),
+        stopped.frame,
+    );
+
+    let (frame, x) = remembered
+        .ledger_wall
+        .expect("the ledger never named a wall, so memory did not reach the next pipe");
+    assert!(
+        remembered.refusals.is_empty(),
+        "the remembering model was refused at absolute X {} on frame {} anyway, so it did not          act on what it remembered",
+        remembered.refusals[0].absolute_x,
+        remembered.refusals[0].frame,
+    );
+    assert!(
+        frame < stopped.frame && x < stopped.absolute_x,
+        "the remembering model saw the wall at frame {frame} and absolute X {x}, which is not          ahead of the cold model's collision at frame {} and absolute X {}",
+        stopped.frame,
+        stopped.absolute_x,
+    );
+    assert!(
+        x > refused_x,
+        "the wall it named was at absolute X {x}, at or behind the pipe that taught it at          {refused_x}: that repeats a position instead of recognizing the artwork drawn there",
     );
 }

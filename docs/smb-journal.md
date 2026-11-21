@@ -252,3 +252,39 @@ pattern hash or a register is out of contract. It also gives SMB-006's gate a na
 destination and a named trigger, so the reader still sitting in `tests/support` is a
 plan being followed rather than a smell, and it leaves the observation's profile
 payload deferred until the client wants to draw the model.
+
+## SMB-017 — 2026-11-21 — Solidity is learned from the game's refusals, keyed on the artwork that refused him
+
+SMB-008's plan, built. A frame counts as a refusal when three conditions the game owns
+are all true: a direction held without its opposite, the body gaining no ground to the
+pixel, and the speed the buttons had built up coming back exactly zero. The verdict is
+stored against the CHR pattern hash of the tile that refused him, the row of his body it
+was pressed against, and the direction — not a tile number, and not a position.
+
+Evidence: the signature is the game's own, so nothing needs a threshold. Pinned against
+the first pipe his speed runs 0, 1, 2, 3, 0 and against the second 0, 1, 2, 3, 4, 0, so
+one contact records one refusal rather than one per frame of pushing. Keying it on the
+pattern is what lets one lesson generalize: refused at absolute X 594, the bot calls the
+second pipe a wall 304 pixels later without ever being stopped by it. Two attributions
+had to be measured rather than assumed. The box the game stops against the level is
+`[x, x + 14)` from the sprite's left edge at `$0086`, fixed by two independent refusals
+304 pixels apart, and not the 11 that had been read off the decoded grid; and the cell
+beyond him has to be found from the world pixel rather than from the screen-indexed
+grid, which is up to one column out on seven frames in eight. The A/B that separates
+memory from reaction restores one checkpoint state twice, once with an empty ledger and
+once with the refusals from an earlier pass: the amnesiac tail names its first wall on
+frame 864 flush against it after being stopped, the remembering tail names it on frame
+855, nine frames and seven pixels before contact, and is refused nothing at all. How far
+ahead the ledger is trusted turned out not to be a knob — the run is identical at 0, 1,
+2, 3 and 5 columns — where the rule it replaced swung between 595 and 2601 over the same
+range.
+
+Consequence: this closes SMB-008 and deletes its reaction rule and its tuning constant
+rather than tuning them; the reader-only policy reaches absolute X 1553 with the rule
+gone. Two things follow that are not handled yet. The ledger lives host-side, so a
+checkpoint restores the machine and not the model, which means a gym's verdict depends
+on whether the model it hands the run is warm or cold and SMB-014's tape does not carry
+that. And a refusal only ever names a drawn cell, so the thing that now takes three
+lives in a row at the camera limit, where he is falling rather than blocked and no
+artwork is involved, sits outside the model entirely: that is the first gym Phase 2 is
+asked to build.

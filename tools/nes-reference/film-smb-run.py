@@ -16,6 +16,7 @@ ROWS=27
 DOTS={
     'load_bearing':(0,255,0),
     'opaque':(255,0,0),
+    'refused':(255,160,0),
     'player':(60,130,255),
 }
 FONTS=[
@@ -24,6 +25,12 @@ FONTS=[
 ]
 MODEL=re.compile(r'model-(\d{6})-x\d{5}\.png$')
 EVENT=re.compile(r'event-[a-z-]*f(\d+)-x\d+\.png$')
+# The overlay is one pixel per cell, and x264 at ordinary quality erases it. Measured
+# on a frame with 36 load-bearing dots and 115 opaque ones: crf 24 decoded back 16 of
+# the 36, crf 18 returned 25, and crf 12 returned all 36 and all 115. The films that
+# carry the model's dots are cut at that ceiling, which costs about three quarters of
+# the size again; the plain film has nothing to preserve and keeps --crf.
+OVERLAY_CRF=12
 
 
 def run(cmd):
@@ -172,7 +179,7 @@ def main():
     parser.add_argument('--every',type=int,default=2,help="the --every the bot ran with, so the plain film keeps real time")
     parser.add_argument('--fps',type=float,default=FPS,help='the emulator rate, 60 for NTSC')
     parser.add_argument('--scale',type=int,default=2,help='integer upscale, nearest neighbour')
-    parser.add_argument('--crf',type=int,default=26,help='x264 quality; lower is larger')
+    parser.add_argument('--crf',type=int,default=26,help='x264 quality for the plain film; the overlay films are capped at %d' % OVERLAY_CRF)
     parser.add_argument('--clip',action='append',default=[],metavar='LO-HI',
                         help='overlay clip over these emulator frames, repeatable')
     parser.add_argument('--sheet-cols',type=int,default=4,help='event stills per row on the contact sheet')
@@ -196,12 +203,12 @@ def main():
         encode(frames,out/('%s.mp4'%name),args.fps/args.every,args.scale,args.crf)
         written.append(out/('%s.mp4'%name))
     if models:
-        encode(models,out/('%s-model.mp4'%name),args.fps,args.scale,args.crf)
+        encode(models,out/('%s-model.mp4'%name),args.fps,args.scale,min(args.crf,OVERLAY_CRF))
         written.append(out/('%s-model.mp4'%name))
     for spec in args.clip:
         lo,hi=(int(part) for part in spec.split('-'))
         label='%s-clip-%d-%d'%(name,lo,hi)
-        count=clip(models,lo,hi,out/('%s.mp4'%label),args.scale,min(args.crf,24),args.fps)
+        count=clip(models,lo,hi,out/('%s.mp4'%label),args.scale,min(args.crf,OVERLAY_CRF),args.fps)
         print('%s: %d frames, %.1fs'%(label,count,count/args.fps))
         written.append(out/('%s.mp4'%label))
     if events:
@@ -210,8 +217,19 @@ def main():
         print('contact sheet legend, left to right then top to bottom:')
         for index,path in enumerate(events): print('  %2d  %s'%(index,os.path.basename(path)))
     if models and not args.no_verify:
-        index=len(models)-2 if len(models)>2 else 0
-        verify(models[index],out/('%s-model.mp4'%name),index,args.scale)
+        # Sample the series, then decode back the frame that shows the most of each
+        # kind of dot. One frame rarely shows all four: the ledger's dots only appear
+        # while the artwork that refused him is on screen at the height it refused
+        # him, which is a few dozen frames in a couple of thousand. A kind this check
+        # never decodes is a kind the encoder could have dropped and the film would
+        # have looked exactly the same.
+        step=max(1,len(models)//48)
+        richest={}
+        for i in range(0,len(models),step):
+            for kind,count in dots(png_raw(models[i],args.scale),args.scale).items():
+                if count>richest.get(kind,(0,-1))[0]: richest[kind]=(count,i)
+        for _,i in sorted(richest.values()):
+            if i>=0: verify(models[i],out/('%s-model.mp4'%name),i,args.scale)
     print('wrote %d file(s) to %s'%(len(written),out))
 
 

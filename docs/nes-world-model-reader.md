@@ -104,7 +104,7 @@ detected when `$0770` becomes 1, the setup script ends at frame 300 and a run
 that has not reached gameplay by frame 500 is a setup failure. The Rust
 examples use the same policy and reach gameplay on frame 120.
 
-## Tile-frame reader and eight decode traps
+## Tile-frame reader and nine decode traps
 
 Terrain comes from the PPU, not RAM. The port reads the scroll latch, walks the
 nametables through the cartridge's own mirroring function, and identifies each
@@ -117,9 +117,10 @@ The decode was validated by reconstructing the background pixel by pixel from
 the nametables, the mirroring and the CHR pattern, and comparing the resulting
 transparency mask against the framebuffer the core actually rendered, with every
 cell a sprite touches set aside. At a static camera the reconstruction is exact:
-51,136 compared pixels, none wrong. Eight traps came out of it: four from that
+51,136 compared pixels, none wrong. Nine traps came out of it: four from that
 pixel comparison, two from joining the terrain to the player, one from driving
-a bot off the result, and one from starting a bot a frame too early.
+a bot off the result, one from starting a bot a frame too early, and one from
+asking the decoded grid which cell a world pixel falls in.
 
 1. **SMB's blank-sky filler is tile `$24`, not `$00`.** A reader that treats
    only `$00` as empty sees a wall of solid tiles across the whole sky. Hashing
@@ -185,7 +186,8 @@ a bot off the result, and one from starting a bot a frame too early.
    platform is solid from above and not from below, a `?` block changes id when
    hit, and breakable and unbreakable bricks share a picture. Learning wall ids
    needs a different experiment, walking into things, or the ROM's own collision
-   table.
+   table. Walking into things settled it, without reading the table: see
+   *Solidity from a refusal* under the bot section.
 
 8. **`$0770` says play before the game has handed him over.** The mode byte flips
    to `$01` on the first frame of a level load, and the load takes about 150 more
@@ -198,6 +200,19 @@ a bot off the result, and one from starting a bot a frame too early.
    reports that as the bot giving up before it moved. `SmbState::is_in_control`
    waits for the state to hold for eight consecutive frames rather than for it to
    flicker once.
+
+9. **The decoded grid is indexed by screen column; the level is laid out in world
+   pixels.** `tile_grid` samples the picture at cell centres, so its column 14 is
+   whatever is under screen pixel 116, and screen pixel 116 is world pixel
+   `scroll + 116` for whatever the fine scroll happens to be. The level's cells sit
+   on world multiples of eight. The two agree only when the fine scroll is zero, so
+   asking the grid "which cell is this pixel in" is up to one column out on seven
+   frames in eight. That is not a rounding complaint: it is why a pipe stopped the
+   bot with `wall_ahead` false *after* the reader had been refused by that same
+   artwork. The refusal was attributed to the right pattern and the look-ahead was
+   measured against the wrong grid. A cell at a world pixel is read through
+   `tile_at_world_pixel`, which follows the PPU's own mirroring from the world
+   coordinate instead of through a column number.
 
 The attribute table is a separate channel again: 20 of 884 sprite-free cells in
 the sample frame render the same pattern under different palette indices. Tile
@@ -252,26 +267,28 @@ that reads as a goomba (type 6) 110 pixels ahead, then 10, then gone.
 policy that decides every frame from the reader alone. It senses the tile grid, its
 own cell from the feet offset, and the enemy slots, and knows nothing about 1-1's
 shape beyond the load-bearing ids the reader learned by watching. The policy is the
-simplest one that model supports: run right, jump a hole or an enemy in reach. It
-lives next to the reader, in `tests/support/smb_world_model.rs`, so that the example
-and the optional test cannot drift apart on what "acting on the model" means.
+simplest one that model supports: run right, and jump a hole, an enemy or a cell the
+model can call a wall. Since Phase 1 the last of those includes cells the game has
+already refused to let him through, which the reader cannot see at all. It lives next
+to the reader, in `tests/support/smb_world_model.rs`, so that the example and the
+optional test cannot drift apart on what "acting on the model" means.
 
 Measured on 1-1, release build, repeatable to the frame:
 
 | Policy | Furthest absolute X | How it ends |
 | --- | --- | --- |
 | reader only | 899 | pushes right against a pipe for 600 frames, no deaths |
-| reader plus a blocked-means-run-at-it reflex | 2601 | two deaths, then the game ends |
+| reader plus a blocked-means-run-at-it reflex, since deleted | 2601 | two deaths, then the game ends |
+| reader plus a ledger of the game's refusals | 1553 | two deaths at a screen lock, then the game ends |
 
-The reflex is the cheapest thing that stands in for the missing wall ids: if the
-controller says right and the world will not move, the game is telling the bot that
-its model is wrong. It backs off for 24 frames, runs back, and jumps when something
-drawn appears within reach in the rows its body occupies. That signal is not "a
-wall", because opaque is not solid (trap 6); it is "something is there and the model
-cannot say what", which is the most an honest reading of the nametable offers.
-
-What it buys is distance, not reliability. `--reflex-look N` sets that reach, and the
-run moves by more than two thousand pixels with it:
+The middle row is kept as history, because it is the measurement that justified
+deleting it. The reflex was the cheapest thing that stood in for the missing wall ids:
+if the controller says right and the world will not move, back off for 24 frames, run
+back at it, and jump whatever drawn thing appears within reach in the rows the body
+occupies. That signal is not "a wall", because opaque is not solid (trap 6); it is
+"something is there and the model cannot say what", which is the most an honest reading
+of the nametable offers. What it bought was distance, and how much distance depended on
+one tuning constant:
 
 | `--reflex-look` | 3 | 4 | 5 | 6 | 7 | 8 | 9 and above |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -279,50 +296,131 @@ run moves by more than two thousand pixels with it:
 
 From 7 columns the answer stops changing, because the window is then wider than
 anything the level puts between the player and the obstruction. Nothing about the
-reader differs across that table. A reaction rule bolted onto a model with a hole in
-it is a lottery, and an earlier draft of this document, which reported the reflex
-clearing 1-1 at absolute X 3266, had drawn one winning ticket: that build pressed A
-one frame later than this one does, and what it won at the third pipe it lost at the
-first.
+reader differs across that table. A reaction rule bolted onto a model with a hole in it
+is a lottery, and an earlier draft of this document, which reported the reflex clearing
+1-1 at absolute X 3266, had drawn one winning ticket: that build pressed A one frame
+later than this one does, and what it won at the third pipe it lost at the first. The
+rule is deleted, not tuned, and `--reflex-look` went with it.
 
-Three findings belong to the bot rather than the reader, and all three were
-invisible from outside the run.
+### Solidity from a refusal
+
+The core already knows whether it stopped him. When SMB blocks a body it takes the
+motion back out of the speed, so the difference between the motion the buttons asked
+for and the motion that came out is a verdict from the game rather than an inference
+from the picture, and it can be attributed to the cell the body is pressed against.
+`Resistance` in the reader records that verdict and nothing else, on three conditions
+that are all the game's own rather than a threshold: the direction was held without its
+opposite, the body gained no ground to the pixel, and the speed the buttons had built
+up came back exactly zero.
+
+What the signature actually looks like is a sawtooth. Pinned against the first pipe his
+speed runs `0, 1, 2, 3, 0` while his position does not move at all, and against the
+second `0, 1, 2, 3, 4, 0`. Only the frame that resets to zero satisfies the third
+condition, so one contact records one refusal rather than one per frame of pushing.
+
+The verdict is stored against the CHR pattern hash of the tile that refused him, the
+row of his body it was pressed against, and the direction: not a tile number, and not a
+position. The pattern is what makes it generalize. The game refused him at absolute X
+594, and every cell drawn like that became a wall, which is what the second pipe, 304
+pixels further along, is drawn like.
+
+Two measurements had to be right for the attribution to mean anything, and both were
+wrong at first.
+
+- **How far the body reaches.** `$0086` is the left edge of the sprite, and the box the
+  game stops against the level is not the sprite. Two independent refusals fix the
+  number: the game holds him at absolute X 594 against a pipe whose left edge is at
+  608, and at 898 against a pipe whose left edge is at 912. Both leave exactly 14
+  pixels, so the box is `[x, x + 14)`, the last pixel he occupies is `x + 13`, and the
+  cell that can refuse him is the one containing `x + 14`. The number in the reader
+  before this was 11, read off the decoded grid rather than off the level.
+- **Which cell that pixel is in.** Asking the screen-indexed grid is trap 9, and the
+  answer is up to one column out on seven frames in eight. The refusal was being
+  attributed to the right artwork while the look-ahead was measured against the wrong
+  grid, which is how a bot can be stopped by a pipe it has already learned to call a
+  wall. Cells beyond the body are read through `tile_at_world_pixel` now, which follows
+  the PPU's own mirroring from the world coordinate instead of through a column number.
+
+Whether that counts as memory or only as reaction needs an A/B whose single variable is
+the memory, so `world_model_solidity` runs four passes: learn one refusal; take a
+checkpoint from a cold run 120 frames *after* it; restore that checkpoint and run the
+tail with an empty ledger; restore the same checkpoint and run the same tail holding the
+first pass's refusals. Both tails start from the same bits, and the thing they differ on
+happened before either of them began.
+
+| One 725-frame tail from the same frame 762 state | First cell the ledger calls a wall that the tile ids do not | Refusals in the tail | Furthest absolute X |
+| --- | --- | --- | --- |
+| nothing remembered | frame 864 at absolute X 898, flush against it, after being stopped | 1 | 1544 |
+| pass 1's refusals | frame 855 at absolute X 891, nine frames and seven pixels before contact | 0 | 1542 |
+
+In this window the ledger buys anticipation and no collision, not distance: the
+amnesiac tail is stopped, jumps off the refusal and still gets through, and both tails
+end at the same place. What it is not is a reaction to what is in front of him, because
+the wall it names is a different pipe than the one that taught it.
+`remembering_a_refusal_names_a_wall_the_tile_ids_do_not` keeps that comparison in CI,
+including the exactness of the restore it is built on.
+
+The same run drawn on the picture is the shorter argument. At frame 641 he is pressed
+against the first pipe with no orange dots anywhere in the frame: the model has nothing
+to say about what is stopping him. Frame 642 is the refusal. Frame 643 has two orange
+cells and a jump. At the second pipe, frames 820 to 860 carry orange dots with no
+refusal event between them at all. At the screen lock that kills him at absolute X 1544
+there are no orange dots either, so the model is exactly as silent about that as it was
+about the pipe, which is the next hole named. Those dot counts are read back out of the
+PNGs rather than looked at.
+
+How far ahead the ledger is trusted turned out not to be a knob, which is the whole
+difference between it and the rule it replaced. `WALL_LOOK_COLUMNS` is 1, because a body
+flush against a wall has no run-up left and a jump started flush clears a two-cell pipe
+only just, and the bot's outcome is identical at 0, 1, 2, 3 and 5: 1553 and two deaths
+every time. The deleted `--reflex-look` swung from 595 to 2601 over the same range. A
+model that names artwork can be trusted one cell ahead because it says what a cell is
+before he reaches it; a rule that only knows something is there cannot.
+
+Three findings belong to the bot rather than the reader, and all three were invisible
+from outside the run.
 
 - **A one-frame A press is a hop.** SMB's jump is variable-height. The first version
-  pressed A for a single frame, cleared nothing, and read as a model failure; the
-  same policy with A held for 20 frames went from absolute X 436 to 899 with no
-  change to the reader at all.
+  pressed A for a single frame, cleared nothing, and read as a model failure; the same
+  policy with A held for 20 frames went from absolute X 436 to 899 with no change to
+  the reader at all.
 - **The frame a press lands in is part of the action.** The reflex set its jump hold
-  after the frame's buttons had been built, so A reached the game one frame late.
-  That one frame is the difference between the two numbers in the table above, which
-  is a more useful result than either. An action space has to be specified to the
-  frame and measured, not assumed, and a decode gap and an action bug look identical
-  from outside.
+  after the frame's buttons had been built, so A reached the game one frame late. That
+  one frame is the difference between the two numbers in the table above, which is a
+  more useful result than either. An action space has to be specified to the frame and
+  measured, not assumed, and a decode gap and an action bug look identical from
+  outside.
 - **A bot pinned flat against a wall has no run-up.** Jumping straight from blocked
-  clears nothing; the reflex has to leave the wall before it can get over it.
+  clears nothing, which is why the reflex had to leave the wall before it could get
+  over it. The ledger does not need the escape, because it stops him arriving flush in
+  the first place: the measured jump starts seven pixels out.
 
-The reader-only run is the one worth keeping, and
-`the_tile_that_stops_the_player_is_not_one_the_reader_calls_solid` keeps it: it plays
-the policy, waits for 120 frames that cover no new ground, reads the first cell ahead
-that draws anything in the rows his body occupies, and asserts that the game stopped
-him on a tile the reader does not call load-bearing while `wall_ahead` said nothing
-was there. If the load-bearing set ever grows a wall, that test says so and points at
-trap 7.
+Two tests keep the bot's half of this honest, one on each side of the memory.
+`the_tile_that_stops_the_player_is_not_one_the_reader_calls_solid` plays the policy with
+an empty ledger, waits for 120 frames that cover no new ground, reads the first cell
+ahead that draws anything in the rows his body occupies, and asserts that the game
+stopped him on a tile the reader does not call load-bearing while `wall_ahead` said
+nothing was there; if the load-bearing set ever grows a wall, that test says so and
+points at trap 7. The other test is the same cell one memory later.
 
-What the reader cannot see at 899 fits in one picture. `--shots DIR --overlay` writes
-a PNG of every frame with the model's own opinion dotted on: green where a cell is
-load-bearing, red where a cell draws something that is not, blue on the cell he is
-standing in. At the pipe the row under his feet is an unbroken line of green and the
-three rows of pipe in front of him are red, which is trap 7 without any of the prose.
-Frames are named for what was happening (`event-jump-*`, `event-death-*`,
-`event-stuck-*`, `event-game-over-*`), and `tools/nes-reference/film-smb-run.py` turns a
+What the reader cannot see fits in one picture. `--shots DIR --overlay` writes a PNG of
+every frame with the model's own opinion dotted on: green where a cell is
+load-bearing, orange where the game has refused to let him through a cell of that
+artwork, red where a cell draws something the model calls neither, blue on the cell he
+is standing in. A red dot against a Mario who will not move is trap 7 in one image, and
+watching that dot turn orange on the next pass is what learning looks like in the same
+picture. Frames are named for what was happening (`event-jump-*`, `event-refusal-*`,
+`event-death-*`, `event-game-over-*`), and `tools/nes-reference/film-smb-run.py` turns a
 shots directory into two films that stay in step (plain, and the same frames with the
 dots on), short overlay clips over a frame range, and one contact sheet of the event
 stills in the order they happened. The plain series is thinned to every Nth frame by
 `--every`, so its film runs at 60/N to stay in real time while the overlay series keeps
-all 60. The tool then decodes a frame back out of the film it just wrote and counts the
-dots again: a one-pixel mark is exactly what a lossy encoder discards, and a film that
-quietly lost the overlay still looks like a film.
+all 60. The tool then decodes frames back out of the film it just wrote and counts the
+dots again, one frame for each kind of dot the run ever drew: a one-pixel mark is
+exactly what a lossy encoder discards, and it does. At x264's default quality a frame
+with 36 load-bearing dots and 115 opaque ones came back with 16 and 102 of them, so the
+overlay films are capped at crf 12, where every dot comes back. A film that quietly
+lost the overlay still looks exactly like a film.
 
 An earlier draft reported this bot reaching world 1-2 and going blind there. The
 current code dies before the flagpole, so the blindness is an argument again rather
@@ -381,19 +479,37 @@ free of a filesystem, clock, thread and renderer.
   them inside the documented mapper envelope, but each needs its own map.
 - The DFS in DirtSim runs against a runtime with wall-clock pacing; the Rust
   host must drive it from the synchronous frame call instead.
+- Solidity is learned, not known. The ledger holds only artwork this bot has
+  already been refused by, so a level is passable on the second walk and not the
+  first, and nothing measured yet says whether a refusal recorded against one body
+  row holds at a height it was never refused at.
+- The model's memory is not part of a checkpoint. `Resistance` lives host-side, so
+  `restore` returns the machine to a frame and leaves the model wherever the caller
+  left it, so the A/B above has to carry the ledger across the restore itself. A gym's
+  verdict therefore depends on a second input its tape does not carry yet.
+- Whatever ends the run at the camera limit is not a cell the model can name. Three
+  lives in a row end at absolute X 1544 and 1553. Absolute X holds at 1544 for 213
+  frames before the first life is taken, and in every frame of that window sampled at
+  all the player's cell is screen column 29, the last column the screen has, with his
+  row walking down and round the grid and his speed (+4, +4): he is falling, not
+  blocked. No refusal is recorded there and no orange dot is drawn, and the model's
+  picture of the frame does not change by a single dot across the whole window, which
+  is what a locked camera looks like from inside the overlay. Whether the thing that
+  takes the life is a pit at the edge of what the camera will scroll to or a ledge the
+  reader cannot see is the first question worth a gym.
 
 How far that leaves this from a player, measured rather than judged: the bot has
 never finished a level at all, and 1-1 is the only level whose tiles it can read
 and the only place it can start. It has three macro-actions written inline in an
 example where DirtSim has eleven, no reward or termination wiring, no item or block
-state, five enemy slots because that is all the game keeps live, no solidity model
-for the sideways direction, a reaction rule whose distance is a lottery on one
-tuning constant, and no golden hashes, so a core change that quietly alters SMB is
-still invisible without a cartridge to boot.
+state, five enemy slots because that is all the game keeps live, a sideways
+solidity model that knows only what one bot has already walked into, no answer for
+the thing at the camera limit, and no golden hashes, so a core change that quietly
+alters SMB is still invisible without a cartridge to boot.
 
 ## What is in the tree now
 
-One reader, four drivers, one optional test, one film cutter.
+One reader, five drivers, one optional test, one film cutter.
 
 | File | Role |
 | --- | --- |
@@ -403,6 +519,7 @@ One reader, four drivers, one optional test, one film cutter.
 | `crates/engine-nes/examples/world_model_tiles.rs` | Prints the tile grid, the player's cell and the pixel comparison |
 | `crates/engine-nes/examples/world_model_rollout.rs` | Nametable dump, checkpoint/branch/rewind with throughput, and how far ahead of the camera the reader can see |
 | `crates/engine-nes/examples/world_model_bot.rs` | A policy that acts on the reader alone, how far that gets, and PNGs of the run with the model's own beliefs drawn on |
+| `crates/engine-nes/examples/world_model_solidity.rs` | The A/B that tells memory from reaction: learn one refusal, checkpoint from a cold run, restore the same state twice, once with the ledger and once without |
 | `tools/nes-reference/film-smb-run.py` | Cuts films, clips and an event contact sheet out of a `--shots` directory, and checks the overlay survived the encoder |
 
 The reader sits under `tests/`, not `src/`, on purpose: `engine-nes` holds no
@@ -422,15 +539,16 @@ cargo run --release --locked -p engine-nes --example world_model_rollout \
   -- data/roms/smb.nes
 cargo run --release --locked -p engine-nes --example world_model_bot \
   -- data/roms/smb.nes 9000
-cargo run --release --locked -p engine-nes --example world_model_bot \
-  -- data/roms/smb.nes 9000 --reflex
+cargo run --release --locked -p engine-nes --example world_model_solidity \
+  -- data/roms/smb.nes
 cargo run --release --locked -p engine-nes --example world_model_bot \
   -- data/roms/smb.nes 2400 --shots /tmp/smb-film --overlay --every 2
-python3 tools/nes-reference/film-smb-run.py /tmp/smb-film --clip 1600-1802
+python3 tools/nes-reference/film-smb-run.py /tmp/smb-film --clip 600-700 --clip 830-920
 ```
 
-The last one writes a PNG per frame, with the reader's green/red/blue dots in a
-second copy of each, which is the fastest way to see what the model believes.
+The last one writes a PNG per frame, with the reader's green, orange, red and blue
+dots in a second copy of each, which is the fastest way to see what the model
+believes and, on the next pass, what it has learned.
 
 Observed on x86-64 Linux with a release build:
 
@@ -450,53 +568,66 @@ Observed on x86-64 Linux with a release build:
   magnitude: several hundred frames per second including checkpoint restore,
   comfortably above the 60 fps the kiosk needs. Its lookahead section reports the
   slot-stability numbers quoted above.
-- `world_model_bot` runs the reader-only policy to absolute X 899, where it stops
-  against a pipe and prints the grid that explains why: the pipe's body tiles
-  `$68`/`$69` fill every row its body occupies and none of them is in the
-  load-bearing set, so `wall_ahead` is false while the game refuses to move him.
-  With `--reflex` the same sense data reaches 2601, dies twice and gets a game
-  over; how far it gets depends on `--reflex-look` as measured above. It waits for
+- `world_model_bot` runs the reader-only policy plus the refusal ledger to absolute
+  X 1553, losing three lives at the same place near the camera limit before the game
+  ends the run. It waits for
   the level load to hand the player over (trap 8) before it starts, and says which
-  of "stuck", "out of lives" or "cleared the level" ended the run.
+  of "stuck", "out of lives" or "cleared the level" ended the run. The one refusal
+  it learns, at absolute X 594, teaches two cells and carries it past the pipe that
+  stopped the same policy with an empty ledger at 899.
+- `world_model_solidity` runs the four passes behind the A/B table above and prints,
+  for both tails, the first cell the ledger calls a wall that the tile ids do not,
+  the refusals the tail itself collected and the furthest absolute X, all from one
+  checkpoint state captured 120 frames after the refusal was learned.
 
 ## Where the films live
 
 Run artifacts stay out of the repository with the rest of `data/`, so the films
 this document reports are on the owner's workstation under `data/shots` and this
 paragraph is their record. A `--shots` directory holds the raw series and the film
-tool writes beside it:
+tool writes its output into that directory unless `--out` says otherwise:
 
 | Name | What it is |
 | --- | --- |
 | `data/shots/<run>/` | the raw PNG series, `frame-*` plain and `model-*` with the dots on |
-| `data/shots/<run>/event-<what>-f<frame>-x<x>.png` | a still at a moment: `jump`, `death`, `stuck`, `game-over` |
+| `data/shots/<run>/event-<what>-f<frame>-x<x>.png` | a still at a moment: `jump`, `refusal`, `death`, `stuck`, `game-over` |
 | `<run>.mp4` | the plain series at 60/N, so it still runs in real time |
 | `<run>-model.mp4` | the same frames at 60 with the model's own beliefs dotted on |
 | `<run>-clip-<lo>-<hi>.mp4` | an overlay clip over emulator frames `lo` to `hi` |
 | `<run>-events.png` | every event still in the order they happened, legend printed |
 
-Two runs are worth keeping. `reader-only` is the honest one, 2,283 frames, stopped
-against the pipe at absolute X 899. `reflex` is the tuned one, 8,168 frames, reaching
-2601 and dying twice. The clips that carry the argument are
-`reader-only-clip-380-440`, the first jump; `reader-only-clip-1600-1802`, the pipe,
-where the row under his feet is green and the three rows ahead are red, which is trap
-7 without any prose; `reflex-clip-2480-2620`, the same pipe cleared; and
-`reflex-clip-990-1080`, a death. `sheet-moments.png` and the `hero-*.png` stills are
-one-off comparisons of the screen against the model at chosen frames.
+Three runs are worth keeping. `reader-only` is the honest one, 2,283 frames, stopped
+against the pipe at absolute X 899. `reflex` is the reaction rule that was deleted,
+8,168 frames, reaching 2601 and dying twice; it stays because it is the evidence for
+SMB-008, not a current build. `ledger` is the current one, 2,380 frames, absolute X
+1553 and two deaths, and it is the only series whose overlay includes orange.
+
+The clips that carry the argument are `reader-only-clip-1600-1802`, the pipe, where
+the row under his feet is green and the three rows ahead are red, which is trap 7
+without any prose; `ledger-clip-600-700`, the refusal at the first pipe and the jump
+one frame later; `ledger-clip-830-920`, the second pipe jumped without ever
+being stopped by it, with no refusal event anywhere near it, which is the memory
+rather than the collision;
+and `ledger-clip-1330-1400`, the death at the camera limit that the model says nothing
+about at all. `sheet-moments.png` and the `hero-*.png` stills are one-off comparisons
+of the screen against the model at chosen frames. The two older runs were cut with
+`--out data/shots`, which is why their films sit beside their series; `ledger`'s sit
+inside it, where the tool puts them by default.
 
 Any of them is re-cut from the cartridge in two commands, the run that writes the
 series and the cut:
 
 ```sh
 cargo run --release --locked -p engine-nes --example world_model_bot \
-  -- data/roms/smb.nes 9000 --reflex --shots data/shots/reflex --overlay --every 2
-python3 tools/nes-reference/film-smb-run.py data/shots/reflex --clip 990-1080
+  -- data/roms/smb.nes 9000 --shots data/shots/ledger --overlay --every 2
+python3 tools/nes-reference/film-smb-run.py data/shots/ledger \
+  --clip 600-700 --clip 830-920 --clip 1330-1400
 ```
 
-Re-cutting `reader-only` from its existing series reproduces `reader-only.mp4`,
-`reader-only-model.mp4` and `reader-only-events.png` byte for byte, which is the
-point: a film that cannot be re-cut from a commit is a screenshot with a claim
-attached to it.
+Re-cutting `ledger` from its existing series reproduces all six of its files, both
+films, the contact sheet and the three clips, byte for byte, and the cutter's own
+check reports every dot count going in and coming out the same. That is the point: a
+film that cannot be re-cut from a commit is a screenshot with a claim attached to it.
 
 ## Optional cartridge test
 

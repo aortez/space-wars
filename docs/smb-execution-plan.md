@@ -113,6 +113,16 @@ noisy, read the game's own collision result out of RAM instead. The oracle only 
 to be correct at decision points, not every frame, which is what makes either route
 tractable.
 
+**Met, and the exit turned out to be the easy half.** The refusal is recorded against
+the CHR pattern that made it, so the pipe that stopped the reader-only policy at
+absolute X 899 is called a wall nine frames and seven pixels before contact on the next
+pass, the bot climbs it, and the run reaches 1553. The reaction rule is deleted along
+with its tuning constant, and the distance the ledger is trusted ahead is not a knob:
+the run is identical from 0 to 5 columns. What the exit did not anticipate is a stop
+with no artwork attached to it. Three lives in a row now end at the camera limit near
+absolute X 1553, where he is falling rather than blocked, so nothing can be attributed
+to a cell and the model has nothing to say. That is the first gym.
+
 ## Phase 2 - The gym harness
 
 Deliberately earlier than the mission's order, which lists gyms after the skill
@@ -130,6 +140,12 @@ the cartridge's identity, an input prefix and a frame index, and the state is
 re-derived when the gym runs. A committed savestate silently mismatches when the
 core changes, which is precisely when a gym is worth having; a tape fails loudly
 instead.
+
+Phase 1 adds a requirement this ordering did not anticipate: a start state is now two
+things, the machine's frame and the model's memory of what it has been refused, and the
+tape has to say which of the two it carries. Restoring the frame and handing over a cold
+ledger is a different gym from restoring the frame and handing over the lessons an
+earlier run learned, and the difference between them is the experiment worth running.
 
 ## Phase 3 - Skills, then a scripted bot that finishes a level
 

@@ -17,6 +17,7 @@ use engine_nes::{
     CHR_MEMORY_BYTES, ControllerButtons, FRAME_PIXELS, FRAME_WIDTH, MachineConfig, Mirroring,
     NesMachine,
 };
+use std::collections::BTreeSet;
 
 // Player and progression state. DirtSim NesSuperMarioBrosRamExtractor.cpp,
 // from the Data Crystal Super Mario Bros. RAM map.
@@ -230,6 +231,40 @@ pub fn boot_to_gameplay(rom: &[u8]) -> Result<(NesMachine, u64), Box<dyn std::er
     Err("setup script never reached normal play".into())
 }
 
+/// Frames the game takes to place a level, counted from the mode byte saying play.
+pub const LEVEL_LOAD_FRAMES: u64 = 300;
+/// Consecutive frames of "in control and grounded" that count as a handover.
+pub const HANDOVER_FRAMES: u64 = 8;
+
+/// Run idle frames until the game has put the player in the level and let go.
+///
+/// `boot_to_gameplay` stops at the mode byte, and the mode byte says play from the
+/// very first frame of the level load. The load then takes about 150 more frames to
+/// place the level, and through the first two of those the player bytes still hold
+/// the *previous* screen's values, so a single frame of "normal, grounded, at X 40"
+/// is the ghost of a level that is already gone. Wait for the state to hold rather
+/// than for it to flicker: a policy started on the mode byte spends its first two
+/// seconds pushing at a world that is not listening, and a stall detector counted in
+/// frames then reads the run as giving up before it has moved.
+///
+/// Returns the frame id the handover was confirmed on.
+pub fn wait_for_handover(machine: &mut NesMachine) -> Result<u64, Box<dyn std::error::Error>> {
+    let mut in_control_for = 0;
+    for _ in 0..LEVEL_LOAD_FRAMES {
+        let state = read_state(machine);
+        in_control_for = if state.is_in_control() && state.is_grounded() {
+            in_control_for + 1
+        } else {
+            0
+        };
+        if in_control_for >= HANDOVER_FRAMES {
+            return Ok(machine.ppu().frame_id());
+        }
+        machine.run_frame([ControllerButtons::NONE, ControllerButtons::NONE])?;
+    }
+    Err("the game never handed the player over".into())
+}
+
 /// Snapshot the PPU side of the world model.
 ///
 /// The core finishes a frame inside vblank, before the cartridge has written
@@ -435,6 +470,85 @@ pub fn player_tile(state: &SmbState, origin_x: u16) -> (i16, i16) {
     )
 }
 
+/// The first world pixel to the right of the body the core collides with.
+///
+/// `$0086` is the left edge of the sprite, and the box the game stops against the
+/// level is not the sprite. Two independent refusals on the same cartridge say where
+/// it is: the game holds him at absolute X 594 against a pipe whose left edge is at
+/// 608, and at absolute X 898 against a pipe whose left edge is at 912. Both leave
+/// exactly 14 pixels, so the box is `[x, x + 14)`, the last pixel he occupies is
+/// `x + 13`, and the cell that can refuse him is the one containing `x + 14`.
+///
+/// The earlier number here was 11, read off the decoded grid rather than off the
+/// level. That reading was wrong for the reason [`tile_at_world_pixel`] explains: the
+/// grid is indexed by screen column, so asking it which cell a pixel falls in is up
+/// to one column out whenever the fine scroll is not zero.
+pub const BODY_RIGHT_REACH_PIXELS: u16 = 14;
+/// The same measurement on the left, still at the conservative end of its range:
+/// the pixel his stored X is on. Nothing has been refused from the left yet, so
+/// there is no second refusal to fix it with, and a leftward wall can only ever
+/// look further off than it is.
+pub const BODY_LEFT_REACH_PIXELS: u16 = 0;
+
+/// The world pixel the body's leading edge is at on the way to that side.
+pub fn leading_pixel(state: &SmbState, side: Side) -> u16 {
+    match side {
+        Side::Right => state.absolute_x + BODY_RIGHT_REACH_PIXELS,
+        Side::Left => state.absolute_x.saturating_sub(BODY_LEFT_REACH_PIXELS),
+    }
+}
+
+/// The tile drawn at one world pixel and one grid row.
+///
+/// This is the exact horizontal channel, and the difference between it and
+/// [`tile_at`] is not cosmetic. [`tile_grid`] samples the screen at cell centres, so
+/// its column 14 is the tile under screen pixel 116, and screen pixel 116 is world
+/// pixel `origin + 116` for whatever the fine scroll happens to be. The level's own
+/// cells sit on world multiples of eight. The two agree only when the fine scroll is
+/// zero, so a cell looked up through the grid is up to one column away from the cell
+/// the pixel actually falls in, on seven frames out of eight.
+///
+/// That is the whole reason a pipe stopped the bot with `wall_ahead` false: the
+/// refusal was attributed to the right artwork but the look-ahead was measured
+/// against the wrong grid.
+pub fn tile_at_world_pixel(frame: &PpuBytes, origin_x: u16, world_x: u16, row: i16) -> Option<u8> {
+    let screen_x = wrapped_delta(world_x, origin_x);
+    if screen_x < 0 {
+        return None;
+    }
+    let y = i32::from(row) * 8 + i32::from(TOP_CROP_PIXELS) + 4;
+    let y = u16::try_from(y).ok()?;
+    Some(tile_id_at(
+        frame,
+        origin_x,
+        0,
+        u16::try_from(screen_x).ok()?,
+        y,
+    ))
+}
+
+/// The cell `step` cells beyond the body's leading edge, `rise` rows above his feet
+/// row, read through [`tile_at_world_pixel`]. `None` when it is off the visible
+/// screen or off the top or bottom of the level.
+pub fn cell_beyond(
+    frame: &PpuBytes,
+    origin_x: u16,
+    state: &SmbState,
+    side: Side,
+    step: i16,
+    rise: i16,
+) -> Option<u8> {
+    let edge = i32::from(leading_pixel(state, side));
+    let step = i32::from(step) * 8;
+    let world_x = match side {
+        Side::Right => edge + step,
+        Side::Left => edge - step,
+    };
+    let world_x = u16::try_from(world_x).ok()?;
+    let row = player_tile(state, origin_x).1 - rise;
+    tile_at_world_pixel(frame, origin_x, world_x, row)
+}
+
 /// The tile row the player's own sprite is standing on, measured from OAM.
 ///
 /// [`player_tile`] needs `PLAYER_FEET_OFFSET_PIXELS`, and that number is the one
@@ -612,40 +726,61 @@ pub fn gap_ahead(tiles: &[u8; TILE_CELLS], column: i16, row: i16) -> Option<i16>
     })
 }
 
-/// Whether the model sees the next column as something to stand against. It
-/// cannot see a pipe: the pipe's body is not in the load-bearing set, so this
-/// reports false right up to the frame the game stops him.
-pub fn wall_ahead(tiles: &[u8; TILE_CELLS], column: i16, row: i16) -> bool {
-    (1..=BODY_ROWS).any(|rise| tile_at(tiles, column + 1, row - rise).is_some_and(is_load_bearing))
-}
+/// Cells beyond the body that a refusal is allowed to speak for.
+///
+/// Zero is the strictest reading of the ledger: it records the cell that refused
+/// him, so only that cell is a report and every cell past it is an induction. One is
+/// what acting on the report needs, because a body pressed flush against a wall has
+/// no run-up left and a jump started flush clears a two-cell pipe only just. It is
+/// still two cells, not the seven a reaction rule needed: the ledger names artwork,
+/// so it can say what a cell is before he reaches it, which is the thing the load
+/// bearing set could never do.
+pub const WALL_LOOK_COLUMNS: i16 = 1;
 
-/// Columns to the first cell ahead that draws something in the rows his body
-/// occupies. Opaque is not solid, so this is not "a wall is coming": it is
-/// "something is there and the model cannot say what", which is the most an honest
-/// reading of the nametable offers, and enough to time a jump on.
-pub fn obstruction_ahead(
+/// Whether the model sees something to stand against in the cells his body would
+/// sweep into.
+///
+/// Two sources, and the difference between them is the point. The load-bearing set
+/// is what the game has held him up on, so on its own this reports false right up to
+/// the frame a pipe body stops him. The ledger is what the game has refused to let
+/// him through, the same fact arrived at from the other side, and because it is
+/// keyed on the artwork it carries to every cell drawn the same way, which is what
+/// makes looking more than one cell ahead worth doing at all.
+pub fn wall_ahead(
     frame: &PpuBytes,
-    tiles: &[u8; TILE_CELLS],
-    column: i16,
-    row: i16,
-    within: i16,
-) -> Option<i16> {
-    (1..=within).find(|&step| {
+    origin_x: u16,
+    state: &SmbState,
+    resistance: &Resistance,
+    columns: i16,
+) -> bool {
+    (0..=columns).any(|step| {
         (1..=BODY_ROWS).any(|rise| {
-            tile_at(tiles, column + step, row - rise).is_some_and(|t| !is_blank_tile(frame, t))
+            cell_beyond(frame, origin_x, state, Side::Right, step, rise).is_some_and(|tile| {
+                is_load_bearing(tile)
+                    || resistance.refused(
+                        pattern_hash(pattern_bytes(frame, tile)),
+                        -rise,
+                        Side::Right,
+                    )
+            })
         })
     })
 }
 
-/// One frame of the base policy: run right, and jump a hole or an enemy the reader
-/// can see. `hold_a` carries a jump across frames, because releasing A on the frame
-/// he leaves the ground gives a hop rather than a jump.
+/// One frame of the base policy: run right, and jump a hole, an enemy or a wall the
+/// reader can see. `hold_a` carries a jump across frames, because releasing A on the
+/// frame he leaves the ground gives a hop rather than a jump.
+///
+/// The caller passes the verdict rather than the ledger, because how far ahead to
+/// trust a wall is the caller's business and the answer differs between a bot with a
+/// run-up and a test that only wants to know what the model saw.
 pub fn run_right_buttons(
     state: &SmbState,
     machine: &NesMachine,
     tiles: &[u8; TILE_CELLS],
     column: i16,
     row: i16,
+    wall: bool,
     hold_a: &mut u64,
 ) -> ControllerButtons {
     let enemy_ahead = state
@@ -656,7 +791,7 @@ pub fn run_right_buttons(
         .min()
         .unwrap_or(i16::MAX);
     if state.is_grounded()
-        && (gap_ahead(tiles, column, row).is_some() || enemy_ahead <= ENEMY_TRIGGER_PIXELS)
+        && (wall || gap_ahead(tiles, column, row).is_some() || enemy_ahead <= ENEMY_TRIGGER_PIXELS)
     {
         *hold_a = JUMP_HOLD_FRAMES;
     }
@@ -666,4 +801,195 @@ pub fn run_right_buttons(
         *hold_a -= 1;
     }
     buttons
+}
+
+// Solidity learned from the game's own refusals.
+//
+// The nametable records what is drawn and [`LOAD_BEARING_TILES`] records what has
+// held the player up. Neither records what stops him sideways, and the three are
+// provably different sets: a pipe's top row is load-bearing and its body is not,
+// while the body is exactly what stops him. The core already carries the answer.
+// When the game stops a body it takes the motion back out of the speed, so the
+// difference between the motion the buttons asked for and the motion that came out
+// is a verdict from the game rather than an inference from the picture, and it can
+// be attributed to the cell his body is pressed against.
+//
+// Keyed on the CHR pattern hash, not the nametable number, per SMB-002: a refusal
+// belongs to the artwork, and the same wall drawn with a different number in
+// another area is still the same wall.
+
+/// Which way the body was trying to go when the game refused it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Side {
+    Right,
+    Left,
+}
+
+impl Side {
+    /// The column a refused cell occupies, relative to the body's own column.
+    pub fn column_offset(self) -> i16 {
+        match self {
+            Self::Right => 1,
+            Self::Left => -1,
+        }
+    }
+
+    fn button(self) -> ControllerButtons {
+        match self {
+            Self::Right => ControllerButtons::RIGHT,
+            Self::Left => ControllerButtons::LEFT,
+        }
+    }
+
+    fn opposed_by(self, buttons: ControllerButtons) -> bool {
+        buttons.contains(self.button())
+            && !buttons.contains(match self {
+                Self::Right => ControllerButtons::LEFT,
+                Self::Left => ControllerButtons::RIGHT,
+            })
+    }
+}
+
+/// What the body was doing on the frame a command was issued, so that the next
+/// frame can say what the game did with it.
+#[derive(Clone, Copy, Debug)]
+pub struct Motion {
+    pub x: u16,
+    pub h_speed: i8,
+    pub grounded: bool,
+    pub asked: ControllerButtons,
+}
+
+impl Motion {
+    /// The motion a frame's buttons were asking for.
+    pub fn asked(state: &SmbState, buttons: ControllerButtons) -> Self {
+        Self {
+            x: state.absolute_x,
+            h_speed: state.h_speed,
+            grounded: state.is_grounded(),
+            asked: buttons,
+        }
+    }
+}
+
+/// A single refusal, recorded where it happened so a claim about it can be replayed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Refusal {
+    /// The CHR pattern of the tile that refused him.
+    pub pattern: u64,
+    /// The number it was drawn with on that frame, for reporting only.
+    pub tile: u8,
+    /// Row relative to his feet row. Only -1, the row a grounded body is pressed
+    /// against, is recorded; a head bump is a different relation and is not here.
+    pub row_offset: i16,
+    pub side: Side,
+    pub absolute_x: u16,
+    pub frame: u64,
+}
+
+/// Everything the game has refused so far, keyed by the pattern that refused it.
+///
+/// This is the model's memory of solidity, and it is what a player has after
+/// walking into a pipe once. It survives a death and a level change because a
+/// wall does not move, and it is empty at the start of a cartridge, which is
+/// honest: nothing has been refused yet.
+#[derive(Clone, Debug, Default)]
+pub struct Resistance {
+    cells: BTreeSet<(u64, i16, Side)>,
+    log: Vec<Refusal>,
+}
+
+impl Resistance {
+    /// Rebuild a memory from refusals recorded elsewhere, which is how a gym hands
+    /// a model what a previous run learned without replaying the run.
+    pub fn from_log(log: &[Refusal]) -> Self {
+        Self {
+            cells: log
+                .iter()
+                .map(|r| (r.pattern, r.row_offset, r.side))
+                .collect(),
+            log: log.to_vec(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.cells.is_empty()
+    }
+
+    /// How many distinct pattern, row and direction triples have been refused.
+    pub fn len(&self) -> usize {
+        self.cells.len()
+    }
+
+    /// Every refusal in the order the game made them.
+    pub fn log(&self) -> &[Refusal] {
+        &self.log
+    }
+
+    /// Whether this pattern has refused this body row from this side.
+    pub fn refused(&self, pattern: u64, row_offset: i16, side: Side) -> bool {
+        self.cells.contains(&(pattern, row_offset, side))
+    }
+
+    /// Compare the motion a frame's buttons asked for with the motion the core
+    /// produced, and attribute the difference to the cell at the body's leading
+    /// edge.
+    ///
+    /// The three conditions are the game's own signature, not a threshold: the
+    /// direction was held without its opposite, the body gained no ground at all,
+    /// and the speed the buttons had built up came back zero, which is what the
+    /// core does when it subtracts a blocked move. A frame that merely moved
+    /// slowly is not a refusal, so nothing here needs a tuning constant.
+    pub fn observe(
+        &mut self,
+        asked: Motion,
+        produced: &SmbState,
+        frame: &PpuBytes,
+        origin_x: u16,
+        at_frame: u64,
+    ) -> Option<Refusal> {
+        if !asked.grounded || !produced.is_grounded() || !produced.is_in_control() {
+            return None;
+        }
+        if produced.absolute_x != asked.x {
+            return None;
+        }
+        let mut first = None;
+        for side in [Side::Right, Side::Left] {
+            let moving = match side {
+                Side::Right => asked.h_speed > 0,
+                Side::Left => asked.h_speed < 0,
+            };
+            if !moving || produced.h_speed != 0 || !side.opposed_by(asked.asked) {
+                continue;
+            }
+            // The run of drawn cells from the row his body rests on upwards, in the
+            // cell his box would enter next. The first blank one is air he would have
+            // walked through, and anything above that is not part of what stopped
+            // him.
+            for rise in 1..=BODY_ROWS {
+                let Some(tile) = cell_beyond(frame, origin_x, produced, side, 0, rise) else {
+                    break;
+                };
+                if is_blank_tile(frame, tile) {
+                    break;
+                }
+                let refusal = Refusal {
+                    pattern: pattern_hash(pattern_bytes(frame, tile)),
+                    tile,
+                    row_offset: -rise,
+                    side,
+                    absolute_x: produced.absolute_x,
+                    frame: at_frame,
+                };
+                self.cells
+                    .insert((refusal.pattern, refusal.row_offset, refusal.side));
+                self.log.push(refusal);
+                if first.is_none() {
+                    first = Some(refusal);
+                }
+            }
+        }
+        first
+    }
 }

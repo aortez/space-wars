@@ -15,13 +15,14 @@
 //! wall: a pipe's top row is in the set and its body is not. See
 //! `docs/nes-world-model-reader.md`, where this is trap 7.
 //!
-//! `--reflex` adds the rule that stands in for the missing wall ids: if the
-//! controller says right and the world will not move, the game is telling the bot
-//! that its model is wrong. It backs off for a moment, runs at the obstruction and
-//! jumps on the approach. That buys distance and no reliability: the furthest X
-//! swings from 595 to 2601 with `--reflex-look` alone, and the best setting still
-//! ends in a game over rather than the flagpole. A reaction rule on top of a model
-//! with a hole in it is a lottery, which is the result worth having.
+//! That hole is now filled by the game rather than by a rule. `Resistance` keeps
+//! every motion the core has refused the bot, keyed on the CHR pattern that refused
+//! it, and `wall_ahead` believes that ledger as well as the load-bearing set. The
+//! bot learns the first pipe by walking into it once, the way a player does, and
+//! needs no tuning constant to do it. An earlier version stood in for the missing
+//! knowledge with a `--reflex` reaction rule; it is gone, because the ledger says
+//! the same thing with no knob to turn. What the reflex measured is kept in
+//! `docs/nes-world-model-reader.md` as the record of what a knob was doing there.
 //!
 //! `--keep-going` runs past a level change instead of stopping at it, which is how
 //! to watch the same bot go blind in 1-2: the load-bearing set is 1-1's vocabulary,
@@ -51,36 +52,20 @@ use engine_nes::{
     ControllerButtons, FRAME_HEIGHT, FRAME_PIXELS, FRAME_WIDTH, NesMachine, write_rgb888,
 };
 use smb::{
-    JUMP_HOLD_FRAMES, MODE_END_GAME, PpuBytes, TILE_CELLS, TILE_COLUMNS, TILE_ROWS,
-    TOP_CROP_PIXELS, boot_to_gameplay, is_blank_tile, is_load_bearing, obstruction_ahead,
-    player_tile, read_state, run_right_buttons, scroll_x, snapshot, tile_at, tile_grid, wall_ahead,
+    MODE_END_GAME, Motion, PpuBytes, Resistance, Side, TILE_CELLS, TILE_COLUMNS, TILE_ROWS,
+    TOP_CROP_PIXELS, WALL_LOOK_COLUMNS, boot_to_gameplay, is_blank_tile, is_load_bearing,
+    pattern_bytes, pattern_hash, player_tile, read_state, run_right_buttons, scroll_x, snapshot,
+    tile_at, tile_grid, wait_for_handover, wall_ahead,
 };
 
-/// Frames without any new ground covered before the bot believes it is blocked.
-const BLOCKED_FRAMES: u64 = 6;
 /// Frames without any new ground covered before the run is called over.
 const STUCK_FRAMES: u64 = 600;
-/// The `--reflex` cycle: walk away to get room, then run back and jump on the
-/// approach. Pinned flat against a wall he has no run-up to jump with, so the
-/// reflex has to leave the wall before it can get over it.
-const BACKOFF_FRAMES: u64 = 24;
-const CHARGE_FRAMES: u64 = 48;
-const REFLEX_CYCLE: u64 = BACKOFF_FRAMES + CHARGE_FRAMES;
 /// Absolute X below which the game has restarted the level, so a death is not read
 /// as the bot running out of ideas.
 const RESPAWN_X: u16 = 128;
-/// How far ahead the reflex looks for something drawn before committing to the
-/// jump. Measured, not guessed: at 3 columns the run dies at the first pipe, at 4
-/// it dies at the second, at 5, 6 and 8 it stops at the third, and from 7 columns
-/// on it reaches 2601 and never further. A single tuning constant moving the
-/// outcome by 2000 pixels is the finding, not the tuning. See
-/// `docs/nes-world-model-reader.md`.
-const REFLEX_LOOK_COLUMNS: i16 = 7;
 /// How much of the grid to print when the run ends.
 const DUMP_COLUMNS: i16 = 11;
 const DUMP_ROWS: i16 = 5;
-/// Frames the game takes to place a level, counted from the mode byte saying play.
-const LEVEL_LOAD_FRAMES: u64 = 300;
 
 /// Print the cells around the player, flagging the ones the model calls ground.
 fn dump_grid(tiles: &[u8; TILE_CELLS], column: i16, row: i16) {
@@ -130,10 +115,19 @@ fn dot_cell(rgb: &mut [u8], column: i16, row: i16, colour: [u8; 3]) {
 }
 
 /// Dot the reader's opinion onto the picture: green where the model calls a cell
-/// ground, red where a cell draws something the model does not call ground, blue on
-/// the cell he is standing in. A red dot against a Mario who will not move is
-/// trap 7 in one image: the pipe's body is scenery as far as the model goes.
-fn paint_model(rgb: &mut [u8], frame: &PpuBytes, tiles: &[u8; TILE_CELLS], column: i16, row: i16) {
+/// ground, orange where the game has refused to let him through a cell of that
+/// artwork, red where a cell draws something the model calls neither, blue on the
+/// cell he is standing in. A red dot against a Mario who will not move is trap 7 in
+/// one image; watching that dot turn orange on the next pass is what learning looks
+/// like in the same picture.
+fn paint_model(
+    rgb: &mut [u8],
+    frame: &PpuBytes,
+    tiles: &[u8; TILE_CELLS],
+    column: i16,
+    row: i16,
+    resistance: &Resistance,
+) {
     for grid_row in 0..TILE_ROWS as i16 {
         for grid_column in 0..TILE_COLUMNS as i16 {
             let Some(tile) = tile_at(tiles, grid_column, grid_row) else {
@@ -142,7 +136,15 @@ fn paint_model(rgb: &mut [u8], frame: &PpuBytes, tiles: &[u8; TILE_CELLS], colum
             let colour = if is_load_bearing(tile) {
                 [0, 255, 0]
             } else if !is_blank_tile(frame, tile) {
-                [255, 0, 0]
+                if resistance.refused(
+                    pattern_hash(pattern_bytes(frame, tile)),
+                    grid_row - row,
+                    Side::Right,
+                ) {
+                    [255, 160, 0]
+                } else {
+                    [255, 0, 0]
+                }
             } else {
                 continue;
             };
@@ -154,18 +156,14 @@ fn paint_model(rgb: &mut [u8], frame: &PpuBytes, tiles: &[u8; TILE_CELLS], colum
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = env::args().skip(1);
-    let rom_path = PathBuf::from(
-        args.next()
-            .ok_or("usage: world_model_bot ROM [FRAMES] [--reflex] [--keep-going] [--shots DIR] [--overlay] [--every N]")?,
-    );
-    let mut reflex = false;
+    let rom_path = PathBuf::from(args.next().ok_or(
+        "usage: world_model_bot ROM [FRAMES] [--keep-going] [--shots DIR] [--overlay] [--every N]",
+    )?);
     let mut keep_going = false;
     let mut overlay = false;
     let mut shots = None;
     let mut every = 1u64;
     let mut start_delay = 0u64;
-    let mut reflex_look = REFLEX_LOOK_COLUMNS;
-    let mut expect_look = false;
     let mut budget = None;
     let mut expect_dir = false;
     let mut expect_every = false;
@@ -180,17 +178,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         } else if expect_every {
             every = arg.parse()?;
             expect_every = false;
-        } else if expect_look {
-            reflex_look = arg.parse()?;
-            expect_look = false;
         } else if arg == "--every" {
             expect_every = true;
         } else if arg == "--start-delay" {
             expect_delay = true;
-        } else if arg == "--reflex-look" {
-            expect_look = true;
-        } else if arg == "--reflex" {
-            reflex = true;
         } else if arg == "--keep-going" {
             keep_going = true;
         } else if arg == "--overlay" {
@@ -212,35 +203,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let rom = fs::read(&rom_path)?;
     let (mut machine, gameplay_frame) = boot_to_gameplay(&rom)?;
     println!(
-        "frame {gameplay_frame}: gameplay; policy = run right, jump what the reader sees{}",
-        if reflex {
-            ", plus the blocked-means-run-at-it reflex"
-        } else {
-            ""
-        }
+        "frame {gameplay_frame}: gameplay; policy = run right, jump what the reader sees          and what the game has already refused to let him through"
     );
 
     // The mode byte says play from the first frame of the level load, and the load
-    // takes about 150 more frames to place the level and hand him over. Starting on
-    // the mode byte would spend the first two seconds of the run pushing at a world
-    // that is not listening, and a stuck detector counted in frames would call that
-    // the bot giving up.
-    let mut in_control_for = 0;
-    for _ in 0..LEVEL_LOAD_FRAMES {
-        let state = read_state(&machine);
-        if state.is_in_control() && state.is_grounded() {
-            in_control_for += 1;
-            if in_control_for >= 8 {
-                break;
-            }
-        } else {
-            in_control_for = 0;
-        }
-        machine.run_frame([ControllerButtons::NONE, ControllerButtons::NONE])?;
-    }
-    if in_control_for < 8 {
-        return Err("the game never handed the player over".into());
-    }
+    // takes about 150 more frames to place the level and hand him over.
+    wait_for_handover(&mut machine)?;
     for _ in 0..start_delay {
         machine.run_frame([ControllerButtons::NONE, ControllerButtons::NONE])?;
     }
@@ -257,8 +225,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut lives = opened.lives;
     let mut deaths = 0u32;
     let mut a_frames = 0u32;
-    let mut blocked_frames = 0u32; // frames spent believing the model is wrong
     let mut hold_a = 0u64;
+    // What the core has refused this bot so far. It outlives deaths and level
+    // changes, because a wall does not move, and it starts empty, because nothing
+    // has been refused yet.
+    let mut ledger = Resistance::default();
+    let mut refusals = 0u32;
     let mut a_down = false;
     let mut awaiting_respawn = false;
     let mut cleared = false;
@@ -267,22 +239,37 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut out_of_lives = false;
 
     for elapsed in 1..=frames {
+        // One number per frame, for the transcript and the shot names alike. A
+        // checkpoint and a tape are addressed by frame id, and the loop counter
+        // starts after the level load, so printing that instead would put two
+        // frame numbers about a hundred and fifty frames apart in one transcript.
+        let frame_id = machine.ppu().frame_id();
         let state = read_state(&machine);
         if state.lives < lives {
             lives = state.lives;
             deaths += 1;
             awaiting_respawn = true;
+            // Which death it was matters more than where: a pit, an enemy and a
+            // wall he misjudged each say something different about the model, and
+            // the position alone says none of them.
+            let nearest = state
+                .enemies(&machine)
+                .first()
+                .map(|enemy| format!("kind {:#04x} at {:+}", enemy.kind, enemy.delta_x))
+                .unwrap_or_else(|| "nobody within reach".to_owned());
             println!(
-                "  frame {:>5}: died at absolute X {}",
-                gameplay_frame + elapsed,
-                state.absolute_x
+                "  frame {:>5}: died at absolute X {} with player state {:#04x}, float {}, \
+                 speed ({:+},{:+}), screen y {}, {nearest}",
+                frame_id,
+                state.absolute_x,
+                state.player_state,
+                state.float_state,
+                state.h_speed,
+                state.v_speed,
+                state.screen_y,
             );
             if let (Some(dir), Some(rgb)) = (&shots, capture(&machine)) {
-                let name = format!(
-                    "event-death-f{}-x{}.png",
-                    gameplay_frame + elapsed,
-                    state.absolute_x
-                );
+                let name = format!("event-death-f{}-x{}.png", frame_id, state.absolute_x);
                 write_png(&dir.join(name), &rgb)?;
             }
         }
@@ -293,15 +280,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             out_of_lives = true;
             println!(
                 "  frame {:>5}: the game ended at absolute X {} after {deaths} deaths",
-                gameplay_frame + elapsed,
-                state.absolute_x
+                frame_id, state.absolute_x
             );
             if let (Some(dir), Some(picture)) = (&shots, capture(&machine)) {
-                let name = format!(
-                    "event-game-over-f{}-x{}.png",
-                    machine.ppu().frame_id(),
-                    state.absolute_x
-                );
+                let name = format!("event-game-over-f{}-x{}.png", frame_id, state.absolute_x);
                 write_png(&dir.join(name), &picture)?;
             }
             break;
@@ -310,12 +292,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             cleared = true;
             println!(
                 "  frame {:>5}: cleared world {}.{} at absolute X {} and landed in world {}.{}",
-                gameplay_frame + elapsed,
-                start_level.0,
-                start_level.1,
-                furthest_x,
-                state.world,
-                state.level
+                frame_id, start_level.0, start_level.1, furthest_x, state.world, state.level
             );
             break;
         }
@@ -329,45 +306,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         let origin_x = scroll_x(&frame);
         let tiles = tile_grid(&frame, origin_x, 0);
         let (column, row) = player_tile(&state, origin_x);
-        let wall = wall_ahead(&tiles, column, row);
+        let wall = wall_ahead(&frame, origin_x, &state, &ledger, WALL_LOOK_COLUMNS);
 
-        // The reflex reads the game's refusal to move as "your model is wrong about
-        // this cell". It backs off to get a run-up, runs at the obstruction and jumps
-        // on the approach. The decision has to be made before the frame's buttons are
-        // built: setting the hold afterwards presses A one frame late, and one frame
-        // is the difference between clearing the first pipe and dying against it.
-        let blocked = no_progress_for >= BLOCKED_FRAMES;
-        let mut backing_off = false;
-        if reflex && blocked {
-            blocked_frames += 1;
-            let cycle = no_progress_for - BLOCKED_FRAMES;
-            if cycle % REFLEX_CYCLE < BACKOFF_FRAMES {
-                backing_off = true;
-            } else if let Some(step) = obstruction_ahead(&frame, &tiles, column, row, reflex_look)
-                && state.is_grounded()
-                && state.h_speed > 0
-            {
-                println!(
-                    "  frame {:>5}: reflex jump at x={} hspeed={:+}, obstruction {step} ahead",
-                    gameplay_frame + elapsed,
-                    state.absolute_x,
-                    state.h_speed
-                );
-                hold_a = JUMP_HOLD_FRAMES;
-            }
-        }
-        let mut buttons = run_right_buttons(&state, &machine, &tiles, column, row, &mut hold_a);
+        let buttons = run_right_buttons(&state, &machine, &tiles, column, row, wall, &mut hold_a);
         // A jump starts on the frame A goes down. `run_right_buttons` spends the
         // hold in the same call that sets it, so the counter is already one short
         // by the time the buttons are back.
         let jumping = buttons.contains(ControllerButtons::A) && !a_down;
         a_down = buttons.contains(ControllerButtons::A);
-        if backing_off {
-            buttons = ControllerButtons::LEFT | ControllerButtons::B;
-        }
         if buttons.contains(ControllerButtons::A) {
             a_frames += 1;
         }
+        // What these buttons were asking for, so the frame after this one can say
+        // what the game did with it.
+        let asked = Motion::asked(&state, buttons);
 
         if state.absolute_x > furthest_x {
             furthest_x = state.absolute_x;
@@ -379,7 +331,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let Some(dir) = &shots {
             let picture =
                 capture(&machine).ok_or("video output is disabled, so there is nothing to film")?;
-            let frame_id = machine.ppu().frame_id();
             if jumping {
                 let name = format!("event-jump-f{frame_id}-x{}.png", state.absolute_x);
                 write_png(&dir.join(name), &picture)?;
@@ -389,12 +340,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 write_png(&dir.join(&name), &picture)?;
                 if overlay {
                     let mut model = picture;
-                    paint_model(&mut model, &frame, &tiles, column, row);
+                    paint_model(&mut model, &frame, &tiles, column, row, &ledger);
                     write_png(&dir.join(name.replace("frame-", "model-")), &model)?;
                 }
             } else if overlay {
                 let mut model = picture;
-                paint_model(&mut model, &frame, &tiles, column, row);
+                paint_model(&mut model, &frame, &tiles, column, row, &ledger);
                 let name = format!("model-{frame_id:06}-x{:05}.png", state.absolute_x);
                 write_png(&dir.join(name), &model)?;
             }
@@ -402,15 +353,46 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         machine.run_frame([buttons, ControllerButtons::NONE])?;
 
+        // The other half of the ledger: read what came back and, if the game took
+        // the motion the buttons asked for straight out of the speed, write down the
+        // cell that refused him. `snapshot` only peeks at the PPU, so taking a
+        // second picture of the same frame costs nothing but time.
+        let produced = read_state(&machine);
+        let after: PpuBytes = snapshot(&machine);
+        let after_origin = scroll_x(&after);
+        let after_tiles = tile_grid(&after, after_origin, 0);
+        if let Some(refusal) = ledger.observe(asked, &produced, &after, after_origin, frame_id) {
+            refusals += 1;
+            println!(
+                "  frame {:>5}: the game refused {} at row {:+}, drawn ${:02x}: the model now \
+                 calls that artwork a wall ({} cell(s) known)",
+                refusal.frame,
+                match refusal.side {
+                    Side::Right => "rightward motion",
+                    Side::Left => "leftward motion",
+                },
+                refusal.row_offset,
+                refusal.tile,
+                ledger.len(),
+            );
+            if let (Some(dir), Some(picture)) = (&shots, capture(&machine)) {
+                let name = format!(
+                    "event-refusal-f{}-x{}.png",
+                    refusal.frame, refusal.absolute_x
+                );
+                write_png(&dir.join(&name), &picture)?;
+                let mut model = picture;
+                paint_model(&mut model, &after, &after_tiles, column, row, &ledger);
+                write_png(&dir.join(name.replace("event-", "model-event-")), &model)?;
+            }
+        }
+
         if elapsed % 600 == 0 {
             println!(
                 "  frame {:>5}: world {}.{} mode={:#04x} x={:>5} furthest={furthest_x:>5} \
-                 col={column:>3} row={row:>2} lives={lives} blocked={blocked} wall={wall}",
-                gameplay_frame + elapsed,
-                state.world,
-                state.level,
-                state.game_mode,
-                state.absolute_x,
+                 col={column:>3} row={row:>2} lives={lives} stuck_for={no_progress_for} \
+                 wall={wall}",
+                frame_id, state.world, state.level, state.game_mode, state.absolute_x,
             );
         }
 
@@ -420,7 +402,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "  frame {:>5}: covered no new ground for {STUCK_FRAMES} frames at absolute X {} \
                  with hspeed={:+}, screen y={}/{}, player state {:#04x}, float {}, \
                  and wall_ahead={wall}",
-                gameplay_frame + elapsed,
+                frame_id,
                 state.absolute_x,
                 state.h_speed,
                 state.screen_x,
@@ -432,22 +414,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             if let Some(dir) = &shots {
                 let mut picture = capture(&machine)
                     .ok_or("video output is disabled, so there is nothing to film")?;
-                let name = format!(
-                    "event-stuck-f{}-x{}.png",
-                    machine.ppu().frame_id(),
-                    state.absolute_x
-                );
+                let name = format!("event-stuck-f{}-x{}.png", frame_id, state.absolute_x);
                 write_png(&dir.join(&name), &picture)?;
-                paint_model(&mut picture, &frame, &tiles, column, row);
+                paint_model(&mut picture, &frame, &tiles, column, row, &ledger);
                 write_png(&dir.join(name.replace("event-", "model-event-")), &picture)?;
             }
             break;
         }
     }
 
+    let known = ledger.len();
     println!(
         "furthest absolute X {furthest_x}: {deaths} deaths, {a_frames} frames with A held, \
-         {blocked_frames} blocked frames, {}",
+         {refusals} refusals teaching {known} cell(s) of solidity, {}",
         if cleared {
             "cleared the level, which is as far as 1-1's tile vocabulary reaches"
         } else if out_of_lives {
