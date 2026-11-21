@@ -9,6 +9,9 @@ belongs to [the world-model reader](nes-world-model-reader.md), where a claim
 about the reader gets measured and defended. This document changes only when the
 direction does.
 
+The order of work, and why it is that order, is in
+[the execution plan](smb-execution-plan.md).
+
 ## Why this is the mission
 
 The bot is the instrument, not the product. A bot that finishes a level having
