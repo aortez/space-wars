@@ -39,12 +39,13 @@ installed generation 28 by itself on 2026-11-10, the first automatic
 installation on hardware.
 
 Publication is owner-local. Each Nightly generation is built on the workstation
-from the selected `main` commit in the pinned kas container, qualified against
-that commit's passing CI run, prepared, reviewed and signed with pinned drivers,
-and published by the owner. A Release promotion signs the same payload under
-the Release role against a local qualification record. The feed's timestamp is
-renewed weekly by the owner. The hosted image workflow runs on manual dispatch
-only and has never completed a build; see [Publication](#publication) below.
+from the selected `main` commit in the pinned kas container and qualified
+against that commit's passing CI run; the owner's release command plans,
+signs and publishes it. A Release promotion signs the same payload under the
+Release role against a local qualification record. A timer on the workstation
+renews the feed's timestamp before it expires. The hosted image workflow runs
+on manual dispatch only and has never completed a build; see
+[Publication](#publication) below.
 
 ### Fleet and feed state
 
@@ -91,12 +92,68 @@ the panel on 2026-11-07 and 2026-11-08
 
 ### Publication
 
-The owner-local drivers (`prepare`, `sign`, `publish`) live beside each
-generation's evidence on the workstation and pin the source commit, the CI
-run, the payload digest, the publisher state they were prepared against, and
-the tools and modules they run. Prepare and sign use a read-only GitHub client;
-publish is the owner's command. The workstation build reuses its warm Yocto
-state and takes about ten minutes.
+The owner's release command,
+[`ota_release.py`](../.github/ci/ota_release.py), makes every change to the
+feed: a Nightly generation, a Release promotion, or a renewal that re-signs
+every role with unchanged targets. It takes the version, generation, source
+commit, CI run and previous bundle from the publisher journal and the prepared
+candidate, where the per-generation drivers it replaces pinned them by hand.
+
+```bash
+ota_release.py status                     # read-only: expiry, pending work, public feed, asset headroom
+ota_release.py nightly CANDIDATE_DIR      # plan a Nightly publication
+ota_release.py promote --payload SHA256 --qualification RECORD --notes FILE
+ota_release.py sign VERSION --plan-sha256 SHA256
+ota_release.py publish VERSION --plan-sha256 SHA256
+ota_release.py renew sign|publish         # no plan; targets stay unchanged
+ota_release.py abandon                    # drop a pending operation that is not public
+```
+
+`nightly` checks a prepared candidate directory: every artifact against its
+preparation record, the image with the pinned `image_candidate` verifier, the
+image's embedded source, and a successful CI run of that commit pushed to
+`main`. `promote` requires a published Nightly image and a qualification
+record naming that whole image and its generation. Both write a plan and print
+its digest. `sign` and `publish` take the digest, repeat the checks, and refuse
+if the journal, the candidate, the record, the trusted tools or the command's
+code changed after planning, so plan, sign and publish from the same checkout
+of `main`. Planning and signing use a read-only GitHub client, and only a
+signed plan can be published.
+
+Every operation signs all five online roles one version higher under the
+shared publisher lock, saves a journal checkpoint before and after each signer
+call, hard-links the payloads from the previous bundle, checks the new bundle
+with `feed_inventory` and delivers it timestamp-last. Before delivery it checks
+the channels change only as intended: a renewal changes no target, a Nightly
+publication adds exactly the selected image, and a promotion adds that Nightly
+target relabelled for Release.
+
+An interrupted operation resumes on its next run. Its roles must all be signed
+within 24 hours of the reservation, the signer's limit. A signed operation can
+be published, or its interrupted delivery resumed, while its timestamp has a
+day left. Once devices can fetch its timestamp, `publish` only finishes it,
+whatever its age and whatever changed since. `abandon` clears an operation
+that never became public and puts the current `timestamp.json` back if an
+interrupted swap left none; the versions it reserved stay used. A renewal also
+repairs a missing `timestamp.json`, and `status` reports the feed as matching
+only while that file serves the journal's current timestamp.
+
+A local file only the owner can write, `~/.config/spacewars-ota/release.json`,
+names the authority and the qualification workspace, and pins the digests of
+the trusted tools and of the reviewed command and its two modules. The command
+refuses to run other code, so after reviewing a change to those three files,
+update their digests there. Each operation keeps its plan, bundle and results under the
+workspace's `feed/v<version>-<kind>/`, and its signing evidence beside the
+authority's journal. `renewal/latest-bundle.json` in the workspace names the
+last published bundle, where the next operation starts.
+
+The workstation build reuses its warm Yocto state and takes about ten minutes.
+
+A user timer on the workstation checks the feed daily and renews it when the
+timestamp has less than three days left, so the feed stays valid while the
+workstation is in use. Every signing also renews the other roles for 30 days;
+if 30 days pass without one, the targets role expires and the signer refuses
+to sign again. The root expires in October 2027 and needs rotating before then.
 
 The hosted [image workflow](../.github/workflows/ota-build.yml) builds the
 same unsigned candidate on a standard runner, on manual dispatch only. Its
@@ -346,7 +403,7 @@ test unit and a fresh candidate are available.
 | #256 | Corrected installed time service verified after signed update and normal boot on both primary Pis; broader provider and RTC retention qualification remain |
 | #258–#260 | Native off/time-wake/automatic-OTA/off cycle and SSH controls passed on Pi 5 and the selected second Picade; expected setup profile changes and remaining per-device rollout remain |
 | #261 | Shared metadata/image contract and verification fixtures in use by every publication and install; retain those checks through further service integration |
-| #262 | Owner-local publication in use: 26 Nightly generations and four Release promotions prepared, reviewed and signed with pinned drivers and published by the owner; the weekly timestamp renewal is the owner's command; the hosted candidate workflow runs on manual dispatch only and has never completed a build, and automatic signing is not pursued while signing stays an owner action |
+| #262 | Owner-local publication in use: 28 Nightly generations and four Release promotions signed and published by the owner; `ota_release.py` now plans, signs and publishes Nightly generations, Release promotions and renewals, and a workstation timer renews the timestamp; the hosted candidate workflow runs on manual dispatch only and has never completed a build, and automatic signing is not pursued while signing stays an owner action |
 | #263 | The 2026-10-27 approval bundle holds all eleven case reports: seven observed passes, two reviewed from earlier observations, interrupted promotion as owner-accepted risk and power loss as a partial observation plus accepted risk; the confirming normal reboot (#600) was observed on 2026-11-08 |
 | #264 | Native writer connected and in routine use from the Updates panel on all three units; development installs (#566) implemented but not yet enabled on `sw-picade-2`; cancellation, worker failure, lost CLI replies, rollback of a panel install and service or app restart during an install remain untested on hardware |
 | #265 | Daily checks and downloads run unattended on all three units and delivered Release generation 20 by themselves on 2026-10-29; download impact on gameplay and resumed downloads remain unmeasured |
@@ -380,8 +437,11 @@ test unit and a fresh candidate are available.
 4. Publication (#262): the hosted image workflow keeps manual dispatch only;
    a dispatch succeeds only once the cold build fits the runner or reuses a
    cache, which nobody needs while the workstation builds in minutes. Signing
-   and publishing stay owner actions, and the weekly renewal stays the owner's
-   command.
+   and publishing stay owner actions through `ota_release.py`, and the
+   workstation timer renews the feed. Next: bring the candidate build and
+   preparation into the command, prune superseded assets before the release
+   reaches GitHub's 1000-asset limit, and rotate the root before it expires in
+   October 2027.
 5. Deferred qualification (#263, #267): interrupted promotion and the
    promotion-boundary power cuts are accepted risk until a test unit and a
    fresh candidate are set aside for them. Kernel, firmware and boot-asset
@@ -408,6 +468,7 @@ review candidates, not authorization to delete evidence or recovery data:
 | Repeated extracted root filesystems, build outputs and copied executables under local qualification directories | Inventory references and retain verified image/artifact hashes plus the evidence needed to reproduce a result. Review redundant copies only after archival and current-device recovery requirements are satisfied. |
 | Per-run qualification directories on the Pi, including copied binaries and isolated state | Verify local archives/hashes and ensure their transient services/timers have finished before reviewing removal. Keep live production state, holds and recovery history separate. |
 | Local flash/bootstrap/recovery helpers and saved `/data` archives from replaced media | Treat these as recovery records until device identity, restoration and replacement-drive checks are closed. Review independently of ordinary build-cache cleanup. |
+| Per-generation `operate.py` and `review.py` publication drivers and `renewal/renew.py` in the local qualification workspace | Replaced by `ota_release.py`. Published evidence names their digests, so archive them with their generation's records rather than deleting them, and never rerun one for a new publication. |
 
 The review-fix inventory found four extracted rootfs copies using about 1.98 GiB;
 all still have their compressed candidate and verification record. These are
