@@ -621,3 +621,73 @@ evidence about is reported as "nothing to stand on", which is why the staircase 
 sixty-four-pixel hole, and the ledger that already knows those cells refuses to be asked.
 And a height counted by what draws is inflated by any background artwork stacked above a
 real wall, which is the cost of lifting that cap and is not yet priced by anything.
+
+## SMB-024 — 2026-11-21 — A wall gets its gym, and the layer that fails is not the model
+
+`pipe-608` joins the committed gyms, `bot` takes `--trace N` so that a cut frame is a
+measurement rather than a guess, and Phase 3's exit closes with every skill in the library
+ablated against something named.
+
+Rationale: the standing rule says a skill is not in the library until a gym fails without it,
+and two of the three skills satisfied that rule on the strength of one gym that is about the
+hole. `clear-wall` carries eleven of the twenty-six behaviours that finish 1-1 and had no
+situation named after it, so "the level needed this skill" had never been tested. The level
+run cannot test it: there the skill is never alone, it has a ledger warmed by everything
+before it, an enemy standing in front of half its walls, and 1-1's own ordering of obstacles.
+A gym is the only place in this project where one entry in one library can be the only
+difference between two runs, so the wall needed a start state of its own.
+
+Cutting one turned out to be a question about where the player is on a given frame, and the
+instrument that answers it printed a decoded line every 600 frames. The reflex is refused at
+the second pipe on frame 642 and is at absolute X 908 on 886, so "cut it sixty pixels short
+of the pipe at running speed" was being read off two prints that bracketed the entire
+approach. `--trace N` prints every N frames instead, and the cut came from what it said:
+grounded and running from 608 (absolute X 531) to 636 (593), stuck at 594 from 638, refused
+on 642 against artwork `$68`, reading `Wall { x: 608 }` from 644. Frame 616 is X 546 — inside
+the run, before the refusal, and far enough back that the pipe is met under the gym's own
+driver rather than on momentum the tape had already spent.
+
+Evidence: `pipe-608` carries the reflex's recorded run-up to 616, golden hash
+`v3:0xdcc8e4285344c231`, a cold ledger, objective absolute X 700, budget 600, stall 120.
+Under `skills::SCRIPTED` it is `Met` after 108 frames at furthest absolute X 698 with **one**
+refusal. Under the same tape with `clear-wall` deleted from the script it is `Stuck` after
+142 frames at absolute X 595 with **eighteen**. Same tape, same objective, same budget, same
+stall rule, one entry of one library apart. `the_pipe_gym_fails_without_the_skill_that_acts_on_a_wall`
+holds the pair; the suite is twenty-nine tests, eleven of which need no cartridge.
+
+The two verdicts are worth less than what is inside them. **The layer that fails is not the
+model.** By the second refusal the ledger holds the pipe's pattern and `wall_ahead` names the
+column at 608 on the frames he stands in front of it, and the run still never gets its box
+past that column: knowing a wall and clearing one are the two layers the whole design rests
+on, and until this gym the case for splitting them was prose. What the ablated library does
+instead is the part that explains a stop rather than describing one — its transcript is two
+`hop-obstacle`s, both from absolute X 594, both about pixel 642, because a koomba
+forty-eight pixels ahead is the only affordance in reach that a remaining skill can act on.
+The hop carries sixty-five pixels and rises thirty-nine into a four-row column. A wall with
+an enemy in front of it looks, to a library with no wall skill, like an enemy.
+
+The `Met` verdict has an ordering inside it that the gym was cut to produce and that is now
+measured rather than hoped for: the first behaviour is `clear-wall` on frame 643, from X 594,
+about pixel 608 — the frame *after* the game refused him there. The pipe's artwork is not in
+the load-bearing set and this gym's ledger starts cold, so nothing in the picture calls that
+column solid until the game has said so; the run earns one refusal and spends it. That makes
+the verdict a measurement of refusal-then-action, which is the question
+`camera-limit-remembering` asked of memory and could not answer, because nothing at the
+camera limit had ever been refused.
+
+Consequence: three things, cheapest first. Phase 3's exit is met, and what is left of the
+phase is the flagpole — a twelve-row column that is also the level's exit, whose gym
+therefore has to start downstream of the pit. `Gym::record` cannot cut that tape because it
+hard-codes the reflex as the run-up's player, so recording a run-up with the gym's own driver
+is the harness change that the next skill is waiting on. Second, a takeoff that fails its own
+postcondition leaves no trace: run past its own objective on this tape and the script starts
+`clear-wall` from absolute X 722 about pixel 736 on frames 740, 783 and 826 — three takeoffs
+at one pixel — where the level run, on frame 673, cleared that same wall from that same
+pixel in one jump. The mechanism behind the difference is unmeasured; what is decided here is that no layer
+records that a behaviour was just spent there and did not land, so an envelope can be spent
+twice with nothing new known. That is a named hole rather than a flaky run, and it is now a
+command line rather than a claim: `transcript` prints a gym's behaviour list past the
+objective that stops its verdict, and takes `--without SKILL` so the ablated run can be read
+as well as asserted. Third, three of the four gyms in the tree are still about the hole; the
+balance is better and not good, and Phase 4's inventory is where that gets fixed by
+measurement rather than by intent.

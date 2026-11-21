@@ -40,6 +40,12 @@
 //! was started to get past. A library with no record of its own choices has no evidence
 //! about itself, and the reflex prints nothing because it has no names for what it does.
 //!
+//! `--trace N` prints a decoded line every N frames instead of every 600. Where a
+//! gym's start frame is cut from is a question about where the player is on a given
+//! frame, and at 600 frames a print the answer is a guess: the reflex is refused at the
+//! first pipe on frame 642 and is at absolute X 908 on 886, and nothing in between is
+//! printed. Tracing is what turns "cut it about here" into a measurement.
+//!
 //! `--shots DIR` writes a PNG of every frame to `DIR`, so the run can be watched
 //! rather than read, and names the frames where something happened
 //! (`event-jump-*`, `event-death-*`, `event-stuck-*`, `event-clear-*`).
@@ -174,12 +180,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut shots = None;
     let mut every = 1u64;
     let mut start_delay = 0u64;
+    let mut trace = 600u64;
     let mut budget = None;
     let mut expect_dir = false;
     let mut expect_every = false;
     let mut expect_delay = false;
+    let mut expect_trace = false;
     for arg in args {
-        if expect_delay {
+        if expect_trace {
+            trace = arg.parse()?;
+            expect_trace = false;
+        } else if expect_delay {
             start_delay = arg.parse()?;
             expect_delay = false;
         } else if expect_dir {
@@ -190,6 +201,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             expect_every = false;
         } else if arg == "--every" {
             expect_every = true;
+        } else if arg == "--trace" {
+            expect_trace = true;
         } else if arg == "--start-delay" {
             expect_delay = true;
         } else if arg == "--keep-going" {
@@ -415,7 +428,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
-        if elapsed % 600 == 0 {
+        if elapsed % trace == 0 {
             println!(
                 "  frame {:>5}: world {}.{} mode={:#04x} x={:>5} furthest={furthest_x:>5} \
                  col={column:>3} row={row:>2} lives={lives} stuck_for={no_progress_for} \

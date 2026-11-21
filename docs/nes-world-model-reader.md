@@ -807,6 +807,78 @@ ledger that already knows those cells is not asked. And a height counted by what
 inflated by background artwork stacked over a real wall, which is the price of lifting that
 cap and has no gym attached to it yet.
 
+### The wall gets its gym, and the layer that fails is not the model
+
+Phase 3's exit asks every skill for a gym that fails without it. Two skills had one and
+both of those gyms were about the hole, so `clear-wall` — the skill that carries eleven of
+the twenty-six behaviours that finish 1-1 — was in the library on the strength of the level
+run alone. `pipe-608` is the wall's gym, and the answer it gave is worth more than the
+box it was cut to tick.
+
+The start state is the reflex's own run-up to frame 616: absolute X 546, on the ground, at
+running speed — the two and a half pixels a frame the pit measurement already records —
+sixty-two pixels short of the second pipe in 1-1, with a cold ledger and no refusal anywhere
+in the tape. The pipe is the one the reflex is refused at on frame 642, and the objective
+is absolute X 700 — past the column, on ground the reflex itself lands on, and short of the
+next wall at 736.
+
+```text
+pipe-608        reach absolute X 700   player script
+  with    clear-wall   Met   after 108 frames, furthest absolute X 698, 1 refusal
+  without clear-wall   Stuck after 142 frames, furthest absolute X 595, 18 refusals
+```
+
+One field of one gym apart — the same tape, the same objective, the same budget, the same
+stall rule, and a library with or without one entry.
+
+**The layer that fails is not the model.** Eighteen refusals is the ablated run being
+told, eighteen times, that the column at 608 is solid, by a ledger that has held that cell
+since the first of them, and `wall_ahead` names the column at 608 on the frames he stands
+in front of it. The model knows the pipe and the library still has nothing to do about it,
+which is the two-layer split the whole design rests on, arriving as a verdict rather than
+as an argument. Before this gym the evidence for that split was prose.
+
+What the ablated library does instead is the detail that makes the pair readable. Its
+transcript is two `hop-obstacle`s, both from absolute X 594, both about pixel 642 — an
+enemy forty-eight pixels ahead, which is the only affordance in reach that a remaining
+skill knows how to act on. The hop carries sixty-five pixels and rises thirty-nine, and a
+four-row pipe wants more than that, so he hops into the column, is refused, and hops again
+three hundred frames later. A wall with an enemy in front of it looks, to a library with no
+wall skill, like an enemy.
+
+**The `Met` verdict has an ordering inside it that the gym was cut to produce.** The first
+behaviour is `clear-wall` on frame 643, from absolute X 594, about pixel 608 — the frame
+*after* the game refused him there. The pipe's artwork is not in the load-bearing set and
+this gym's ledger starts empty, so nothing in the picture calls that column solid until the
+game has said so. The run earns one refusal and spends it, which makes the verdict a
+measurement of refusal-then-action rather than of action alone. `camera-limit-remembering`
+is the same idea asked of memory and got `nothing changes` because nothing at the camera
+limit was ever refused; this is the case where the lesson exists to be used.
+
+**A skill can start three times at one wall and nothing knows it.** Run long enough past
+its own objective, the script on this tape meets the next pipe, at 736, and starts
+`clear-wall` from absolute X 722 on frames 740, 783 and 826 — the same pixel, three times,
+each attempt ending back where it started — where the level run from the handover cleared
+that same wall from that same pixel in one jump on frame 673. The two runs differ in what
+they were refused and when, and the mechanism behind the difference has not been measured.
+What is worth stating is the hole it exposes: a takeoff that fails its own postcondition
+leaves no trace, so the library will spend the same envelope again at the same pixel with
+no memory that it just did. That is a different missing thing from the flagpole, and it is
+now a command line rather than a hypothesis — `transcript pipe-608` prints the behaviour
+list a verdict stops short of, and `transcript --without clear-wall` prints the ablated
+one, which is the other half of the pair above and eighty-one refusals by the time its own
+budget runs out.
+
+Choosing that cut frame is why `bot` takes `--trace N`. A gym's start frame is a question
+about where the player is on a given frame, and the example printed a decoded line every
+600 frames: the reflex is refused at the pipe on 642 and is at absolute X 908 on 886, and
+nothing in between was ever printed, so "cut it sixty pixels short of the pipe" was a guess
+read off two prints that bracketed the whole approach. Traced at two frames the same run
+says it is grounded and running from 608 (absolute X 531) to 636 (593), stuck at 594 from
+638, refused on 642 against artwork `$68`, and reads `Wall { x: 608 }` from 644 — so 616, at
+X 546, is inside the run, before the refusal, and far enough back that the pipe is met under
+the gym's own driver rather than on momentum the tape already spent.
+
 ### The frame a button arrives on
 
 `engine-client`'s training test flaked on a shared runner and was reported as possible
@@ -911,7 +983,15 @@ free of a filesystem, clock, thread and renderer.
   which at running speed is past the picture's own edge — so the crossing works because the
   hole reports its far lip, and it would stop working on a hole whose far lip is not the
   ground return. Three skills is also three skills: one level, one cartridge, one start, and
-  the only tapes ever run under them are one gym cut and the level's own beginning.
+  the only tapes ever run under them are the level's own beginning and four gyms cut out of
+  runs that stopped — three of them about the hole, and the fourth the only one that asks the
+  wall skill anything.
+- A takeoff that fails its own postcondition leaves no trace, and the library will spend the
+  same envelope at the same pixel again with nothing new known. On the pipe tape the script
+  starts `clear-wall` from absolute X 722 about pixel 736 on frames 740, 783 and 826 — three
+  takeoffs, one column — where the level run cleared that same wall from that same pixel in
+  one jump. What differs between the two runs has not been measured; what is missing has:
+  no layer records that a behaviour was just started there and did not land.
 
 How far that leaves this from a player, measured rather than judged: the reflex has
 never finished a level and still stops at the pit, and the script has finished exactly
@@ -920,14 +1000,14 @@ can start. It has three macro-actions written inline in an
 example where DirtSim has eleven, no reward or termination wiring, no item or block
 state, five enemy slots because that is all the game keeps live, a sideways
 solidity model that knows only what one bot has already walked into, three skills that
-between them clear one level and cannot name the thing that ends it, and three golden hashes — the frames three tapes
-start on — so a core change that quietly alters SMB is caught where a gym happens to
-stand and is still invisible everywhere else.
+between them clear one level and cannot name the thing that ends it, and four golden hashes —
+the frames four tapes start on — so a core change that quietly alters SMB is caught where a
+gym happens to stand and is still invisible everywhere else.
 
 ## What is in the tree now
 
 One model in four layers, one policy, a three-entry skill library that clears 1-1, one
-harness, three gyms, eight drivers, twenty-eight tests — seventeen of them skipped when the
+harness, four gyms, nine drivers, twenty-nine tests — eighteen of them skipped when the
 cartridge is absent, the eleven that hold the skill rules needing no game at all — and one
 film cutter.
 
@@ -943,7 +1023,7 @@ film cutter.
 | `crates/smb-ai/src/gym.rs` | instrument | tape, replay, objective, frame budget, verdict |
 | `crates/smb-ai/src/gyms.rs` | instrument | the gyms this project has actually needed |
 | `crates/smb-model/examples/{probe,tiles,rollout}.rs` | | read-side exploration: decoded state, the tile grid and the pixel comparison, branch and rewind |
-| `crates/smb-ai/examples/{bot,solidity,gym,film,limit}.rs` | | the bot, its overlay films and the transcript of behaviours it started, the A/B that tells memory from reaction, the tape recorder, the films a gym's own driver was measured under, the instrument that asks a stop what it actually is |
+| `crates/smb-ai/examples/{bot,solidity,gym,transcript,film,limit}.rs` | | the bot, its overlay films and the transcript of behaviours it started, the A/B that tells memory from reaction, the tape recorder, the behaviours behind a gym's verdict and the library entries that produce them, the films a gym's own driver was measured under, the instrument that asks a stop what it actually is |
 | `crates/smb-model/tests/reader.rs` | | the optional cartridge test: the RAM map, the tile frame, a frame-exact restore, and the frame a button arrives on |
 | `crates/smb-ai/tests/{gyms,solidity,skills}.rs` | | a gym's verdict is what its driver does, the A/B that tells memory from reaction, and the skill rules and their ablation |
 | `tools/nes-reference/film-smb-run.py` | | cuts films, clips and a contact sheet from a `--shots` directory, and checks the overlay survived the encoder |
@@ -967,10 +1047,17 @@ cargo run --release --locked -p smb-ai --example bot -- data/roms/smb.nes 9000
 # The library, on the whole level: 1-1 cleared, no death, and a line for every behaviour
 # it started. Drop `--script` to watch the reflex spend two lives at the pit.
 cargo run --release --locked -p smb-ai --example bot -- data/roms/smb.nes 2620 --script
+
+# Where a gym's cut frame comes from: a decoded line every N frames instead of every 600.
+cargo run --release --locked -p smb-ai --example bot -- data/roms/smb.nes 900 --trace 2
 cargo run --release --locked -p smb-ai --example solidity
 cargo run --release --locked -p smb-ai --example gym
 cargo run --release --locked -p smb-ai --example bot -- data/roms/smb.nes 2400 --shots /tmp/smb-film --overlay --every 2
 python3 tools/nes-reference/film-smb-run.py /tmp/smb-film --clip 600-700 --clip 830-920
+
+# The behaviours a gym's verdict stops short of, and the same run with one skill deleted.
+cargo run --release --locked -p smb-ai --example transcript -- pipe-608
+cargo run --release --locked -p smb-ai --example transcript -- pipe-608 --without clear-wall
 
 # A gym film: the tape, the ledger and the player all come off the gym.
 cargo run --release --locked -p smb-ai --example film -- pit-1379 data/shots/pit-cross 200
@@ -1037,7 +1124,7 @@ tool writes its output into that directory unless `--out` says otherwise:
 | `<run>-clip-<lo>-<hi>.mp4` | an overlay clip over emulator frames `lo` to `hi` |
 | `<run>-events.png` | every event still in the order they happened, legend printed |
 
-Five runs are worth keeping. `reader-only` is the honest one, 2,283 frames, stopped
+Six runs are worth keeping. `reader-only` is the honest one, 2,283 frames, stopped
 against the pipe at absolute X 899. `reflex` is the reaction rule that was deleted,
 8,168 frames, reaching 2601 and dying twice; it stays because it is the evidence for
 SMB-008, not a current build. `ledger` is the current one, 2,380 frames, absolute X
@@ -1055,11 +1142,11 @@ what it holds is the ending rather than the jump that caused it; the jump is the
 `event-jump` still at frame 1961 and the film is what joins them. It is cut by
 `bot 2620 --script --shots data/shots/script-1-1` with no overlay, so the series is the
 plain one and the film is `script-1-1.mp4`.
-It has no `model-*` series and no overlay
-clip because it is a gym film rather than a `bot` film: `film` replays a gym's tape and
-hands the machine to the driver that gym names, so the run on screen is the run the
-verdict was measured from, and it writes one PNG a frame instead of two. Re-cutting it
-reproduces all two hundred frames and all four stills byte for byte.
+`pit-cross` and `pipe-608` have no `model-*` series and no overlay clip because they are gym
+films rather than `bot` films: `film` replays a gym's tape and hands the machine to the driver
+that gym names, so the run on screen is the run the verdict was measured from, and it writes
+one PNG a frame instead of two. Re-cutting either reproduces every frame and every still byte
+for byte.
 
 The clips that carry the argument are `reader-only-clip-1600-1802`, the pipe, where
 the row under his feet is green and the three rows ahead are red, which is trap 7
@@ -1076,6 +1163,13 @@ column at 3168 and the slide down a column no jump in the library gets over; and
 `script-1-1-clip-2300-2613` is the walk to the castle and the level ending, which is what
 the run's last three hundred frames turn out to be. `script-1-1-events.png` is all
 twenty-nine stills in the order they happened, the transcript as one picture.
+
+The sixth is `pipe-608`: 200 frames of the wall gym under its own driver, from the tape's
+own frame 616, cut by `film pipe-608 data/shots/pipe-608 200`. It is the film of a refusal
+being spent — the `event-jump` still at frame 643 is one frame after the game stopped him at
+the pipe, which is the ordering the gym was cut to produce, and the two stills at absolute X
+722, frames 740 and 783, are two of the three takeoffs at the next pipe, the same pixel asked
+twice. `pipe-608-events.png` is those four in order.
 `sheet-moments.png` and the `hero-*.png` stills are one-off comparisons
 of the screen against the model at chosen frames. The two older runs were cut with
 `--out data/shots`, which is why their films sit beside their series; `ledger`'s sit

@@ -202,8 +202,76 @@ pub const PIT_1379: Gym = Gym {
     },
 };
 
+/// The run-up the pipe gym starts from: the base policy from power-on to frame 616,
+/// which is absolute X 546 on the ground at full running speed, sixty-two pixels short of
+/// the second pipe in 1-1 and one refusal short of knowing what that pipe is.
+///
+/// Recorded, not authored — `gym --record 616 pipe-608` cut it and replayed it before
+/// printing it. The run-up holds no refusal at all, so this gym's `Cold` and `Warm` seeds
+/// are the same start state; the lesson about the pipe is earned inside the gym, which is
+/// the whole point of asking it there.
+const PIPE_608_TAPE: Tape = Tape {
+    cartridge: smb_model::cartridge::SMB_IDENTITY,
+    runs: Cow::Borrowed(&[
+        (0x00, 119), // NONE
+        (0x08, 1),   // START
+        (0x00, 167), // NONE: the level is still being placed
+        (0x82, 119), // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 10),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 23),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 3),   // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 33),  // B|RIGHT
+        (0x83, 20),  // A|B|RIGHT
+        (0x82, 41),  // B|RIGHT
+    ]),
+    frame: 616,
+    golden_hash: engine_nes::StateHash {
+        version: 3,
+        value: 0xdcc8_e428_5344_c231,
+    },
+};
+
+/// A pipe, cut upstream of the contact, for the one skill in the library that acts on a
+/// wall.
+///
+/// The first gym `clear-wall` needed and did not have: Phase 3's exit asks each skill for
+/// a situation that fails without it, and the two skills that had one were both about the
+/// hole. This is the wall, taken from the run that stopped the reader-only policy at
+/// absolute X 899 — the same pipe, one pipe earlier in the level than the one SMB-007
+/// named, and the one the reflex is refused at on frame 642.
+///
+/// The start state is sixty-two pixels short of it at full running speed with a cold
+/// ledger, which is what makes the verdict about the library rather than about the
+/// memory: the pipe's artwork is not in the load-bearing set, so nothing in the picture
+/// says *wall* until the game has refused him, and the run therefore earns one refusal and
+/// then has to use it. `Met` after 108 frames at absolute X 698 with exactly that one
+/// refusal is the script being told the pipe is solid and jumping it anyway; take
+/// `clear-wall` out of the library and the same start state has no answer to a solid
+/// column at all, however well the model knows it.
+pub const PIPE_608: Gym = Gym {
+    name: "pipe-608",
+    objective: Objective::ReachX { at_least: 700 },
+    seed: LedgerSeed::Cold,
+    tape: PIPE_608_TAPE,
+    driver: skills::SCRIPTED,
+    frame_budget: CAMERA_LIMIT.frame_budget,
+    stall_frames: CAMERA_LIMIT.stall_frames,
+    recorded: Verdict {
+        outcome: Outcome::Met,
+        frames: 108,
+        // The harness reads the objective before it reads the position, so the frame that
+        // satisfies `at_least: 700` reports the X it stood on one frame earlier.
+        furthest_x: 698,
+        refusals: 1,
+    },
+};
+
 /// Every committed gym, in the order a transcript prints them.
-pub const ALL: [Gym; 3] = [CAMERA_LIMIT, CAMERA_LIMIT_REMEMBERING, PIT_1379];
+pub const ALL: [Gym; 4] = [CAMERA_LIMIT, CAMERA_LIMIT_REMEMBERING, PIPE_608, PIT_1379];
 
 /// The gym a command line means, by the name it carries.
 ///

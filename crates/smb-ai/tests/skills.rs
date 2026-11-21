@@ -712,3 +712,100 @@ fn a_script_and_a_reflex_are_the_same_kind_of_player() {
     let _: fn(BaseBot) -> Box<dyn Bot> = gym::reflex;
     let _: fn(&mut dyn Bot, &NesMachine) -> ControllerButtons = drives;
 }
+
+/// The script with `clear-wall` taken out of it, as a driver, so a gym can be run with it
+/// and the difference attributed to one entry in a library.
+fn without_a_wall_skill(bot: BaseBot) -> Box<dyn Bot> {
+    Box::new(ScriptedBot::with_script(bot, &[&CLEAR_GAP, &HOP_OBSTACLE]))
+}
+
+/// The library's answer to a pipe, measured both ways on one tape.
+///
+/// Phase 3's exit asks every skill for a situation that fails without it, and until now
+/// both gyms with that property were about the hole: `clear-gap` and `hop-obstacle` are
+/// load-bearing for `pit-1379` and `clear-wall` had nothing. `pipe-608` is the wall, and
+/// the pair is one field of one gym apart.
+///
+/// With the library as written: `Met` after 108 frames at absolute X 698, on one
+/// behaviour — `clear-wall` started on frame 643 from absolute X 594, about pixel 608,
+/// which is the frame *after* the game refused him there. That ordering is the whole
+/// gym's design. The pipe's artwork is not in the load-bearing set and the ledger starts
+/// empty, so nothing in the picture calls that column solid until the game has said so;
+/// the run earns one refusal and then spends it.
+///
+/// Take the skill out and the same start state, the same objective and the same model
+/// — which by then knows the pipe, and knows it eighteen times over — come to `Stuck`
+/// after 142 frames at absolute X 595 with **eighteen refusals**. The ablated transcript
+/// says what the library does instead: `hop-obstacle`, twice, from absolute X 594 about
+/// pixel 642, because there is an enemy forty-eight pixels ahead and that is the only
+/// affordance in reach that a skill knows how to act on. The hop carries sixty-five
+/// pixels and rises thirty-nine, and a four-row pipe needs more than that, so he hops
+/// into the column, is refused, and hops again three hundred frames later.
+///
+/// That is the sharpest form this evidence could have come in, because the failure is not
+/// the model's. The refusal signature is recorded against the CHR pattern that made it,
+/// the ledger has held it since the first of the eighteen, and `wall_ahead` names the
+/// column at 608 on the frames he is in front of it — the model knows the pipe is solid and
+/// the library still has no thing to do about it. Knowing a wall and clearing one are two layers, and only one of
+/// them had a gym.
+#[test]
+fn the_pipe_gym_fails_without_the_skill_that_acts_on_a_wall() {
+    let Some(rom) = cartridge::read_or_skip() else {
+        return;
+    };
+    let pipe = gyms::PIPE_608;
+    let cleared = pipe.run(&rom).expect("the scripted pipe gym should run");
+    assert_eq!(
+        cleared.outcome,
+        gym::Outcome::Met,
+        "the script is expected to clear the pipe it carries a skill for: {cleared:?}"
+    );
+
+    let (started, furthest, died) =
+        scripted_with(&rom, &pipe.tape, &[&CLEAR_GAP, &HOP_OBSTACLE], 600);
+    assert!(
+        !started.iter().any(|run| run.skill == &CLEAR_WALL),
+        "the ablated library has no wall skill to start, and the transcript says it did \
+         not invent one: {started:?}"
+    );
+    assert!(
+        started.iter().all(|run| run.skill == &HOP_OBSTACLE),
+        "what the ablated library offers at a pipe is the hop it borrowed from an enemy, \
+         twice, from the same pixel: {started:?}"
+    );
+    assert!(
+        !died,
+        "the ablated run stops rather than dying, so the verdict below is about the stop"
+    );
+    assert!(
+        furthest <= 608,
+        "eighteen refusals and no hop long enough is a body that never gets its box past \
+         the column it was refused by: furthest absolute X {furthest} against the wall at 608"
+    );
+
+    let stalled = Gym {
+        driver: gym::Driver {
+            name: "script minus clear-wall",
+            player: without_a_wall_skill,
+        },
+        ..pipe
+    }
+    .run(&rom)
+    .expect("the same tape under the ablated script should run");
+    assert_eq!(
+        stalled.outcome,
+        gym::Outcome::Stuck,
+        "the gym exists to fail without this skill, and it did not: {stalled:?} against \
+         the scripted {cleared:?}"
+    );
+    assert!(
+        stalled.furthest_x < cleared.furthest_x,
+        "a wall the model names and the library cannot act on stops him short of the \
+         objective: {stalled:?} vs {cleared:?}"
+    );
+    assert!(
+        stalled.refusals > cleared.refusals,
+        "the ablated run is refused many times by a cell the scripted run is refused once \
+         and then jumps: {stalled:?} vs {cleared:?}"
+    );
+}
