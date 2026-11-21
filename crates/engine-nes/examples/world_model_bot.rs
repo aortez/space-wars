@@ -259,6 +259,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut a_frames = 0u32;
     let mut blocked_frames = 0u32; // frames spent believing the model is wrong
     let mut hold_a = 0u64;
+    let mut a_down = false;
     let mut awaiting_respawn = false;
     let mut cleared = false;
     let mut no_progress_for = 0u64;
@@ -356,7 +357,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
         let mut buttons = run_right_buttons(&state, &machine, &tiles, column, row, &mut hold_a);
-        let jumping = hold_a == JUMP_HOLD_FRAMES;
+        // A jump starts on the frame A goes down. `run_right_buttons` spends the
+        // hold in the same call that sets it, so the counter is already one short
+        // by the time the buttons are back.
+        let jumping = buttons.contains(ControllerButtons::A) && !a_down;
+        a_down = buttons.contains(ControllerButtons::A);
         if backing_off {
             buttons = ControllerButtons::LEFT | ControllerButtons::B;
         }
