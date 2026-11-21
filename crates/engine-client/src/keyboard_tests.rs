@@ -530,6 +530,43 @@ fn simulated_controller_uses_shared_clock_routing_and_bounded_single_edges() {
 
 #[cfg(unix)]
 #[test]
+fn a_held_controller_direction_changes_a_clock_setting_once_but_still_moves_through_rows() {
+    use spacewars_control::{InputButton, InputPressRequest, UiScreen};
+    use std::time::Instant;
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    install_ui_navigation(&window);
+    window.set_launcher_visible(false);
+    window.set_launcher_scenario("clock".into());
+    window.set_ingame_menu_visible(true);
+    window.set_ingame_clock_visible(true);
+    clock_menu::publish(&window, &engine_common::ClockSettings::default());
+    clock_menu::show(&window, clock_menu::Page::Events, None);
+    let adjusted = Rc::new(RefCell::new(Vec::new()));
+    let log = Rc::clone(&adjusted);
+    window.on_clock_menu_adjust(move |index, delta| log.borrow_mut().push((index, delta)));
+    let (input, gamepads) = input::new_shared_input();
+    let mut driver = gamepad::SimulatedInput::new(input, gamepads);
+    let state = simulated_ui(UiScreen::PauseClockEvents);
+    // Each direction is held well past the controller's repeat delay.
+    let hold = |driver: &mut gamepad::SimulatedInput, button| {
+        let mut request = InputPressRequest::new(&state, button);
+        request.hold_ms = 1200;
+        let now = Instant::now();
+        driver.press(&window, &state, request, now).unwrap();
+        for tick in 1..=12 {
+            driver.tick(&window, &state, now + Duration::from_millis(tick * 100));
+        }
+    };
+    hold(&mut driver, InputButton::Right);
+    assert_eq!(*adjusted.borrow(), [(0, 1)]);
+    hold(&mut driver, InputButton::Down);
+    assert!(window.get_ingame_clock_focus_index() > 2);
+    assert_eq!(adjusted.borrow().len(), 1);
+}
+
+#[cfg(unix)]
+#[test]
 fn simulated_controller_never_leaks_across_context_changes_or_input_clear() {
     use spacewars_control::{InputButton, InputPressRequest, InputReleaseReason, UiScreen};
     use std::time::Instant;
@@ -982,6 +1019,10 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     key(&window, Key::F1);
     assert!(input.borrow_mut().take_controls_requested());
 
+    use crate::clock_menu::{self, Page};
+    let page = || clock_menu::page(&window);
+    let focus = || window.get_ingame_clock_focus_index();
+    clock_menu::publish(&window, &engine_common::ClockSettings::default());
     window.set_ingame_menu_visible(true);
     key(&window, Key::DownArrow);
     key(&window, Key::DownArrow);
@@ -990,7 +1031,20 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert!(window.get_ingame_clock_visible());
     let adjusted = Rc::new(Cell::new(None));
     let adjustment = Rc::clone(&adjusted);
-    window.on_ingame_clock_adjust(move |index, delta| adjustment.set(Some((index, delta))));
+    window.on_clock_menu_adjust(move |index, delta| adjustment.set(Some((index, delta))));
+    let played = Rc::new(Cell::new(None));
+    let play = Rc::clone(&played);
+    window.on_clock_menu_play(move |index| play.set(Some(index)));
+    // The top page: Look, Events and Back, and around from either end.
+    assert_eq!((page(), focus()), (Page::Top, 0));
+    key(&window, Key::UpArrow);
+    assert_eq!(focus(), 2);
+    key(&window, Key::DownArrow);
+    assert_eq!(focus(), 0);
+    key(&window, Key::DownArrow);
+    key(&window, Key::RightArrow);
+    assert_eq!((page(), focus()), (Page::Events, 0));
+    // Right steps How often on, once however long it is held.
     key(&window, Key::RightArrow);
     assert_eq!(adjusted.get(), Some((0, 1)));
     adjusted.set(None);
@@ -1000,49 +1054,47 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
             text: Key::RightArrow.into(),
         });
     assert_eq!(adjusted.get(), None);
+    // Down passes over the Digits heading to Cell Swap. Left and Right flip
+    // its switch, and A plays it.
     key(&window, Key::DownArrow);
-    key(&window, Key::DownArrow);
-    assert_eq!(window.get_ingame_clock_focus_index(), 24);
-    key(&window, Key::Return);
-    assert_eq!(adjusted.get(), Some((24, 1)));
-    key(&window, Key::DownArrow);
-    assert_eq!(window.get_ingame_clock_focus_index(), 16);
-    key(&window, Key::DownArrow);
-    assert_eq!(window.get_ingame_clock_focus_index(), 13);
-    key(&window, Key::Return);
-    assert_eq!(adjusted.get(), Some((13, 1)));
-    key(&window, Key::DownArrow);
-    assert_eq!(window.get_ingame_clock_focus_index(), 18);
-    key(&window, Key::Return);
-    assert_eq!(adjusted.get(), Some((18, 1)));
-    // Grass and Slot Machine finish the switch row, so Right walks out to them
-    // and wraps back to Rain where the row starts.
-    key(&window, Key::RightArrow);
-    assert_eq!(window.get_ingame_clock_focus_index(), 19);
-    key(&window, Key::RightArrow);
-    assert_eq!(window.get_ingame_clock_focus_index(), 20);
-    key(&window, Key::Return);
-    assert_eq!(adjusted.get(), Some((20, 1)));
-    key(&window, Key::RightArrow);
-    assert_eq!(window.get_ingame_clock_focus_index(), 12);
-    key(&window, Key::DownArrow);
-    key(&window, Key::RightArrow);
-    assert_eq!(window.get_ingame_clock_focus_index(), 3);
-    key(&window, Key::Return);
-    assert_eq!(adjusted.get(), Some((3, 1)));
-    // Theme ends the recipe's row: Down walks from the recipe to it and on to
-    // Preview & Resume, and Left and Right adjust it.
-    window.set_ingame_clock_focus_index(10);
-    key(&window, Key::DownArrow);
-    assert_eq!(window.get_ingame_clock_focus_index(), 25);
-    key(&window, Key::Return);
-    assert_eq!(adjusted.get(), Some((25, 1)));
+    assert_eq!(focus(), 2);
     key(&window, Key::LeftArrow);
-    assert_eq!(adjusted.get(), Some((25, -1)));
-    assert_eq!(window.get_ingame_clock_focus_index(), 25);
+    assert_eq!(adjusted.get(), Some((2, -1)));
+    key(&window, Key::Return);
+    assert_eq!(played.get(), Some(2));
+    // A steps on the recipe, which has no Play.
+    played.set(None);
+    for _ in 0..7 {
+        key(&window, Key::DownArrow);
+    }
+    assert_eq!(focus(), 9);
+    key(&window, Key::Return);
+    assert_eq!((adjusted.get(), played.get()), (Some((9, 1)), None));
+    // Up passes over the Visitors heading, and after Rain come Back and How
+    // often.
+    window.set_ingame_clock_focus_index(13);
+    key(&window, Key::UpArrow);
+    assert_eq!(focus(), 11);
+    window.set_ingame_clock_focus_index(20);
     key(&window, Key::DownArrow);
-    assert_eq!(window.get_ingame_clock_focus_index(), 6);
-    window.set_ingame_clock_focus_index(0);
+    assert_eq!(focus(), 21);
+    key(&window, Key::DownArrow);
+    assert_eq!(focus(), 0);
+    // Back returns to the top page on Events. A on Look opens it, and A on
+    // its Fonts row opens Fonts.
+    key(&window, Key::Escape);
+    assert_eq!((page(), focus()), (Page::Top, 1));
+    key(&window, Key::UpArrow);
+    key(&window, Key::Return);
+    assert_eq!((page(), focus()), (Page::Look, 0));
+    let fonts_opened = Rc::new(Cell::new(false));
+    let opened = Rc::clone(&fonts_opened);
+    window.on_clock_fonts_open(move || opened.set(true));
+    window.set_ingame_clock_focus_index(4);
+    key(&window, Key::Return);
+    assert!(fonts_opened.get());
+    key(&window, Key::Escape);
+    assert_eq!((page(), focus()), (Page::Top, 0));
     let resumes = Rc::new(Cell::new(0));
     let resumed = Rc::clone(&resumes);
     window.on_ingame_resume(move || resumed.set(resumed.get() + 1));
@@ -1068,77 +1120,33 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert!(input.borrow_mut().take_pause_requested());
     window.set_ingame_menu_visible(true);
     window.set_ingame_clock_visible(true);
-    // Pi-sized page: left-hand event switch and time-format row are hittable.
-    click(&window, 175.0, 200.0);
-    assert_eq!(adjusted.get(), Some((2, 1)));
-    click(&window, 400.0, 200.0);
-    assert_eq!(adjusted.get(), Some((7, 1)));
-    click(&window, 510.0, 200.0);
-    assert_eq!(adjusted.get(), Some((8, 1)));
-    click(&window, 625.0, 200.0);
-    assert_eq!(adjusted.get(), Some((11, 1)));
-    adjusted.set(None);
-    click(&window, 175.0, 110.0);
+    // At 800×480 the top page's rows open their pages when tapped.
+    let activated = Rc::new(Cell::new(None));
+    let activation = Rc::clone(&activated);
+    window.on_clock_menu_activate(move |index| activation.set(Some(index)));
+    let backs = Rc::new(Cell::new(0));
+    let backed = Rc::clone(&backs);
+    window.on_clock_menu_back(move || backed.set(backed.get() + 1));
+    click(&window, 300.0, 238.0);
+    assert_eq!(activated.get(), Some(1));
+    click(&window, 400.0, 332.0);
+    assert_eq!(backs.get(), 1);
+    // On Events, scrolled to the top: How often's ‹ and ›, Cell Swap's switch
+    // and Play, a tap on the row itself, and Back.
+    clock_menu::show(&window, Page::Events, None);
+    click(&window, 337.0, 96.0);
+    assert_eq!(adjusted.get(), Some((0, -1)));
+    click(&window, 640.0, 96.0);
     assert_eq!(adjusted.get(), Some((0, 1)));
-    click(&window, 456.0, 110.0);
-    assert_eq!(adjusted.get(), Some((1, 1)));
-    click(&window, 536.0, 110.0);
-    assert_eq!(adjusted.get(), Some((24, 1)));
-    let fonts_opened = Rc::new(Cell::new(false));
-    let opened = Rc::clone(&fonts_opened);
-    window.on_clock_fonts_open(move || opened.set(true));
-    click(&window, 649.0, 110.0);
-    assert!(fonts_opened.get());
-    // The switch row has the same five columns as the event row below it, so
-    // Slot Machine is hittable at the far end rather than buried under Falling.
-    click(&window, 625.0, 166.0);
-    assert_eq!(adjusted.get(), Some((20, 1)));
-    click(&window, 512.0, 166.0);
-    assert_eq!(adjusted.get(), Some((19, 1)));
-    click(&window, 400.0, 166.0);
-    assert_eq!(adjusted.get(), Some((18, 1)));
-    // Crow and Explosion flank preview; Coins and Tanks join the next row.
-    click(&window, 520.0, 292.0);
-    assert_eq!(adjusted.get(), Some((22, 1)));
-    click(&window, 635.0, 246.0);
-    assert_eq!(adjusted.get(), Some((15, 1)));
-    click(&window, 537.0, 246.0);
-    assert_eq!(adjusted.get(), Some((14, 1)));
-    // Arrows walk the row's switches rather than flipping them: Spider to
-    // Coins to Tanks and back, then from Explosion off the end of the preview
-    // row to the selector, which they adjust.
-    adjusted.set(None);
-    window.set_ingame_clock_focus_index(21);
-    key(&window, Key::RightArrow);
-    assert_eq!(window.get_ingame_clock_focus_index(), 22);
-    key(&window, Key::RightArrow);
-    assert_eq!(window.get_ingame_clock_focus_index(), 23);
-    key(&window, Key::LeftArrow);
-    assert_eq!(window.get_ingame_clock_focus_index(), 22);
-    window.set_ingame_clock_focus_index(15);
-    key(&window, Key::RightArrow);
-    assert_eq!(window.get_ingame_clock_focus_index(), 4);
-    assert_eq!(adjusted.get(), None);
-    key(&window, Key::RightArrow);
-    assert_eq!(adjusted.get(), Some((4, 1)));
-    click(&window, 287.0, 166.0);
-    assert_eq!(adjusted.get(), Some((13, 1)));
-    click(&window, 175.0, 166.0);
-    assert_eq!(adjusted.get(), Some((12, 1)));
-    click(&window, 175.0, 292.0);
-    assert_eq!(adjusted.get(), Some((9, 1)));
-    // The recipe shares its row with Theme, at its end.
-    click(&window, 550.0, 338.0);
-    assert_eq!(adjusted.get(), Some((10, 1)));
-    click(&window, 631.0, 338.0);
-    assert_eq!(adjusted.get(), Some((25, 1)));
-    // Each event switch in the lower row remains directly hittable.
-    click(&window, 404.0, 292.0);
-    assert_eq!(adjusted.get(), Some((21, 1)));
-    click(&window, 285.0, 292.0);
-    assert_eq!(adjusted.get(), Some((17, 1)));
-    click(&window, 625.0, 292.0);
-    assert_eq!(adjusted.get(), Some((23, 1)));
+    click(&window, 554.0, 176.0);
+    assert_eq!(adjusted.get(), Some((2, 1)));
+    played.set(None);
+    click(&window, 637.0, 176.0);
+    assert_eq!(played.get(), Some(2));
+    click(&window, 200.0, 176.0);
+    assert_eq!(activated.get(), Some(2));
+    click(&window, 400.0, 426.0);
+    assert_eq!(backs.get(), 2);
     // The extra launcher row must not overlap Back/Start at 800×480.
     window.set_ingame_menu_visible(false);
     window.set_launcher_visible(true);
@@ -1635,8 +1643,9 @@ fn calendar_date_live_control_reaches_host_and_persists_without_restarting() {
     window.invoke_ingame_clock_open();
     pump_until(|| controls.borrow().clock_state().is_some_and(|s| s.paused));
     let before = controls.borrow().clock_state().unwrap();
+    crate::clock_menu::show(&window, crate::clock_menu::Page::Look, Some("show-date"));
     for show_date in [true, false, true] {
-        window.invoke_ingame_clock_adjust(13, 1);
+        window.invoke_clock_menu_adjust(window.get_ingame_clock_focus_index(), 1);
         pump_until(|| {
             controls
                 .borrow()

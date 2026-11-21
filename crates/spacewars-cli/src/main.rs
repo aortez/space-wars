@@ -219,6 +219,10 @@ enum UiScreenArg {
     PauseControls,
     #[value(name = "pause.clock")]
     PauseClock,
+    #[value(name = "pause.clock-look")]
+    PauseClockLook,
+    #[value(name = "pause.clock-events")]
+    PauseClockEvents,
     #[value(name = "pause.clock-fonts")]
     PauseClockFonts,
     #[value(name = "game-over")]
@@ -252,6 +256,8 @@ impl From<UiScreenArg> for UiScreen {
             UiScreenArg::PauseNetwork => Self::PauseNetwork,
             UiScreenArg::PauseControls => Self::PauseControls,
             UiScreenArg::PauseClock => Self::PauseClock,
+            UiScreenArg::PauseClockLook => Self::PauseClockLook,
+            UiScreenArg::PauseClockEvents => Self::PauseClockEvents,
             UiScreenArg::PauseClockFonts => Self::PauseClockFonts,
             UiScreenArg::GameOver => Self::GameOver,
         }

@@ -135,7 +135,9 @@ impl SimulatedInput {
             Some(InputButton::Right) => Some(UiDirection::Right),
             _ => None,
         };
-        if let Some(action) = self.repeat.update(direction, now) {
+        if let Some((action, repeat)) = self.repeat.update(direction, now)
+            && (!repeat || crate::may_repeat(window, action.code()))
+        {
             window.invoke_ui_action(action.code());
         }
     }

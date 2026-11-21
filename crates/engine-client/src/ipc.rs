@@ -1534,6 +1534,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
         ingame_menu: window.get_ingame_menu_visible(),
         ingame_controls: window.get_ingame_controls_visible(),
         ingame_clock: window.get_ingame_clock_visible(),
+        clock_page: crate::clock_menu::page(window),
         clock_fonts: window.get_clock_fonts_visible(),
         game_over: window.get_game_over_visible(),
     });
@@ -1608,11 +1609,15 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             launcher_settings_focus_index: window.get_launcher_settings_focus_index(),
             launcher_controls_focus_index: window.get_launcher_controls_focus_index(),
             ingame_menu_focus_index: window.get_ingame_menu_focus_index(),
-            ingame_clock_focus_index: window.get_ingame_clock_focus_index(),
-            clock_preview: engine_common::ClockEventKind::ALL
-                .get(window.get_clock_preview_index() as usize)
-                .map_or("", |event| event.label())
-                .into(),
+            clock_controls: if window.get_ingame_clock_visible() {
+                crate::clock_menu::targets(window)
+                    .into_iter()
+                    .map(|(control, _, _)| control)
+                    .collect()
+            } else {
+                Vec::new()
+            },
+            clock_selected: Some(crate::clock_menu::selected(window)),
             clock_controls_pending: window.get_clock_controls_pending(),
             clock_settings_error: non_empty(window.get_clock_settings_error().as_str()),
             game_over_focus_index: window.get_game_over_focus_index(),
@@ -2863,6 +2868,143 @@ mod tests {
                 .active_scenario
                 .as_deref(),
             Some("pizza")
+        );
+    }
+
+    #[test]
+    fn every_clock_control_is_listed_on_its_page_and_activates_as_its_input_does() {
+        use crate::SettingsRowKind;
+        use crate::clock_menu::{self, Page};
+        use engine_common::{ClockEventKind, ClockSettings};
+        use slint::Model;
+        use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
+        use slint::platform::{Platform, PlatformError, WindowAdapter};
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        struct TestPlatform;
+        impl Platform for TestPlatform {
+            fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
+                Ok(MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer))
+            }
+        }
+        slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+        let window = MainWindow::new().unwrap();
+        window.set_launcher_scenario("clock".into());
+        window.set_ingame_menu_visible(true);
+        clock_menu::publish(&window, &ClockSettings::default());
+        // What reaches the host, or the Fonts page, from each press.
+        let pressed = Rc::new(RefCell::new(Vec::new()));
+        let log = Rc::clone(&pressed);
+        window.on_clock_menu_adjust(move |index, delta| {
+            log.borrow_mut().push(format!("adjust {index} {delta}"));
+        });
+        let log = Rc::clone(&pressed);
+        window.on_clock_menu_play(move |index| log.borrow_mut().push(format!("play {index}")));
+        let log = Rc::clone(&pressed);
+        window.on_clock_fonts_open(move || log.borrow_mut().push("fonts".to_owned()));
+        let mut tracker = UiStateTracker::default();
+        let mut listed = Vec::new();
+        for (page, screen) in [
+            (Page::Top, UiScreen::PauseClock),
+            (Page::Look, UiScreen::PauseClockLook),
+            (Page::Events, UiScreen::PauseClockEvents),
+        ] {
+            window.set_ingame_clock_visible(true);
+            clock_menu::show(&window, page, None);
+            let rows = window.get_clock_menu_rows().iter().collect::<Vec<_>>();
+            let state = ui_state(&window, &mut tracker).unwrap();
+            assert_eq!(state.screen, screen);
+            let ids = state
+                .controls
+                .iter()
+                .map(|control| control.id.clone())
+                .collect::<Vec<_>>();
+            assert_eq!(
+                ids,
+                clock_menu::targets(&window)
+                    .into_iter()
+                    .map(|(control, _, _)| control.id)
+                    .collect::<Vec<_>>()
+            );
+            for id in ids {
+                // Each control is pressed from the page, as a script would.
+                window.set_ingame_clock_visible(true);
+                clock_menu::show(&window, page, None);
+                let state = ui_state(&window, &mut tracker).unwrap();
+                let request = UiActivateRequest {
+                    schema_version: UI_STATE_SCHEMA_VERSION,
+                    control_id: id.clone(),
+                    expected_screen: Some(screen),
+                    expected_revision: Some(state.revision),
+                };
+                assert!(validate_ui_activate(&request, &state).is_ok(), "{id}");
+                pressed.borrow_mut().clear();
+                assert!(crate::ui_activation::activate(&window, &id), "{id}");
+                let name = id.strip_prefix("pause.clock.").unwrap();
+                let (base, end) = name.split_once('.').unwrap_or((name, ""));
+                let Some(row) = rows.iter().position(|row| row.id == base) else {
+                    // Back goes up a page, onto the row that opened it, or
+                    // from the top page out of Clock Controls.
+                    assert_eq!(id, "pause.clock.back");
+                    if page == Page::Top {
+                        assert!(!window.get_ingame_clock_visible());
+                    } else {
+                        assert_eq!(clock_menu::page(&window), Page::Top);
+                        assert_eq!(
+                            clock_menu::selected(&window),
+                            format!("pause.clock.{}", page.name())
+                        );
+                    }
+                    listed.push(id);
+                    continue;
+                };
+                let expected = match (end, rows[row].kind) {
+                    ("previous", SettingsRowKind::Choice) => vec![format!("adjust {row} -1")],
+                    ("next", SettingsRowKind::Choice) | ("", SettingsRowKind::Switch) => {
+                        vec![format!("adjust {row} 1")]
+                    }
+                    ("play", _) => vec![format!("play {row}")],
+                    ("", SettingsRowKind::Page) if base == "fonts" => vec!["fonts".to_owned()],
+                    ("", SettingsRowKind::Page) => {
+                        assert_eq!(clock_menu::page(&window), Page::named(base), "{id}");
+                        Vec::new()
+                    }
+                    other => panic!("{id} names no press on its row: {other:?}"),
+                };
+                assert_eq!(*pressed.borrow(), expected, "{id}");
+                if rows[row].kind != SettingsRowKind::Page {
+                    assert_eq!(window.get_ingame_clock_focus_index(), row as i32, "{id}");
+                }
+                listed.push(id);
+            }
+        }
+        // Every event can be played, and these IDs, which scripts and the
+        // docs use, keep their names.
+        for kind in ClockEventKind::ALL {
+            let play = format!("pause.clock.{}.play", kind.as_str());
+            assert!(listed.contains(&play), "{play}");
+        }
+        for id in [
+            "pause.clock.crow.next",
+            "pause.clock.event-profile.next",
+            "pause.clock.events",
+            "pause.clock.fonts",
+            "pause.clock.grass",
+            "pause.clock.lamps.next",
+            "pause.clock.look",
+            "pause.clock.marquee-preset.next",
+            "pause.clock.rain.previous",
+            "pause.clock.show-date",
+            "pause.clock.theme.next",
+            "pause.clock.time-format.next",
+        ] {
+            assert!(listed.iter().any(|listed| listed == id), "{id}");
+        }
+        assert!(
+            !listed
+                .iter()
+                .any(|id| id == "pause.clock.marquee-preset.play")
         );
     }
 }

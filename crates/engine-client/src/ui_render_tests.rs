@@ -684,17 +684,14 @@ fn clock_explosion_captures_warning_burst_reformation_and_controls_on_device_lay
                 ui.set_launcher_scenario("clock".into());
                 ui.set_ingame_menu_visible(true);
                 ui.set_ingame_clock_visible(true);
-                ui.set_ingame_clock_focus_index(15);
-                ui.set_clock_event_labels(
-                    Rc::new(slint::VecModel::from(
-                        ClockEventKind::ALL
-                            .iter()
-                            .map(|kind| kind.label().into())
-                            .collect::<Vec<_>>(),
-                    ))
-                    .into(),
+                crate::clock_controls::publish_settings(
+                    &ui,
+                    engine_common::ClockSettings::default(),
                 );
-                ui.set_clock_preview_index(ClockEventKind::Explosion as i32);
+                crate::clock_menu::show(&ui, crate::clock_menu::Page::Events, Some("explosion"));
+                // The list scrolls to the row in a change handler, which runs
+                // with the timers.
+                slint::platform::update_timers_and_animations();
             }
             let mut screenshot = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
             windows[0].request_redraw();
@@ -1152,11 +1149,118 @@ fn clock_events_and_a_change_of_theme_wear_the_theme_in_real_pixels() {
     save(&fade, "fade");
 }
 
+/// The Clock's settings pages at each device size, over the paused Clock.
+/// With `SPACEWARS_CLOCK_ARTIFACTS` set, each page is saved as
+/// `pages-<W>x<H>-<page>.png`.
+#[test]
+fn clock_settings_pages_render_at_each_size() {
+    use crate::clock_menu::Page;
+    use crate::render::{FrameLayout, Viewport};
+    use engine_common::{
+        ClockCrowWaterTolerance, ClockEventProfile, ClockEvents, ClockMarqueePreset,
+        ClockRainAmount, ClockSettings, ClockThemeChoice, ClockTimeFormat, Scenario,
+    };
+    use scenario_clock::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario};
+    use std::time::Duration;
+    let windows = Rc::new(RefCell::new(Vec::new()));
+    slint::platform::set_platform(Box::new(TestPlatform(windows.clone()))).unwrap();
+    let ui = MainWindow::new().unwrap();
+    ui.show().unwrap();
+    let windows = windows.borrow();
+    // The longest values, and an event Off, so the summaries and rows show
+    // what they do with them. Crow and Rain have the least room, beside Play.
+    let settings = ClockSettings {
+        time_format: ClockTimeFormat::TwelveHour,
+        show_date: true,
+        theme: ClockThemeChoice::Christmas,
+        event_profile: ClockEventProfile::Demo,
+        events: ClockEvents {
+            coins: false,
+            ..ClockEvents::default()
+        },
+        rain_amount: ClockRainAmount::Medium,
+        crow_water_tolerance: ClockCrowWaterTolerance::Varied,
+        marquee_preset: ClockMarqueePreset::TextRibbon,
+        ..ClockSettings::default()
+    };
+    for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
+        windows[0].set_size(PhysicalSize::new(width, height));
+        let viewport = Viewport::new(width as f32, height as f32);
+        let mut state = ClockScenario::init(
+            ClockConfig {
+                aspect_ratio: viewport.aspect_ratio(),
+                ..Default::default()
+            },
+            42,
+        );
+        ClockScenario::step(
+            &mut state,
+            &[ClockAction::set_reading(
+                ClockReading::new(21, 34, 0)
+                    .unwrap()
+                    .with_date(ClockDate::new(2026, 12, 24).unwrap()),
+            )],
+            Duration::ZERO,
+        );
+        let frames = [ClockScenario::render_frame(&state)];
+        let overlay =
+            crate::render::raster_text_overlay(&frames, viewport, FrameLayout::EqualHorizontal);
+        let face = crate::thruster_visual_tests::raster(&frames[0], viewport);
+        // Focus on Events, on Theme, on Cell Swap under its heading, on
+        // Crow under its own, and on Rain at the end of the Events page.
+        for (page, focus, name) in [
+            (Page::Top, 1, "top"),
+            (Page::Look, 2, "look"),
+            (Page::Events, 2, "events"),
+            (Page::Events, 13, "events-visitors"),
+            (Page::Events, 20, "events-room"),
+        ] {
+            reset_panels(&ui);
+            ui.set_launcher_scenario("clock".into());
+            crate::apply_scenario_metadata(&ui, "clock");
+            crate::clock_controls::publish_settings(&ui, settings);
+            ui.set_raster_visible(true);
+            ui.set_raster_frame(Image::from_rgb8(face.clone()));
+            ui.set_primitives(Rc::new(slint::VecModel::from(overlay.clone())).into());
+            ui.set_clock_menu_page(page.name().into());
+            ui.set_ingame_menu_visible(true);
+            ui.set_ingame_clock_visible(true);
+            ui.set_ingame_clock_focus_index(focus);
+            // The list scrolls to the focused row in a change handler, which
+            // runs with the timers.
+            slint::platform::update_timers_and_animations();
+            let mut shot = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+            windows[0].request_redraw();
+            windows[0].draw_if_needed(|renderer| {
+                renderer.render(shot.make_mut_slice(), width as usize);
+            });
+            // Only the focused row's border draws a long straight run of its
+            // lit color, so finding one shows the list scrolled the row into
+            // view.
+            let lit = Rgb8Pixel::new(0x80, 0xd8, 0xff);
+            assert!(
+                shot.as_slice().chunks(width as usize).any(|line| line
+                    .split(|pixel| *pixel != lit)
+                    .any(|run| run.len() >= 200)),
+                "{name} at {width}×{height}: the focused row is out of view"
+            );
+            if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {
+                let directory = std::path::PathBuf::from(directory);
+                std::fs::create_dir_all(&directory).unwrap();
+                crate::thruster_visual_tests::write_png(
+                    &directory.join(format!("pages-{width}x{height}-{name}.png")),
+                    &shot,
+                );
+            }
+        }
+    }
+}
+
 #[test]
 fn the_theme_control_and_what_auto_does_show_on_both_settings_pages() {
     use crate::render::{FrameLayout, Viewport};
     use engine_common::{
-        ClockEventKind, ClockEventProfile, ClockLampMode, ClockSettings, ClockThemeChoice, Scenario,
+        ClockEventProfile, ClockLampMode, ClockSettings, ClockThemeChoice, Scenario,
     };
     use scenario_clock::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario};
     use std::time::Duration;
@@ -1206,21 +1310,13 @@ fn the_theme_control_and_what_auto_does_show_on_both_settings_pages() {
             ui.set_launcher_scenario("clock".into());
             crate::apply_scenario_metadata(&ui, "clock");
             crate::clock_controls::publish_settings(&ui, settings);
-            ui.set_clock_event_labels(
-                Rc::new(slint::VecModel::from(
-                    ClockEventKind::ALL
-                        .iter()
-                        .map(|kind| kind.label().into())
-                        .collect::<Vec<_>>(),
-                ))
-                .into(),
-            );
             ui.set_raster_visible(true);
             ui.set_raster_frame(Image::from_rgb8(face.clone()));
             ui.set_primitives(Rc::new(slint::VecModel::from(overlay.clone())).into());
             if live {
                 ui.set_ingame_menu_visible(true);
                 ui.set_ingame_clock_visible(true);
+                ui.set_clock_menu_page("look".into());
                 ui.set_ingame_clock_focus_index(focus);
             } else {
                 ui.set_launcher_visible(true);
@@ -1257,15 +1353,15 @@ fn the_theme_control_and_what_auto_does_show_on_both_settings_pages() {
                 .collect();
             inked.last().unwrap() - inked.first().unwrap()
         };
-        // The live page's status line says what Auto does while Theme is
-        // selected, and that settings save otherwise. The line sits between
-        // the recipe's row and Back, in a panel 432 px tall.
-        let live = shoot(true, 25);
+        // The Look page's help line says what Auto does while Theme is
+        // selected, and what Lamps do while they are. The panel fits Look's
+        // five rows, 412 px, and the line's box starts 108 px above its foot.
+        let live = shoot(true, 2);
         assert_eq!(ui.get_launcher_clock_theme(), "Christmas");
-        let status = (height - 432) / 2 + 62 + 276;
+        let status = (height - 412) / 2 + 412 - 108 + 8;
         assert_ne!(
             band(&live, status, 20),
-            band(&shoot(true, 10), status, 20),
+            band(&shoot(true, 3), status, 20),
             "{width}x{height}"
         );
         // The panel is 600 px wide, or 32 px narrower than the view, and the
@@ -1562,8 +1658,9 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
         ui.set_launcher_clock_time_format("12-hour".into());
         ui.set_launcher_clock_event_profile("Off".into());
         ui.set_launcher_settings_focus_index(10);
-        ui.set_ingame_clock_focus_index(4);
-        ui.set_clock_event_labels(Rc::new(slint::VecModel::from(vec!["Falling".into()])).into());
+        // Back on the Clock's top page, Theme on Look and Cell Swap on Events.
+        crate::clock_menu::publish(ui, &engine_common::ClockSettings::default());
+        ui.set_ingame_clock_focus_index(2);
         ui.set_scenario_controls_help("Move with the joystick. A selects. B goes back.".into());
         ui.set_sound_volume_percent(5);
         ui.set_device_info_ready(true);
@@ -1764,6 +1861,13 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
             ui.set_ingame_controls_visible(true);
         }),
         ("pause-clock", |ui| {
+            ui.set_clock_menu_page("top".into());
+            ui.set_ingame_menu_visible(true);
+            ui.set_ingame_clock_visible(true);
+        }),
+        // The longest Clock page, which scrolls, with its headings and Play.
+        ("pause-clock-events", |ui| {
+            ui.set_clock_menu_page("events".into());
             ui.set_ingame_menu_visible(true);
             ui.set_ingame_clock_visible(true);
         }),
@@ -1831,7 +1935,7 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
                 assert_eq!(ui.get_launcher_clock_time_format(), "12-hour");
                 assert_eq!(ui.get_launcher_clock_event_profile(), "Off");
                 assert_eq!(ui.get_launcher_settings_focus_index(), 10);
-                assert_eq!(ui.get_ingame_clock_focus_index(), 4);
+                assert_eq!(ui.get_ingame_clock_focus_index(), 2);
                 assert_eq!(ui.get_sound_volume_percent(), 5);
             }
             // Optional, local before/after visual comparison. No golden hashes

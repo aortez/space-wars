@@ -293,13 +293,12 @@ Controls, is Lively by default. Steady keeps both lamps at rest whatever goes
 on, and an outage under way skips to its warm-up. Lively lamps act under every
 event profile, Off included, where they follow a player's duck. The setting is
 saved with the others. In Scenario Settings it sits between Date and Theme; in
-Clock Controls the top row makes room for it between Profile and Fonts, its
-buttons narrowed so the profile still shows Demo whole, and Left and Right
-switch it, as they do Time and Date.
+Clock Controls it is on the Look page, between Theme and Fonts, and Left and
+Right switch it, as they change every setting there.
 
 | Clock Controls | Scenario Settings | Portrait |
 | --- | --- | --- |
-| ![Lamps Lively, selected, between the Demo profile and Fonts on the pause page's top row](screenshots/clock/lamps-800x480-live-controls.png) | ![Lamps Lively, selected, between Date and Fonts in the launcher's Clock settings](screenshots/clock/lamps-800x480-launcher-controls.png) | ![The 480×800 view, the top row's buttons narrower and Demo still whole](screenshots/clock/lamps-480x800-live-controls.png) |
+| ![Lamps Lively, selected, between Theme and Fonts on the Look page of Clock Controls, with what it does under the rows](screenshots/clock/lamps-800x480-live-controls.png) | ![Lamps Lively, selected, between Date and Fonts in the launcher's Clock settings](screenshots/clock/lamps-800x480-launcher-controls.png) | ![The Look page in the 480×800 view](screenshots/clock/lamps-480x800-live-controls.png) |
 
 **Isolation.** The lamps draw from a seeded stream of their own, never the
 event schedule's, and only read the scene, so they never change it: the same
@@ -708,8 +707,10 @@ The display-backed functional test
 both entry points, pool editing, rotation, live application and saved restart.
 Public UI screens are `launcher.clock-fonts` and `pause.clock-fonts`, with
 `clock.fonts.select.{name}`, `clock.fonts.pool.{name}`, `clock.fonts.rotate`, and
-`clock.fonts.back` controls. Clock state reports `active_font` separately from
-the configured `settings.fonts`, since a timed effect can delay application.
+`clock.fonts.back` controls. On pause, `pause.clock.fonts` on the Look page
+(`pause.clock-look`) opens the picker, and `clock.fonts.back` returns there.
+Clock state reports `active_font` separately from the configured
+`settings.fonts`, since a timed effect can delay application.
 
 **Font validation (2026-09-28):** The affected common, water, Clock, client,
 control and CLI suites passed 892 tests. Four display-backed workflows also
@@ -739,7 +740,7 @@ rotation off, Demo events and the date visible.
 ## Optional weekday and date
 
 Enable **Clock → Scenario Settings → Show Date**, or **Pause → Clock Controls →
-Date**, to display a quiet line such as `FRIDAY · SEPTEMBER 25` in the upper band.
+Look → Date**, to display a quiet line such as `FRIDAY · SEPTEMBER 25` in the upper band.
 It defaults to **Off**, including when loading older settings. The saved
 `clock.show_date` boolean is independent of 12/24-hour format and event cadence.
 Keyboard, controller, touch and guarded CLI UI activation use the same controls:
@@ -999,16 +1000,16 @@ until then no Halloween choice is offered.
 
 In Scenario Settings, Theme sits between Lamps and Fonts in a row of five
 buttons, where the time format became a **Time** button so that its value still
-shows in the portrait view. In Clock Controls, Theme ends the recipe's row:
-Down from the recipe reaches it, and Down again reaches Preview & Resume. Left
-and Right switch it, as they do Time, Date and Lamps, and a press or a tap
-moves it on. While Theme is selected, the page says what Auto does, "Auto:
-Christmas on December nights, 6 pm to 6 am.", in Scenario Settings in place of
-the subtitle and in Clock Controls in place of the status line.
+shows in the portrait view. In Clock Controls, Theme is on the Look page,
+between Date and Lamps. Left and Right, or a tap on its ‹ or ›, step it, and A
+or Enter moves it on. While Theme is selected, the page says what Auto does,
+"Auto: Christmas on December nights, 6 pm to 6 am.", in Scenario Settings in
+place of the subtitle and in Clock Controls on the line under the rows, where
+each row says what it does.
 
 | Clock Controls | Scenario Settings |
 | --- | --- |
-| ![Theme Christmas, selected, at the end of the recipe's row in the paused Clock's controls, with "Auto: Christmas on December nights, 6 pm to 6 am." under the row](screenshots/clock/theme-800x480-live-controls.png) | ![Theme Christmas, selected, between Lamps and Fonts in the launcher's Clock settings, with the same line in place of the subtitle](screenshots/clock/theme-800x480-launcher-controls.png) |
+| ![Theme Christmas, selected, on the paused Clock's Look page, with "Auto: Christmas on December nights, 6 pm to 6 am." under the rows](screenshots/clock/theme-800x480-live-controls.png) | ![Theme Christmas, selected, between Lamps and Fonts in the launcher's Clock settings, with the same line in place of the subtitle](screenshots/clock/theme-800x480-launcher-controls.png) |
 
 Both at [1024×768](screenshots/clock/theme-1024x768-live-controls.png)
 ([settings](screenshots/clock/theme-1024x768-launcher-controls.png)) and in the
@@ -1120,17 +1121,16 @@ size cuts it short.
 
 The setting's tests are
 `settings::tests::theme_is_auto_in_old_settings_and_round_trips_every_choice`,
-`clock_controls::tests::theme_control_cycles_the_choices_both_ways_and_changes_nothing_else`,
-the keyboard, touch and navigation tests of both pages, and two functional
-tests through the public controls.
+`clock_settings_table::tests::every_step_moves_one_value_and_wraps_at_either_end`,
+`clock_settings_table::tests::stepping_a_setting_changes_only_its_own_fields`,
+the keyboard and touch tests of the launcher's page, and a functional test
+through the public controls.
 `clock::live_clock_controls_preserve_events_preview_and_persist_across_restart_and_relaunch`
-chooses Christmas in the paused Clock Controls while saving fails. It finds
+chooses Christmas on the paused Look page while saving fails. It finds
 the face heading for Christmas with its fade held at the start, and the failure
 on the page. The next change, to the lamps, saves the theme with it. After
-Preview & Resume the fade has run its course, and Christmas is back after a
+Color Cycle's Play the fade has run its course, and Christmas is back after a
 restart and a relaunch.
-`clock::marquee_recipes_preview_pause_persist_and_restore_live_clock` walks the
-D-pad from the recipe to Theme and back.
 
 ## Events
 
@@ -1138,7 +1138,7 @@ Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepa
 The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, **Rain**, **Explosion**, **Aquarium**, **Cell Swap**, **Grass**, **Slot Machine**, **Spider**, **Coins**, and **Tanks** controls select the periodic event mix.
 **Digit Slide** enables minute-change transitions. All switches
 default to On and are saved with the other Clock settings. These values
-can also be changed live through **Pause → Clock Controls**, without relaunching.
+can also be changed live through **Pause → Clock Controls → Events**, without relaunching.
 
 | Profile | Idle wait before selecting an event |
 | --- | --- |
@@ -1178,7 +1178,7 @@ the Off profile still disables every automatic event.
 ### Tanks
 
 Tanks uses the shared Scorched duel in Clock's existing physics world. Enable
-**Tanks** in scenario settings or Clock Controls; select it in the preview list,
+**Tanks** in scenario settings or Clock Controls; press its **Play** there,
 or run `spacewars-cli clock trigger tanks`. It participates in Calm and Demo's
 ordinary periodic selection. Off permits manual requests only. Completion and
 cancellation start its 120-second reuse delay and the ordinary two-second event
@@ -1260,8 +1260,8 @@ phase. Pause freezes progress while accepting the latest reading. Font changes
 follow the existing deferral until completion. Cancellation and resize restore
 the latest reading using the existing event cleanup path.
 
-Use **Cell Swap** in launcher settings or live Clock Controls, select it in the
-**Preview Event** picker and press **Preview & Resume**, or run
+Use **Cell Swap** in launcher settings or live Clock Controls, press its
+**Play** on the Events page, or run
 `spacewars-cli clock trigger cell-swap`. The saved `clock.events.cell_swap`
 switch defaults to On when missing; an existing Off profile remains Off. Manual
 previews work with the switch disabled. Next Event honors the switch. The event
@@ -1283,8 +1283,8 @@ Local validation and screen captures are described in
 
 ### Exploding digits
 
-Enable **Explosion** in scenario settings, select it in **Clock Controls →
-Preview & Resume**, or use Next Event. It participates in the existing periodic
+Enable **Explosion** in scenario settings, press its **Play** in **Clock
+Controls → Events**, or use Next Event. It participates in the existing periodic
 mix; it does not create another timer. Missing saved switches default to On,
 without changing the saved profile or other switches. Profile Off still prevents
 automatic events, but explicit previews/triggers work even with Explosion Off.
@@ -1384,8 +1384,8 @@ Additional actual-device frames: [warning](screenshots/clock/picade-explosion-wa
 
 ### Coins
 
-Enable **Coins** in scenario settings, select it in **Clock Controls →
-Preview & Resume**, or use Next Event. It joins the periodic mix like
+Enable **Coins** in scenario settings, press its **Play** in **Clock
+Controls → Events**, or use Next Event. It joins the periodic mix like
 Explosion, with the same 45-second reuse delay, and it is Explosion's batch
 made of round pieces (`events::explosion::Debris`): the same cells, the same
 cap of **239** (Classic at most 119) and the same return. Only the launch, the
@@ -1542,18 +1542,16 @@ below it:
 
 ![The pile under the face in the 480×800 view](screenshots/clock/coins-480x800-piled.png)
 
-The switch sits in the pause page's lower row of five, after Spider and
-before Tanks, and in the launcher's Events row, six columns since Tanks.
-Left and Right walk the row's switches, as they do on every switch, and
-adjust the selectors. The pause page keeps its height with six rows of 44px;
-the recipe takes a row of its own, the preview selector drops its label
-under 480px so the event's name keeps its room, and
-`tools/audit-clock-control-layout.py` holds every selector on the page to the
-room its value needs:
+The switch sits on the pause Events page under Digits, between Cell Swap and
+Color Cycle, with its Play, and in the launcher's Events row, six columns since
+Tanks. On the launcher, Left and Right walk the row's switches, as they do on
+every switch, and adjust the selectors. The pause page is a list of rows, which
+can't overlap, so `tools/audit-clock-control-layout.py` measures only the
+launcher's grid and holds it to having no two controls overlap:
 
 | Clock Controls | Scenario Settings | Portrait |
 | --- | --- | --- |
-| ![Coins On between Spider and Tanks in the pause page's lower row](screenshots/clock/coins-800x480-live-controls.png) | ![Coins On in the launcher's Events row](screenshots/clock/coins-800x480-launcher-controls.png) | ![The 480×800 view, the preview selector without its label](screenshots/clock/coins-480x800-live-controls.png) |
+| ![Coins On, selected, between Cell Swap and Color Cycle on the pause Events page, its Play lit](screenshots/clock/coins-800x480-live-controls.png) | ![Coins On in the launcher's Events row](screenshots/clock/coins-800x480-launcher-controls.png) | ![The Events page in the 480×800 view](screenshots/clock/coins-480x800-live-controls.png) |
 
 `coins_tests` cover the cap and the batch's own identities, seeded replay at
 six aspect ratios in both formats, the settle measurement above, the return
@@ -1576,8 +1574,8 @@ second.
 
 ### Crow visitor
 
-Set **Crow** to **Varied**, **Shy**, or **Hardy** in Clock settings, or select **Crow → Preview & Resume** in
-Clock Controls. Next Event includes it in the normal enabled-event cycle.
+Set **Crow** to **Varied**, **Shy**, or **Hardy** in Clock settings, or press Crow's **Play** in
+**Clock Controls → Events**. Next Event includes it in the normal enabled-event cycle.
 Previewing a crow adds one visitor without cancelling an active animation;
 previewing it again leaves the existing visit and its deadline unchanged.
 Choosing **Off** prevents future automatic admissions, not the current visit.
@@ -1696,8 +1694,8 @@ Actual device captures: [flight](screenshots/clock/picade-crow-flight-device.png
 
 ### Spider visitor
 
-Set **Spider** on or off in Clock settings, or select **Spider → Preview &
-Resume** in Clock Controls. Next Event includes it in the normal enabled-event
+Set **Spider** on or off in Clock settings, or press Spider's **Play** in
+**Clock Controls → Events**. Next Event includes it in the normal enabled-event
 cycle. Previewing a spider adds one visitor; previewing it again, or asking
 for one while a duck, a crow or an event the spider would not keep live is
 running, reports why and changes nothing. Choosing **Off** prevents future
@@ -1876,7 +1874,8 @@ or live **Clock Controls**. Varied chooses a seeded amount for each visit;
 changing the setting affects the next event, not water already falling. Rain's
 amount is separate from the global Calm/Demo event frequency. Older settings
 default to Varied with Rain enabled, preserving all existing choices.
-Preview **Rain → Preview & Resume** to run it immediately, including when Off.
+Press Rain's **Play** in **Clock Controls → Events** to run it immediately,
+including when Off.
 
 Rain ramps up and down over 20 simulated seconds. Stratified, jittered drops
 collect on lit digit pixels, spill through their real gaps and reach the two
@@ -2031,7 +2030,7 @@ two corydoras pause over submerged floor and digit ledges. Fish enter and leave
 through the visible water-filled passage in the left rail.
 
 Aquarium is event ID **9**, available in the catalog, launcher enablement, live
-Clock controls, manual cycling and **Preview & Resume**. Older settings enable
+Clock controls, manual cycling and its **Play**. Older settings enable
 it by default and retain previous choices. An explicit preview works when its
 automatic switch or the event profile is Off. Automatic reuse has a 45-second
 per-event cooldown within the existing global scheduler.
@@ -2207,7 +2206,7 @@ resize, restart and preview replacement release the transition. Turning its
 switch Off leaves the current slide alone; the Off profile disables all automatic
 events, including slides. With only Digit Slide enabled there is no periodic timer.
 
-Manual `digit-slide` triggers and **Preview & Resume** roll the *current* digits
+Manual `digit-slide` triggers and its **Play** roll the *current* digits
 out and back in. They never fabricate a different clock reading. This preview
 works even with the switch/profile Off and is reported as `preview: true`.
 
@@ -2345,8 +2344,8 @@ depend on destructible terrain. See [the water design](design/water.md) for mode
 limits, performance measurements, and the optional buoyancy/displacement experiments.
 
 To inspect a stepped basin spilling into a closed collecting pool, use the
-development-only override below, then select **Clock Controls → Preview Event:
-Meltdown → Preview**. It replaces Meltdown's material source for that process;
+development-only override below, then select **Clock Controls → Events →
+Meltdown → Play**. It replaces Meltdown's material source for that process;
 normal startup is unchanged, and no extra launcher scenario or setting is added.
 The optional preview also includes an orange floating box, yellow floating ball,
 and dense red sinking box. These are real Rapier bodies with one-way buoyancy
@@ -2526,7 +2525,7 @@ values use the seeded mix. It is not a persistent menu setting. Changing the
 override requires relaunching the process. Standard benchmark mode remains
 pinned to Careful on the original Platforms pattern. The course override accepts
 `platforms`, `terraces`, `two-jump`, or `shortcut`; unset, `mixed`, and unknown
-values select a seeded pattern. Preview Duck through Clock Controls after
+values select a seeded pattern. Play Duck from Clock Controls → Events after
 launching. Use `shortcut` in the last command to watch platform skipping, or
 switch the personality to `careful` to watch the adjacent route on the same course.
 These overrides are independent and do not change event scheduling.
@@ -2607,7 +2606,7 @@ For an optional planning overlay, start the client with:
 SPACEWARS_CLOCK_DUCK_DEBUG=1 cargo run --release -p engine-client -- --scenario clock
 ```
 
-Use **Clock Controls → Preview Event → Duck → Preview & Resume**. Cyan marks the planned takeoff,
+Use **Clock Controls → Events → Duck → Play**. Cyan marks the planned takeoff,
 purple dots show the estimated body-center arc, and green marks the landing.
 This environment-only diagnostic is off by default, is not saved in settings,
 and does not alter the simulation. Normal benchmarks leave it off.
@@ -2636,7 +2635,7 @@ Press **N**, the gamepad's **right shoulder**, or Picade's **upper-right blue
 button** (HAT Button 3 / West) for **Next Event**. Each fresh
 press cycles forward through enabled, currently compatible events in catalog order
 (including Digit Slide), starting after the last event that ran. It uses the same clean replacement
-path as Preview & Resume, including recovery of the current event's physics and
+path as Play in Clock Controls, including recovery of the current event's physics and
 floor. Holding does not repeat; menu/launch handoffs require released controls.
 The event name appears for two seconds of simulation time. Off disables automatic
 scheduling, not this manual action. Individual disabled events are skipped;
@@ -2912,7 +2911,7 @@ width is excessive even at both end faces; transport and water accounting are un
 
 Another Duck admission and developer **water-lab** Meltdown previews are excluded
 from automatic selection and Next Event while any duck owns the course.
-An incompatible Preview & Resume preserves both the duck and
+An incompatible Play preserves both the duck and
 current event, resumes, and shows a dismissal hint; `clock trigger` rejects it
 with an explicit `action-unavailable` reason. Disabled events can still be manually
 previewed if compatible. The Off profile and disabled Duck event do not disable
@@ -3348,18 +3347,53 @@ caption are gone; the optional performance overlay remains enabled here.
 
 ![Clock face on Picade with no permanent controls button](screenshots/clock/picade-clean-controls.png)
 
-The page changes **12/24-hour format**, **Off/Calm/Demo cadence**, and the
-**Falling/Color Cycle/Meltdown/Duck/Marquee/Digit Slide automatic switches** and **Marquee Recipe**. Changes apply at the next host tick,
-even while paused, and are saved for restart/relaunch. A save failure is shown
-on the page; settings then remain active for the current session. Setting
-changes do not interrupt the current animation or reset its physics, event ID,
-or cooldown. A format change during a fall takes effect as the digits reform.
+### Clock Controls pages
 
-Choose a **Preview Event**, then **Preview & Resume** to replace any active event
-or cooldown with a clean preview, even if that event or automatic events are
-Off. This releases previous physics/appearance resources, preserves the scenario
-instance and monotonic event IDs, synchronizes the latest time, and resumes.
-It is deliberately different from the strict, non-replacing `clock trigger`.
+Clock Controls open on a short top page: **Look** and **Events**, each with a
+summary of what it holds, then **Back**. **Look** holds Time, Date, Theme and
+Lamps, then **Fonts**, which opens the font picker. **Events** holds How often,
+then the events under **Digits**, **Visitors** and **Room**. Each event's row
+has its switch, or a choice for Crow and Rain, and a **Play** button. Marquee's
+Recipe has a row of its own after it. The line under the rows says what the
+focused row does. The rows come from the client's Clock settings table, so a
+setting added there appears on its page.
+
+| Page | 800×480 | 1024×768 | 480×800 |
+| --- | --- | --- | --- |
+| Top | ![The top page, Look and Events with their summaries and Events selected, at 800 by 480](screenshots/clock/pages-800x480-top.png) | ![The top page, Look and Events with their summaries and Events selected, at 1024 by 768](screenshots/clock/pages-1024x768-top.png) | ![The top page, Look and Events with their summaries and Events selected, at 480 by 800](screenshots/clock/pages-480x800-top.png) |
+| Look | ![The Look page, Theme Christmas selected and what Auto does under the rows, at 800 by 480](screenshots/clock/pages-800x480-look.png) | ![The Look page, Theme Christmas selected and what Auto does under the rows, at 1024 by 768](screenshots/clock/pages-1024x768-look.png) | ![The Look page, Theme Christmas selected and what Auto does under the rows, at 480 by 800](screenshots/clock/pages-480x800-look.png) |
+| Events | ![The Events page from How often, Cell Swap selected with its Play lit and Coins Off, at 800 by 480](screenshots/clock/pages-800x480-events.png) | ![The Events page from How often, Cell Swap selected with its Play lit and Coins Off, at 1024 by 768](screenshots/clock/pages-1024x768-events.png) | ![The Events page from How often, Cell Swap selected with its Play lit and Coins Off, at 480 by 800](screenshots/clock/pages-480x800-events.png) |
+
+Up and Down move between rows, skip the headings, and wrap around through Back.
+Left and Right change the focused row's value: a switch flips and a choice
+steps. Right also opens a page's row. A or Enter plays an event's row, whose
+**Play** is lit while the row is focused; on a page's row it opens the page, on
+any other setting it steps forward, and on Back it goes back. A tap on a row's
+‹, › or switch changes it, a tap on Play plays it, and a tap on a page's row
+opens the page. B/Esc goes up one page, and from the top page closes Clock
+Controls. C/F1 closes them from any page. Start resumes. Clock Controls reopen
+where they were left, even after Restart; each launch of the Clock starts them
+on the top page.
+Holding Left or Right never repeats on these pages.
+
+The control API names the pages' screens `pause.clock` (the top page),
+`pause.clock-events` and `pause.clock-look`; the font picker stays
+`pause.clock-fonts`. `pause.clock.events` and `pause.clock.look` open the
+pages. A switch is `pause.clock.<setting>`, a choice is
+`pause.clock.<setting>.previous` and `.next`, an event's Play is
+`pause.clock.<event>.play`, and `pause.clock.back` goes back.
+
+Changes apply at the next host tick, even while paused, and are saved for
+restart/relaunch. A save failure is shown on the page; settings then remain
+active for the current session. Setting changes do not interrupt the current
+animation or reset its physics, event ID, or cooldown. A format change during a
+fall takes effect as the digits reform.
+
+Press an event's **Play** to replace any active event or cooldown with a clean
+preview, even if that event or automatic events are Off. This releases previous
+physics/appearance resources, preserves the scenario instance and monotonic
+event IDs, synchronizes the latest time, and resumes. It is deliberately
+different from the strict, non-replacing `clock trigger`.
 
 These are ordinary guarded UI controls, also available to CLI automation.
 `gameplay.clock-controls` remains a semantic settings shortcut for existing CLI
@@ -3369,11 +3403,14 @@ scripts; it no longer represents a permanent button on the clock face:
 spacewars-cli ui activate gameplay.clock-controls --expect-screen gameplay
 spacewars-cli ui wait --screen pause.clock --scenario clock --timeout 3s
 spacewars-cli ui state --json
-spacewars-cli ui activate pause.clock.event-profile.next --expect-screen pause.clock
-spacewars-cli ui activate pause.clock.preview-event.next --expect-screen pause.clock
-spacewars-cli ui activate pause.clock.preview --expect-screen pause.clock
+spacewars-cli ui activate pause.clock.events --expect-screen pause.clock
+spacewars-cli ui activate pause.clock.event-profile.next --expect-screen pause.clock-events
+spacewars-cli ui activate pause.clock.falling.play --expect-screen pause.clock-events
 spacewars-cli ui wait --screen gameplay --scenario clock --timeout 3s
 ```
+
+Clock Controls reopen where they were left, so a second pass in the same run
+finds `pause.clock-events`; `pause.clock.back` returns to the top page.
 
 Use the current UI revision as `--expect-revision` for guarded scripts. Setting
 changes acknowledge a queued operation; controls are temporarily disabled until
@@ -3408,11 +3445,13 @@ also goes in the client's Clock settings table,
 is also its control's name on both settings pages. The table says once what the
 setting's values are (Off and On, or Off and a choice, as Rain and Crow have)
 and how it changes `ClockSettings`, and both pages step it through the table.
-Each page still places the control by hand: in its grid in `ui/main.slint`, its
-focus order in `ui_inventory.rs`, its activation target in `ui_activation.rs`
-and, on the pause page, its moves in `ui_navigation.rs`. Tests check that the
-focus orders name every setting in the table and that activation agrees with
-them. Finishing or
+The pause pages build their rows from the table, in `clock_menu.rs`, so the
+setting appears on its page, in its section, with its controls, focus and
+moves, and an event's row gets its Play, with nothing else to change. The
+launcher's page still places the control by hand: in its grid in
+`ui/main.slint`, its focus order in `ui_inventory.rs` and its activation target
+in `ui_activation.rs`. Tests check that both pages offer every setting in the
+table and that the launcher's activation agrees with its focus order. Finishing or
 resizing drops the active event and restores the latest face and base palette;
 residents of the run's physics arena stay through a resize, as below.
 Restart/relaunch constructs a fresh scenario. There is no plugin framework and
@@ -3881,8 +3920,8 @@ ffmpeg -framerate 30 -i frame-%04d.png -vf "split[a][b];[a]palettegen=max_colors
 
 ### Composed Marquee effects
 
-Choose **Recipe** in the launcher or live Clock Controls, select **Marquee** as
-the Preview Event, then **Preview & Resume**. The default is **Random**.
+Choose **Recipe** in the launcher or on the live **Clock Controls → Events**
+page, then press Marquee's **Play**. The default is **Random**.
 Explicit previews work even with the Marquee switch or profile Off.
 
 | Recipe | Content | Motion | Lighting |
@@ -3936,7 +3975,7 @@ spacewars-cli clock message "Hello, pi!"
 spacewars-cli clock state                 # shows saved and active content separately
 ```
 
-Open **Clock Controls → Preview Event → Marquee → Preview & Resume** to see the
+Open **Clock Controls → Events** and press Marquee's **Play** to see the
 new message immediately. Simply resuming an existing text event keeps its old
 message until that event finishes. The command does not change the recipe,
 automatic-event switches, profile, or pause state. Clock-digit recipes ignore
@@ -4327,8 +4366,8 @@ restart/relaunch and persistence. It waits for the durable completion state,
 not for a busy CI runner to catch an animation shorter than a second; exact phase
 and pause behavior are deterministic tests.
 
-On a running client, use **Clock Controls → Preview Event → Digit Slide →
-Preview & Resume**, or `spacewars-cli clock trigger digit-slide` from idle.
+On a running client, use **Clock Controls → Events → Digit Slide → Play**,
+or `spacewars-cli clock trigger digit-slide` from idle.
 `clock wait --event digit-slide --phase sliding` is useful interactively, but
 may miss the short phase; use its event ID and `--lifecycle idle` to confirm
 completion reliably. Device validation/deployment is tracked separately from
@@ -4395,8 +4434,9 @@ SPACEWARS_CLOCK_ARTIFACTS=/tmp/clock-meridiem-captures \
   cargo test --locked -p engine-client --bin engine-client meridiem_events_reach
 ```
 
-For manual testing, select **Clock Controls → 12-hour**, then preview **Falling**
-and **Meltdown**. Change time format during the event to check its recovery.
+For manual testing, choose **12-hour** for Time on **Clock Controls → Look**,
+then play **Falling** and **Meltdown** from **Events**. Change time format
+during the event to check its recovery.
 
 Local validation (2026-09-12, after integrating main's rendering changes):
 **463 selected tests passed**, with four existing ignored tests, across

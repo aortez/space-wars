@@ -152,20 +152,13 @@ fn tanks_render_both_adapters_and_controls_without_covering_the_reading() {
             ui.set_launcher_scenario("clock".into());
             crate::apply_scenario_metadata(&ui, "clock");
             crate::clock_controls::publish_settings(&ui, ClockSettings::default());
-            ui.set_clock_event_labels(
-                Rc::new(slint::VecModel::from(
-                    ClockEventKind::ALL
-                        .iter()
-                        .map(|kind| kind.label().into())
-                        .collect::<Vec<_>>(),
-                ))
-                .into(),
-            );
-            ui.set_clock_preview_index(ClockEventKind::Tanks as i32);
             if live {
                 ui.set_ingame_menu_visible(true);
                 ui.set_ingame_clock_visible(true);
-                ui.set_ingame_clock_focus_index(23);
+                crate::clock_menu::show(&ui, crate::clock_menu::Page::Events, Some("tanks"));
+                // The list scrolls to the row in a change handler, which runs
+                // with the timers.
+                slint::platform::update_timers_and_animations();
             } else {
                 ui.set_launcher_visible(true);
                 ui.set_launcher_settings_visible(true);

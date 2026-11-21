@@ -394,7 +394,9 @@ impl GamepadPump {
             return;
         }
 
-        if let Some(action) = self.ui_repeat.update(ui_direction(gamepad), Instant::now()) {
+        if let Some((action, repeat)) = self.ui_repeat.update(ui_direction(gamepad), Instant::now())
+            && (!repeat || crate::may_repeat(window, action.code()))
+        {
             window.invoke_ui_action(action.code());
         }
     }
@@ -975,11 +977,13 @@ struct UiRepeat {
 }
 
 impl UiRepeat {
-    fn update(&mut self, direction: Option<UiDirection>, now: Instant) -> Option<UiAction> {
+    /// The action to send for the direction held now, if any, and whether it
+    /// repeats one already sent.
+    fn update(&mut self, direction: Option<UiDirection>, now: Instant) -> Option<(UiAction, bool)> {
         if direction != self.direction {
             self.direction = direction;
             self.next_repeat = direction.map(|_| now + UI_REPEAT_DELAY);
-            return direction.map(UiDirection::action);
+            return direction.map(|direction| (direction.action(), false));
         }
 
         let direction = direction?;
@@ -988,7 +992,7 @@ impl UiRepeat {
             return None;
         }
         self.next_repeat = Some(now + UI_REPEAT_INTERVAL);
-        Some(direction.action())
+        Some((direction.action(), true))
     }
 
     fn reset(&mut self) {
@@ -1103,7 +1107,7 @@ mod tests {
 
         assert_eq!(
             repeat.update(Some(UiDirection::Down), start),
-            Some(UiAction::Down)
+            Some((UiAction::Down, false))
         );
         assert_eq!(
             repeat.update(Some(UiDirection::Down), start + UI_REPEAT_DELAY / 2),
@@ -1111,12 +1115,12 @@ mod tests {
         );
         assert_eq!(
             repeat.update(Some(UiDirection::Down), start + UI_REPEAT_DELAY),
-            Some(UiAction::Down)
+            Some((UiAction::Down, true))
         );
         assert_eq!(repeat.update(None, start + UI_REPEAT_DELAY), None);
         assert_eq!(
             repeat.update(Some(UiDirection::Down), start + UI_REPEAT_DELAY),
-            Some(UiAction::Down)
+            Some((UiAction::Down, false))
         );
     }
 

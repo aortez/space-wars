@@ -62,6 +62,7 @@ fn grass_admission_smoke(name: &'static str, renderer: &'static str) {
         let gameplay = h.state();
         h.activate_guarded("gameplay.clock-controls", &gameplay);
         let page = h.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = h.activate_guarded("pause.clock.events", &page);
         let page = h.change_clock_setting("pause.clock.grass", "Off", &page);
         let deadline = Instant::now() + TRANSITION_TIMEOUT;
         let paused = loop {
@@ -82,7 +83,7 @@ fn grass_admission_smoke(name: &'static str, renderer: &'static str) {
         assert_eq!(paused.grass.as_ref().unwrap().organisms, grass.organisms);
         h.assert_clock_ceiling_stays_paused(&paused);
         write_json(&h.run_path().join("disabled-paused.json"), &paused);
-        let page = h.activate_guarded("pause.clock.back", &page);
+        let page = h.leave_clock_controls(&page);
         h.activate_guarded("pause.restart", &page);
         h.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let restarted = h.clock_state();
@@ -278,9 +279,13 @@ fn grass_progress(name: &'static str, renderer: &'static str) {
         };
         let retained = before.grass.as_ref().unwrap().soil_retained;
         h.clock_trigger_event(&before, ClockEventKind::ColorCycle);
+        // A pause that lands before the host admits the trigger drops it, so
+        // the cycle must be running before Clock Controls pause the clock.
+        h.clock_wait(&before, "cycling", before.event_id + 1, 0);
         let gameplay = h.state();
         h.activate_guarded("gameplay.clock-controls", &gameplay);
         let page = h.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = h.activate_guarded("pause.clock.events", &page);
         let page = h.change_clock_setting("pause.clock.grass", "Off", &page);
         // UI enablement acknowledges the simulation setting, while its disk
         // write may still be pending. Establish a fully persisted baseline
@@ -309,7 +314,7 @@ fn grass_progress(name: &'static str, renderer: &'static str) {
         assert!(!paused.settings.events.grass);
         assert_eq!(paused.grass.as_ref().unwrap().soil_retained, retained);
         h.assert_clock_stays_paused(&paused);
-        let page = h.activate_guarded("pause.clock.back", &page);
+        let page = h.leave_clock_controls(&page);
         h.activate_guarded("pause.restart", &page);
         h.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let restarted = h.clock_state();
@@ -409,16 +414,11 @@ fn cell_swap_preview_and_saved_switch_use_the_public_controls() {
         h.activate_guarded("launcher.settings.start", &page);
         let gameplay = h.wait_clock_screen(UiScreen::Gameplay, page.revision);
         h.activate_guarded("gameplay.clock-controls", &gameplay);
-        let mut page = h.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
-        for _ in 0..ClockEventKind::CellSwap as usize {
-            page = h.activate_guarded("pause.clock.preview-event.next", &page);
-        }
-        assert_eq!(
-            control_value(&page, "pause.clock.preview-event.next"),
-            Some("Cell Swap")
-        );
+        let page = h.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = h.activate_guarded("pause.clock.events", &page);
+        assert_eq!(control_value(&page, "pause.clock.cell-swap"), Some("Off"));
         let initial = h.clock_state();
-        h.activate_guarded("pause.clock.preview", &page);
+        h.activate_guarded("pause.clock.cell-swap.play", &page);
         let gameplay = h.wait_clock_screen(UiScreen::Gameplay, page.revision);
         // The one-second animation is covered at exact ticks by core/render
         // tests; this process workflow must tolerate a loaded CI host.
@@ -427,20 +427,25 @@ fn cell_swap_preview_and_saved_switch_use_the_public_controls() {
         assert!(!recovered.settings.events.cell_swap);
         assert_eq!((recovered.body_count, recovered.collider_count), (0, 0));
         assert_eq!(recovered.next_event_tick, None);
+        // Clock Controls open where they were left: on Cell Swap, just played.
         h.activate_guarded("gameplay.clock-controls", &gameplay);
-        let page = h.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = h.wait_clock_screen(UiScreen::PauseClockEvents, gameplay.revision);
+        assert_eq!(
+            page.selected_control.as_deref(),
+            Some("pause.clock.cell-swap")
+        );
         let paused = h.clock_state();
         let page = h.change_clock_setting("pause.clock.cell-swap", "On", &page);
         let configured = h.clock_state();
         assert_eq!(configured.simulation_tick, paused.simulation_tick);
         assert!(configured.settings.events.cell_swap);
-        let page = h.activate_guarded("pause.clock.back", &page);
+        let page = h.leave_clock_controls(&page);
         h.activate_guarded("pause.resume", &page);
         h.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let gameplay = h.state();
         h.activate_guarded("gameplay.clock-controls", &gameplay);
         let page = h.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
-        let page = h.activate_guarded("pause.clock.back", &page);
+        let page = h.leave_clock_controls(&page);
         h.activate_guarded("pause.restart", &page);
         h.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let restarted = h.clock_state();
@@ -480,17 +485,11 @@ fn aquarium_preview_pause_enablement_and_restart_use_the_public_ui() {
         harness.activate_guarded("launcher.settings.start", &page);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
-        let mut page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
-        for _ in 0..ClockEventKind::Aquarium as usize {
-            page = harness.activate_guarded("pause.clock.preview-event.next", &page);
-        }
-        assert_eq!(
-            control_value(&page, "pause.clock.preview-event.next"),
-            Some("Aquarium")
-        );
+        let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = harness.activate_guarded("pause.clock.events", &page);
         harness.capture_screenshot("aquarium-pause-controls.png");
         let initial = harness.clock_state();
-        harness.activate_guarded("pause.clock.preview", &page);
+        harness.activate_guarded("pause.clock.aquarium.play", &page);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let swimming = harness.clock_wait(&initial, "swimming", 1, 60);
         let aquarium = swimming.aquarium.unwrap();
@@ -500,7 +499,7 @@ fn aquarium_preview_pause_enablement_and_restart_use_the_public_ui() {
         assert_eq!((swimming.body_count, swimming.collider_count), (0, 0));
         harness.capture_screenshot("aquarium-swimming.png");
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
-        let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = harness.wait_clock_screen(UiScreen::PauseClockEvents, gameplay.revision);
         let paused = harness.clock_state();
         harness.assert_clock_stays_paused(&paused);
         let page = harness.change_clock_setting("pause.clock.aquarium", "On", &page);
@@ -518,7 +517,7 @@ fn aquarium_preview_pause_enablement_and_restart_use_the_public_ui() {
             expected.clearance_corrections = actual.clearance_corrections;
         }
         assert_eq!(configured.aquarium, expected);
-        let page = harness.activate_guarded("pause.clock.back", &page);
+        let page = harness.leave_clock_controls(&page);
         harness.activate_guarded("pause.restart", &page);
         harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let restarted = harness.clock_state();
@@ -575,6 +574,7 @@ fn clock_fonts_save_live_choices_and_survive_restart() {
         );
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
         let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = harness.activate_guarded("pause.clock.look", &page);
         let page = harness.activate_guarded("pause.clock.fonts", &page);
         assert_eq!(page.screen, UiScreen::PauseClockFonts);
         let pending = harness.activate_guarded("clock.fonts.select.serif", &page);
@@ -599,7 +599,7 @@ fn clock_fonts_save_live_choices_and_survive_restart() {
         let expected = harness.clock_state();
         assert!(!expected.settings.fonts.rotate);
         let page = harness.activate_guarded("clock.fonts.back", &page);
-        let page = harness.activate_guarded("pause.clock.back", &page);
+        let page = harness.leave_clock_controls(&page);
         harness.activate_guarded("pause.restart", &page);
         harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let restarted = harness.clock_state();
@@ -644,6 +644,7 @@ fn explosion_controls_pause_recovery_and_restart_preserve_settings() {
         assert_eq!(exploding.body_count, debris.cells as usize + 4);
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
         let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = harness.activate_guarded("pause.clock.events", &page);
         let paused = harness.clock_state();
         harness.assert_clock_stays_paused(&paused);
         let mut page = harness.change_clock_setting("pause.clock.explosion", "On", &page);
@@ -652,7 +653,7 @@ fn explosion_controls_pause_recovery_and_restart_preserve_settings() {
         assert_eq!(configured.explosion, paused.explosion);
         assert_eq!(configured.phase_tick, paused.phase_tick);
         harness.capture_screenshot("clock-explosion-controls.png");
-        page = harness.activate_guarded("pause.clock.back", &page);
+        page = harness.leave_clock_controls(&page);
         harness.activate_guarded("pause.resume", &page);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let recovered = harness.clock_wait(&initial, "idle", 1, 0);
@@ -729,23 +730,16 @@ fn crow_trigger_pause_settings_and_restart_preserve_the_resident_contract() {
         );
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
         let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = harness.activate_guarded("pause.clock.events", &page);
         let paused = harness.clock_state();
         harness.assert_clock_stays_paused(&paused);
-        let page = harness.change_clock_setting("pause.clock.crow", "Varied", &page);
+        let page = harness.change_clock_setting("pause.clock.crow.next", "Varied", &page);
         let configured = harness.clock_state();
         assert!(configured.settings.events.crow);
         assert_eq!(configured.crow, paused.crow);
         // A second preview resumes, but does not replace/extend the resident.
-        let mut page = page;
-        for _ in 0..ClockEventKind::Crow as usize {
-            page = harness.activate_guarded("pause.clock.preview-event.next", &page);
-        }
-        assert_eq!(
-            control_value(&page, "pause.clock.preview-event.next"),
-            Some("Crow")
-        );
         harness.capture_screenshot("clock-crow-controls.png");
-        harness.activate_guarded("pause.clock.preview", &page);
+        harness.activate_guarded("pause.clock.crow.play", &page);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         assert_eq!(harness.clock_state().crow.unwrap().visit_id, visit_id);
         harness.pause_guarded(&gameplay);
@@ -838,25 +832,12 @@ fn digit_slide_controls_preview_cleanup_and_persistence() {
         assert_eq!(recovered.next_event_tick, None);
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
         let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
-        let mut page = harness.change_clock_setting("pause.clock.digit-slide", "On", &page);
+        let page = harness.activate_guarded("pause.clock.events", &page);
+        let page = harness.change_clock_setting("pause.clock.digit-slide", "On", &page);
         let configured = harness.clock_state();
         assert!(configured.settings.events.digit_slide);
-        page = harness.press_guarded(UiAction::Left, &page);
-        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.duck"));
-        page = harness.press_guarded(UiAction::Right, &page);
-        assert_eq!(
-            page.selected_control.as_deref(),
-            Some("pause.clock.digit-slide")
-        );
-        for _ in 0..ClockEventKind::DigitSlide as usize {
-            page = harness.activate_guarded("pause.clock.preview-event.next", &page);
-        }
-        assert_eq!(
-            control_value(&page, "pause.clock.preview-event.next"),
-            Some("Digit Slide")
-        );
         harness.capture_screenshot("clock-digit-slide-controls.png");
-        harness.activate_guarded("pause.clock.preview", &page);
+        harness.activate_guarded("pause.clock.digit-slide.play", &page);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let recovered = harness.clock_wait(&initial, "idle", initial.event_id + 2, 0);
         assert!(recovered.digit_slide.is_none());
@@ -898,20 +879,14 @@ fn marquee_preview_settings_and_recovery_smoke() {
         let game = h.wait_clock_screen(UiScreen::Gameplay, launcher.revision);
         h.activate_guarded("gameplay.clock-controls", &game);
         let page = h.wait_clock_screen(UiScreen::PauseClock, game.revision);
+        let page = h.activate_guarded("pause.clock.events", &page);
         let page = h.change_clock_setting("pause.clock.event-profile.previous", "Off", &page);
         h.change_clock_setting("pause.clock.marquee-preset.previous", "Text spin", &page);
         let paused = h.clock_state();
         let configured = h.clock_message(&paused, "Smoke test");
         assert_eq!(configured.settings.marquee_message.as_str(), "SMOKE TEST");
-        let mut page = h.state();
-        for _ in 0..ClockEventKind::Marquee as usize {
-            page = h.activate_guarded("pause.clock.preview-event.next", &page);
-        }
-        assert_eq!(
-            control_value(&page, "pause.clock.preview-event.next"),
-            Some("Marquee")
-        );
-        h.activate_guarded("pause.clock.preview", &page);
+        let page = h.state();
+        h.activate_guarded("pause.clock.marquee.play", &page);
         h.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let running = h.clock_wait(&configured, "presenting", configured.event_id + 1, 90);
         let marquee = running.marquee.as_ref().unwrap();
@@ -990,55 +965,10 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         assert_eq!(updated.simulation_tick, paused.simulation_tick);
         // Read a fresh UI snapshot: settings acknowledgement may briefly disable
         // controls and therefore legitimately change its revision.
-        let mut page = harness.state();
-        // D-pad reaches Marquee and its recipe without triggering gameplay.
-        for expected in [
-            "pause.clock.event-profile",
-            "pause.clock.lamps",
-            "pause.clock.fonts",
-            "pause.clock.show-date",
-            "pause.clock.cell-swap",
-            "pause.clock.rain",
-            "pause.clock.falling",
-            "pause.clock.preview-event",
-            "pause.clock.crow",
-            "pause.clock.explosion",
-            "pause.clock.marquee",
-        ] {
-            page = harness.press_guarded(UiAction::Down, &page);
-            assert_eq!(page.selected_control.as_deref(), Some(expected));
-        }
-        assert_eq!(
-            page.selected_control.as_deref(),
-            Some("pause.clock.marquee")
-        );
-        page = harness.press_guarded(UiAction::Right, &page);
-        assert_eq!(
-            page.selected_control.as_deref(),
-            Some("pause.clock.aquarium")
-        );
-        // Spider, Coins and Tanks follow Aquarium in the Marquee row, and Down
-        // from the row's end reaches the recipe on the row below.
-        page = harness.press_guarded(UiAction::Right, &page);
-        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.spider"));
-        page = harness.press_guarded(UiAction::Right, &page);
-        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.coins"));
-        page = harness.press_guarded(UiAction::Right, &page);
-        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.tanks"));
-        page = harness.press_guarded(UiAction::Down, &page);
-        assert_eq!(
-            page.selected_control.as_deref(),
-            Some("pause.clock.marquee-preset")
-        );
-        // Theme ends the recipe's row: Down reaches it, and Up comes back.
-        page = harness.press_guarded(UiAction::Down, &page);
-        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.theme"));
-        page = harness.press_guarded(UiAction::Up, &page);
-        assert_eq!(
-            page.selected_control.as_deref(),
-            Some("pause.clock.marquee-preset")
-        );
-        page = harness.change_clock_setting("pause.clock.marquee-preset.next", "Text spin", &page);
+        let page = harness.state();
+        let page = harness.activate_guarded("pause.clock.events", &page);
+        let page =
+            harness.change_clock_setting("pause.clock.marquee-preset.next", "Text spin", &page);
         let configured = harness.clock_state();
         assert_eq!(
             configured.marquee.unwrap().preset,
@@ -1049,15 +979,8 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
             ClockMarqueePreset::TextSpin
         );
         assert_eq!(configured.phase_tick, paused.phase_tick);
-        for _ in 0..4 {
-            page = harness.activate_guarded("pause.clock.preview-event.next", &page);
-        }
-        assert_eq!(
-            control_value(&page, "pause.clock.preview-event.next"),
-            Some("Marquee")
-        );
         harness.capture_screenshot("clock-marquee-controls.png");
-        harness.activate_guarded("pause.clock.preview", &page);
+        harness.activate_guarded("pause.clock.marquee.play", &page);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let spinning = harness.clock_wait(&initial, "presenting", 2, 150);
         let content = spinning.marquee.unwrap();
@@ -1070,7 +993,7 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         assert_eq!((idle.body_count, idle.collider_count), (0, 0));
         harness.capture_screenshot("clock-marquee-recovered.png");
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
-        let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = harness.wait_clock_screen(UiScreen::PauseClockEvents, gameplay.revision);
         // Text spin immediately precedes Random; the live helper advances once
         // and waits for the settings acknowledgement before returning.
         let page = harness.change_clock_setting("pause.clock.marquee-preset.next", "Random", &page);
@@ -1079,7 +1002,7 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
             ClockMarqueePreset::Random
         );
         harness.capture_screenshot("clock-marquee-random-controls.png");
-        harness.activate_guarded("pause.clock.preview", &page);
+        harness.activate_guarded("pause.clock.marquee.play", &page);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let preview = harness.clock_wait(&idle, "presenting", idle.event_id + 1, 90);
         assert_eq!(preview.event_kind, Some(ClockEventKind::Marquee));
@@ -1088,7 +1011,7 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         assert!(ClockMarqueePreset::CONCRETE.contains(&preview_preset));
         assert_eq!((preview.body_count, preview.collider_count), (0, 0));
         harness.capture_screenshot("clock-marquee-random-preview.png");
-        // Preview & Resume admits an event itself. Finish it before issuing
+        // Play admits an event itself. Finish it before issuing
         // another trigger with the idle event id and scenario revision.
         let mut baseline = harness.clock_wait(&preview, "idle", preview.event_id, 0);
         assert!(baseline.marquee.is_none());
@@ -1173,6 +1096,7 @@ fn rain_settings_preview_pause_cleanup_and_persistence() {
         harness.capture_screenshot("clock-rain-shower.png");
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
         let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = harness.activate_guarded("pause.clock.events", &page);
         let paused = harness.clock_state();
         harness.assert_clock_stays_paused(&paused);
         let page = harness.change_clock_setting("pause.clock.rain.next", "Off", &page);
@@ -1192,12 +1116,9 @@ fn rain_settings_preview_pause_cleanup_and_persistence() {
         assert_eq!((recovered.body_count, recovered.collider_count), (0, 0));
         assert_eq!(recovered.next_event_tick, None);
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
-        let mut page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
-        for _ in 0..ClockEventKind::Rain as usize {
-            page = harness.activate_guarded("pause.clock.preview-event.next", &page);
-        }
+        let page = harness.wait_clock_screen(UiScreen::PauseClockEvents, gameplay.revision);
         // Explicit preview still works when Rain is disabled.
-        harness.activate_guarded("pause.clock.preview", &page);
+        harness.activate_guarded("pause.clock.rain.play", &page);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let preview = harness.clock_wait(&initial, "raining", 2, 1);
         assert_eq!(preview.rain.unwrap().amount, ClockRainAmount::Heavy);
@@ -1211,18 +1132,24 @@ fn rain_settings_preview_pause_cleanup_and_persistence() {
         assert_eq!(restarted.floor, ClockFloorMode::Closed);
         assert_eq!(restarted.settings, configured.settings);
         assert_eq!((restarted.body_count, restarted.collider_count), (0, 0));
-        harness.pause_guarded(&gameplay);
-        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        // Restart keeps Clock Controls where Rain's Play left them.
+        harness.activate_guarded("gameplay.clock-controls", &gameplay);
+        let page = harness.wait_clock_screen(UiScreen::PauseClockEvents, gameplay.revision);
+        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.rain"));
+        let menu = harness.leave_clock_controls(&page);
         harness.activate_guarded("pause.return-to-launcher", &menu);
         let launcher = harness.wait_clock_screen(UiScreen::LauncherMain, menu.revision);
         harness.activate_guarded("launcher.start", &launcher);
-        harness.wait_clock_screen(UiScreen::Gameplay, launcher.revision);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, launcher.revision);
         assert_eq!(harness.clock_state().settings, configured.settings);
         let saved: engine_common::Settings = toml::from_str(
             &fs::read_to_string(harness.run_path().join("config/settings.toml")).unwrap(),
         )
         .unwrap();
         assert_eq!(saved.clock, configured.settings);
+        // A new launch starts Clock Controls on the top page.
+        harness.activate_guarded("gameplay.clock-controls", &gameplay);
+        harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
     });
 }
 
@@ -1338,32 +1265,46 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         harness.clock_wait(&initial, "falling", 1, 30);
         // The same operation as the on-face touchscreen affordance.
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
-        let mut page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
         let paused = harness.clock_state();
         assert!(paused.paused && paused.body_count > 4);
-        page = harness.change_clock_setting("pause.clock.time-format.next", "12-hour", &page);
+        // Events: how often, and every event switched off.
+        let mut page = harness.activate_guarded("pause.clock.events", &page);
+        assert_eq!(page.screen, UiScreen::PauseClockEvents);
         page = harness.change_clock_setting("pause.clock.event-profile.previous", "Off", &page);
-        page = harness.change_clock_setting("pause.clock.falling", "Off", &page);
-        page = harness.change_clock_setting("pause.clock.color-cycle", "Off", &page);
-        page = harness.change_clock_setting("pause.clock.meltdown", "Off", &page);
-        page = harness.change_clock_setting("pause.clock.duck", "Off", &page);
-        assert_eq!(control_value(&page, "pause.clock.crow"), Some("Varied"));
-        for choice in ["Shy", "Hardy", "Off"] {
-            page = harness.change_clock_setting("pause.clock.crow", choice, &page);
+        for event in [
+            "falling",
+            "color-cycle",
+            "meltdown",
+            "duck",
+            "explosion",
+            "aquarium",
+            "cell-swap",
+            "grass",
+            "slot-machine",
+            "spider",
+            "coins",
+            "tanks",
+            "marquee",
+        ] {
+            page = harness.change_clock_setting(&format!("pause.clock.{event}"), "Off", &page);
         }
-        page = harness.change_clock_setting("pause.clock.explosion", "Off", &page);
-        page = harness.change_clock_setting("pause.clock.aquarium", "Off", &page);
-        page = harness.change_clock_setting("pause.clock.cell-swap", "Off", &page);
-        page = harness.change_clock_setting("pause.clock.grass", "Off", &page);
-        page = harness.change_clock_setting("pause.clock.slot-machine", "Off", &page);
-        page = harness.change_clock_setting("pause.clock.spider", "Off", &page);
-        page = harness.change_clock_setting("pause.clock.coins", "Off", &page);
-        page = harness.change_clock_setting("pause.clock.tanks", "Off", &page);
-        page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
+        assert_eq!(
+            control_value(&page, "pause.clock.crow.next"),
+            Some("Varied")
+        );
+        for choice in ["Shy", "Hardy", "Off"] {
+            page = harness.change_clock_setting("pause.clock.crow.next", choice, &page);
+        }
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
+        // Look: the time, the date, the theme and the lamps.
+        page = harness.activate_guarded("pause.clock.back", &page);
+        page = harness.activate_guarded("pause.clock.look", &page);
+        assert_eq!(page.screen, UiScreen::PauseClockLook);
+        page = harness.change_clock_setting("pause.clock.time-format.next", "12-hour", &page);
         page = harness.change_clock_setting("pause.clock.show-date", "On", &page);
-        assert_eq!(control_value(&page, "pause.clock.theme"), Some("Auto"));
-        page = harness.change_clock_setting("pause.clock.theme", "Normal", &page);
+        assert_eq!(control_value(&page, "pause.clock.theme.next"), Some("Auto"));
+        page = harness.change_clock_setting("pause.clock.theme.next", "Normal", &page);
         // A theme whose save fails still reaches the face, and the page says
         // the save failed. An owned, empty directory at the destination forces
         // the failure. Christmas turns the face whatever the date: paused, it
@@ -1372,8 +1313,8 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         let backup = harness.run_path().join("config/settings-before-error.toml");
         fs::rename(&path, &backup).unwrap();
         fs::create_dir(&path).unwrap();
-        let pending = harness.activate_guarded("pause.clock.theme", &page);
-        harness.wait_clock_screen(UiScreen::PauseClock, pending.revision);
+        let pending = harness.activate_guarded("pause.clock.theme.next", &page);
+        harness.wait_clock_screen(UiScreen::PauseClockLook, pending.revision);
         let failed = harness.clock_settings_settled();
         assert!(failed.settings_error.is_some());
         assert_eq!(
@@ -1386,15 +1327,21 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
             (engine_common::ClockTheme::Christmas, 0)
         );
         page = harness.state();
-        assert_eq!(page.screen, UiScreen::PauseClock);
-        assert_eq!(control_value(&page, "pause.clock.theme"), Some("Christmas"));
+        assert_eq!(page.screen, UiScreen::PauseClockLook);
+        assert_eq!(
+            control_value(&page, "pause.clock.theme.next"),
+            Some("Christmas")
+        );
         assert!(page.error.is_some());
         fs::remove_dir(&path).unwrap();
         fs::rename(&backup, &path).unwrap();
         // The next change, to the lamps, saves the theme with it, and leaves
         // the fade where it was.
-        assert_eq!(control_value(&page, "pause.clock.lamps"), Some("Lively"));
-        page = harness.change_clock_setting("pause.clock.lamps", "Steady", &page);
+        assert_eq!(
+            control_value(&page, "pause.clock.lamps.next"),
+            Some("Lively")
+        );
+        page = harness.change_clock_setting("pause.clock.lamps.next", "Steady", &page);
         let configured = harness.clock_settings_settled();
         assert_eq!(configured.settings_error, None);
         let saved: engine_common::Settings =
@@ -1427,20 +1374,18 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         assert_eq!(
             harness
                 .expect_activate_failure(
-                    "pause.clock.preview",
-                    Some(UiScreen::PauseClock),
+                    "pause.clock.back",
+                    Some(UiScreen::PauseClockLook),
                     Some(page.revision - 1)
                 )
                 .code,
             ControlFailureCode::StaleRevision
         );
-        page = harness.activate_guarded("pause.clock.preview-event.next", &page);
-        assert_eq!(
-            control_value(&page, "pause.clock.preview-event.next"),
-            Some("Color Cycle")
-        );
+        // Play shows Color Cycle, Off as it is, and resumes.
+        page = harness.activate_guarded("pause.clock.back", &page);
+        page = harness.activate_guarded("pause.clock.events", &page);
         harness.capture_screenshot("clock-live-controls.png");
-        harness.activate_guarded("pause.clock.preview", &page);
+        harness.activate_guarded("pause.clock.color-cycle.play", &page);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let color = harness.clock_wait(&configured, "cycling", 2, 35);
         assert_eq!(color.scenario_revision, initial.scenario_revision);
@@ -1455,46 +1400,28 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         );
         harness.capture_screenshot("clock-live-preview.png");
 
-        // Controller-style navigation reaches the full-width Clock button.
+        // Controller-style navigation reaches the full-width Clock button,
+        // which opens Clock Controls where they were left: on Events, at the
+        // event just played. Three rows down, A plays Falling.
         harness.pause_guarded(&gameplay);
         let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
         let menu = harness.press_guarded(UiAction::Down, &menu);
         let menu = harness.press_guarded(UiAction::Down, &menu);
         assert_eq!(menu.selected_control.as_deref(), Some("pause.clock"));
-        let page = harness.press_guarded(UiAction::Confirm, &menu);
-        assert_eq!(page.screen, UiScreen::PauseClock);
-        let page = harness.press_guarded(UiAction::Down, &page);
-        let page = harness.press_guarded(UiAction::Down, &page);
-        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.lamps"));
-        let page = harness.press_guarded(UiAction::Down, &page);
-        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.fonts"));
-        let page = harness.press_guarded(UiAction::Down, &page);
-        assert_eq!(
-            page.selected_control.as_deref(),
-            Some("pause.clock.show-date")
-        );
-        assert_eq!(control_value(&page, "pause.clock.show-date"), Some("On"));
-        let page = harness.press_guarded(UiAction::Down, &page);
-        assert_eq!(
-            page.selected_control.as_deref(),
-            Some("pause.clock.cell-swap")
-        );
-        let page = harness.press_guarded(UiAction::Right, &page);
-        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.grass"));
-        let page = harness.press_guarded(UiAction::Right, &page);
-        assert_eq!(
-            page.selected_control.as_deref(),
-            Some("pause.clock.slot-machine")
-        );
-        let page = harness.press_guarded(UiAction::Right, &page);
-        let page = harness.press_guarded(UiAction::Down, &page);
-        let page = harness.press_guarded(UiAction::Right, &page);
+        let mut page = harness.press_guarded(UiAction::Confirm, &menu);
+        assert_eq!(page.screen, UiScreen::PauseClockEvents);
         assert_eq!(
             page.selected_control.as_deref(),
             Some("pause.clock.color-cycle")
         );
-        let page = harness.activate_guarded("pause.clock.preview-event.previous", &page);
-        harness.activate_guarded("pause.clock.preview", &page);
+        for _ in 0..3 {
+            page = harness.press_guarded(UiAction::Down, &page);
+        }
+        assert_eq!(
+            page.selected_control.as_deref(),
+            Some("pause.clock.falling")
+        );
+        harness.press_guarded(UiAction::Confirm, &page);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let falling = harness.clock_wait(&color, "falling", 3, 30);
         assert!(falling.body_count > 4 && falling.collider_count <= 100);
@@ -1582,13 +1509,29 @@ impl FunctionalHarness {
         }
     }
 
+    /// Changes a setting on the Clock Controls page showing, and waits for
+    /// the host to apply it there.
     fn change_clock_setting(&mut self, id: &str, value: &str, state: &UiState) -> UiState {
         let pending = self.activate_guarded(id, state);
-        let applied = self.wait_clock_screen(UiScreen::PauseClock, pending.revision);
+        let applied = self.wait_clock_screen(pending.screen, pending.revision);
         assert_eq!(control_value(&applied, id), Some(value));
         assert!(applied.controls.iter().all(|control| control.enabled));
         assert_eq!(applied.error, None);
         applied
+    }
+
+    /// Backs out of Clock Controls, from whichever page shows, to the pause
+    /// menu.
+    fn leave_clock_controls(&mut self, state: &UiState) -> UiState {
+        let mut state = state.clone();
+        for _ in 0..2 {
+            if state.screen == UiScreen::PauseMain {
+                break;
+            }
+            state = self.activate_guarded("pause.clock.back", &state);
+        }
+        assert_eq!(state.screen, UiScreen::PauseMain);
+        state
     }
 }
 
@@ -2219,30 +2162,14 @@ fn meltdown_pools_drains_previews_and_cleans_up_through_the_real_client() {
         }
         harness.capture_screenshot("clock-melting.png");
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
-        let mut page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = harness.activate_guarded("pause.clock.events", &page);
         let paused = harness.clock_state();
         harness.assert_clock_stays_paused(&paused);
-        page = harness.change_clock_setting("pause.clock.meltdown", "Off", &page);
+        let page = harness.change_clock_setting("pause.clock.meltdown", "Off", &page);
         assert_eq!(harness.clock_state().meltdown, paused.meltdown);
-        // The original event switches remain reachable through controller navigation.
-        let page = harness.press_guarded(UiAction::Left, &page);
-        assert_eq!(
-            page.selected_control.as_deref(),
-            Some("pause.clock.color-cycle")
-        );
-        let page = harness.press_guarded(UiAction::Right, &page);
-        assert_eq!(
-            page.selected_control.as_deref(),
-            Some("pause.clock.meltdown")
-        );
-        let page = harness.activate_guarded("pause.clock.preview-event.next", &page);
-        let page = harness.activate_guarded("pause.clock.preview-event.next", &page);
-        assert_eq!(
-            control_value(&page, "pause.clock.preview-event.next"),
-            Some("Meltdown")
-        );
         harness.capture_screenshot("clock-meltdown-controls.png");
-        harness.activate_guarded("pause.clock.preview", &page);
+        harness.activate_guarded("pause.clock.meltdown.play", &page);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let draining = harness.clock_wait(&initial, "draining", 2, 10);
         let material = draining.meltdown.unwrap();
@@ -2351,37 +2278,9 @@ fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
         let paused = harness.clock_state();
         harness.assert_clock_stays_paused(&paused);
         assert_eq!(harness.clock_state().duck, paused.duck);
-        // The event switches remain reachable past the lamp, font and date
-        // controls.
-        let mut page = page;
-        for expected in [
-            "event-profile",
-            "lamps",
-            "fonts",
-            "show-date",
-            "cell-swap",
-            "rain",
-            "falling",
-        ] {
-            page = harness.press_guarded(UiAction::Down, &page);
-            assert_eq!(
-                page.selected_control,
-                Some(format!("pause.clock.{expected}"))
-            );
-        }
-        for _ in 0..3 {
-            page = harness.press_guarded(UiAction::Right, &page);
-        }
-        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.duck"));
-        for _ in 0..3 {
-            page = harness.activate_guarded("pause.clock.preview-event.next", &page);
-        }
-        assert_eq!(
-            control_value(&page, "pause.clock.preview-event.next"),
-            Some("Duck")
-        );
+        let page = harness.activate_guarded("pause.clock.events", &page);
         harness.capture_screenshot("clock-duck-controls.png");
-        harness.activate_guarded("pause.clock.preview", &page);
+        harness.activate_guarded("pause.clock.duck.play", &page);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         // Duplicate Duck preview resumes without evicting the resident actor.
         let resetting = harness.clock_wait(&initial, "resetting", 1, 5);
@@ -2830,7 +2729,7 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
         let gameplay = h.state();
         h.activate_guarded("gameplay.clock-controls", &gameplay);
         let page = h.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
-        let page = h.activate_guarded("pause.clock.back", &page);
+        let page = h.leave_clock_controls(&page);
         h.activate_guarded("pause.restart", &page);
         h.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let restarted = h.clock_state();

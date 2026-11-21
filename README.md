@@ -87,7 +87,7 @@ The local launcher includes the following scenarios and presets:
   Digit Slide rolls changed digits on minute boundaries without physics.
   Save custom text through `clock message` in the CLI or the Clock settings file.
   Tap the clock face or press Start/P/Esc to pause. **Pause → Clock Controls**
-  changes live settings and offers **Preview & Resume**.
+  changes live settings, and each event's **Play** shows it now.
   See [Clock](docs/clock.md) for
   timing, the event catalog, and synchronized preview controls; the
   [performance lab](docs/clock-performance-lab.md) provides repeatable CPU

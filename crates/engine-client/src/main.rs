@@ -12,6 +12,7 @@ mod camera_probe;
 mod client_scenarios;
 mod clock_controls;
 mod clock_fonts;
+mod clock_menu;
 mod clock_settings_table;
 mod controller_assignments;
 mod controller_controls;
@@ -1284,6 +1285,18 @@ fn install_ingame_menu_callbacks(
     });
 }
 
+/// Whether a held input may repeat the action with this code. Repeat may move
+/// the selection, but must never repeatedly toggle a setting, restart, or
+/// pause/resume as the user holds it across a transition. On a settings page
+/// Left and Right change the selected setting, so they don't repeat there
+/// either. The keyboard and the gamepad both ask.
+pub(crate) fn may_repeat(window: &MainWindow, code: i32) -> bool {
+    let adjusts_setting = matches!(code, 2 | 3)
+        && (window.get_launcher_settings_visible()
+            || (window.get_ingame_clock_visible() && !window.get_clock_fonts_visible()));
+    matches!(code, 0..=3) && !adjusts_setting
+}
+
 fn install_ui_navigation(window: &MainWindow) {
     let weak = window.as_weak();
     window.on_ui_action(move |code| {
@@ -1335,15 +1348,7 @@ fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
         if window.get_launcher_busy() {
             return;
         }
-        // Repeat may move selection, but must never repeatedly toggle a setting,
-        // restart, or pause/resume as the user holds a key across a transition.
-        let adjusts_setting = matches!(code, 2 | 3)
-            && (window.get_launcher_settings_visible()
-                || (window.get_ingame_clock_visible()
-                    && matches!(window.get_ingame_clock_focus_index(), 0 | 1 | 4)));
-        if (repeat && (!matches!(code, 0..=3) || adjusts_setting))
-            || window.get_clock_controls_pending()
-        {
+        if (repeat && !may_repeat(&window, code)) || window.get_clock_controls_pending() {
             return;
         }
         let menu = window.get_launcher_visible()
