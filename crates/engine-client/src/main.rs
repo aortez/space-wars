@@ -12,6 +12,7 @@ mod camera_probe;
 mod client_scenarios;
 mod clock_controls;
 mod clock_fonts;
+mod clock_settings_table;
 mod controller_assignments;
 mod controller_controls;
 mod controller_profile;
@@ -1988,147 +1989,30 @@ fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
     }
 }
 
+/// Moves the launcher's Clock setting at `focus` by `delta`, or opens the
+/// fonts page from its control.
 fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
-    if focus == 15 {
+    let Some(id) = usize::try_from(focus)
+        .ok()
+        .and_then(|focus| ui_inventory::LAUNCHER_CLOCK_FOCUS_ORDER.get(focus))
+        .and_then(|control| control.strip_prefix("launcher.settings.clock."))
+    else {
+        return;
+    };
+    if id == "fonts" {
         window.invoke_clock_fonts_open();
         return;
     }
-    if focus == 23 {
-        let labels = engine_common::ClockLampMode::ALL.map(|mode| mode.label());
-        let next = cycle_label(window.get_launcher_clock_lamps().as_str(), &labels, delta);
-        window.set_launcher_clock_lamps(next.into());
+    let Some(setting) = clock_settings_table::find(id) else {
         return;
+    };
+    match clock_setup_from_window(window) {
+        Ok(settings) => clock_controls::publish_settings(
+            window,
+            clock_settings_table::stepped(setting, settings, delta),
+        ),
+        Err(error) => tracing::warn!(%error, "The launcher's Clock settings could not be read."),
     }
-    if focus == 24 {
-        let labels = engine_common::ClockThemeChoice::ALL.map(|choice| choice.label());
-        let next = cycle_label(window.get_launcher_clock_theme().as_str(), &labels, delta);
-        window.set_launcher_clock_theme(next.into());
-        return;
-    }
-    if focus == 19 {
-        window.set_launcher_clock_slot_machine_enabled(
-            !window.get_launcher_clock_slot_machine_enabled(),
-        );
-        return;
-    }
-    if focus == 22 {
-        window.set_launcher_clock_tanks_enabled(!window.get_launcher_clock_tanks_enabled());
-        return;
-    }
-    if focus == 21 {
-        window.set_launcher_clock_coins_enabled(!window.get_launcher_clock_coins_enabled());
-        return;
-    }
-    if focus == 20 {
-        window.set_launcher_clock_spider_enabled(!window.get_launcher_clock_spider_enabled());
-        return;
-    }
-    if focus == 18 {
-        window.set_launcher_clock_grass_enabled(!window.get_launcher_clock_grass_enabled());
-        return;
-    }
-    if focus == 17 {
-        window.set_launcher_clock_cell_swap_enabled(!window.get_launcher_clock_cell_swap_enabled());
-        return;
-    }
-    if focus == 16 {
-        window.set_launcher_clock_aquarium_enabled(!window.get_launcher_clock_aquarium_enabled());
-        return;
-    }
-    if focus == 14 {
-        window.set_launcher_clock_explosion_enabled(!window.get_launcher_clock_explosion_enabled());
-        return;
-    }
-    if focus == 13 {
-        let current = if window.get_launcher_clock_crow_enabled() {
-            window.get_launcher_clock_crow_water_tolerance()
-        } else {
-            "Off".into()
-        };
-        let next = cycle_label(current.as_str(), &["Off", "Varied", "Shy", "Hardy"], delta);
-        window.set_launcher_clock_crow_enabled(next != "Off");
-        if next != "Off" {
-            window.set_launcher_clock_crow_water_tolerance(next.into());
-        }
-        return;
-    }
-    if focus == 12 {
-        window.set_launcher_clock_show_date(!window.get_launcher_clock_show_date());
-        return;
-    }
-    if focus == 11 {
-        let current = if window.get_launcher_clock_rain_enabled() {
-            window.get_launcher_clock_rain_amount()
-        } else {
-            "Off".into()
-        };
-        let next = cycle_label(
-            current.as_str(),
-            &["Off", "Varied", "Light", "Medium", "Heavy"],
-            delta,
-        );
-        window.set_launcher_clock_rain_enabled(next != "Off");
-        if next != "Off" {
-            window.set_launcher_clock_rain_amount(next.into());
-        }
-        return;
-    }
-    if focus == 3 {
-        window.set_launcher_clock_digit_slide_enabled(
-            !window.get_launcher_clock_digit_slide_enabled(),
-        );
-        return;
-    }
-    if focus == 9 {
-        window.set_launcher_clock_marquee_enabled(!window.get_launcher_clock_marquee_enabled());
-        return;
-    }
-    if focus == 10 {
-        let labels = engine_common::ClockMarqueePreset::ALL.map(|preset| preset.label());
-        let next = cycle_label(
-            window.get_launcher_clock_marquee_preset().as_str(),
-            &labels,
-            delta,
-        );
-        window.set_launcher_clock_marquee_preset(next.into());
-        return;
-    }
-    if focus == 8 {
-        window.set_launcher_clock_duck_enabled(!window.get_launcher_clock_duck_enabled());
-        return;
-    }
-    if focus == 7 {
-        window.set_launcher_clock_meltdown_enabled(!window.get_launcher_clock_meltdown_enabled());
-        return;
-    }
-    if focus == 5 {
-        window.set_launcher_clock_falling_enabled(!window.get_launcher_clock_falling_enabled());
-        return;
-    }
-    if focus == 6 {
-        window.set_launcher_clock_color_cycle_enabled(
-            !window.get_launcher_clock_color_cycle_enabled(),
-        );
-        return;
-    }
-    if focus == 4 {
-        let next = cycle_label(
-            window.get_launcher_clock_event_profile().as_str(),
-            &["Off", "Calm", "Demo"],
-            delta,
-        );
-        window.set_launcher_clock_event_profile(SharedString::from(next));
-        return;
-    }
-    if focus != 2 {
-        return;
-    }
-    let next = cycle_label(
-        window.get_launcher_clock_time_format().as_str(),
-        &["24-hour", "12-hour"],
-        delta,
-    );
-    window.set_launcher_clock_time_format(SharedString::from(next));
 }
 
 fn cycle_label<'a>(current: &str, values: &'a [&'a str], delta: i32) -> &'a str {
@@ -4330,6 +4214,50 @@ mod tests {
 
         assert!(args.touch_test);
         assert!(!should_launch_directly(&args));
+    }
+
+    /// Each Clock control on the launcher steps its setting as the settings
+    /// table does, through the labels the launcher shows and parses back.
+    #[test]
+    fn launcher_clock_controls_step_their_settings_as_the_table_does() {
+        use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
+        use slint::platform::{Platform, PlatformError, WindowAdapter};
+
+        struct TestPlatform;
+
+        impl Platform for TestPlatform {
+            fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
+                Ok(MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer)
+                    as Rc<dyn WindowAdapter>)
+            }
+        }
+
+        slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+        let window = MainWindow::new().unwrap();
+        window.set_launcher_scenario("clock".into());
+        let mut covered = 0;
+        for (focus, control) in ui_inventory::LAUNCHER_CLOCK_FOCUS_ORDER.iter().enumerate() {
+            let Some(setting) = control
+                .strip_prefix("launcher.settings.clock.")
+                .and_then(clock_settings_table::find)
+            else {
+                continue;
+            };
+            for start in clock_settings_table::starting_points() {
+                for delta in [1, -1] {
+                    clock_controls::publish_settings(&window, start);
+                    window.set_launcher_settings_focus_index(focus as i32);
+                    adjust_launcher_setting(&window, delta);
+                    assert_eq!(
+                        clock_setup_from_window(&window),
+                        Ok(clock_settings_table::stepped(setting, start, delta)),
+                        "{control} by {delta}"
+                    );
+                }
+            }
+            covered += 1;
+        }
+        assert_eq!(covered, clock_settings_table::SETTINGS.len());
     }
 
     #[test]

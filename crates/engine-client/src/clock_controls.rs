@@ -4,11 +4,11 @@
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
-use engine_common::{ClockEventKind, ClockEventProfile, ClockSettings, ClockTimeFormat, Settings};
+use engine_common::{ClockEventKind, ClockSettings, Settings};
 use slint::ComponentHandle;
 use spacewars_control::UiAction;
 
-use crate::{MainWindow, host, ui_navigation};
+use crate::{MainWindow, clock_settings_table, host, ui_navigation};
 
 pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     crate::clock_fonts::publish(window, settings.fonts);
@@ -166,96 +166,12 @@ pub(crate) fn log_settings_change(previous: ClockSettings, next: ClockSettings, 
         "Clock settings changed.");
 }
 
-fn adjusted_settings(mut settings: ClockSettings, index: i32, delta: i32) -> Option<ClockSettings> {
-    match index {
-        13 => settings.show_date = !settings.show_date,
-        14 => {
-            let current = if settings.events.crow {
-                settings.crow_water_tolerance as i32 + 1
-            } else {
-                0
-            };
-            let next = ui_navigation::moved_selection(current, 4, delta);
-            settings.events.crow = next != 0;
-            if next != 0 {
-                settings.crow_water_tolerance =
-                    engine_common::ClockCrowWaterTolerance::ALL[next as usize - 1];
-            }
-        }
-        15 => settings.events.explosion = !settings.events.explosion,
-        17 => settings.events.aquarium = !settings.events.aquarium,
-        18 => settings.events.cell_swap = !settings.events.cell_swap,
-        19 => settings.events.grass = !settings.events.grass,
-        20 => settings.events.slot_machine = !settings.events.slot_machine,
-        21 => settings.events.spider = !settings.events.spider,
-        22 => settings.events.coins = !settings.events.coins,
-        23 => settings.events.tanks = !settings.events.tanks,
-        24 => {
-            let modes = engine_common::ClockLampMode::ALL;
-            let current = modes.iter().position(|mode| *mode == settings.lamps)?;
-            settings.lamps =
-                modes[ui_navigation::moved_selection(current as i32, modes.len() as i32, delta)
-                    as usize];
-        }
-        25 => {
-            let choices = engine_common::ClockThemeChoice::ALL;
-            let current = choices
-                .iter()
-                .position(|choice| *choice == settings.theme)?;
-            settings.theme =
-                choices[ui_navigation::moved_selection(current as i32, choices.len() as i32, delta)
-                    as usize];
-        }
-        0 => {
-            settings.time_format = match settings.time_format {
-                ClockTimeFormat::TwelveHour => ClockTimeFormat::TwentyFourHour,
-                ClockTimeFormat::TwentyFourHour => ClockTimeFormat::TwelveHour,
-            }
-        }
-        1 => {
-            let profiles = [
-                ClockEventProfile::Off,
-                ClockEventProfile::Calm,
-                ClockEventProfile::Demo,
-            ];
-            let current = profiles
-                .iter()
-                .position(|profile| *profile == settings.event_profile)?;
-            settings.event_profile =
-                profiles[ui_navigation::moved_selection(current as i32, 3, delta) as usize];
-        }
-        2 => settings.events.falling = !settings.events.falling,
-        3 => settings.events.color_cycle = !settings.events.color_cycle,
-        7 => settings.events.meltdown = !settings.events.meltdown,
-        8 => settings.events.duck = !settings.events.duck,
-        9 => settings.events.marquee = !settings.events.marquee,
-        11 => settings.events.digit_slide = !settings.events.digit_slide,
-        12 => {
-            // One five-way choice keeps the small-display controls compact.
-            // Disabling Rain preserves the last amount in saved settings.
-            let current = if settings.events.rain {
-                settings.rain_amount as i32 + 1
-            } else {
-                0
-            };
-            let next = ui_navigation::moved_selection(current, 5, delta);
-            settings.events.rain = next != 0;
-            if next != 0 {
-                settings.rain_amount = engine_common::ClockRainAmount::ALL[next as usize - 1];
-            }
-        }
-        10 => {
-            let presets = engine_common::ClockMarqueePreset::ALL;
-            let index = presets
-                .iter()
-                .position(|preset| *preset == settings.marquee_preset)?;
-            settings.marquee_preset =
-                presets[ui_navigation::moved_selection(index as i32, presets.len() as i32, delta)
-                    as usize];
-        }
-        _ => return None,
-    }
-    Some(settings)
+/// `settings` with the setting at pause-page `index` moved `delta` places, or
+/// `None` where the control at `index` changes no setting.
+fn adjusted_settings(settings: ClockSettings, index: i32, delta: i32) -> Option<ClockSettings> {
+    let control = crate::ui_inventory::PAUSE_CLOCK_FOCUS_ORDER.get(usize::try_from(index).ok()?)?;
+    let setting = clock_settings_table::find(control.strip_prefix("pause.clock.")?)?;
+    Some(clock_settings_table::stepped(setting, settings, delta))
 }
 
 pub(crate) fn open(window: &MainWindow) {
