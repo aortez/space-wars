@@ -6,6 +6,10 @@ dependency into `engine-nes`. User-provided cartridges already use the generic
 `scenario-nes` and client adapter described in
 [`nes-rom-library.md`](nes-rom-library.md).
 
+Reading semantic game state back out of a cartridge for bots is a separate
+concern from either extension and needs no core change; see
+[`nes-world-model-reader.md`](nes-world-model-reader.md).
+
 ## Before implementation
 
 Record the candidate ROM's source repository, exact source commit, license,
