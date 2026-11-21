@@ -18,16 +18,12 @@ fn training_replays_keep_results_identical_and_support_pinning_speed_and_navigat
     let wait = |predicate: &dyn Fn() -> bool| {
         // Both complete training runs and validation use this bounded wait.
         // Shared CI runner speed must not decide checkpoint-equivalence checks.
-        let deadline = std::time::Instant::now() + Duration::from_secs(60);
-        while !predicate() {
-            assert!(
-                std::time::Instant::now() < deadline,
-                "training preview timed out: {}",
-                window.get_training_snapshot()
-            );
-            std::thread::sleep(Duration::from_millis(2));
-            slint::platform::update_timers_and_animations();
-        }
+        pump_job_until(
+            "training preview",
+            &|| host_progress(&window),
+            &|| window.get_training_snapshot().to_string(),
+            predicate,
+        );
     };
     window
         .window()
@@ -102,7 +98,28 @@ fn training_replays_keep_results_identical_and_support_pinning_speed_and_navigat
     // Unobserved control performs exactly the same selection and validation.
     let control_root = directory.path().join("control");
     let control = TrainingManager::new(control_root.clone()).unwrap();
-    wait(&|| control.control().snapshot().state == JobState::Ready);
+    // The control run has no view of its own, so the counters it publishes are
+    // the only evidence that it is still moving.
+    let wait_job = |predicate: &dyn Fn() -> bool| {
+        pump_job_until(
+            "unobserved control job",
+            &|| {
+                let job = control.control().snapshot();
+                format!(
+                    "{:?}|{}|{}|{}|{}|{}",
+                    job.state,
+                    job.completed_generations,
+                    job.evaluated_candidates,
+                    job.saved_candidates,
+                    job.evaluated_episodes,
+                    job.validation.len(),
+                )
+            },
+            &|| format!("{:?}", control.control().snapshot()),
+            predicate,
+        );
+    };
+    wait_job(&|| control.control().snapshot().state == JobState::Ready);
     control
         .control()
         .start(JobSpec {
@@ -113,7 +130,7 @@ fn training_replays_keep_results_identical_and_support_pinning_speed_and_navigat
             initial_genomes: None,
         })
         .unwrap();
-    wait(&|| control.control().snapshot().state == JobState::Completed);
+    wait_job(&|| control.control().snapshot().state == JobState::Completed);
     let load = |path: &std::path::Path, id: &str| -> serde_json::Value {
         serde_json::from_slice(&std::fs::read(path.join(format!("{id}.json"))).unwrap()).unwrap()
     };
@@ -1683,17 +1700,102 @@ fn calendar_date_live_control_reaches_host_and_persists_without_restarting() {
 // they need a separate budget from the two-second menu transitions below.
 #[track_caller]
 fn pump_worker_until(window: &MainWindow, predicate: impl Fn() -> bool) {
-    let deadline = std::time::Instant::now() + Duration::from_secs(20);
+    pump_job_until(
+        "background UI work",
+        &|| host_progress(window),
+        &|| {
+            format!(
+                "training={}, genomes_busy={}",
+                window.get_training_snapshot(),
+                window.get_genomes_busy()
+            )
+        },
+        &predicate,
+    );
+}
+
+/// A shared runner sizes the episode worker pool from live machine CPU, so the
+/// same job legitimately takes several times longer when the machine is busy
+/// without any result changing. An elapsed-time budget reads that throttle as a
+/// hang and lets runner load decide the verdict, so these waits bound liveness
+/// instead: work that keeps advancing may take as long as it needs, and only
+/// work that stops advancing counts as hung.
+const PROGRESS_STALL: Duration = Duration::from_secs(60);
+const PROGRESS_CEILING: Duration = Duration::from_secs(900);
+
+#[track_caller]
+fn pump_job_until(
+    label: &str,
+    progress: &dyn Fn() -> String,
+    detail: &dyn Fn() -> String,
+    predicate: &dyn Fn() -> bool,
+) {
+    let started = std::time::Instant::now();
+    let mut signature = progress();
+    let mut advanced = started;
     while !predicate() {
+        let now = std::time::Instant::now();
         assert!(
-            std::time::Instant::now() < deadline,
-            "background UI work timed out: training={}, genomes_busy={}",
-            window.get_training_snapshot(),
-            window.get_genomes_busy()
+            now.duration_since(advanced) < PROGRESS_STALL,
+            "{label} stopped advancing after {}s: {}",
+            advanced.elapsed().as_secs(),
+            detail()
         );
-        std::thread::sleep(Duration::from_millis(1));
+        assert!(
+            now.duration_since(started) < PROGRESS_CEILING,
+            "{label} ran past its {}s ceiling: {}",
+            PROGRESS_CEILING.as_secs(),
+            detail()
+        );
+        let next = progress();
+        if next != signature {
+            signature = next;
+            advanced = now;
+        }
+        std::thread::sleep(Duration::from_millis(2));
         slint::platform::update_timers_and_animations();
     }
+}
+
+/// The counters the host moves while training or trial work is alive. The live
+/// worker-load figures in the snapshot are left out on purpose: they keep
+/// drifting while a wedged job publishes them, which would hide a real stall.
+fn host_progress(window: &MainWindow) -> String {
+    let job: serde_json::Value =
+        serde_json::from_str(&window.get_training_snapshot()).unwrap_or_default();
+    let count = |key: &str| -> u64 {
+        job.get(key)
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or_default()
+    };
+    let length = |key: &str| -> usize {
+        job.get(key)
+            .and_then(serde_json::Value::as_array)
+            .map_or(0, Vec::len)
+    };
+    let text = |key: &str| -> String {
+        job.get(key)
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default()
+            .to_owned()
+    };
+    format!(
+        "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+        text("state"),
+        text("run_id"),
+        text("best_id"),
+        count("completed_generations"),
+        count("evaluated_candidates"),
+        count("saved_candidates"),
+        count("evaluated_episodes"),
+        length("history"),
+        length("validation"),
+        window.get_training_preview_tick(),
+        window.get_training_preview_id(),
+        window.get_training_preview_label(),
+        window.get_genomes_busy(),
+        window.get_genomes_count(),
+    )
 }
 
 #[track_caller]

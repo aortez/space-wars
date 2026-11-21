@@ -102,6 +102,13 @@ an old executable's checkpoint. The [compact results](data/adaptive-training-wor
 link to raw measurements and source/binary provenance in
 `data/training-experiments/training-workers-20261017/`.
 
+The same throttle reaches the test suite. The rendered Training test waits for a
+complete run and its scheduled validation, and Auto can hold that job at one
+worker for most of its life on a busy machine, so an elapsed-time budget reads a
+slow runner as a hang. Those waits now bound liveness instead: they fail when the
+job's published counters stop moving, never merely because the machine was busy.
+Machine load may change how long a test takes and must not change what it decides.
+
 Pool tests compare full practice episode traces and serialized evolution
 checkpoints across serial, Fixed and Auto scheduling, including resume after
 changing policy. Other tests cover draining active episodes after a reduction,
