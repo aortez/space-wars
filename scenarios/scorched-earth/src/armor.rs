@@ -163,7 +163,7 @@ impl Recipients for NoRecipients {
         Vec::new()
     }
 
-    fn tissue(&self, _key: u64) -> Option<(Region, Section)> {
+    fn region(&self, _key: u64) -> Option<(Region, Section)> {
         None
     }
 
@@ -228,7 +228,7 @@ fn guests(
 /// law would refuse at that scale has none, and stops energy as a body does,
 /// so it cannot spoil a delivery to the tanks.
 fn proxy(recipients: &impl Recipients, key: u64, scale: f32) -> Option<(Region, Section, f64)> {
-    let (region, section) = recipients.tissue(key)?;
+    let (region, section) = recipients.region(key)?;
     let volume = region.volume() / scale.powi(3);
     let capacity = f64::from(Region::new(region.material(), volume).ok()?.capacity());
     let share = region.remaining_precise() / f64::from(region.capacity());

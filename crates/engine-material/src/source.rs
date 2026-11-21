@@ -357,6 +357,28 @@ impl Source {
         face: Face,
         closing_speed: f32,
     ) -> Result<Outcome, SourceError> {
+        let offered = self.offered(key, recipient, closing_speed)?;
+        let mut outcome = deposit(recipient, face, offered)?;
+        let ledger = &mut outcome.ledger;
+        ledger.resolve_excess(ledger.excess)?;
+        let kept = (f64::from(ledger.irreversible[0]) + f64::from(ledger.dissipated[0]))
+            .min(self.kinetic_left());
+        self.struck.insert(key);
+        self.ledger.kinetic.add(kept, &outcome, 0);
+        Ok(outcome)
+    }
+
+    /// The energy a [`pass`](Self::pass) through `recipient` at
+    /// `closing_speed` would offer it, without passing: what a perfectly
+    /// inelastic collision with its mass would make available, at most what
+    /// the kinetic budget has left. It refuses what the pass would refuse of
+    /// the source and the load; the face is not checked.
+    pub fn offered(
+        &self,
+        key: u64,
+        recipient: &Region,
+        closing_speed: f32,
+    ) -> Result<f32, SourceError> {
         let projectile = self.flying(key)?;
         let load = Impact {
             closing_speed,
@@ -366,14 +388,11 @@ impl Source {
             )?,
         };
         load.validate()?;
-        let left = (self.ledger.kinetic.budget - self.ledger.kinetic.delivered).max(0.0);
-        let mut outcome = deposit(recipient, face, at_most(load.energy(), left))?;
-        let ledger = &mut outcome.ledger;
-        ledger.resolve_excess(ledger.excess)?;
-        let kept = (f64::from(ledger.irreversible[0]) + f64::from(ledger.dissipated[0])).min(left);
-        self.struck.insert(key);
-        self.ledger.kinetic.add(kept, &outcome, 0);
-        Ok(outcome)
+        Ok(at_most(load.energy(), self.kinetic_left()))
+    }
+
+    fn kinetic_left(&self) -> f64 {
+        (self.ledger.kinetic.budget - self.ledger.kinetic.delivered).max(0.0)
     }
 
     /// The projectile hits a hard recipient, with the impact the host measured
@@ -424,6 +443,16 @@ impl Source {
     /// couplings leave goes on past the path. The outcomes are [`deposit`]s on
     /// each share's face, in share order, with the recipient in slot 0.
     pub fn pulse(&mut self, shares: &[Share]) -> Result<Vec<Outcome>, SourceError> {
+        let energy = self.beam.map_or(0.0, |beam| beam.energy);
+        self.pulse_of(energy, shares)
+    }
+
+    /// Fire one beam pulse that carries `energy`, at most the beam's pulse
+    /// energy, as a beam that weakens with range does, and spread it as
+    /// [`pulse`](Self::pulse) does. What the pulse does not carry never
+    /// reaches a recipient. An energy that is negative, not finite or past the
+    /// pulse energy is an invalid load.
+    pub fn pulse_of(&mut self, energy: f32, shares: &[Share]) -> Result<Vec<Outcome>, SourceError> {
         if self.retired {
             return Err(SourceError::Retired);
         }
@@ -431,7 +460,10 @@ impl Source {
             .beam
             .filter(|beam| self.fired < beam.count)
             .ok_or(SourceError::Spent(Part::Beam))?;
-        let outcomes = spread(beam.energy, shares)?;
+        if !(energy.is_finite() && (0.0..=beam.energy).contains(&energy)) {
+            return Err(MaterialError::InvalidLoad.into());
+        }
+        let outcomes = spread(energy, shares)?;
         self.fired += 1;
         record(&mut self.ledger.beam, &outcomes);
         Ok(outcomes)

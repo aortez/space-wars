@@ -11,13 +11,14 @@ use engine_material::{
 use engine_rapier::world::loading::response::ResponseRejection;
 use engine_rapier::world::loading::{CaptureConfig, ContactSource, RegionId, RegionToken};
 use engine_rapier::world::weapon::{
-    BeamSpec, Blast, Exclusion, Reachable, Recipient, Recipients, ShotSpec, WeaponError,
+    BeamSpec, Blast, Exclusion, Pulse, Reachable, Recipient, Recipients, ShotSpec, WeaponError,
     WeaponEvent, Weapons, projectile_impact,
 };
 use engine_rapier::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, CollisionGroups,
     PhysicsId, PhysicsWorld, PhysicsWorldConfig,
 };
+use std::collections::BTreeMap;
 
 const DT: f32 = 1.0 / 240.0;
 const SPEED: f32 = 300.0;
@@ -26,8 +27,15 @@ const SHOT_MASS: f32 = 0.5;
 const FIRER: u64 = 1;
 const SHOT: u64 = 2;
 const PLATE: u64 = 10;
+/// The key the host keeps a plate's region under, apart from the blades'.
+const HULL: u64 = 1000;
 const RAIL: u64 = 20;
 const PANE: u64 = 21;
+/// A ball and a rover whose regions the host keeps, under their own keys.
+const BALL: u64 = 30;
+const BALL_HULL: u64 = 1001;
+const ROVER: u64 = 40;
+const ROVER_HULL: u64 = 1002;
 /// Blades of moss stand at x = 2.5, 3.5 and 4.5, and the plate's face at 7.5.
 const BLADES: [f32; 3] = [2.5, 3.5, 4.5];
 const BLADE_RADIUS: f32 = 0.1;
@@ -61,12 +69,17 @@ impl Environment for Meadow {
     }
 }
 
-/// The host: three blades of moss, kept by the tissue adapter, and the
-/// circles it admits to fronts.
+/// The host: three blades of moss, kept by the tissue adapter, the regions it
+/// keeps for bodies, the circles it admits to fronts and the recipients its
+/// policy shields.
 struct Field {
     integrity: TissueIntegrity,
     blades: Vec<TissueId>,
     circles: Vec<Reachable>,
+    bodies: BTreeMap<u64, (PhysicsId, Region)>,
+    shielded: Vec<Recipient>,
+    /// The section the host gives every blade.
+    section: Section,
 }
 
 impl Field {
@@ -109,7 +122,15 @@ impl Field {
             integrity: TissueIntegrity::new(table, &plants).unwrap(),
             blades: ids,
             circles,
+            bodies: BTreeMap::new(),
+            shielded: Vec::new(),
+            section: BLADE,
         }
+    }
+
+    /// The capacity left in the region the host keeps for a body.
+    fn left(&self, key: u64) -> f64 {
+        self.bodies[&key].1.remaining_precise()
     }
 
     /// Admits a plate's circles to fronts: a column of four along it.
@@ -135,17 +156,43 @@ impl Recipients for Field {
     fn near(&self, center: Vec2, radius: f32) -> Vec<Reachable> {
         self.circles
             .iter()
-            .filter(|circle| circle.center.distance_to(center) - circle.radius <= radius)
+            .filter(|circle| {
+                // A circle the host cannot place is admitted, for the weapons
+                // to refuse.
+                let gap = circle.center.distance_to(center) - circle.radius;
+                gap <= radius || gap.is_nan()
+            })
             .copied()
             .collect()
     }
 
-    fn tissue(&self, key: u64) -> Option<(Region, Section)> {
-        Some((*self.integrity.region(key)?, BLADE))
+    fn region(&self, key: u64) -> Option<(Region, Section)> {
+        if let Some((_, region)) = self.bodies.get(&key) {
+            return Some((*region, PLATE_SECTION));
+        }
+        Some((*self.integrity.region(key)?, self.section))
     }
 
     fn absorb(&mut self, key: u64, work: f32) {
-        self.integrity.charge(key, work).unwrap();
+        match self.bodies.get_mut(&key) {
+            Some((_, region)) => {
+                region.absorb(work).unwrap();
+            }
+            None => {
+                self.integrity.charge(key, work).unwrap();
+            }
+        }
+    }
+
+    fn body(&self, body: BodyId) -> Option<u64> {
+        self.bodies
+            .iter()
+            .find(|(_, (entity, _))| *entity == body.entity)
+            .map(|(key, _)| *key)
+    }
+
+    fn protected(&self, recipient: Recipient) -> bool {
+        self.shielded.contains(&recipient)
     }
 }
 
@@ -225,6 +272,40 @@ fn register(world: &mut PhysicsWorld, material: Option<Region>, parts: usize) ->
 
 fn armor() -> Region {
     Region::new(ARMOR, 4.0).unwrap()
+}
+
+/// The shape of `plate`'s one part.
+fn slab() -> ColliderSpec {
+    ColliderSpec::cuboid(collider(PLATE, 0), 0.5, 2.0)
+}
+
+/// A fixed body of `entity` at `position`, of `shape` and with no loading
+/// region, whose armor the host keeps under `key`.
+fn hosted(
+    world: &mut PhysicsWorld,
+    field: &mut Field,
+    entity: u64,
+    key: u64,
+    position: Vec2,
+    shape: ColliderSpec,
+) -> Recipient {
+    assert!(world.insert_body(
+        body(entity),
+        BodySpec {
+            kind: BodyKind::Fixed,
+            position,
+            ..Default::default()
+        },
+        &[shape],
+    ));
+    let entity = PhysicsId::new(entity);
+    field.bodies.insert(key, (entity, armor()));
+    Recipient::Body { key, entity }
+}
+
+/// A plate's body at `x`, kept as `hosted` keeps one, under `HULL`.
+fn hull(world: &mut PhysicsWorld, field: &mut Field, x: f32, shape: ColliderSpec) -> Recipient {
+    hosted(world, field, PLATE, HULL, Vec2::new(x, 0.0), shape)
 }
 
 fn token(recipient: Recipient) -> RegionToken {
@@ -465,6 +546,7 @@ fn world_with_plate() -> (PhysicsWorld, Recipient) {
 fn body_of(recipient: Recipient) -> BodyId {
     match recipient {
         Recipient::Region(token) => BodyId::new(token.id.entity, BodyRole::PRIMARY),
+        Recipient::Body { entity, .. } => BodyId::new(entity, BodyRole::PRIMARY),
         Recipient::Unmodeled(body) => body,
         Recipient::Tissue(_) => panic!("tissue has no body"),
     }
@@ -556,7 +638,6 @@ fn a_beam_charges_the_moss_it_crosses_and_ends_on_the_plate() {
             pulses,
             width: 0.5,
             height: 1.0,
-            range: 20.0,
             collision_groups: CollisionGroups::ALL,
             protected: None,
         })
@@ -565,7 +646,7 @@ fn a_beam_charges_the_moss_it_crosses_and_ends_on_the_plate() {
     world.step(DT);
     for _ in 0..3 {
         weapons
-            .fire(&mut world, 7, Vec2::ZERO, Vec2::new(1.0, 0.0), &mut field)
+            .fire(&mut world, 7, east(100.0), &mut field)
             .unwrap();
     }
     let events = weapons.take_events();
@@ -607,7 +688,7 @@ fn a_beam_charges_the_moss_it_crosses_and_ends_on_the_plate() {
     };
     assert!(ledger.beam.delivered <= 300.0 * (1.0 + 1.0e-6));
     assert_eq!(
-        weapons.fire(&mut world, 7, Vec2::ZERO, Vec2::new(1.0, 0.0), &mut field),
+        weapons.fire(&mut world, 7, east(100.0), &mut field),
         Err(WeaponError::UnknownSource)
     );
 }
@@ -830,14 +911,13 @@ fn a_protected_firer_is_passed_and_reported_not_charged() {
             },
             width: 0.5,
             height: 1.0,
-            range: 20.0,
             collision_groups: CollisionGroups::ALL,
             protected: Some(firer.entity),
         })
         .unwrap();
     world.step(DT);
     weapons
-        .fire(&mut world, 7, Vec2::ZERO, Vec2::new(1.0, 0.0), &mut field)
+        .fire(&mut world, 7, east(100.0), &mut field)
         .unwrap();
     // A blast beside it reports the firer's share without charging it.
     shot_body(&mut world, SHOT, Vec2::new(3.0, 0.0), Vec2::ZERO);
@@ -1145,7 +1225,6 @@ fn launches_need_a_free_id_and_a_free_dynamic_body() {
         },
         width: 0.5,
         height: 1.0,
-        range: 1.0,
         collision_groups: CollisionGroups::ALL,
         protected: None,
     };
@@ -1458,9 +1537,8 @@ fn a_source_can_be_retired_early() {
         .unwrap();
     // The physics' query index is the last step's.
     world.step(DT);
-    let east = Vec2::new(1.0, 0.0);
     weapons
-        .fire(&mut world, 7, Vec2::ZERO, east, &mut field)
+        .fire(&mut world, 7, east(100.0), &mut field)
         .unwrap();
     weapons.take_events();
     // A trigger released after one of three pulses.
@@ -1472,7 +1550,7 @@ fn a_source_can_be_retired_early() {
     assert_eq!(ledger.beam.budget, 300.0);
     assert!((ledger.beam.delivered - 100.0).abs() < 1.0e-3);
     assert_eq!(
-        weapons.fire(&mut world, 7, Vec2::ZERO, east, &mut field),
+        weapons.fire(&mut world, 7, east(100.0), &mut field),
         Err(WeaponError::UnknownSource)
     );
     assert_eq!(
@@ -1494,7 +1572,7 @@ fn a_source_can_be_retired_early() {
     assert!(world.motion(body(SHOT)).is_none());
 }
 
-/// A beam of one pulse of 100, 0.5 wide and 1 high, with a range of 20.
+/// A beam of one pulse of 100, 0.5 wide and 1 high.
 fn beam(id: u64) -> BeamSpec {
     BeamSpec {
         id,
@@ -1505,13 +1583,22 @@ fn beam(id: u64) -> BeamSpec {
         },
         width: 0.5,
         height: 1.0,
-        range: 20.0,
         collision_groups: CollisionGroups::ALL,
         protected: None,
     }
 }
 
-/// Arms a beam and fires one pulse from the origin along +x.
+/// A pulse from the origin along +x, as far as 20, carrying `energy`.
+fn east(energy: f32) -> Pulse {
+    Pulse {
+        start: Vec2::ZERO,
+        direction: Vec2::new(1.0, 0.0),
+        range: 20.0,
+        energy,
+    }
+}
+
+/// Arms a beam and fires one full pulse `east`.
 fn fire_beam(
     world: &mut PhysicsWorld,
     weapons: &mut Weapons,
@@ -1520,7 +1607,7 @@ fn fire_beam(
 ) -> Vec<WeaponEvent> {
     weapons.arm_beam(spec).unwrap();
     weapons
-        .fire(world, spec.id, Vec2::ZERO, Vec2::new(1.0, 0.0), field)
+        .fire(world, spec.id, east(spec.pulses.energy), field)
         .unwrap();
     weapons.take_events()
 }
@@ -1662,4 +1749,509 @@ fn tissue_the_host_cannot_charge_is_reported() {
         unknown
     );
     assert!(blast.iter().all(|(_, energy)| *energy > 0.0));
+}
+
+#[test]
+fn a_body_the_host_keeps_takes_the_hit_a_registered_region_would() {
+    // The same shot strikes a plate whose armor the world keeps, and one whose
+    // armor the host keeps.
+    let (mut registered, mut kept) = (world(), world());
+    let plate = plate(&mut registered, Some(armor()), &[(0.0, 2.0)]);
+    let mut field = Field::new(&[]);
+    let hull = hull(&mut kept, &mut field, 8.0, slab());
+    let mut outcomes = Vec::new();
+    for (world, recipient) in [(&mut registered, plate), (&mut kept, hull)] {
+        world.step(DT);
+        let mut weapons = Weapons::new();
+        fire(world, &mut weapons, None);
+        let events = run(world, &mut weapons, &mut field, 0);
+        outcomes.push(delivered(&events, Part::Kinetic, recipient));
+    }
+    assert_eq!(outcomes[0].len(), 1);
+    assert_eq!(outcomes[0], outcomes[1]);
+    // Each keeper took the same work.
+    let left = registered.loading_material_remaining(token(plate)).unwrap();
+    assert!((field.left(HULL) - left).abs() < 1.0e-6);
+    assert!(left < armor().remaining_precise());
+}
+
+#[test]
+fn the_hosts_policy_shields_what_it_keeps() {
+    // The host shields its plate and the middle blade. A shot through the
+    // blades stops on the plate and bursts there.
+    let mut world = world();
+    let mut field = Field::new(&BLADES);
+    let hull = hull(&mut world, &mut field, 8.0, slab());
+    let mut field = field.with_plate(hull, 8.0);
+    let middle = Recipient::Tissue(field.blades[1]);
+    field.shielded = vec![hull, middle];
+    world.step(DT);
+    let mut weapons = Weapons::new();
+    fire(&mut world, &mut weapons, Some(PAYLOAD));
+    let events = run(&mut world, &mut weapons, &mut field, 0);
+    let shielded = |part| -> Vec<(Recipient, f32)> {
+        events
+            .iter()
+            .filter_map(|event| match event {
+                WeaponEvent::Excluded {
+                    part: excluded,
+                    recipient,
+                    reason: Exclusion::Protected,
+                    energy,
+                    ..
+                } if *excluded == part => Some((*recipient, *energy)),
+                _ => None,
+            })
+            .collect()
+    };
+    // The shot passes the middle blade untouched, and the plate stops it.
+    let kinetic = shielded(Part::Kinetic);
+    assert_eq!(
+        kinetic
+            .iter()
+            .map(|(recipient, _)| *recipient)
+            .collect::<Vec<_>>(),
+        [middle, hull]
+    );
+    assert!(kinetic.iter().all(|(_, energy)| *energy > 0.0));
+    assert!(events.iter().any(|event| matches!(
+        event,
+        WeaponEvent::Stopped { body: stopped, .. } if *stopped == body(PLATE)
+    )));
+    let payload = shielded(Part::Payload);
+    assert_eq!(
+        payload
+            .iter()
+            .filter(|(recipient, _)| *recipient == hull)
+            .count(),
+        1
+    );
+    // Neither is charged, while the other blades are.
+    for part in [Part::Kinetic, Part::Payload] {
+        assert!(delivered(&events, part, hull).is_empty());
+        assert!(delivered(&events, part, middle).is_empty());
+    }
+    assert_eq!(field.left(HULL), armor().remaining_precise());
+    for blade in [field.blades[0], field.blades[2]] {
+        assert_eq!(
+            delivered(&events, Part::Kinetic, Recipient::Tissue(blade)).len(),
+            1
+        );
+    }
+}
+
+#[test]
+fn a_beam_stops_on_a_body_the_host_keeps() {
+    // The host gives its plate no circles, so it takes all of a pulse that
+    // reaches it.
+    let mut world = world();
+    let mut field = Field::new(&[]);
+    let hull = hull(&mut world, &mut field, 8.0, slab());
+    world.step(DT);
+    let mut weapons = Weapons::new();
+    let events = fire_beam(&mut world, &mut weapons, beam(7), &mut field);
+    let outcomes = delivered(&events, Part::Beam, hull);
+    assert_eq!(outcomes.len(), 1);
+    assert!((outcomes[0].ledger.available - 100.0).abs() < 1.0e-3);
+    assert!(outcomes[0].consumed[0] > 0.0);
+    let charged = armor().remaining_precise() - field.left(HULL);
+    assert!((charged - f64::from(outcomes[0].consumed[0])).abs() < 1.0e-3);
+    // While the host shields it, it still stops the beam, which charges
+    // nothing.
+    field.shielded = vec![hull];
+    let events = fire_beam(&mut world, &mut weapons, beam(8), &mut field);
+    assert!(events.contains(&WeaponEvent::Excluded {
+        source: 8,
+        part: Part::Beam,
+        recipient: hull,
+        reason: Exclusion::Protected,
+        energy: 100.0,
+    }));
+    assert!(events.contains(&WeaponEvent::Traced {
+        source: 8,
+        start: Vec2::ZERO,
+        end: Vec2::new(7.5, 0.0),
+        body: Some(body(PLATE)),
+    }));
+    assert!((charged - (armor().remaining_precise() - field.left(HULL))).abs() < 1.0e-9);
+}
+
+/// Whether any event delivers energy to `recipient` or reports some reaching
+/// it.
+fn reached(events: &[WeaponEvent], recipient: Recipient) -> bool {
+    events.iter().any(|event| match event {
+        WeaponEvent::Delivered { recipient: r, .. } => *r == recipient,
+        WeaponEvent::Excluded {
+            recipient: r,
+            energy,
+            ..
+        } => *r == recipient && *energy > 0.0,
+        _ => false,
+    })
+}
+
+#[test]
+fn a_beam_reaches_no_tissue_past_the_body_it_stops_on() {
+    // A ball whose circle reaches past the beam's end at its face, x = 7.5,
+    // and a blade beside it, behind the face, in the part of a 2 wide beam
+    // the ball misses. The ball takes the half of the beam it covers, and the
+    // beam ends at the face, so the blade is not reached.
+    let mut world = world();
+    let mut field = Field::new(&[]);
+    let ball = ColliderSpec::ball(collider(PLATE, 0), 0.5);
+    let hull = hull(&mut world, &mut field, 8.0, ball);
+    let mut field = field.with_circle(hull, Vec2::new(8.0, 0.0), 0.5);
+    let behind = Recipient::Tissue(99);
+    field.circles.push(Reachable {
+        recipient: behind,
+        center: Vec2::new(8.3, 0.7),
+        radius: 0.1,
+        thickness: 1.0,
+    });
+    world.step(DT);
+    let mut weapons = Weapons::new();
+    let spec = BeamSpec {
+        width: 2.0,
+        ..beam(7)
+    };
+    let events = fire_beam(&mut world, &mut weapons, spec, &mut field);
+    let shares = delivered(&events, Part::Beam, hull);
+    assert_eq!(shares.len(), 1);
+    assert!((shares[0].ledger.available - 50.0).abs() < 1.0e-3);
+    assert!(!reached(&events, behind));
+}
+
+#[test]
+fn a_beam_meets_the_bodies_across_its_path_before_the_one_it_stops_on() {
+    // A 2 wide beam ends on the plate's face at x = 7.5. A ball the host
+    // keeps stands off the ray at (5, 0.6), with a blade in its shadow. The
+    // ball takes the part of the beam it covers, the blade nothing, and the
+    // plate what passes the ball.
+    let mut world = world();
+    let plate = plate(&mut world, Some(armor()), &[(0.0, 2.0)]);
+    let mut field = Field::new(&[]);
+    let at = Vec2::new(5.0, 0.6);
+    let shape = ColliderSpec::ball(collider(BALL, 0), 0.3);
+    let ball = hosted(&mut world, &mut field, BALL, BALL_HULL, at, shape);
+    let mut field = field.with_circle(ball, at, 0.3);
+    let shaded = Recipient::Tissue(98);
+    field.circles.push(Reachable {
+        recipient: shaded,
+        center: Vec2::new(6.5, 0.6),
+        radius: 0.1,
+        thickness: 1.0,
+    });
+    world.step(DT);
+    let mut weapons = Weapons::new();
+    let spec = BeamSpec {
+        width: 2.0,
+        ..beam(7)
+    };
+    let events = fire_beam(&mut world, &mut weapons, spec, &mut field);
+    let shares = delivered(&events, Part::Beam, ball);
+    assert_eq!(shares.len(), 1);
+    assert!((shares[0].ledger.available - 30.0).abs() < 1.0e-3);
+    assert!(field.left(BALL_HULL) < armor().remaining_precise());
+    let ends = delivered(&events, Part::Beam, plate);
+    assert_eq!(ends.len(), 1);
+    assert!((ends[0].ledger.available - 70.0).abs() < 1.0e-3);
+    assert!(!reached(&events, shaded));
+}
+
+#[test]
+fn a_region_over_several_bodies_of_an_entity_is_one_recipient() {
+    // A rover's chassis at x = 8 and its wheel at x = 6 share one region,
+    // and the host lists a circle for each. A 2 wide beam ends on the wheel.
+    // The region is one recipient whichever of its bodies the ray meets, so
+    // it takes, once, the part of the beam the two circles cover together:
+    // the chassis's, which shades the wheel's.
+    let mut world = world();
+    let mut field = Field::new(&[]);
+    let chassis = ColliderSpec::ball(collider(ROVER, 0), 0.5);
+    let rover = hosted(
+        &mut world,
+        &mut field,
+        ROVER,
+        ROVER_HULL,
+        Vec2::new(8.0, 0.0),
+        chassis,
+    );
+    let wheel = BodyId::new(PhysicsId::new(ROVER), BodyRole::new(1));
+    assert!(world.insert_body(
+        wheel,
+        BodySpec {
+            kind: BodyKind::Fixed,
+            position: Vec2::new(6.0, 0.0),
+            ..Default::default()
+        },
+        &[ColliderSpec::ball(collider(ROVER, 1), 0.3)],
+    ));
+    let mut field = field
+        .with_circle(rover, Vec2::new(8.0, 0.0), 0.5)
+        .with_circle(rover, Vec2::new(6.0, 0.0), 0.3);
+    world.step(DT);
+    let mut weapons = Weapons::new();
+    let spec = BeamSpec {
+        width: 2.0,
+        ..beam(7)
+    };
+    let events = fire_beam(&mut world, &mut weapons, spec, &mut field);
+    assert!(events.iter().any(|event| matches!(
+        event,
+        WeaponEvent::Traced { body: Some(body), .. } if *body == wheel
+    )));
+    let shares = delivered(&events, Part::Beam, rover);
+    assert_eq!(shares.len(), 1);
+    assert!((shares[0].ledger.available - 50.0).abs() < 1.0e-3);
+    // A pulse whose range ends before the chassis's circle begins meets only
+    // the wheel's.
+    weapons.arm_beam(BeamSpec { id: 8, ..spec }).unwrap();
+    let short = Pulse {
+        range: 7.0,
+        ..east(100.0)
+    };
+    weapons.fire(&mut world, 8, short, &mut field).unwrap();
+    let events = weapons.take_events();
+    let shares = delivered(&events, Part::Beam, rover);
+    assert_eq!(shares.len(), 1);
+    assert!((shares[0].ledger.available - 30.0).abs() < 1.0e-3);
+}
+
+#[test]
+fn a_beam_refuses_a_recipient_with_a_bad_circle_and_reaches_the_rest() {
+    // The host lists the plate it keeps with a circle of infinite radius,
+    // gives the first blade a second circle at no finite place, and lists a
+    // blade with a negative radius on the path. Each is refused whole, and the
+    // other blades still take their shares. Circles with no thickness beside
+    // the path, behind the muzzle and behind the plate cannot be met, so they
+    // are not refused.
+    let mut world = world();
+    let mut field = Field::new(&BLADES);
+    let hull = hull(&mut world, &mut field, 8.0, slab());
+    let mut field = field.with_circle(hull, Vec2::new(8.0, 0.0), f32::INFINITY);
+    let first = Recipient::Tissue(field.blades[0]);
+    field.circles.push(Reachable {
+        center: Vec2::new(f32::NAN, 0.0),
+        ..field.circles[0]
+    });
+    for (key, center) in [
+        (902, Vec2::new(3.0, 5.0)),
+        (903, Vec2::new(-0.2, 0.0)),
+        (904, Vec2::new(15.0, 0.0)),
+    ] {
+        field.circles.push(Reachable {
+            recipient: Recipient::Tissue(key),
+            center,
+            radius: 0.1,
+            thickness: 0.0,
+        });
+    }
+    let inside_out = Recipient::Tissue(905);
+    field.circles.push(Reachable {
+        recipient: inside_out,
+        center: Vec2::new(5.0, 0.0),
+        radius: -0.6,
+        thickness: 1.0,
+    });
+    world.step(DT);
+    let mut weapons = Weapons::new();
+    let events = fire_beam(&mut world, &mut weapons, beam(7), &mut field);
+    let geometry = SourceError::Material(MaterialError::InvalidGeometry);
+    assert_eq!(
+        refusals(&events),
+        [
+            (Part::Beam, hull, geometry),
+            (Part::Beam, first, geometry),
+            (Part::Beam, inside_out, geometry)
+        ]
+    );
+    for blade in &field.blades[1..] {
+        assert_eq!(
+            delivered(&events, Part::Beam, Recipient::Tissue(*blade)).len(),
+            1
+        );
+    }
+    assert!(!reached(&events, first));
+    assert!(!reached(&events, hull));
+    assert_eq!(field.left(HULL), armor().remaining_precise());
+}
+
+#[test]
+fn a_pulse_reaches_and_carries_what_the_host_gives_it() {
+    let mut world = world();
+    let plate = plate(&mut world, Some(armor()), &[(0.0, 2.0)]);
+    world.step(DT);
+    let mut field = Field::new(&[]);
+    let mut weapons = Weapons::new();
+    let spec = BeamSpec {
+        pulses: Pulses {
+            energy: 100.0,
+            count: 2,
+        },
+        ..beam(7)
+    };
+    weapons.arm_beam(spec).unwrap();
+    // The first pulse has grown to 5 and stops short of the plate's face.
+    let short = Pulse {
+        range: 5.0,
+        ..east(100.0)
+    };
+    weapons.fire(&mut world, 7, short, &mut field).unwrap();
+    let events = weapons.take_events();
+    assert!(delivered(&events, Part::Beam, plate).is_empty());
+    assert!(events.contains(&WeaponEvent::Traced {
+        source: 7,
+        start: Vec2::ZERO,
+        end: Vec2::new(5.0, 0.0),
+        body: None,
+    }));
+    // A pulse must reach somewhere and carry at most the beam's pulse energy,
+    // and a refused one is not spent.
+    let refused = |error| Err(WeaponError::Source(SourceError::Material(error)));
+    let nowhere = Pulse {
+        range: 0.0,
+        ..east(100.0)
+    };
+    assert_eq!(
+        weapons.fire(&mut world, 7, nowhere, &mut field),
+        refused(MaterialError::InvalidGeometry)
+    );
+    for energy in [100.5, -1.0, f32::NAN] {
+        assert_eq!(
+            weapons.fire(&mut world, 7, east(energy), &mut field),
+            refused(MaterialError::InvalidLoad)
+        );
+    }
+    // The next carries 40, as a beam that weakens with range might, and the
+    // plate takes all of it.
+    weapons.fire(&mut world, 7, east(40.0), &mut field).unwrap();
+    let events = weapons.take_events();
+    let ends = delivered(&events, Part::Beam, plate);
+    assert_eq!(ends.len(), 1);
+    assert_eq!(ends[0].ledger.available, 40.0);
+    let WeaponEvent::Retired { ledger, .. } = retired(&events)[0] else {
+        unreachable!()
+    };
+    assert_eq!(ledger.beam.budget, 200.0);
+    assert_eq!(ledger.beam.delivered, 40.0);
+}
+
+#[test]
+fn a_shielded_blade_already_passed_is_refused_as_a_duplicate() {
+    // The first blade is passed in the step that ends on it, then shielded
+    // before the next step's sweep reports it again. That pass is refused as
+    // it would be unshielded, and nothing reaching the blade is reported.
+    let mut world = world();
+    plate(&mut world, Some(armor()), &[(0.0, 2.0)]);
+    world.step(DT);
+    let mut field = Field::new(&BLADES);
+    let first = Recipient::Tissue(field.blades[0]);
+    let mut weapons = Weapons::new();
+    fire(&mut world, &mut weapons, None);
+    let mut events = Vec::new();
+    while delivered(&events, Part::Kinetic, first).is_empty() {
+        let prepared = weapons.prepare(&world, DT);
+        world.step(DT);
+        weapons.settle(prepared, &mut world, DT, &mut field);
+        events.extend(weapons.take_events());
+    }
+    field.shielded = vec![first];
+    let later = run(&mut world, &mut weapons, &mut field, 0);
+    assert!(refusals(&later).iter().any(|(part, recipient, error)| {
+        *part == Part::Kinetic && *recipient == first && matches!(error, SourceError::Duplicate(_))
+    }));
+    assert!(!reached(&later, first));
+}
+
+#[test]
+fn a_shielded_blade_on_a_face_the_geometry_refuses_is_refused() {
+    // The host gives every blade a section with no thickness and shields the
+    // middle one. Each pass is refused alike, and none reaches its blade.
+    let mut world = world();
+    plate(&mut world, Some(armor()), &[(0.0, 2.0)]);
+    world.step(DT);
+    let mut field = Field::new(&BLADES);
+    field.section = Section::new(0.0, BLADE.depth);
+    field.shielded = vec![Recipient::Tissue(field.blades[1])];
+    let mut weapons = Weapons::new();
+    fire(&mut world, &mut weapons, None);
+    let events = run(&mut world, &mut weapons, &mut field, 0);
+    let geometry = SourceError::Material(MaterialError::InvalidGeometry);
+    for blade in &field.blades {
+        let recipient = Recipient::Tissue(*blade);
+        assert!(refusals(&events).contains(&(Part::Kinetic, recipient, geometry)));
+        assert!(!reached(&events, recipient));
+    }
+}
+
+#[test]
+fn what_a_beam_cannot_deliver_is_reported_at_its_share() {
+    // The host shields the plate it keeps and keeps no region for a blade in
+    // front of it. Each is reported excluded with its share of the pulse, and
+    // the shares add up to the pulse.
+    let mut world = world();
+    let mut field = Field::new(&[]);
+    let hull = hull(&mut world, &mut field, 8.0, slab());
+    let unknown = Recipient::Tissue(900);
+    let mut field = field.with_circle(unknown, Vec2::new(3.0, 0.0), 0.1);
+    field.shielded = vec![hull];
+    world.step(DT);
+    let mut weapons = Weapons::new();
+    let events = fire_beam(&mut world, &mut weapons, beam(7), &mut field);
+    let excluded = |recipient, reason| -> f32 {
+        events
+            .iter()
+            .filter_map(|event| match event {
+                WeaponEvent::Excluded {
+                    recipient: r,
+                    reason: why,
+                    energy,
+                    ..
+                } if *r == recipient && *why == reason => Some(*energy),
+                _ => None,
+            })
+            .sum()
+    };
+    let blade = excluded(unknown, Exclusion::Unmodeled);
+    let plate = excluded(hull, Exclusion::Protected);
+    assert!(blade > 0.0 && plate > blade);
+    assert!((blade + plate - 100.0).abs() < 1.0e-3);
+}
+
+#[test]
+fn a_stop_takes_only_what_its_circles_within_the_range_cover() {
+    // The host lists a ball it keeps with a circle inside its collider, which
+    // begins 0.1 past the surface the ray meets. A 2 wide pulse that ends
+    // before the circle begins gives the ball nothing, and a longer one gives
+    // it the part the circle covers.
+    let mut world = world();
+    let mut field = Field::new(&[]);
+    let at = Vec2::new(8.0, 0.0);
+    let shape = ColliderSpec::ball(collider(BALL, 0), 0.5);
+    let ball = hosted(&mut world, &mut field, BALL, BALL_HULL, at, shape);
+    let mut field = field.with_circle(ball, at, 0.4);
+    world.step(DT);
+    let mut weapons = Weapons::new();
+    for (id, range, share) in [(7, 7.55, 0.0), (8, 20.0, 40.0)] {
+        let spec = BeamSpec {
+            width: 2.0,
+            ..beam(id)
+        };
+        weapons.arm_beam(spec).unwrap();
+        let pulse = Pulse {
+            range,
+            ..east(100.0)
+        };
+        weapons.fire(&mut world, id, pulse, &mut field).unwrap();
+        let events = weapons.take_events();
+        assert!(events.iter().any(|event| matches!(
+            event,
+            WeaponEvent::Traced { body: Some(body), .. } if *body == self::body(BALL)
+        )));
+        let taken: f32 = delivered(&events, Part::Beam, ball)
+            .iter()
+            .map(|outcome| outcome.ledger.available)
+            .sum();
+        assert!((taken - share).abs() < 1.0e-3, "{range}: {taken}");
+    }
 }

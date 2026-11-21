@@ -194,7 +194,10 @@ fn a_crowd_cannot_draw_more_than_the_kinetic_budget() {
     let budget = source.ledger().kinetic.budget;
     for key in 0..10_000 {
         let left = budget - source.ledger().kinetic.delivered;
+        // What a pass would offer, as a host shielding the blade reports it.
+        let offered = source.offered(key, &blade.region(), SPEED).unwrap();
         let outcome = source.pass(key, &blade.region(), face, SPEED).unwrap();
+        assert_eq!(outcome.ledger.available, offered);
         // No pass gets more than the budget has left.
         assert!(f64::from(outcome.ledger.available) <= left);
         assert!(source.ledger().kinetic.delivered <= budget);
@@ -259,6 +262,10 @@ fn a_shot_reaches_each_recipient_once_and_hits_once() {
         source.pass(1, &blade.region(), face, SPEED),
         Err(SourceError::Duplicate(1))
     );
+    assert_eq!(
+        source.offered(1, &blade.region(), SPEED),
+        Err(SourceError::Duplicate(1))
+    );
     assert_eq!(source, before);
     source.hit(2, &tank().region(), contact, load).unwrap();
     // A detonating shell's direct-hit and generic contact callbacks both
@@ -272,6 +279,10 @@ fn a_shot_reaches_each_recipient_once_and_hits_once() {
     }
     assert_eq!(
         source.pass(4, &blade.region(), face, SPEED),
+        Err(SourceError::Spent(Part::Kinetic))
+    );
+    assert_eq!(
+        source.offered(4, &blade.region(), SPEED),
         Err(SourceError::Spent(Part::Kinetic))
     );
     assert_eq!(source, before);
@@ -439,6 +450,52 @@ fn beam_pulses_never_carry_more_than_their_energy() {
     let before = source.clone();
     assert_eq!(source.pulse(&path), Err(SourceError::Spent(Part::Beam)));
     assert_eq!(source, before);
+}
+
+#[test]
+fn a_weakened_pulse_carries_only_its_energy() {
+    // A beam that weakens with range fires 40 of its pulse's 100 along a
+    // blade to a plate. Each share takes its coupling of the 40, and the 60 the
+    // pulse does not carry never reaches a recipient.
+    let blade = blade().region();
+    let blade_face = Face::new(0.2, self::blade().section(0.2));
+    let plate = tank().region();
+    let path = [
+        Share {
+            key: 1,
+            region: &blade,
+            face: blade_face,
+            coupling: 0.1,
+        },
+        Share {
+            key: 3,
+            region: &plate,
+            face: plate_face(0.2),
+            coupling: 0.9,
+        },
+    ];
+    let mut source = beam(100.0, 3);
+    let outcomes = source.pulse_of(40.0, &path).unwrap();
+    let energies: Vec<f32> = outcomes
+        .iter()
+        .map(|outcome| outcome.ledger.available)
+        .collect();
+    assert_eq!(energies, [4.0, 36.0]);
+    assert_eq!(source.ledger().beam.budget, 300.0);
+    assert_eq!(source.ledger().beam.delivered, 40.0);
+    // A pulse past the beam's energy, negative or not finite is refused and
+    // not spent.
+    let before = source.clone();
+    for energy in [100.5, -1.0, f32::NAN, f32::INFINITY] {
+        assert_eq!(
+            source.pulse_of(energy, &path),
+            Err(SourceError::Material(MaterialError::InvalidLoad))
+        );
+    }
+    assert_eq!(source, before);
+    // A full pulse is the plain one.
+    let full = source.clone().pulse(&path).unwrap();
+    assert_eq!(source.pulse_of(100.0, &path).unwrap(), full);
 }
 
 #[test]
