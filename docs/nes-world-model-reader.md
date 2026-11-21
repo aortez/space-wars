@@ -6,6 +6,10 @@ Mario Bros. (`data/roms/smb.nes`) as the target. It is an investigation, not a
 feature contract: nothing here has been promoted into `engine-nes` or
 `scenario-nes` yet.
 
+The direction from here — the abstraction ladder, a shared skill library,
+practice gyms and a search layer over both — is in
+[See Mario, be Mario](smb-mission.md).
+
 The conclusion is that **no emulator change is required**. The core already
 exposes every channel a world-model reader needs, and the address map, tile
 decode, rollout and search design already exist in DirtSim's C++ NES
