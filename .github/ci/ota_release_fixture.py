@@ -2,11 +2,12 @@
 
 Never use this module to bootstrap production authority. It builds a throwaway
 authority, workspace and configuration, then drives the release command with
-the real signer and inventory tools through a Nightly publication whose
-delivery loses a reply and resumes, a Release promotion, a renewal signed and
-then published, an abandoned Nightly planned again under its generation, and
-the renewal of a feed whose timestamp has already expired. Candidate selection
-is replaced by a synthetic one; test_ota_release.py covers the real checks.
+the real signer and inventory tools: Nightly publications, a Release promotion
+and renewals; deliveries that lose a reply and resume, or that devices can
+already see and are finished days later; abandoned operations, one of which
+must put the timestamp alias back; a missing alias repaired by a renewal; and
+the renewal of a feed whose timestamp has already expired. Only the image
+verifier and the CI query are mocked; test_ota_release.py covers their checks.
 """
 import argparse
 from datetime import datetime, timedelta, timezone
@@ -25,10 +26,12 @@ import ota_delivery as delivery
 import ota_publisher_journal as journal
 import ota_release as release
 from test_ota_delivery import FakeGitHub
-from test_ota_publisher_journal import nightly
+from test_ota_release import CI_URL, prepared_candidate
 
 TOP = ('root', 'targets', 'snapshot', 'timestamp')
 MEMBERS = dict(release.MEMBERS, root=['root'])
+# Old enough that a publication devices cannot see yet is refused, young enough that its timestamp has not expired.
+LATE = timedelta(days=6, hours=12)
 
 
 class Feed(FakeGitHub):
@@ -62,24 +65,28 @@ class Feed(FakeGitHub):
 
 
 class Publisher(release.Publisher):
-    """Publishes to the fake feed and reads synthetic candidates."""
+    """Publishes to the fake feed on a clock that can run ahead; image_candidate and CI are mocked."""
 
-    def __init__(self, config, feed):
+    def __init__(self, config, feed, ahead=timedelta()):
         super().__init__(config)
-        self.feed = feed
+        self.feed, self.ahead = feed, ahead
 
     def github(self, mutating):
         self.feed.read_only = not mutating
         return self.feed
 
-    def gh_json(self, args):
-        raise AssertionError('The fixture never asks GitHub about CI')
+    def now(self):
+        return super().now() + self.ahead
 
-    def select_nightly(self, candidate):
-        root = Path(candidate)
-        raw = (root / 'intent.json').read_bytes()
-        return (json.loads(raw), dict(candidate=str(root), preparation_sha256=delivery.digest(raw), ci='mocked'),
-                root / 'image.ext4.zst')
+    def run(self, name, *args, timeout=120):
+        if name != 'image_candidate':
+            return super().run(name, *args, timeout=timeout)
+        self.tool(name)
+        return (Path(args[2]).parent / 'qualification.json').read_bytes()  # It accepts the candidate's own record.
+
+    def gh_json(self, args):
+        return dict(status='completed', conclusion='success', event='push', headBranch='main', headSha='a' * 40,
+                    url=CI_URL)
 
 
 def write_private(path, data):
@@ -153,30 +160,26 @@ def authority(directory, signer, inventory, now, timestamp_expires):
     tools.mkdir(mode=0o700)
     shutil.copy2(signer, tools / 'feed_sign')
     shutil.copy2(inventory, tools / 'feed_inventory')
-    (tools / 'image_candidate').write_bytes(b'Never run: the fixture selects candidates itself.\n')
+    (tools / 'image_candidate').write_bytes(b'Never run: the fixture mocks the image verifier.\n')
     path = directory / 'release.json'
     write_private(path, json.dumps(dict(
         schema=1, authority=str(home), workspace=str(workspace), root_sha256=delivery.digest(root),
-        tools_directory=str(tools),
-        tools={name: release.file_blob(tools / name)['sha256'] for name in release.TOOLS})).encode())
+        tools_directory=str(tools), tools={name: release.file_blob(tools / name)['sha256'] for name in release.TOOLS},
+        code=release.code_digests())).encode())
     return release.Config.load(path), feed
 
 
-def candidate(directory, payload):
-    """A synthetic prepared candidate: a payload and its Nightly intent."""
-    directory.mkdir(mode=0o700)
-    selected = nightly(payload)
-    (directory / 'image.ext4.zst').write_bytes(payload)
-    (directory / 'intent.json').write_bytes(journal.encode(selected))
-    return directory, selected
+def lose_reply(feed, name, occurrence=1):
+    """Applies the occurrence-th next call named `name`, then loses its reply."""
+    seen = 0
 
-
-def lose_reply(feed, name):
-    """Applies the next call named `name`, then loses its reply."""
     def hook(called):
+        nonlocal seen
         if called == name:
-            feed.hook = None
-            raise OSError('Fixture: lost the reply to ' + name)
+            seen += 1
+            if seen == occurrence:
+                feed.hook = None
+                raise OSError('Fixture: lost the reply to ' + name)
     feed.hook = hook
 
 
@@ -194,102 +197,121 @@ def refuses(action, text):
     raise AssertionError('Expected a refusal naming ' + repr(text))
 
 
+def fails(action, text):
+    """Runs an operation whose GitHub call fails part way, as a lost reply or a broken upload does."""
+    try:
+        action()
+    except OSError as error:
+        check(text in str(error), 'Unexpected failure: ' + str(error))
+        return
+    raise AssertionError('The interrupted operation finished')
+
+
 def run(signer, inventory):
     signer, inventory = (Path(p).resolve(strict=True) for p in (signer, inventory))
     now = datetime.now(timezone.utc).replace(microsecond=0)
     with tempfile.TemporaryDirectory(prefix='ota-release-fixture-') as scratch:
         directory = Path(scratch)
         config, feed = authority(directory / 'current', signer, inventory, now, now + timedelta(days=7))
+        receipts = []
 
-        def session():
-            return Publisher(config, feed)
+        def call(action, *args, ahead=timedelta()):
+            with Publisher(config, feed, ahead) as publisher:
+                result = getattr(publisher, action)(*args)
+            if result.get('published'):
+                receipts.append(result)
+            return result
 
-        first, selected = candidate(directory / 'first', b'first fixture image')
-        payload = journal.identity(selected['image'])
-        with session() as publisher:
-            plan = publisher.nightly(first)
+        def public():
+            return delivery.parse_state(feed.release)
+
+        first, second = directory / 'first', directory / 'second'
+        prepared_candidate(first, b'first fixture image')
+        prepared_candidate(second, b'second fixture image')
+        plan = call('nightly', first)
         check((plan['version'], plan['generation'], plan['targets_after']) == (2, 1, dict(release=0, nightly=1)),
               'Unexpected Nightly plan')
-        with session() as publisher:
-            refuses(lambda: publisher.proceed('sign', 2, '0' * 64), 'No plan for v2 has that digest')
-            refuses(lambda: publisher.proceed('publish', 2, plan['plan_sha256']), 'Sign the plan before publishing')
-            with patch.object(release, 'code_digests', return_value={}):
-                refuses(lambda: publisher.proceed('sign', 2, plan['plan_sha256']), 'release command changed')
-            publisher.proceed('sign', 2, plan['plan_sha256'])
-        check(delivery.parse_state(feed.release)['current']['version'] == 1, 'Signing changed the feed')
-        lose_reply(feed, 'upload:timestamp.json')
-        try:
-            with session() as publisher:
-                publisher.proceed('publish', 2, plan['plan_sha256'])
-            raise AssertionError('The interrupted publication finished')
-        except OSError as error:
-            check(str(error).startswith('Fixture: lost the reply'), 'Unexpected failure: ' + str(error))
-        check(delivery.parse_state(feed.release)['pending']['version'] == 2, 'The feed is not mid-publication')
-        with session() as publisher:
-            nightly_receipt = publisher.proceed('publish', 2, plan['plan_sha256'])
-        with session() as publisher:
-            check(publisher.proceed('publish', 2, plan['plan_sha256'])['already_published'],
-                  'A finished plan published again')
+        digest = plan['plan_sha256']
+        refuses(lambda: call('proceed', 'sign', 2, '0' * 64), 'No plan for v2 has that digest')
+        refuses(lambda: call('proceed', 'publish', 2, digest), 'Sign the plan before publishing')
+        with patch.object(release, 'code_digests', side_effect=[release.code_digests(), {}]):
+            refuses(lambda: call('proceed', 'sign', 2, digest), 'release command changed')
+        call('proceed', 'sign', 2, digest)
+        check(public()['current']['version'] == 1, 'Signing changed the feed')
 
+        # Devices can fetch the new timestamp once the alias is swapped, so even days later the
+        # publication is finished, never abandoned.
+        lose_reply(feed, 'upload:timestamp.json')
+        fails(lambda: call('proceed', 'publish', 2, digest), 'lost the reply')
+        check(public()['pending']['version'] == 2, 'The feed is not mid-publication')
+        refuses(lambda: call('abandon', ahead=LATE), 'finish it with ota_release.py publish 2 --plan-sha256 ' + digest)
+        check(call('proceed', 'publish', 2, digest, ahead=LATE)['result'] == 'published', 'The late finish failed')
+        check(call('proceed', 'publish', 2, digest)['already_published'], 'A finished plan published again')
+
+        with Publisher(config, feed) as publisher:
+            payload = plan['payload']
+            image = publisher.state['images'][payload]['image']
         record, notes = directory / 'qualification.json', directory / 'notes.txt'
-        named = dict(selected['image'], generation=1)
-        record.write_text(json.dumps(dict(purpose='release-qualification', image=named)))
+        record.write_text(json.dumps(dict(purpose='release-qualification', image=dict(image, generation=1))))
         notes.write_text('Fixture promotion only; no physical rollout.\n')
-        with session() as publisher:
-            plan = publisher.promote(payload, record, notes)
-        with session() as publisher:
-            publisher.proceed('sign', 3, plan['plan_sha256'])
-        with session() as publisher:
-            promotion = publisher.proceed('publish', 3, plan['plan_sha256'])
+        plan = call('promote', payload, record, notes)
+        call('proceed', 'sign', 3, plan['plan_sha256'])
+        lose_reply(feed, 'update', occurrence=2)  # The final release update, after the reservation.
+        fails(lambda: call('proceed', 'publish', 3, plan['plan_sha256']), 'lost the reply')
+        check(public()['pending'] is None and public()['current']['version'] == 3, 'The final update was not applied')
+        check(call('proceed', 'publish', 3, plan['plan_sha256'])['result'] == 'unchanged', 'The promotion stalled')
 
         # A plan left unsigned neither blocks a renewal nor survives it.
-        second, _ = candidate(directory / 'second', b'second fixture image')
-        with session() as publisher:
-            stale = publisher.nightly(second)
-        with session() as publisher:
-            check(publisher.renew('sign')['published'] is False, 'renew sign published')
-        with session() as publisher:
-            renewal = publisher.renew('publish')
-        with session() as publisher:
-            refuses(lambda: publisher.proceed('sign', 4, stale['plan_sha256']),
-                    'changed since this operation was prepared')
+        stale = call('nightly', second)
+        check(call('renew', 'sign')['published'] is False, 'renew sign published')
+        lose_reply(feed, 'upload:4.snapshot.json')
+        fails(lambda: call('renew', 'publish'), 'lost the reply')
+        call('renew', 'publish')
+        refuses(lambda: call('proceed', 'sign', 4, stale['plan_sha256']), 'changed since this operation was prepared')
 
-        with session() as publisher:
-            plan = publisher.nightly(second)
-        with session() as publisher:
-            publisher.proceed('sign', 5, plan['plan_sha256'])
-        with session() as publisher:
-            abandoned = publisher.abandon()
-        with session() as publisher:
-            plan = publisher.nightly(second)
+        plan = call('nightly', second)
+        call('proceed', 'sign', 5, plan['plan_sha256'])
+        check(call('abandon')['timestamp_restored'] is False, 'An undelivered abandon touched the alias')
+        plan = call('nightly', second)
         check((plan['version'], plan['generation']) == (6, 2), 'The abandoned Nightly lost its generation')
-        with session() as publisher:
-            publisher.proceed('sign', 6, plan['plan_sha256'])
-        with session() as publisher:
-            replanned = publisher.proceed('publish', 6, plan['plan_sha256'])
-        with session() as publisher:
-            status = publisher.status()
-        check(status['version'] == 6 and status['pending'] is None and status['public_feed_matches']
+        call('proceed', 'sign', 6, plan['plan_sha256'])
+        call('proceed', 'publish', 6, plan['plan_sha256'])
+
+        # A broken alias upload leaves an empty starter in place of timestamp.json. Days later the
+        # attempt can no longer be published; abandoning it puts the current timestamp back.
+        call('renew', 'sign')
+        feed.starter = 'timestamp.json'
+        fails(lambda: call('renew', 'publish'), 'empty starter')
+        refuses(lambda: call('renew', 'publish', ahead=LATE), 'too old to publish; abandon it first')
+        check(call('abandon', ahead=LATE)['timestamp_restored'], 'The alias was not restored')
+        check(call('status')['public_feed_matches'], 'The restored feed does not match')
+        call('renew', 'publish')
+
+        # With no alias at all, the archived timestamp proves the feed and a renewal publishes a new alias.
+        feed.files.pop(feed.named('timestamp.json')[0]['id'])
+        check(not call('status')['public_feed_matches'], 'status missed the missing alias')
+        call('renew', 'publish')
+        status = call('status')
+        check(status['version'] == 9 and status['pending'] is None and status['public_feed_matches']
               and (status['release_targets'], status['nightly_targets'], status['generation']) == (1, 2, 2),
               'Unexpected final feed: ' + json.dumps(status))
         pointer = json.loads(config.pointer.read_bytes())
         manifest = subprocess.check_output([str(inventory), str(config.root_path), pointer['bundle'],
                                             release.stamp(now)], env=release.TOOL_ENV, timeout=120)
-        check(delivery.digest(manifest) == delivery.parse_state(feed.release)['current']['manifest_sha256'],
+        check(delivery.digest(manifest) == public()['current']['manifest_sha256'],
               'The pointer does not name the published bundle')
+        unreviewed = release.Config(dict(json.loads((directory / 'current/release.json').read_bytes()),
+                                         code={name: '0' * 64 for name in release.CODE}))
+        refuses(lambda: Publisher(unreviewed, feed).__enter__(), 'Not the reviewed code')
 
         config, feed = authority(directory / 'expired', signer, inventory, now, now - timedelta(hours=1))
-        with Publisher(config, feed) as publisher:
-            check(publisher.status()['hours_left'] < 0, 'The fixture feed has not expired')
-        with Publisher(config, feed) as publisher:
-            revived = publisher.renew('publish')
-        with Publisher(config, feed) as publisher:
-            check(publisher.status()['hours_left'] > 7 * 24 - 1, 'The renewal did not restore the timestamp')
+        check(call('status')['hours_left'] < 0, 'The fixture feed has not expired')
+        call('renew', 'publish')
+        check(call('status')['hours_left'] > 7 * 24 - 1, 'The renewal did not restore the timestamp')
         return dict(schema=1, scope='ephemeral keys and MOCK GitHub only',
-                    operations=[dict(kind=r['kind'], version=r['version'], result=r.get('result'))
-                                for r in (nightly_receipt, promotion, renewal, replanned, revived)],
-                    abandoned_version=abandoned['version'], interrupted_publication_resumed=True,
-                    expired_feed_renewed=True)
+                    operations=[dict(kind=r['kind'], version=r['version'], result=r['result']) for r in receipts],
+                    abandoned_versions=[5, 7], late_visible_publication_finished=True, alias_restored=True,
+                    missing_alias_repaired=True, expired_feed_renewed=True)
 
 
 if __name__ == '__main__':

@@ -3,14 +3,13 @@ from datetime import timedelta
 import json
 import os
 from pathlib import Path
-import subprocess
 import tempfile
 import unittest
 
 import ota_publisher_journal as journal
 import ota_release as release
 from ota_delivery import digest
-from test_ota_publisher_journal import NOW, ROOT, FakeTooling, finish, genesis, nightly
+from test_ota_publisher_journal import NOW, ROOT, FakeTooling, finish, genesis, nightly, staged
 
 EXPIRES = '2026-11-27T07:58:33Z'
 CI_URL = 'https://github.com/aortez/space-wars/actions/runs/7'
@@ -19,12 +18,33 @@ CI_URL = 'https://github.com/aortez/space-wars/actions/runs/7'
 def configuration(root):
     return dict(schema=1, authority=str(root / 'authority'), workspace=str(root / 'workspace'),
                 root_sha256=digest(ROOT), tools_directory=str(root / 'tools'),
-                tools={name: 'f' * 64 for name in release.TOOLS})
+                tools={name: 'f' * 64 for name in release.TOOLS}, code={name: 'c' * 64 for name in release.CODE})
 
 
 def publisher(root):
     (root / 'workspace').mkdir()
     return release.Publisher(release.Config(configuration(root)))
+
+
+def prepared_candidate(directory, payload, embedded='a' * 40):
+    """A candidate directory as preparation leaves it, from source 'a' * 40, and its image_candidate output."""
+    (directory / 'candidate').mkdir(parents=True)
+    descriptor = dict(schema=1, format='rootfs-ext4-zstd', expanded=dict(bytes=4096, sha256=digest(payload * 2)),
+                      compressed=dict(bytes=len(payload), sha256=digest(payload)))
+    image = dict(schema=1, source=dict(schema=1, commit=embedded, dirty=False, revision=embedded[:12]),
+                 build_id='fixture-rootfs', machine='raspberrypi-spacewars', architecture='aarch64',
+                 layout='spacewars-ab-v1', boot_identity='b' * 64, data=dict(reads=dict(min=1, max=1), writes=1),
+                 updater_protocol=1, recovery_protocol=2, binaries={}, rootfs_tree='t' * 64)
+    files = {'policy.json': b'{}', 'candidate/image.ext4.zst': payload,
+             'main-ci-run.json': json.dumps(dict(url=CI_URL)).encode(),
+             'candidate/candidate.json': json.dumps(descriptor).encode(),
+             'candidate/qualification.json': json.dumps(dict(schema=1, image=image)).encode()}
+    for name, data in files.items():
+        (directory / name).write_bytes(data)
+    report = dict(source='a' * 40, descriptor=descriptor,
+                  artifacts={name: dict(bytes=len(data), sha256=digest(data)) for name, data in files.items()})
+    (directory / 'preparation-result.json').write_text(json.dumps(report))
+    return files['candidate/qualification.json']
 
 
 def target(image, channel, generation):
@@ -106,6 +126,14 @@ class PhaseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'too old to publish; abandon it first'):
             release.check_resumable(pending, release.parse(NOW) + timedelta(days=6))
 
+    def test_unsigned_roles_are_signed_only_within_the_signers_window(self):
+        reserved = journal.reserve(self.base, release.RENEW, NOW)
+        start = release.parse(NOW)
+        release.check_signable(reserved['pending'], start + timedelta(hours=23))
+        with self.assertRaisesRegex(ValueError, 'signer accepts them only for 24 hours'):
+            release.check_signable(reserved['pending'], start + timedelta(hours=24))
+        release.check_signable(staged(reserved, FakeTooling())['pending'], start + timedelta(days=3))
+
 
 class ConfigTests(unittest.TestCase):
     def test_configuration_is_complete_and_private(self):
@@ -113,6 +141,7 @@ class ConfigTests(unittest.TestCase):
             root = Path(scratch)
             value = configuration(root)
             for case, changed in (('a missing tool', dict(value, tools={'feed_sign': 'f' * 64})),
+                                  ('missing code pins', dict(value, code={})),
                                   ('a relative path', dict(value, workspace='workspace')),
                                   ('an unknown field', dict(value, extra=1))):
                 with self.subTest(case), self.assertRaises(ValueError):
@@ -133,30 +162,14 @@ class SelectionTests(unittest.TestCase):
         self.root = Path(temporary.name)
         self.publisher = publisher(self.root)
 
-    def candidate(self, source='a' * 40):
-        """A prepared candidate and the image_candidate output that verifies it."""
+    def candidate(self, embedded='a' * 40):
+        """A prepared candidate, verified by a fake image_candidate and passed by a fake CI run on main."""
         directory = self.root / 'candidate'
-        (directory / 'candidate').mkdir(parents=True)
-        payload = b'compressed image'
-        descriptor = dict(schema=1, format='rootfs-ext4-zstd', expanded=dict(bytes=4096, sha256='e' * 64),
-                          compressed=dict(bytes=len(payload), sha256=digest(payload)))
-        image = dict(schema=1, source=dict(schema=1, commit=source, dirty=False, revision=source[:12]),
-                     build_id='fixture-rootfs', machine='raspberrypi-spacewars', architecture='aarch64',
-                     layout='spacewars-ab-v1', boot_identity='b' * 64, data=dict(reads=dict(min=1, max=1), writes=1),
-                     updater_protocol=1, recovery_protocol=2, binaries={}, rootfs_tree='t' * 64)
-        files = {'policy.json': b'{}', 'candidate/image.ext4.zst': payload,
-                 'main-ci-run.json': json.dumps(dict(url=CI_URL)).encode(),
-                 'candidate/candidate.json': json.dumps(descriptor).encode(),
-                 'candidate/qualification.json': json.dumps(dict(schema=1, image=image)).encode()}
-        for name, data in files.items():
-            (directory / name).write_bytes(data)
-        report = dict(source='a' * 40, descriptor=descriptor,
-                      artifacts={name: dict(bytes=len(data), sha256=digest(data)) for name, data in files.items()})
-        (directory / 'preparation-result.json').write_text(json.dumps(report))
-        self.publisher.run = lambda name, *args, timeout=120: files['candidate/qualification.json']
+        qualification = prepared_candidate(directory, b'compressed image', embedded)
+        self.publisher.run = lambda name, *args, timeout=120: qualification
         self.ci = dict(status='completed', conclusion='success', event='push', headBranch='main', headSha='a' * 40)
         self.publisher.gh_json = lambda args: dict(self.ci, url=args[2])
-        return directory, payload
+        return directory, b'compressed image'
 
     def test_nightly_selection_checks_the_candidate_and_ci_on_main(self):
         directory, payload = self.candidate()
@@ -175,7 +188,7 @@ class SelectionTests(unittest.TestCase):
             self.publisher.select_nightly(directory)
 
     def test_nightly_selection_requires_the_embedded_source(self):
-        directory, _ = self.candidate(source='c' * 40)
+        directory, _ = self.candidate(embedded='c' * 40)
         with self.assertRaisesRegex(ValueError, 'Wrong embedded source'):
             self.publisher.select_nightly(directory)
 
@@ -225,6 +238,13 @@ class PreviousBundleTests(unittest.TestCase):
                 self.assertEqual(self.publisher.previous_bundle(bundle), (bundle, self.manifest))
                 self.assertEqual(self.checked[-1], (bundle, release.stamp(checked)))
 
+    def test_a_relative_bundle_path_is_kept_absolute(self):
+        bundle = self.root / 'bundle'
+        bundle.mkdir()
+        self.publisher.run = self.inventory
+        self.publisher.now = lambda: release.parse(EXPIRES) - timedelta(days=1)
+        self.assertEqual(self.publisher.previous_bundle(Path(os.path.relpath(bundle)))[0], bundle.resolve())
+
     def test_bundle_search_passes_over_unusable_candidates(self):
         config = self.publisher.config
         broken, good = config.operations / 'v1-renew/bundle', self.root / 'good'
@@ -235,12 +255,13 @@ class PreviousBundleTests(unittest.TestCase):
 
         def inventory(name, root, path, at):
             if Path(path) == broken:
-                raise subprocess.CalledProcessError(1, name)
+                raise release.Refused('feed_inventory refused: Error: ExpiredMetadata')
             return self.inventory(name, root, path, at)
         self.publisher.run = inventory
         self.assertEqual(self.publisher.previous_bundle()[0], good)
         self.manifest = b'{}'
-        with self.assertRaisesRegex(ValueError, 'bundle: feed_inventory refused it; .*good: another feed version'):
+        with self.assertRaisesRegex(ValueError, 'bundle: feed_inventory refused: Error: ExpiredMetadata; '
+                                                '.*good: another feed version'):
             self.publisher.previous_bundle()
 
 

@@ -100,7 +100,7 @@ commit, CI run and previous bundle from the publisher journal and the prepared
 candidate, where the per-generation drivers it replaces pinned them by hand.
 
 ```bash
-ota_release.py status                     # read-only: expiry, pending work, asset headroom
+ota_release.py status                     # read-only: expiry, pending work, public feed, asset headroom
 ota_release.py nightly CANDIDATE_DIR      # plan a Nightly publication
 ota_release.py promote --payload SHA256 --qualification RECORD --notes FILE
 ota_release.py sign VERSION --plan-sha256 SHA256
@@ -126,13 +126,23 @@ call, hard-links the payloads from the previous bundle, checks the new bundle
 with `feed_inventory` and delivers it timestamp-last. Before delivery it checks
 the channels change only as intended: a renewal changes no target, a Nightly
 publication adds exactly the selected image, and a promotion adds that Nightly
-target relabelled for Release. An interrupted `sign` or `publish` resumes on
-its next run while the reserved timestamp has a day left; `abandon` clears one
-that never became public, and its versions stay used.
+target relabelled for Release.
+
+An interrupted operation resumes on its next run. Its roles must all be signed
+within 24 hours of the reservation, the signer's limit. A signed operation can
+be published, or its interrupted delivery resumed, while its timestamp has a
+day left. Once devices can fetch its timestamp, `publish` only finishes it,
+whatever its age and whatever changed since. `abandon` clears an operation
+that never became public and puts the current `timestamp.json` back if an
+interrupted swap left none; the versions it reserved stay used. A renewal also
+repairs a missing `timestamp.json`, and `status` reports the feed as matching
+only while that file serves the journal's current timestamp.
 
 A local file only the owner can write, `~/.config/spacewars-ota/release.json`,
-names the authority, the qualification workspace and the digests of the
-trusted tools. Each operation keeps its plan, bundle and results under the
+names the authority and the qualification workspace, and pins the digests of
+the trusted tools and of the reviewed command and its two modules. The command
+refuses to run other code, so after reviewing a change to those three files,
+update their digests there. Each operation keeps its plan, bundle and results under the
 workspace's `feed/v<version>-<kind>/`, and its signing evidence beside the
 authority's journal. `renewal/latest-bundle.json` in the workspace names the
 last published bundle, where the next operation starts.

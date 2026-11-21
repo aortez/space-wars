@@ -17,14 +17,16 @@ targets and needs no plan.
   ota_release.py publish VERSION --plan-sha256 SHA256
   ota_release.py abandon
 
-Paths and trusted tool digests come from a local configuration file,
-~/.config/spacewars-ota/release.json unless --config names another; see
-docs/ota-updates.md#publication. Private keys never leave the authority.
+Paths and the digests of the trusted tools and of the reviewed code come from
+a local configuration file, ~/.config/spacewars-ota/release.json unless
+--config names another; see docs/ota-updates.md#publication. Private keys never
+leave the authority.
 """
 import argparse
 from datetime import datetime, timedelta, timezone
 import fcntl
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -37,9 +39,8 @@ import tempfile
 import ota_delivery as delivery
 import ota_publisher_journal as journal
 
-HERE = Path(__file__).resolve().parent
 DEFAULT_CONFIG = Path.home() / '.config/spacewars-ota/release.json'
-# A plan binds these files, so the code that signs is the code that planned.
+# The configuration pins these files, and a plan binds them, so only reviewed code signs.
 CODE = ('ota_release.py', 'ota_publisher_journal.py', 'ota_delivery.py')
 TOOLS = ('feed_sign', 'feed_inventory', 'image_candidate')
 TOOL_ENV = {'PATH': '/usr/bin:/bin', 'LC_ALL': 'C'}
@@ -49,6 +50,8 @@ LIFETIME = dict(timestamp=timedelta(days=7), snapshot=timedelta(days=30), target
                 release=timedelta(days=30), nightly=timedelta(days=30))
 # A pending operation resumes only while its timestamp keeps a day of validity.
 RESUME_MARGIN = timedelta(days=1)
+# The signer accepts a proposal for 24 hours after its preparation; stop a little short of that.
+SIGNING_WINDOW = timedelta(hours=24) - timedelta(minutes=10)
 # Private key files per role, as ota_authority.py names them.
 MEMBERS = dict(targets=['targets'], release=['release-a', 'release-b'], nightly=['nightly'],
                snapshot=['snapshot'], timestamp=['timestamp'])
@@ -59,9 +62,26 @@ CI_RUN = re.compile(r'https://github\.com/' + re.escape(delivery.REPOSITORY) + r
 CI_FIELDS = 'status,conclusion,event,headBranch,headSha,url'
 
 
+class Refused(ValueError):
+    """A pinned tool refused its input; the message is the tool's own."""
+
+
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def refusal(name, error):
+    detail = (error.stderr or b'').decode(errors='replace').strip() or f'exit status {error.returncode}'
+    return Refused(f'{name} refused: {detail}')
+
+
+def signing(step):
+    """Runs a journal step that calls feed_sign, raising the signer's own refusal."""
+    try:
+        return step()
+    except subprocess.CalledProcessError as error:
+        raise refusal('feed_sign', error) from None
 
 
 def digest(raw):
@@ -135,7 +155,10 @@ def link(source, target, blob):
 
 
 def code_digests():
-    return {name: digest((HERE / name).read_bytes()) for name in CODE}
+    """Digests of the code that runs: this command and the two modules it imported."""
+    files = {'ota_release.py': __file__, 'ota_publisher_journal.py': journal.__file__,
+             'ota_delivery.py': delivery.__file__}
+    return {name: digest(Path(path).read_bytes()) for name, path in files.items()}
 
 
 def targets(raw):
@@ -197,6 +220,14 @@ def check_resumable(pending, moment):
             + pending['prepared_at'] + ' is too old to publish; abandon it first')
 
 
+def check_signable(pending, moment):
+    """Roles still unsigned can be signed only within the signer's window after the reservation."""
+    unsigned = [r for r in journal.ROLES if pending['stages'].get(r, {}).get('signed') is None]
+    require(not unsigned or moment - parse(pending['prepared_at']) < SIGNING_WINDOW,
+            f"The pending {pending['intent']['kind']} operation from {pending['prepared_at']} still has unsigned "
+            'roles, and the signer accepts them only for 24 hours; abandon it and start again')
+
+
 def phase(state, base, plan):
     """Where a planned operation stands: 'initial', 'pending' or 'complete'. Anything else rejects."""
     pending, intent = state['pending'], plan['intent']
@@ -214,20 +245,23 @@ def phase(state, base, plan):
     return 'pending'
 
 
+def pins(value, names):
+    return isinstance(value, dict) and set(value) == set(names) and all(delivery.sha(v) for v in value.values())
+
+
 class Config:
-    """Local paths and trusted tool digests, kept outside the repository."""
-    FIELDS = {'schema', 'authority', 'workspace', 'root_sha256', 'tools_directory', 'tools'}
+    """Local paths and the digests of the trusted tools and the reviewed code, kept outside the repository."""
+    FIELDS = {'schema', 'authority', 'workspace', 'root_sha256', 'tools_directory', 'tools', 'code'}
 
     def __init__(self, value):
         require(isinstance(value, dict) and set(value) == self.FIELDS and value['schema'] == 1
-                and delivery.sha(value['root_sha256']) and isinstance(value['tools'], dict)
-                and set(value['tools']) == set(TOOLS) and all(delivery.sha(v) for v in value['tools'].values()),
+                and delivery.sha(value['root_sha256']) and pins(value['tools'], TOOLS) and pins(value['code'], CODE),
                 'Invalid release configuration')
         self.authority, self.workspace, self.tools_directory = (
             Path(value[key]) for key in ('authority', 'workspace', 'tools_directory'))
         require(all(path.is_absolute() for path in (self.authority, self.workspace, self.tools_directory)),
                 'Configured paths must be absolute')
-        self.root_sha256, self.tools = value['root_sha256'], dict(value['tools'])
+        self.root_sha256, self.tools, self.code = value['root_sha256'], dict(value['tools']), dict(value['code'])
         self.public = self.authority / 'public'
         self.keys = self.authority / 'keys'
         self.state_path = self.public / 'publisher-state.json'
@@ -274,12 +308,21 @@ class Publisher:
         return str(path)
 
     def run(self, name, *args, timeout=120):
-        return subprocess.check_output([self.tool(name), *(str(a) for a in args)], timeout=timeout, env=TOOL_ENV)
+        """Runs a pinned tool and returns its output; a refusal raises the tool's own message."""
+        try:
+            return subprocess.run([self.tool(name), *(str(a) for a in args)], check=True, capture_output=True,
+                                  timeout=timeout, env=TOOL_ENV).stdout
+        except subprocess.CalledProcessError as error:
+            raise refusal(name, error) from None
 
     def __enter__(self):
         self.umask = os.umask(0o077)
         self.lock = None
         try:
+            running = code_digests()
+            changed = [name for name in CODE if running[name] != self.config.code[name]]
+            require(not changed, 'Not the reviewed code pinned in the release configuration: '
+                    + ', '.join(f'{name} is {running[name]}' for name in changed))
             for path in (self.config.authority, self.config.public, self.config.keys):
                 info = path.lstat()
                 require(stat.S_ISDIR(info.st_mode) and info.st_uid == os.geteuid()
@@ -328,6 +371,65 @@ class Publisher:
         require(release is not None, 'The feed release is missing')
         return release, delivery.parse_state(release)
 
+    def exposed(self, api, release, observed):
+        """Whether devices can already fetch the pending publication's timestamp, so it can only be finished."""
+        pending = self.state['pending']
+        sealed = pending['publication'] and journal.publication_record(self.state, pending['publication'])
+        require(observed['current'] in (self.state['current'], sealed) and observed['pending'] in (None, sealed),
+                'The public feed differs from the journal')
+        if not sealed:
+            return False
+        if observed['current'] == sealed:
+            return True
+        if observed['pending'] != sealed:
+            return False
+        return delivery.known_timestamp(api, delivery.asset_map(api, release).get('timestamp.json'), observed) == sealed
+
+    def finishing(self):
+        """Whether publish can only finish the pending publication, because devices can already fetch it."""
+        api = self.github(mutating=False)
+        release, observed = self.observe(api)
+        return self.exposed(api, release, observed)
+
+    def finish_command(self):
+        pending = self.state['pending']
+        kind, version = pending['intent']['kind'], pending['versions']['timestamp']
+        if kind == 'renew':
+            return 'ota_release.py renew publish'
+        plan = self.config.operations / f'v{version}-{kind}' / 'plan.json'
+        if plan.is_file():
+            return f'ota_release.py publish {version} --plan-sha256 {digest(plan.read_bytes())}'
+        return 'the tool that started it'
+
+    def alias_holds(self, api, release, blob):
+        """Whether timestamp.json serves exactly these bytes."""
+        alias = delivery.asset_map(api, release).get('timestamp.json')
+        if alias is None or alias['state'] != 'uploaded' or alias['size'] != blob['bytes']:
+            return False
+        try:
+            api.verify(alias, blob)
+        except ValueError:
+            return False
+        return True
+
+    def restore_alias(self, api):
+        """Puts the current timestamp back at timestamp.json when an abandoned attempt left none there."""
+        release = api.get_release()
+        raw = self.state['roles']['timestamp'].encode()
+        blob = dict(bytes=len(raw), sha256=digest(raw))
+        if self.alias_holds(api, release, blob):
+            return False
+        alias = delivery.asset_map(api, release).get('timestamp.json')
+        if alias is not None:
+            require(alias['state'] == 'starter' and alias['size'] == 0,
+                    'timestamp.json holds bytes of no reserved publication')
+            api.delete_asset(alias)
+        uploaded = api.upload(release, 'timestamp.json', io.BytesIO(raw), len(raw))
+        require(uploaded.get('name') == 'timestamp.json' and uploaded.get('state') == 'uploaded'
+                and uploaded.get('size') == len(raw), 'Upload response differs from the restored timestamp')
+        api.verify(uploaded, blob)
+        return True
+
     def previous_bundle(self, override=None):
         """Finds the local bundle of the published feed and authenticates it.
 
@@ -338,7 +440,7 @@ class Publisher:
         expires = parse(journal.metadata(self.state['roles']['timestamp'])['expires'])
         at = stamp(min(self.now(), expires - timedelta(seconds=1)))
         if override:
-            candidates = [Path(override)]
+            candidates = [Path(override).resolve()]
         else:
             candidates = sorted(self.config.operations.glob(f"v{current['version']}-*/bundle"))
             if self.config.pointer.exists():
@@ -350,8 +452,8 @@ class Publisher:
                 continue
             try:
                 manifest = self.run('feed_inventory', self.config.root_path, path, at)
-            except subprocess.CalledProcessError:
-                rejected.append(f'{path}: feed_inventory refused it')
+            except Refused as error:
+                rejected.append(f'{path}: {error}')
                 continue
             if digest(manifest) == current['manifest_sha256']:
                 return path, manifest
@@ -374,6 +476,10 @@ class Publisher:
         require(old.record == self.state['current'], 'Previous bundle does not match the journal')
         assets = delivery.asset_map(api, release)
         for name, blob in old.files.items():
+            if name == 'timestamp.json' and name not in assets:
+                # An attempt stopped during the timestamp swap can leave no alias. The archived copy proves the
+                # current timestamp, and this operation publishes a new alias.
+                name = old.archive_name
             require(name in assets and assets[name]['size'] == blob['bytes']
                     and assets[name].get('digest') == 'sha256:' + blob['sha256'], 'Remote asset differs: ' + name)
             if name.endswith('.json'):
@@ -395,7 +501,7 @@ class Publisher:
     def sign_roles(self, evidence, history):
         tooling = journal.Tooling(self.tool('feed_sign'), self.root)
         for role in journal.ROLES:
-            self.advance(journal.prepare(self.state, role, tooling), history)
+            self.advance(signing(lambda: journal.prepare(self.state, role, tooling)), history)
             stage = self.state['pending']['stages'][role]
             if stage['signed'] is not None:
                 continue
@@ -411,7 +517,7 @@ class Publisher:
                         and stat.S_IMODE(info.st_mode) == 0o600 and info.st_nlink == 1, 'Unsafe private signing file')
             signed = self.run('feed_sign', self.config.root_path, authority, request,
                               digest(stage['proposal'].encode()), *keys)
-            self.advance(journal.retain(self.state, role, signed, tooling), history)
+            self.advance(signing(lambda: journal.retain(self.state, role, signed, tooling)), history)
             progress(role + ': signature verified and retained')
 
     def build_bundle(self, directory, previous, intent, image):
@@ -446,32 +552,37 @@ class Publisher:
 
     def execute(self, action, operation, evidence, intent, base, previous, source, generation=None, image=None,
                 extra=None):
-        """Reserves or resumes, signs, checks and seals one operation; publish also delivers it."""
+        """Reserves or resumes, signs, checks and seals one operation; publish also delivers it.
+
+        A sealed publication whose timestamp devices can already fetch is finished as sealed, at any age.
+        """
         evidence.mkdir(mode=0o700, exist_ok=True)
         sync(self.config.public)
         history = evidence / 'checkpoints'
         api = self.github(mutating=action == 'publish')
         release, observed = self.observe(api)
-        pending = self.state['pending']
-        if pending is None:
+        if self.state['pending'] is None:
             require(observed == dict(schema=1, current=self.state['current'], pending=None),
                     'The public feed differs from the journal')
             self.advance(journal.reserve(self.state, intent, stamp(self.now())), history)
-        else:
-            check_resumable(pending, self.now())
-            sealed = pending['publication'] and journal.publication_record(self.state, pending['publication'])
-            require(observed['current'] in (self.state['current'], sealed), 'The public feed differs from the journal')
-        require(self.state['pending']['generation'] == generation, 'The reserved generation differs from the plan')
+        elif not self.exposed(api, release, observed):
+            check_resumable(self.state['pending'], self.now())
+        pending = self.state['pending']
+        require(pending['generation'] == generation, 'The reserved generation differs from the plan')
         retain(evidence / 'intent.json', journal.encode(intent))
-        self.sign_roles(evidence, history)
-        check_signed(self.state, base)
-        directory = self.build_bundle(operation / 'bundle', previous, intent, image)
-        manifest = self.run('feed_inventory', self.config.root_path, directory, stamp(self.now()))
-        retain(evidence / 'inventory.json', manifest)
+        directory = operation / 'bundle'
+        if pending['publication'] is None:
+            check_signable(pending, self.now())
+            self.sign_roles(evidence, history)
+            check_signed(self.state, base)
+            self.build_bundle(directory, previous, intent, image)
+            inventory = self.run('feed_inventory', self.config.root_path, directory, stamp(self.now()))
+            retain(evidence / 'inventory.json', inventory)
+            self.advance(journal.seal(self.state, inventory), history)
+            pending = self.state['pending']
+        manifest = pending['publication'].encode()
         bundle = delivery.Bundle(directory, manifest, digest(manifest))
         bundle.verify()
-        self.advance(journal.seal(self.state, manifest), history)
-        pending = self.state['pending']
         receipt = dict(kind=intent['kind'], version=pending['versions']['timestamp'], current=bundle.record,
                        prepared_at=pending['prepared_at'],
                        expires={r: journal.metadata(journal.signed(self.state, r))['expires']
@@ -502,16 +613,17 @@ class Publisher:
         release, observed = self.observe(api)
         roles = {r: journal.metadata(self.state['roles'][r]) for r in journal.ROLES}
         expires = parse(roles['timestamp']['expires'])
-        pending = self.state['pending']
+        pending, current = self.state['pending'], self.state['current']
         assets = len(api.assets(release))
-        return dict(version=self.state['current']['version'], timestamp_expires=roles['timestamp']['expires'],
+        return dict(version=current['version'], timestamp_expires=roles['timestamp']['expires'],
                     hours_left=round((expires - self.now()).total_seconds() / 3600, 1),
                     other_roles_expire=sorted({roles[r]['expires'] for r in journal.ROLES if r != 'timestamp'}),
                     release_targets=len(roles['release']['targets']), nightly_targets=len(roles['nightly']['targets']),
                     generation=self.state['generation'],
                     pending=pending and dict(kind=pending['intent']['kind'], prepared_at=pending['prepared_at'],
                                              sealed=pending['publication'] is not None),
-                    public_feed_matches=observed == dict(schema=1, current=self.state['current'], pending=None),
+                    public_feed_matches=(observed == dict(schema=1, current=current, pending=None)
+                                         and self.alias_holds(api, release, current['timestamp'])),
                     release_assets=assets, asset_headroom=delivery.MAX_ASSETS - assets)
 
     def renew(self, action, previous_override=None):
@@ -640,20 +752,18 @@ class Publisher:
 
     def proceed(self, action, version, plan_sha256):
         """Signs or publishes the plan the owner approved by its digest."""
-        found = [path for path in sorted(self.config.operations.glob(f'v{version}-*/plan.json'))
-                 if digest(path.read_bytes()) == plan_sha256]
+        found = []
+        for path in sorted(self.config.operations.glob(f'v{version}-*/plan.json')):
+            raw = path.read_bytes()
+            if digest(raw) == plan_sha256:
+                found.append((path.parent, raw))
         require(found, f'No plan for v{version} has that digest')
-        operation = found[0].parent
-        raw = found[0].read_bytes()
+        operation, raw = found[0]  # The approved bytes themselves; the file is not read again.
         plan = json.loads(raw)
         require(plan['version'] == version and operation.name == f"v{version}-{plan['kind']}", 'Misplaced plan')
-        require(plan['code'] == code_digests(), 'The release command changed since this plan was prepared')
-        require(plan['tools'] == self.config.tools and plan['root_sha256'] == self.config.root_sha256,
-                'Trusted tools or root changed since this plan was prepared')
         base_raw = (operation / 'base-state.json').read_bytes()
         require(digest(base_raw) == plan['base_state_sha256'], 'The baseline record changed')
         base = journal.load(base_raw)
-        image, evidence = self.reselect(plan)
         stage = phase(self.state, base, plan)
         intent = plan['intent']
         if stage == 'complete':
@@ -662,7 +772,14 @@ class Publisher:
                 self.point(record, Path(plan['bundle']))
             return dict(already_published=True, kind=intent['kind'], version=version, generation=plan['generation'],
                         current=record)
-        require(action == 'sign' or stage == 'pending', 'Sign the plan before publishing it')
+        image = evidence = None
+        # A publication devices can already fetch is only finished; nothing about it is decided again.
+        if not (stage == 'pending' and action == 'publish' and self.finishing()):
+            require(plan['code'] == code_digests(), 'The release command changed since this plan was prepared')
+            require(plan['tools'] == self.config.tools and plan['root_sha256'] == self.config.root_sha256,
+                    'Trusted tools or root changed since this plan was prepared')
+            image, evidence = self.reselect(plan)
+            require(action == 'sign' or stage == 'pending', 'Sign the plan before publishing it')
         folder = self.config.public / f"{intent['kind']}-v{version}"
         folder.mkdir(mode=0o700, exist_ok=True)
         retain(folder / 'plan.json', raw)
@@ -680,19 +797,25 @@ class Publisher:
         require(pending is not None, 'No publisher operation is pending')
         kind, version = pending['intent']['kind'], pending['versions']['timestamp']
         current = self.state['current']
-        if pending['publication'] is None:
-            api = self.github(mutating=False)
-        else:
-            api = self.github(mutating=True)
-            outcome = delivery.abandon(api, current, journal.publication_record(self.state, pending['publication']))
-            require(outcome == 'abandoned', 'That publication is already public; run publish to confirm it')
+        api = self.github(mutating=pending['publication'] is not None)
+        release, observed = self.observe(api)
+        if self.exposed(api, release, observed):
+            raise ValueError('That publication is already public, so it cannot be abandoned; finish it with '
+                             + self.finish_command())
+        restored = False
+        if pending['publication'] is not None:
+            sealed = journal.publication_record(self.state, pending['publication'])
+            if observed['pending'] is not None and delivery.abandon(api, current, sealed) != 'abandoned':
+                raise ValueError('That publication became public; finish it with ' + self.finish_command())
+            # An attempt stopped during the timestamp swap can leave no alias; the current timestamp goes back.
+            restored = self.restore_alias(api)
         _, observed = self.observe(api)
         require(observed == dict(schema=1, current=current, pending=None), 'The public feed differs from the journal')
         evidence = self.config.public / f'{kind}-v{version}'
         evidence.mkdir(mode=0o700, exist_ok=True)
         self.advance(journal.abandon(self.state, observed['current']), evidence / 'checkpoints')
-        return dict(abandoned=True, kind=kind, version=version, prepared_at=pending['prepared_at'], current=current)
-
+        return dict(abandoned=True, kind=kind, version=version, prepared_at=pending['prepared_at'], current=current,
+                    timestamp_restored=restored)
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
