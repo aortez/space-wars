@@ -902,3 +902,98 @@ being told to; and the walk is visible as what it is: absolute X 40 to 160 acros
 is not in, then the load takes the screen, then he is at 40 in his own. The mode exists
 because the measurement needed a byte the primitive will not write, which is the same reason
 the primitive should not write it.
+
+## SMB-027 — 2026-11-21 — Two players on every start, and the script is a 1-1 specialist
+
+`levels drive-all` runs both of the tree's players from all thirty-two starts and prints
+a verdict per start. The point was Phase 4's exit, which was open on one sentence: the
+inventory could not separate "this level is hard" from "this driver only knows 1-1"
+until a second driver ran on it. The second driver was in the tree already —
+`gym::REFLEX` and `skills::SCRIPTED` are both `Driver` values and the gym harness has
+always put them at one tape — but nothing had put them at a *level*.
+
+Rationale: the second loop costs nothing and buys the only reading of the inventory that
+is not circular. Both players are `Driver` values built the same way over the same
+`BaseBot`, the same empty ledger, the same start from `boot_to_level`, the same frame
+budget, the same stuck detector and the same model underneath, so the policy above the
+ledger is the only thing that varies. Where they stop at the same pixel the level put
+them there; where they disagree, one of them did it to itself. `drive --player` is the
+same comparison in miniature, for the one start a person is currently reading.
+
+Evidence: **one of thirty-two is cleared by anyone, and it is the same one as ever.**
+The script leaves 1-1 at absolute X 3266; the reflex dies twice and stops at 1553.
+Neither player leaves anything else.
+
+**The players disagree on twenty-four starts, and the reflex is further ahead on
+nineteen of them.** The script gets further on five — 1-2, 2-3, 3-4, 7-3 and 7-4 — and
+the reflex on nineteen, by as much as 592 px. The scripted player is not the stronger
+player on the cartridge; it is the stronger player on two levels of thirty-two, and the
+inventory only says that now because something other than itself was run there.
+
+**6-2 is the clearest disagreement and it is not a wall.** The script stops at absolute
+X 291 having never died, with the game still in control of him, no refusals, an empty
+ledger and nothing standing against him where he stands; the reflex gets to 883 past
+that same pixel. A stop with no death behind it and no name in front of it is the case
+the inventory exists to catch, and it is a stop about the script's own arbitration
+rather than about 6-2. What the script was waiting for has not been measured.
+
+**Seven stops belong to the level.** 1-4, 2-2, 3-2, 4-4, 6-4, 7-2 and 8-4 stop both
+players within one cell of each other, which is the only test here that says *level* and
+not *player*. Two of the seven — 2-2 and 7-2, both at absolute X 162 against a 64-px
+wall at pixel 176 — are the tall-wall skill's existing debt seen through a second
+player, and five — 1-4, 3-2, 4-4, 6-4 and 8-4 — are stops the model has no name for at
+all.
+
+**Four pairs of starts run identically under both players.** 1-3 with 5-3, 1-4 with 6-4,
+2-2 with 7-2 and 2-4 with 5-4: the same frames played, the same furthest pixel, the same
+deaths, under both drivers. The engine is deterministic and the player is fixed, so the
+level is the only thing left that could account for a match to the frame, and the
+cartridge ships fewer than thirty-two levels under thirty-two names. The map letters
+differ for those four pairs, which says the matched geometry is drawn with different
+tile patterns in different worlds — and the ledger is keyed on pattern hash, so a bot
+that was taught 1-3 arrives at 5-3 having been taught nothing about what is, by the
+run's own evidence, the same level. That has not been measured as a loss yet and it is
+the cheapest experiment left in this area. 2-3 and 7-3 draw an identical first screen
+and still run differently, so a matching picture is not a matching level: the twins have
+to be found from runs.
+
+**The patched start and the played start are the same run, pixel for pixel.** `drive 1
+1` writes a PNG per frame; so does `bot 2620 --script`, which writes no byte at all and
+plays the title screen instead. 2,327 frames carry the same name — the cutter's name is
+the frame id and the absolute X — and every one of them is the same file, 0 differing
+pixels out of 2,327. The patch's justification used to be that the game names the level
+back and that the arrived screen hashes to the table's own hash for it. This is the same
+claim at the highest resolution available here: a start written into RAM and a start the
+game chose draw the same picture and hold the same behaviour for thirty-eight seconds,
+HUD, enemies and all.
+
+**A run now ends where its level ends.** The 1-1 row used to read "no new ground for 600
+frames at absolute X 3266", which was true and misleading — the byte had already moved,
+the level was over, and the 600 frames were spent inside 1-2. The run stops at the first
+byte change and says "cleared the level", because a row of this table is a claim about
+the level it started in.
+
+Consequence: Phase 4's exit is met, and what it met with is a baseline worse than the
+one the plan assumed. Phase 5's search now has two numbers to beat on every start rather
+than one, and on nineteen of the thirty-two the weaker one is the reflex; a search that
+cannot walk right past a Goomba has not earned the word "search". The gym queue is
+ranked by the same table: the seven stops both players make are the ones worth cutting,
+the five the model cannot name are Phase 6's problem and not a gym's, and the two it can
+name are the tall-wall skill — still owed, now with a second witness and the same pixel.
+
+The pattern-hash ledger key is a suspect it produced. `Resistance` is keyed on artwork,
+and four pairs of levels are the same level drawn with different artwork, so the key is
+either free or expensive and nothing has said which. The experiment is the one the gym
+harness already knows how to run: warm the ledger on 1-3, start at 5-3, and see whether
+the run changes.
+
+Four films, all outside the repository. `drive 6 2 1200 --shots DIR --player script`
+and the same with `--player reflex` write two PNG series, and the cutter turns each into
+`data/shots/6-2-script/6-2-script.mp4` and `data/shots/6-2-reflex/6-2-reflex.mp4`. The
+two side by side — script on the left, reflex on the right, both starting on the same
+emulator frame — are `data/shots/6-2-compare/6-2-script-left-reflex-right.mp4`, and it is
+the most legible thing this project has filmed: the left half stops dead at absolute X 291
+and stands there for ten seconds while the right half walks past the same pixel, reaches
+883, and loses the life there. The fourth is `data/shots/1-1-script/1-1-script.mp4`, from
+`drive 1 1 3000 --shots data/shots/1-1-script`: the other side of the same finding, the only
+level anyone finishes, and the series the pixel comparison above is run against.

@@ -17,10 +17,12 @@
 //!                              the same watch from a raw level byte, which is how the
 //!                              pipe travel slot — the one `level_slot` will not name —
 //!                              gets watched and filmed
-//! levels [ROM] drive W L [FRAMES] [--shots DIR]
-//!                              the scripted player loose on a start, its stop, and a
-//!                              PNG per frame for the same cutter the gyms use
-//! levels [ROM] drive-all [FRAMES]  all thirty-two starts, eight worlds in parallel
+//! levels [ROM] drive W L [FRAMES] [--shots DIR] [--player script|reflex]
+//!                              one player loose on one start, its stop, and a PNG per
+//!                              frame for the same cutter the gyms use
+//! levels [ROM] drive-all [FRAMES]
+//!                              all thirty-two starts under both players at once, which
+//!                              is the only way to tell a hard level from a weak player
 //! levels [ROM] natural [FRAMES]    clear 1-1 the game's own way and report where it says it landed
 //! ```
 //!
@@ -39,7 +41,7 @@ use std::{
 use engine_nes::{
     ControllerButtons, CpuBus, FRAME_HEIGHT, FRAME_PIXELS, FRAME_WIDTH, NesMachine, write_rgb888,
 };
-use smb_ai::{policy::BaseBot, skills};
+use smb_ai::{gym, policy::BaseBot, skills};
 use smb_model::{
     affordances::{WALL_LOOK_COLUMNS, wall_ahead},
     cartridge,
@@ -185,6 +187,28 @@ fn shots_dir(args: &[String]) -> Option<PathBuf> {
         .position(|arg| arg == "--shots")
         .and_then(|at| args.get(at + 1))
         .map(PathBuf::from)
+}
+
+/// `--player script|reflex`, defaulting to the script.
+///
+/// The default is the scripted player because it is the stronger of the two and a person
+/// typing this command is usually asking "how far does the best thing I have get". The
+/// flag exists so one start can be re-run under the reflex without recompiling, which is
+/// the smallest version of the comparison `drive-all` makes for all thirty-two.
+fn driver_arg(args: &[String]) -> Result<gym::Driver, Box<dyn Error>> {
+    match args
+        .iter()
+        .position(|arg| arg == "--player")
+        .and_then(|at| args.get(at + 1))
+        .map(String::as_str)
+    {
+        None => Ok(skills::SCRIPTED),
+        Some(name) => DRIVERS
+            .iter()
+            .find(|driver| driver.name == name)
+            .copied()
+            .ok_or_else(|| format!("no player named {name}: try {}", driver_names()).into()),
+    }
 }
 
 /// Every level in the cartridge, started and described.
@@ -385,38 +409,213 @@ fn watch_load(
     Ok(())
 }
 
-/// Turn the scripted player loose on a start and say where it stopped and what the
-/// model had to say about that pixel.
+/// How far apart two drivers' stops may be and still count as the same stop.
 ///
-/// This is the inventory the plan asks for: the same player, the same rules, thirty-two
-/// beginnings. What a level contributes is the stop — the position, the reason the run
-/// ended, and whether the model had a name for the thing there. One line per start, with
-/// the level-byte changes folded in above it, because `drive-all` runs eight of these on
-/// eight threads and two threads writing half a line each is not a report.
-fn drive_line(
+/// One cell. Two players killed by the same Goomba are a frame or two apart in X, which
+/// is a handful of pixels; two players stopped by different things are a screen apart. A
+/// gap that lands between those is a stop worth looking at on its own, and the table
+/// prints the gap either way.
+const SAME_GROUND_PIXELS: u16 = 8;
+
+/// The two players the tree has, run against every start.
+///
+/// Phase 4's exit is a comparison, not a table: a stop that one driver makes is a fact
+/// about that driver, and a stop both make at the same pixel is a fact about the level.
+/// Nothing before this line can tell those apart, because nothing before this line has
+/// ever run a second player on a start.
+const DRIVERS: [gym::Driver; 2] = [skills::SCRIPTED, gym::REFLEX];
+
+/// The names `--player` takes, read off [`DRIVERS`] so the error cannot lie about the list.
+fn driver_names() -> String {
+    DRIVERS
+        .iter()
+        .map(|driver| driver.name)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Why a driven run ended.
+#[derive(Clone, Copy, Debug)]
+enum Ended {
+    /// The level byte moved: he got out. The one outcome that is not a stop.
+    Left,
+    /// The frame budget ran out with the run still going.
+    OutOfFrames,
+    /// The same furthest X for [`STUCK_FRAMES`] frames.
+    Stuck,
+    /// The game's own game-over screen, the only way a run ends before it has to.
+    GameOver,
+}
+
+impl Ended {
+    /// Whether the run ended by leaving the level.
+    fn left(self) -> bool {
+        matches!(self, Self::Left)
+    }
+
+    /// The reason, in the words a single-start report prints.
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Left => "cleared the level",
+            Self::OutOfFrames => "ran out of frames",
+            Self::Stuck => "no new ground for 600 frames",
+            Self::GameOver => "the game ended the run",
+        }
+    }
+
+    /// The same reason in the width a table column has.
+    fn short(self) -> &'static str {
+        match self {
+            Self::Left => "left it",
+            Self::OutOfFrames => "out of frames",
+            Self::Stuck => "stuck",
+            Self::GameOver => "game over",
+        }
+    }
+}
+
+/// One driver's run on one start, kept whole so that two runs can be read against each
+/// other.
+///
+/// The inventory's unit is a pair of runs, not a run. So a run keeps everything a verdict
+/// needs — how far he got, why the run ended, and what the model called the cell under
+/// his feet when it did — and prints it two ways: the paragraph one start deserves, and
+/// the row a thirty-two-start table needs.
+struct Stop {
+    /// The start as the status bar numbers it.
+    asked: String,
+    /// Which of [`DRIVERS`] played it.
+    driver: &'static str,
+    ended: Ended,
+    /// Frames played, which is a run's cost as much as its length.
+    played: u64,
+    furthest: u16,
+    deaths: Vec<(u64, u16)>,
+    refusals: u32,
+    /// The level-byte change that ended the run, in prose, if there was one.
+    change: Option<String>,
+    /// The cell under his feet on the last frame read.
+    cell: (i16, i16),
+    /// Height and near pixel of what the model says stands ahead of him, if it named one.
+    wall: Option<(u16, u16)>,
+    in_control: bool,
+    ledger: usize,
+}
+
+impl Stop {
+    /// What the model called the pixel ahead of him on the run's last frame.
+    fn model(&self) -> String {
+        self.wall.map_or_else(
+            || "nothing standing against him".to_owned(),
+            |(height, x)| format!("a wall {height} px tall starting at pixel {x}"),
+        )
+    }
+
+    /// The run as a paragraph, which is what one start deserves.
+    fn line(&self) -> String {
+        let died = if self.deaths.is_empty() {
+            "never died".to_owned()
+        } else {
+            let places = self
+                .deaths
+                .iter()
+                .map(|(frame, x)| format!("absolute X {x} on frame {frame}"))
+                .collect::<Vec<_>>()
+                .join(", then ");
+            format!("died at {places}")
+        };
+        let report = format!(
+            "{}: {} at absolute X {}; {died}; {} refused buttons; feet on cell ({}, {}); \
+             the model there is {}; {}; {} cells in the ledger",
+            self.asked,
+            self.ended.as_str(),
+            self.furthest,
+            self.refusals,
+            self.cell.0,
+            self.cell.1,
+            self.model(),
+            if self.in_control {
+                "the game still has him"
+            } else {
+                "the game has taken the controller"
+            },
+            self.ledger,
+        );
+        self.change
+            .as_deref()
+            .map_or(report.clone(), |change| format!("{change}\n{report}"))
+    }
+
+    /// The run as a table row, which is what thirty-two starts at once need.
+    fn row(&self) -> String {
+        format!(
+            "{:<5} {:<6} {:<12} {:>6} {:>8} {:>6} {:>8}  {:>8}  {:<4}  {}",
+            self.asked,
+            self.driver,
+            self.ended.short(),
+            self.played,
+            self.furthest,
+            self.deaths.len(),
+            self.refusals,
+            format!("({}, {})", self.cell.0, self.cell.1),
+            if self.in_control { "his" } else { "game" },
+            self.model(),
+        )
+    }
+}
+
+/// A table row's header, formatted by the same string the rows use so the two cannot
+/// drift apart by a column.
+fn drive_header() -> String {
+    format!(
+        "{:<5} {:<6} {:<12} {:>6} {:>8} {:>6} {:>8}  {:>8}  {:<4}  {}",
+        "start",
+        "driver",
+        "outcome",
+        "frames",
+        "furthest",
+        "deaths",
+        "refusals",
+        "feet",
+        "ctrl",
+        "model at the stop",
+    )
+}
+
+/// Turn one driver loose on one start and keep what the run learned.
+///
+/// The run ends at the first level-byte change rather than running on into the next
+/// level, because a row of this inventory is a claim about the level it started in: the
+/// pixel a driver reaches *after* clearing it belongs to another row's question, and
+/// quoting it here is how 1-1 once got a stop 600 frames into a level it had already
+/// finished.
+///
+/// The stuck detector fires on a respawn as much as on an obstacle — a death rewinds him
+/// to the level's own start, so 600 frames of the same level can be 600 frames of the
+/// same mistake — which is why a `Stop` carries where each life was lost and not merely
+/// how many.
+fn run_start(
     rom: &[u8],
+    driver: gym::Driver,
     world: u8,
     level: u8,
     frames: u64,
     shots: Option<&Path>,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<Stop, Box<dyn Error>> {
     // `world` is a byte and `level` is already the number the status bar prints.
     let asked = format!("{}.{}", world + 1, level);
     let (mut machine, _) = boot_to_level(rom, world, level)?;
     let opened = read_state(&machine);
-    let mut player = (skills::SCRIPTED.player)(BaseBot::default());
-    let mut last = (opened.world, opened.level);
+    let mut player = (driver.player)(BaseBot::default());
+    let last = (opened.world, opened.level);
     let mut furthest = opened.absolute_x;
     let mut lives = opened.lives;
-    // Where each life was lost, in the only coordinate that survives a respawn: the
-    // furthest X reached before it. A death rewinds him to the level's own start, so the
-    // stuck detector below fires on the respawn rather than on the obstacle, and without
-    // this the inventory would report thirty "no new ground" stops and no obstacle.
     let mut deaths: Vec<(u64, u16)> = Vec::new();
     let mut refusals = 0u32;
     let mut no_progress_for = 0u64;
-    let mut stopped = "ran out of frames";
-    let mut changes = Vec::new();
+    let mut played = 0u64;
+    let mut ended = Ended::OutOfFrames;
+    let mut change = None;
     for _ in 0..frames {
         let frame_id = machine.ppu().frame_id();
         if let Some(dir) = shots
@@ -444,11 +643,11 @@ fn drive_line(
             }
         }
         if state.game_mode == MODE_END_GAME {
-            stopped = "the game ended the run";
+            ended = Ended::GameOver;
             break;
         }
         if (state.world, state.level) != last {
-            changes.push(format!(
+            change = Some(format!(
                 "  frame {frame_id}: byte {:#04x} -> {:#04x} at absolute X {furthest}, \
                  level {} -> {}",
                 last.1,
@@ -464,7 +663,8 @@ fn drive_line(
                     .level_number()
                     .map_or_else(|| "?".into(), |n| n.to_string()),
             ));
-            last = (state.world, state.level);
+            ended = Ended::Left;
+            break;
         }
         let buttons = player.buttons(&machine);
         if state.absolute_x > furthest {
@@ -473,11 +673,12 @@ fn drive_line(
         } else {
             no_progress_for += 1;
             if no_progress_for > STUCK_FRAMES {
-                stopped = "no new ground for 600 frames";
+                ended = Ended::Stuck;
                 break;
             }
         }
         machine.run_frame([buttons, ControllerButtons::NONE])?;
+        played += 1;
         let produced = read_state(&machine);
         if player.observe(&produced, &machine, frame_id).is_some() {
             refusals += 1;
@@ -486,54 +687,106 @@ fn drive_line(
     let state = read_state(&machine);
     let picture = snapshot(&machine);
     let origin_x = scroll_x(&picture);
-    let (column, row) = player_tile(&state, origin_x);
+    let cell = player_tile(&state, origin_x);
     let wall = wall_ahead(
         &picture,
         origin_x,
         &state,
         player.ledger(),
         WALL_LOOK_COLUMNS,
-    );
-    let control = if state.is_in_control() {
-        "the game still has him"
-    } else {
-        "the game has taken the controller"
-    };
-    let died = if deaths.is_empty() {
-        "never died".to_owned()
-    } else {
-        let places = deaths
-            .iter()
-            .map(|(frame, x)| format!("absolute X {x} on frame {frame}"))
-            .collect::<Vec<_>>()
-            .join(", then ");
-        format!("died at {places}")
-    };
-    let report = format!(
-        "{asked}: {stopped} at absolute X {furthest}; {died}; {refusals} refused buttons; \
-         feet on cell ({column}, {row}); the model there is {}; {control}; \
-         {} cells in the ledger",
-        wall.map_or_else(
-            || "nothing standing against him".to_owned(),
-            |wall| format!(
-                "a wall {} px tall starting at pixel {}",
-                wall.height_pixels(),
-                wall.x
-            ),
-        ),
-        player.ledger().len(),
-    );
-    Ok([changes.join("\n"), report]
-        .iter()
-        .filter(|line| !line.is_empty())
-        .cloned()
-        .collect::<Vec<_>>()
-        .join("\n"))
+    )
+    .map(|wall| (wall.height_pixels(), wall.x));
+    Ok(Stop {
+        asked,
+        driver: driver.name,
+        ended,
+        played,
+        furthest,
+        deaths,
+        refusals,
+        change,
+        cell,
+        wall,
+        in_control: state.is_in_control(),
+        ledger: player.ledger().len(),
+    })
 }
 
-/// [`drive_line`], printed.
+/// What two runs on one start say about each other.
+///
+/// The distinction the whole inventory was built to make: a stop one driver makes is a
+/// fact about that driver, and a stop both make at the same pixel is a fact about the
+/// level. Only the second kind is worth a gym, and only the second kind says a level is
+/// hard rather than saying the script only knows 1-1.
+#[derive(Clone, Copy, Debug)]
+enum Verdict {
+    /// Neither driver got out, and they stopped close enough to have met the same thing.
+    SameGround { x: u16, gap: u16 },
+    /// Neither driver got out, and one of them got considerably further.
+    DriverGap { ahead: &'static str, gap: u16 },
+    /// One driver got out of the level and the other did not.
+    OnlyOne {
+        ahead: &'static str,
+        stopped_at: u16,
+    },
+    /// Both got out.
+    BothLeft,
+}
+
+impl Verdict {
+    /// The verdict as the line under a pair of rows.
+    fn line(&self) -> String {
+        match self {
+            Self::BothLeft => "  both drivers left the level: it stops neither of them".into(),
+            Self::OnlyOne { ahead, stopped_at } => format!(
+                "  only {ahead} left it: the other stops at absolute X {stopped_at}, so the \
+                 level asks for something one player has and the other has not"
+            ),
+            Self::SameGround { x, gap } => format!(
+                "  both stop at absolute X {x} within {gap} px: the stop is the level's, not \
+                 the driver's, so it is a gym candidate"
+            ),
+            Self::DriverGap { ahead, gap } => {
+                format!("  {ahead} got {gap} px further: a stop about the driver, not the level")
+            }
+        }
+    }
+}
+
+/// [`DRIVERS`]' two runs on one start, read against each other.
+fn verdict(script: &Stop, reflex: &Stop) -> Verdict {
+    let gap = i32::from(script.furthest.max(reflex.furthest))
+        - i32::from(script.furthest.min(reflex.furthest));
+    let ahead = if script.furthest >= reflex.furthest {
+        script.driver
+    } else {
+        reflex.driver
+    };
+    match (script.ended.left(), reflex.ended.left()) {
+        (true, true) => Verdict::BothLeft,
+        (true, false) => Verdict::OnlyOne {
+            ahead: script.driver,
+            stopped_at: reflex.furthest,
+        },
+        (false, true) => Verdict::OnlyOne {
+            ahead: reflex.driver,
+            stopped_at: script.furthest,
+        },
+        (false, false) if gap <= i32::from(SAME_GROUND_PIXELS) => Verdict::SameGround {
+            x: script.furthest.max(reflex.furthest),
+            gap: u16::try_from(gap).unwrap_or(u16::MAX),
+        },
+        (false, false) => Verdict::DriverGap {
+            ahead,
+            gap: u16::try_from(gap).unwrap_or(u16::MAX),
+        },
+    }
+}
+
+/// [`run_start`], printed as a paragraph.
 fn drive(
     rom: &[u8],
+    driver: gym::Driver,
     world: u8,
     level: u8,
     frames: u64,
@@ -543,25 +796,46 @@ fn drive(
         std::fs::create_dir_all(dir)?;
         println!("writing a PNG per frame to {}", dir.display());
     }
-    println!("{}", drive_line(rom, world, level, frames, shots)?);
+    println!(
+        "{}",
+        run_start(rom, driver, world, level, frames, shots)?.line()
+    );
     Ok(())
 }
 
-/// Every level in the cartridge driven by the same player, eight worlds in parallel.
+/// Every level in the cartridge driven by both of the tree's players, eight worlds in
+/// parallel.
 ///
-/// The scripted driver is the control, not the subject: what is being inventoried is the
-/// levels, and a stop is only worth reading as a level's difficulty if the thing that
-/// stopped is identical in all thirty-two runs.
+/// Each driver is the control for the other: the levels, the starts, the frame budget and
+/// the model underneath are identical, and the only thing that varies is the player. What
+/// the two disagree about is therefore the player's own contribution, and what they agree
+/// about is the cartridge's.
 fn drive_all(rom: &[u8], frames: u64) -> Result<(), Box<dyn Error>> {
-    let lines = std::thread::scope(|scope| {
+    let pairs = std::thread::scope(|scope| {
         let started: Vec<_> = (0..8u8)
             .map(|world| {
                 scope.spawn(move || {
                     (1..=4u8)
                         .map(|level| {
-                            drive_line(rom, world, level, frames, None).unwrap_or_else(|reason| {
-                                format!("{}.{}: never started — {reason}", world + 1, level)
-                            })
+                            let run = |driver: gym::Driver| {
+                                run_start(rom, driver, world, level, frames, None).unwrap_or_else(
+                                    |reason| Stop {
+                                        asked: format!("{}.{}", world + 1, level),
+                                        driver: driver.name,
+                                        ended: Ended::OutOfFrames,
+                                        played: 0,
+                                        furthest: 0,
+                                        deaths: Vec::new(),
+                                        refusals: 0,
+                                        change: Some(format!("  never started — {reason}")),
+                                        cell: (0, 0),
+                                        wall: None,
+                                        in_control: false,
+                                        ledger: 0,
+                                    },
+                                )
+                            };
+                            (run(DRIVERS[0]), run(DRIVERS[1]))
                         })
                         .collect::<Vec<_>>()
                 })
@@ -572,8 +846,74 @@ fn drive_all(rom: &[u8], frames: u64) -> Result<(), Box<dyn Error>> {
             .flat_map(|handle| handle.join().unwrap())
             .collect::<Vec<_>>()
     });
-    for line in lines {
-        println!("{line}");
+    println!("{}", drive_header());
+    for (script, reflex) in &pairs {
+        println!("{}\n{}", script.row(), reflex.row());
+        println!("{}", verdict(script, reflex).line());
+    }
+    println!("\n== what two players on the same thirty-two starts say ==");
+    let named = |want: &dyn Fn(&Verdict) -> bool| {
+        pairs
+            .iter()
+            .filter(|(script, reflex)| want(&verdict(script, reflex)))
+            .map(|(script, _)| script.asked.as_str())
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    let both_left = named(&|v| matches!(v, Verdict::BothLeft));
+    let only_one = named(&|v| matches!(v, Verdict::OnlyOne { .. }));
+    let same_ground = named(&|v| matches!(v, Verdict::SameGround { .. }));
+    let driver_gap = named(&|v| matches!(v, Verdict::DriverGap { .. }));
+    println!("both players clear the level: {both_left}");
+    println!("one player clears it and the other stops: {only_one}");
+    println!("both stop on the same pixel — the level's own obstacles: {same_ground}");
+    println!("one player gets a screen further — a stop about the player: {driver_gap}");
+    // The two halves of the last list are different debts: a stop both players make that
+    // the model can name is a gym waiting to be written, and one it cannot name is a hole
+    // in the model that no gym will fix.
+    let silent = pairs
+        .iter()
+        .filter(|(script, reflex)| {
+            matches!(verdict(script, reflex), Verdict::SameGround { .. })
+                && script.wall.is_none()
+                && reflex.wall.is_none()
+        })
+        .map(|(script, _)| script.asked.as_str())
+        .collect::<Vec<_>>()
+        .join(" ");
+    println!("…of those, stops the model has no name for: {silent}");
+    // Two starts whose runs match frame for frame under *both* players are the same level
+    // under two names. The engine is deterministic and the player is fixed, so the only
+    // thing left that could make two runs identical is the level itself: the cartridge
+    // ships thirty-two starts and fewer than thirty-two levels, and a bot that has solved
+    // one of a pair has already solved the other.
+    let mut twins: BTreeMap<String, Vec<&str>> = BTreeMap::new();
+    for pair in &pairs {
+        let run = |stop: &Stop| {
+            format!(
+                "{} {} {} {}",
+                stop.ended.short(),
+                stop.played,
+                stop.furthest,
+                stop.deaths.len(),
+            )
+        };
+        twins
+            .entry(format!("{} | {}", run(&pair.0), run(&pair.1)))
+            .or_default()
+            .push(pair.0.asked.as_str());
+    }
+    let mut groups: Vec<_> = twins
+        .into_values()
+        .filter(|group| group.len() > 1)
+        .collect();
+    groups.sort();
+    for group in groups {
+        println!(
+            "the same level under {} names: {} — both players' runs match to the frame",
+            group.len(),
+            group.join(" "),
+        );
     }
     Ok(())
 }
@@ -669,8 +1009,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some("drive") => {
             let (world, level) = level_pair(&args, 2)?;
             let shots = shots_dir(&args);
+            let driver = driver_arg(&args)?;
             drive(
                 rom,
+                driver,
                 world,
                 level,
                 args.get(4).map_or(6000, |a| a.parse().unwrap_or(6000)),

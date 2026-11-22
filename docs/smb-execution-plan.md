@@ -15,7 +15,7 @@ moves. Where it disagrees with the mission's ordering, it says so.
 | 1 solidity | L3, learned from the game's reactions | turns every later failure from mystery into a named hole | met; the stop it could not name turned out not to be a wall |
 | 2 gyms | the harness, not the gyms | turns every later iteration from minutes into seconds | met: five gyms, three of them winnable |
 | 3 skills | the library, and a scripted bot that finishes a level | the unit everything else is measured in | exit met: three skills, each with a gym that fails without it; the flagpole's gym exists, the skill it measures does not |
-| 4 breadth | arbitrary-level start, 32-level inventory | generality is only testable once the model makes a claim | in progress: the start and the inventory are in the tree; the driver that has to fill the inventory out clears 1 level in 32 |
+| 4 breadth | arbitrary-level start, 32-level inventory | generality is only testable once the model makes a claim | met: the start, the inventory, and a second player on every row; nobody leaves more than 1 level in 32, and the reflex is further than the script on 19 of the 32 |
 | 5 search | A* over skills | needs a cost model and a baseline to be compared against | not started |
 | 6 fabrication | levels we author | should be aimed at holes that turned out to be real | not started |
 
@@ -29,7 +29,9 @@ has since spent that explanation: a script of measured skills crosses the pit on
 tape where the reflex stops, and then clears the level, reaching absolute X 3266 with no
 death where the reflex spends two lives at 1553. That is the first distance in this
 project that a library rather than a deleted rule produced, and the first level it ever
-finished.
+finished. Phase 4's instrument then cost that result most of its apparent size: run the
+script and the reflex over all thirty-two starts and the script is further ahead on only
+five of them, so the library that finished 1-1 is a 1-1 library.
 
 ## The ordering principle
 
@@ -278,21 +280,42 @@ sits one higher than its number. SMB-026 is the measurement, `level_slot` is
 where the table lives, and the symptom of getting it wrong was four worlds
 whose starts never handed over inside the load budget the reader had.
 
-The driver is `skills::SCRIPTED` rather than the walk-right bot this section
-asked for, because the point of the inventory is a stop that means the same
-thing in every level and the script is the strongest player the tree has. That
-is also what the inventory found: the script clears exactly one of the
-thirty-two starts — 1-1, the level it was tuned in — and dies once in
-twenty-seven of the rest, usually inside the first 500 pixels. Two of the four
-stops that do not die name a 64-pixel wall at pixel 176 in two different
-worlds, which is the height gate's own ceiling and the tall-wall skill's
-second customer.
+The inventory runs both players the tree has rather than the walk-right bot this
+section asked for: `skills::SCRIPTED` and `gym::REFLEX`, two `Driver` values over
+the same `BaseBot`, the same empty ledger, the same `boot_to_level` start, the
+same frame budget and the same stuck detector, so the policy above the ledger is
+the only thing that varies. One driver would have made the whole table circular.
+A bot that clears one start in thirty-two stops everywhere for a reason that is
+about itself, and only a second opinion separates "this level is hard" from
+"this driver only knows 1-1".
 
-Exit: a table of where each level stops a bot and what the model said about
-the thing that stopped it. The table exists; the exit is not met, because a bot
-that clears one level in thirty-two stops everywhere for a reason that is about
-itself, and the inventory cannot separate "this level is hard" from "this
-driver only knows 1-1" until a second driver runs on it.
+What the second opinion bought is a baseline worse than the one this section
+budgeted for. The script is not the stronger player on the cartridge: it gets
+further on five starts of thirty-two — 1-2, 2-3, 3-4, 7-3 and 7-4 — and the
+reflex on nineteen, by as much as 592 px. Neither player leaves any level but 1-1,
+the level the script was tuned in. Seven stops belong to the level rather than to
+either player, because both players make them within one cell of each other: 1-4,
+2-2, 3-2, 4-4, 6-4, 7-2 and 8-4. Two of the seven name a 64-pixel wall at pixel
+176 — 2-2 and 7-2, both at absolute X 162 — which is the height gate's own
+ceiling and the tall-wall skill's debt seen through a second player, and the other
+five name nothing at all. 6-2 is the stop the whole doubling exists to catch: the
+script stops at absolute X 291 having never died, with the game still in control of
+him, no refusals, an empty ledger and nothing standing against him where he stands,
+while the reflex walks past that pixel to 883.
+
+Exit: met. A table of where each level stops a bot and what the model said about the
+thing that stopped it, with a second player on every row so that a stop can be
+attributed to the level or to the player instead of guessed at. The answer is not
+the one Phase 5 was planned against: search has two numbers to beat on every start,
+and on nineteen of the thirty-two the weaker one is the reflex, so a search that
+cannot walk right past a Goomba has not earned the word. The same table ranks the
+gym queue — the seven stops both players make are the ones worth cutting, the five
+the model cannot name are Phase 6's problem rather than a gym's, and the two it can
+name are the tall-wall skill, still owed, now with a second witness at the same
+pixel. It also produced a suspect: four pairs of starts run identically under both
+players while their map letters differ, and the ledger is keyed on pattern hash, so
+a bot taught 1-3 arrives at 5-3 having been taught nothing about what its own run
+calls the same level.
 
 ## Phase 5 - Search over skills
 
@@ -306,7 +329,10 @@ The result worth having is the comparison the mission asks for: same gym, same s
 state, script against search, and a written account of where search wins and what it
 pays in frames. The expectation is that search wins on tight and ambiguous
 situations and loses on long open ones, and that the crossover is worth recording
-whether or not it matches.
+whether or not it matches. Phase 4 changed what that comparison is scored against:
+there are two numbers per start now, and on nineteen of the thirty-two the larger
+belongs to the reflex. A search that beats only the script has beaten the specialist
+and not the cartridge.
 
 ## Phase 6 - Fabricated levels
 

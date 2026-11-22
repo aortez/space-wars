@@ -1079,14 +1079,69 @@ is not that world's last level, and that one row is what rules out the naive rea
 one castle whose left wall differs from the rest. Thirty-two asks, thirty-two distinct screens,
 every one of them handing the player over in control and standing on ground.
 
-`drive-all` runs the scripted driver — the one that clears 1-1 — from all thirty-two, and that
-is Phase 4's inventory. **One of the thirty-two reaches its ending**: 1-1, absolute X 3266, no
-death. Twenty-seven die once, most between absolute X 270 and 955. Four stop without dying,
-three of them against a wall the model does name, and the two at absolute X 162 — 2-2 and 7-2 —
-name the same wall, 64 px tall at pixel 176, which is `MAX_WALL_ROWS` times eight: the height
-gate's own ceiling, in two different worlds. Everywhere else the model's answer for the cell he
-is standing on is "nothing standing against him", so the inventory's first finding is about the
-driver: it is a 1-1 specialist, and that is the baseline Phase 5 is measured against.
+**The patched start and the played start are the same run, pixel for pixel.** `drive 1 1 3000
+--shots DIR` reaches 1-1 by writing two bytes into RAM; `bot 2620 --script --shots
+data/shots/script-1-1` reaches it by pressing through the title screen and touching no byte at
+all. Both write one PNG per frame, named for the frame id and the absolute X, and 2,327 of those
+names are shared — every one of them the same file, 0 differing pixels out of 2,327, over
+thirty-eight seconds of HUD, enemies, deaths and a level ending. The patched series carries one
+frame the played one does not, `frame-002614-x03266.png`, and the played series names its clear
+still `event-clear-f2614-x3266.png`: two writers that share no code, agreeing on the frame the
+level ends on as well as on every pixel up to it. The patch's justification used to be that the
+game names the level back and that the arrived screen hashes to the table's own hash for it.
+This is the same claim at the highest resolution available here, and it is what licenses reading
+every row of the inventory below as being about the level it names.
+
+`drive-all` runs *both* of the tree's players from all thirty-two, and that pair is Phase 4's
+inventory. `skills::SCRIPTED` and `gym::REFLEX` are two `Driver` values over the same `BaseBot`,
+the same empty ledger, the same start, the same frame budget and the same stuck detector, so the
+policy above the ledger is the only thing that varies — which is the whole reason the run is
+doubled. A single driver cannot tell a hard level from a weak player; two of them can, and the
+verdict line under each pair is the answer. A run ends where its level ends, at the first level
+byte change, because a row is a claim about the level it started in. The excerpt is two of the
+thirty-two pairs and the whole summary; the sixty-four rows between them are the inventory.
+
+```text
+start driver outcome      frames furthest deaths refusals      feet  ctrl  model at the stop
+1.1   script left it        2327     3266      0        2  (20, 25)  game  nothing standing against him
+1.1   reflex stuck          2046     1553      2        1  (29, 10)  his   nothing standing against him
+  only script left it: the other stops at absolute X 1553, so the level asks for something one player has and the other has not
+2.2   script stuck           736      162      0        1   (9, 23)  his   a wall 64 px tall starting at pixel 176
+2.2   reflex stuck           702      162      0        0  (13, 22)  his   nothing standing against him
+  both stop at absolute X 162 within 0 px: the stop is the level's, not the driver's, so it is a gym candidate
+
+== what two players on the same thirty-two starts say ==
+both players clear the level:
+one player clears it and the other stops: 1.1
+both stop on the same pixel — the level's own obstacles: 1.4 2.2 3.2 4.4 6.4 7.2 8.4
+one player gets a screen further — a stop about the player: 1.2 1.3 2.1 2.3 2.4 3.1 3.3 3.4 4.1 4.2 4.3 5.1 5.2 5.3 5.4 6.1 6.2 6.3 7.1 7.3 7.4 8.1 8.2 8.3
+…of those, stops the model has no name for: 1.4 3.2 4.4 6.4 8.4
+the same level under 2 names: 1.3 5.3 — both players' runs match to the frame
+the same level under 2 names: 1.4 6.4 — both players' runs match to the frame
+the same level under 2 names: 2.2 7.2 — both players' runs match to the frame
+the same level under 2 names: 2.4 5.4 — both players' runs match to the frame
+```
+
+**One of the thirty-two reaches its ending, and it is the same one as ever**: 1-1 at
+absolute X 3266 with no death under the script, and the reflex dying twice and stopping at
+1553. **The two players disagree on twenty-four starts, and the reflex is further ahead on
+nineteen of them**; the script's own advantage is 1-2, 2-3, 3-4, 7-3 and 7-4. The scripted
+player is not the stronger player on the cartridge, it is the stronger player on two
+levels, and that is only sayable now that something else has been run there. **Seven stops
+belong to the level**: 1-4, 2-2, 3-2, 4-4, 6-4, 7-2 and 8-4 stop both players within one
+cell of each other, which is the only test here that says *level* rather than *player*.
+Two of the seven name the same wall — 64 px tall at pixel 176, `MAX_WALL_ROWS` times
+eight, the height gate's own ceiling, in two different worlds — and five name nothing at
+all, which is Phase 6's silence arriving early. **6-2 is the disagreement with no wall in
+it**: the script stops at absolute X 291 having never died, with the game still in control
+of him, no refusals, an empty ledger and nothing standing against him where he stands,
+while the reflex reaches 883 past the same pixel. **Four pairs of starts run identically
+under both players** — 1-3 with 5-3, 1-4 with 6-4, 2-2 with 7-2, 2-4 with 5-4, same
+frames, same pixel, same deaths — so the cartridge ships fewer than thirty-two levels
+under thirty-two names, and since the ledger is keyed on pattern hash and those pairs draw
+their shared geometry with different artwork, a bot taught 1-3 arrives at 5-3 having been
+taught nothing. 2-3 and 7-3 draw an identical first screen and still run differently, so
+the twins are found from runs and not from pictures.
 
 ## Rollout and search
 
@@ -1193,7 +1248,7 @@ gym happens to stand and is still invisible everywhere else.
 ## What is in the tree now
 
 One model in four layers, one policy, a three-entry skill library that clears 1-1, one
-harness, five gyms, ten drivers, thirty-two tests — twenty-one of them skipped when the
+harness, five gyms, ten drivers, thirty-three tests — twenty-two of them skipped when the
 cartridge is absent, the eleven that hold the skill rules needing no game at all — and one
 film cutter.
 
@@ -1210,9 +1265,9 @@ film cutter.
 | `crates/smb-ai/src/gyms.rs` | instrument | the gyms this project has actually needed |
 | `crates/smb-model/examples/{probe,tiles,rollout}.rs` | | read-side exploration: decoded state, the tile grid and the pixel comparison, branch and rewind |
 | `crates/smb-ai/examples/{bot,solidity,gym,transcript,film,limit}.rs` | | the bot, its overlay films and the transcript of behaviours it started, the A/B that tells memory from reaction, the tape recorder, the behaviours behind a gym's verdict and the library entries that produce them, the films a gym's own driver was measured under, the instrument that asks a stop what it actually is |
-| `crates/smb-ai/examples/levels.rs` | | the whole cartridge: the thirty-two-start table, a level's playfield as a map, a load watched frame by frame from a level or from a raw byte, the scripted driver loose on any start, and the same driver on all thirty-two |
+| `crates/smb-ai/examples/levels.rs` | | the whole cartridge: the thirty-two-start table, a level's playfield as a map, a load watched frame by frame from a level or from a raw byte, either player loose on any start, and both of them on all thirty-two |
 | `crates/smb-model/tests/reader.rs` | | the optional cartridge test: the RAM map, the tile frame, a frame-exact restore, and the frame a button arrives on |
-| `crates/smb-ai/tests/{gyms,solidity,skills}.rs` | | a gym's verdict is what its driver does, the A/B that tells memory from reaction, and the skill rules and their ablation |
+| `crates/smb-ai/tests/{gyms,levels,solidity,skills}.rs` | | a gym's verdict is what its driver does, the two players disagreeing about a level start in both directions, the A/B that tells memory from reaction, and the skill rules and their ablation |
 | `tools/nes-reference/film-smb-run.py` | | cuts films, clips and a contact sheet from a `--shots` directory, and checks the overlay survived the encoder |
 
 The reader left `engine-nes/tests/support` when its second consumer arrived, which is
@@ -1251,18 +1306,26 @@ cargo run --release --locked -p smb-ai --example film -- pit-1379 data/shots/pit
 python3 tools/nes-reference/film-smb-run.py data/shots/pit-cross
 
 # Any level in the cartridge: the table, one level's map, one load watched, one start
-# driven, and the same driver loose on all thirty-two. `W` is 1-8 and `L` is 1-4 as the
-# game numbers them, not as the byte indexes them. `slot` is the one mode that writes a
-# byte instead of naming a level, which is how the pipe travel gets watched and filmed.
+# driven, and both players loose on all thirty-two. `W` is 1-8 and `L` is 1-4 as the game
+# numbers them, not as the byte indexes them. `slot` is the one mode that writes a byte
+# instead of naming a level, which is how the pipe travel gets watched and filmed, and
+# `--player script|reflex` picks which of the two plays a single start.
 cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes
 cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes map 1 4
 cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes watch 1 2 900
 cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes natural
 cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes drive-all
 cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes drive 8 3 2400 --shots data/shots/level-8-3
+cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes drive 6 2 1200 --shots data/shots/6-2-script --player script
+cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes drive 6 2 1200 --shots data/shots/6-2-reflex --player reflex
 cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes slot 1 01 700 --shots data/shots/travel-1
 python3 tools/nes-reference/film-smb-run.py data/shots/level-8-3 --every 1
 python3 tools/nes-reference/film-smb-run.py data/shots/travel-1 --every 1
+python3 tools/nes-reference/film-smb-run.py data/shots/6-2-script --every 1
+python3 tools/nes-reference/film-smb-run.py data/shots/6-2-reflex --every 1
+# The two players on one start, side by side and time-aligned on the same emulator frame.
+ffmpeg -y -i data/shots/6-2-script/6-2-script.mp4 -i data/shots/6-2-reflex/6-2-reflex.mp4 \
+  -filter_complex "[0:v][1:v]hstack=inputs=2" data/shots/6-2-compare/6-2-script-left-reflex-right.mp4
 ```
 
 The `film` line writes a PNG per frame, with the reader's green, orange, red and blue dots
@@ -1307,9 +1370,11 @@ Observed on x86-64 Linux with a release build:
   run-up, the golden hash and the verdict measured from it — which is how `pit-1379` and
   `flagpole-3168` got their bytes, and why neither has hand-typed ones.
 - `levels` boots all thirty-two starts on eight threads and prints the table above, then,
-  with `drive-all`, runs the scripted driver from every one of them: one start reaches its
-  ending, twenty-seven die once, and the two stops that name a wall name the same 64-pixel
-  wall at the same pixel in two different worlds. `slot 1 01 700 --shots DIR` is the same
+  with `drive-all`, runs both players from every one of them — sixty-four runs in sixteen
+  seconds of wall clock, because a run now ends at its own level byte: one start is left by
+  anyone, seven stop both players on the same pixel, twenty-four stop the two players in
+  different places and nineteen of those favour the reflex, and four pairs of starts match
+  frame for frame under both players. `slot 1 01 700 --shots DIR` is the same
   watch from a raw byte, and it is how the travel gets filmed: the screen it arrives on is
   `4f646cbfb458b1af`, the table's own hash for 1-2, which is the travel slot and a patched
   start agreeing without anyone asserting it. `natural` is the control the whole table
@@ -1340,7 +1405,7 @@ tool writes its output into that directory unless `--out` says otherwise:
 | `<run>-clip-<lo>-<hi>.mp4` | an overlay clip over emulator frames `lo` to `hi` |
 | `<run>-events.png` | every event still in the order they happened, legend printed |
 
-Seven runs are worth keeping. `reader-only` is the honest one, 2,283 frames, stopped
+Ten runs and one composite are worth keeping. `reader-only` is the honest one, 2,283 frames, stopped
 against the pipe at absolute X 899. `reflex` is the reaction rule that was deleted,
 8,168 frames, reaching 2601 and dying twice; it stays because it is the evidence for
 SMB-008, not a current build. `ledger` is the current one, 2,380 frames, absolute X
@@ -1400,6 +1465,18 @@ a gym shows the frame its verdict stops on. `flagpole-3168.mp4` is 25.3 s — th
 every second frame by default and a gym film writes every frame, so it plays at half speed —
 and `flagpole-3168-events.png` is those two in order. Re-cutting either reproduces every
 frame and every still byte for byte.
+
+The last four are the two players on one start. `1-1-script` is `script-1-1` reached the other
+way — `drive 1 1 3000 --shots data/shots/1-1-script` — and it exists because the comparison
+above needs both series on disk; re-cutting it and diffing the shared frame names is the check.
+`6-2-script` and `6-2-reflex` are the same 6-2 start under the two players, 724 and 1,153 frames,
+written by the two `drive 6 2 1200 --player` lines above and cut by `film-smb-run.py`.
+`6-2-compare/6-2-script-left-reflex-right.mp4` is those two films side by side, script on the
+left and reflex on the right, both starting on the same emulator frame, from one `ffmpeg
+-filter_complex hstack`. It is the most legible thing this project has filmed: the left half
+stops dead at absolute X 291 and stands there for the remaining ten seconds while the right half
+walks past the same pixel, reaches 883, loses the life there and is back at absolute X 0 when its
+run is cut off. `6-2-reflex-events.png` is its one still, that death.
 
 `sheet-moments.png` and the `hero-*.png` stills are one-off comparisons
 of the screen against the model at chosen frames. The two older runs were cut with
