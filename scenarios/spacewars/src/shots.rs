@@ -156,9 +156,9 @@ pub(super) fn charged(state: &SpacewarsState, shell: u64, target: MechanicalEnti
         .map(|hit| hit.health)
 }
 
-/// The bodies a shot can harm, as the step left them, and the work the
-/// settling shots have charged each. A body's key is its entity's value.
-struct Bodies<'a> {
+/// The bodies a shot or a beam can harm, as the step left them, and the work
+/// the weapons have charged each since. A body's key is its entity's value.
+pub(super) struct Bodies<'a> {
     ships: &'a [ShipState; 2],
     debris: &'a [DebrisState],
     rovers: &'a [RoverState],
@@ -169,7 +169,7 @@ struct Bodies<'a> {
 }
 
 impl<'a> Bodies<'a> {
-    fn new(
+    pub(super) fn new(
         ships: &'a [ShipState; 2],
         debris: &'a [DebrisState],
         rovers: &'a [RoverState],
@@ -191,9 +191,9 @@ impl<'a> Bodies<'a> {
         }
     }
 
-    /// The map and the health before this step's shots of the body `key`
-    /// stands for, if a shot can harm it.
-    fn health(&self, key: u64) -> Option<(HealthMap, f32)> {
+    /// The map and the health before this step's charges of the body `key`
+    /// stands for, if a weapon can harm it.
+    pub(super) fn health(&self, key: u64) -> Option<(HealthMap, f32)> {
         let entity = physics::classify_entity(PhysicsId::new(key))?;
         let exposed = self.exposed.iter().find(|body| body.entity == entity);
         match entity {
@@ -221,7 +221,8 @@ impl<'a> Bodies<'a> {
 }
 
 impl Recipients for Bodies<'_> {
-    /// Shells carry no blast, so nothing asks.
+    /// No body has circles, so a beam charges only the body it ends on.
+    /// Shells carry no blast.
     fn near(&self, _center: Vec2, _radius: f32) -> Vec<Reachable> {
         Vec::new()
     }

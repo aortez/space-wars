@@ -24,6 +24,11 @@
 //! shell did, and costs rock of radius 40 to 150 about the 15 health a shell's
 //! damage did. A hit's cost follows its energy, so it rises steeply with
 //! closing speed.
+//!
+//! Pilot tissue keeps soft tissue's stiffness and strength, tough enough that
+//! a ship's laser kills a pilot on foot in half the time it takes to fail a
+//! pod's hull, as the old laser did. A round closing at 300 still kills one on
+//! the first hit, but one closing slower than about 236 does not.
 use super::*;
 use engine_material::{HULL, Material, ROCK, Region, SHELL, SOFT_TISSUE, Section};
 use surface_sortie::match_rules::{PILOT_HEALTH, POD_HULL_HEALTH};
@@ -74,6 +79,15 @@ pub const POD_HULL: Material = Material {
     toughness: 12_000.0,
     ..HULL
 };
+/// A pilot on foot: soft tissue's stiffness and strength, tough enough that a
+/// ship's laser 40 units off takes about 2.9 seconds to kill one, half as long
+/// as it takes to fail a pod's hull. A supplied round kills one on the first
+/// hit only when it closes at about 236 or faster.
+pub const PILOT_TISSUE: Material = Material {
+    name: "pilot tissue",
+    toughness: 35_000.0,
+    ..SOFT_TISSUE
+};
 /// Asteroid rock: the reference rock, tough enough that a supplied round costs
 /// rock of radius 40 to 150 about the 15 health a shell's damage did.
 pub const ASTEROID_ROCK: Material = Material {
@@ -117,10 +131,10 @@ impl HealthMap {
         }
     }
 
-    /// A pilot on foot: soft tissue filling the pilot's capsule.
+    /// A pilot on foot: tissue filling the pilot's capsule.
     pub fn pilot() -> Self {
         Self {
-            material: SOFT_TISSUE,
+            material: PILOT_TISSUE,
             section: Section::new(PILOT_THICKNESS, spaceling_geometry::RADIUS),
             volume: PILOT_VOLUME,
             full_health: PILOT_HEALTH,
@@ -321,8 +335,12 @@ mod tests {
 
     #[test]
     fn calibration_changes_only_toughness() {
-        for (calibrated, reference) in [(SHIP_HULL, HULL), (POD_HULL, HULL), (ASTEROID_ROCK, ROCK)]
-        {
+        for (calibrated, reference) in [
+            (SHIP_HULL, HULL),
+            (POD_HULL, HULL),
+            (PILOT_TISSUE, SOFT_TISSUE),
+            (ASTEROID_ROCK, ROCK),
+        ] {
             let restored = Material {
                 name: reference.name,
                 toughness: reference.toughness,
@@ -341,7 +359,7 @@ mod tests {
         let rows = [
             (ship(100).health_map(), 88_455.0, 884.55, (2.0, 0.2)),
             (pod().health_map(), 17_724.0, 177.24, (1.0, 0.2)),
-            (HealthMap::pilot(), 4.512, 0.045_12, (0.3, 0.15)),
+            (HealthMap::pilot(), 2_632.2, 26.322, (0.3, 0.15)),
             (
                 RoverState::new(1, 0, 0, 0).health_map(),
                 8_960.0,

@@ -404,14 +404,14 @@ pub(crate) fn apply_lasers(world: &mut SpacewarsState, pilots: &mut [SurfacePilo
                     LaserTarget::Spaceling(index) => MechanicalEntity::Spaceling(index),
                     _ => continue,
                 };
+                // A beam's charge already counts how exposed the target is.
+                let amount = if world.material_weapons() {
+                    hit.damage
+                } else {
+                    hit.damage * exposure
+                };
                 if target == entity {
-                    damage_target(
-                        world,
-                        pilot,
-                        entity,
-                        hit.damage * exposure,
-                        PilotDamageCause::Laser,
-                    );
+                    damage_target(world, pilot, entity, amount, PilotDamageCause::Laser);
                 }
             }
         }

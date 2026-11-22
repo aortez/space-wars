@@ -3,7 +3,7 @@
 use super::*;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum Target {
+pub(super) enum Target {
     Ship,
     Pod,
     OnFoot,
@@ -11,8 +11,14 @@ enum Target {
 
 /// Seat 1 at rest in `target`'s form, 200 units over the first planet with
 /// gravity off, and seat 0's ship 40 units off, under material weapons.
-fn fixture(target: Target) -> SurfaceSortieState {
-    let mut state = round();
+pub(super) fn fixture(target: Target) -> SurfaceSortieState {
+    let state = arrange(round(), target);
+    assert_eq!(health(&state, target), 100.0);
+    state
+}
+
+/// `state` laid out as [`fixture`] lays out a match.
+pub(super) fn arrange(mut state: SurfaceSortieState, target: Target) -> SurfaceSortieState {
     state.world.enable_material_weapons();
     weightless(&mut state);
     let center = state.world.planets[0].position + Vec2::Y * 200.0;
@@ -38,19 +44,18 @@ fn fixture(target: Target) -> SurfaceSortieState {
         }
     }
     idle(&mut state, 1);
-    assert_eq!(health(&state, target), 100.0);
     state
 }
 
 /// The body a round meets in `target`'s form.
-fn entity(target: Target) -> MechanicalEntity {
+pub(super) fn entity(target: Target) -> MechanicalEntity {
     match target {
         Target::Ship | Target::Pod => MechanicalEntity::Ship(1),
         Target::OnFoot => MechanicalEntity::Spaceling(1),
     }
 }
 
-fn health(state: &SurfaceSortieState, target: Target) -> f32 {
+pub(super) fn health(state: &SurfaceSortieState, target: Target) -> f32 {
     let ship = &state.world.ships[1];
     let form = match target {
         Target::Ship => ShipForm::Ship,
@@ -164,16 +169,47 @@ fn ejection_protection_from_rounds_ends_when_the_old_rules_do() {
 
 /// A round from 8 units off the target's center of mass, closing at 300.
 fn launch(state: &mut SurfaceSortieState) {
+    launch_at(state, 300.0);
+}
+
+/// A round from 8 units off the target's center of mass, closing at `speed`.
+fn launch_at(state: &mut SurfaceSortieState, speed: f32) {
     let motion = state.impact_motion(1).unwrap();
     let mut shell = DebrisState::new_shell(
         0,
         state.world.tick,
         motion.center_of_mass - Vec2::X * 8.0,
-        motion.velocity + Vec2::X * 300.0,
+        motion.velocity + Vec2::X * speed,
         0.0,
     );
     shell.inertial_mass = Some(weapons::ROUND_MASS);
     state.world.debris.push(shell);
+}
+
+/// Pilot tissue, tough enough to last 2.87 seconds in the laser, also survives
+/// a slow round: a round kills a pilot on foot on the first hit only when it
+/// closes at about 236 or faster. The old rules' round killed one at every
+/// speed from 50 to 300.
+#[test]
+fn a_round_kills_a_pilot_on_foot_at_once_only_when_it_closes_fast() {
+    for (speed, killed) in [(240.0, true), (230.0, false)] {
+        let mut state = fixture(Target::OnFoot);
+        launch_at(&mut state, speed);
+        let mut charged = None;
+        for _ in 0..30 {
+            idle(&mut state, 1);
+            let hits = state.world.shot_hits.values();
+            let mut hits = hits.filter(|hit| hit.target == entity(Target::OnFoot));
+            charged = charged.or(hits.next().map(|hit| hit.health));
+        }
+        let charged = charged.unwrap_or_else(|| panic!("{speed}: the round must strike"));
+        let left = health(&state, Target::OnFoot);
+        assert_eq!(
+            left == 0.0,
+            killed,
+            "{speed}: charged {charged}, left {left}"
+        );
+    }
 }
 
 #[test]

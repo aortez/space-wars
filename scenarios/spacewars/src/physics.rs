@@ -9,7 +9,7 @@ use engine_rapier::{
         BodyId as PhysicsBodyId, BodyKind, BodyMotion, BodyRole, BodySpec, ColliderId,
         ColliderRole, ColliderSpec, CollisionGroups, PhysicsId, PhysicsStepMetrics, PhysicsWorld,
         PhysicsWorldConfig, RayCastOptions,
-        weapon::{Prepared, Recipients, ShotSpec, WeaponEvent, Weapons},
+        weapon::{BeamSpec, Prepared, Pulse, Recipients, ShotSpec, WeaponEvent, Weapons},
     },
 };
 
@@ -95,6 +95,8 @@ const GROUP_ALL_SOLIDS: u32 = GROUP_ALL_SHIPS
     | GROUP_ROVER
     | GROUP_SPACELING
     | GROUP_TANK;
+/// What a laser meets: every solid.
+pub(super) const LASER_GROUPS: CollisionGroups = CollisionGroups::new(u32::MAX, GROUP_ALL_SOLIDS);
 
 pub(super) fn spaceling_collision_groups() -> CollisionGroups {
     CollisionGroups::new(
@@ -348,7 +350,8 @@ impl SpacewarsPhysics {
         }
     }
 
-    /// Carries the game's cannon shells as material weapon shots from now on.
+    /// Carries the game's cannon shells as material weapon shots, and its
+    /// lasers as beams, from now on.
     pub(super) fn enable_weapons(&mut self) {
         self.weapons.get_or_insert_with(Weapons::new);
     }
@@ -394,6 +397,29 @@ impl SpacewarsPhysics {
             return Vec::new();
         };
         weapons.settle(prepared, &mut self.world, dt_seconds, recipients);
+        weapons.take_events()
+    }
+
+    /// Arms a laser's beam. False when material weapons are off or the beam is
+    /// refused.
+    pub(super) fn arm_beam(&mut self, spec: BeamSpec) -> bool {
+        self.weapons
+            .as_mut()
+            .is_some_and(|weapons| weapons.arm_beam(spec).is_ok())
+    }
+
+    /// Fires one pulse of a laser's beam, and returns what it did. Nothing
+    /// when material weapons are off or the pulse is refused.
+    pub(super) fn fire_beam(
+        &mut self,
+        id: u64,
+        pulse: Pulse,
+        recipients: &mut impl Recipients,
+    ) -> Vec<WeaponEvent> {
+        let Some(weapons) = &mut self.weapons else {
+            return Vec::new();
+        };
+        let _ = weapons.fire(&mut self.world, id, pulse, recipients);
         weapons.take_events()
     }
 
@@ -1344,7 +1370,7 @@ impl SpacewarsPhysics {
                 max_distance,
                 solid: false,
                 include_sensors: false,
-                collision_groups: CollisionGroups::new(u32::MAX, GROUP_ALL_SOLIDS),
+                collision_groups: LASER_GROUPS,
                 exclude_entity: Some(ship_entity(shooter)),
             },
         )?;
@@ -2000,7 +2026,7 @@ pub(super) fn planet_entity(index: usize) -> PhysicsId {
     PhysicsId::new(PLANET_ENTITY_BASE + index as u64)
 }
 
-fn ship_entity(index: usize) -> PhysicsId {
+pub(super) fn ship_entity(index: usize) -> PhysicsId {
     PhysicsId::new(SHIP_ENTITY_BASE + index as u64)
 }
 

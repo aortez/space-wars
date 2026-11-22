@@ -1932,6 +1932,48 @@ fn a_beam_stops_on_a_body_the_host_keeps() {
     assert!((charged - (armor().remaining_precise() - field.left(HULL))).abs() < 1.0e-9);
 }
 
+#[test]
+fn a_body_a_beam_stops_on_takes_the_share_of_its_height_it_spans() {
+    // The plate is 1 deep into the screen. A beam twice that tall meets it
+    // with half its height, and a beam half as tall meets it whole.
+    for (height, share) in [(2.0, 0.5), (0.5, 1.0)] {
+        let mut world = world();
+        let mut field = Field::new(&[]);
+        let hull = hull(&mut world, &mut field, 8.0, slab());
+        world.step(DT);
+        let mut weapons = Weapons::new();
+        let spec = BeamSpec { height, ..beam(7) };
+        let events = fire_beam(&mut world, &mut weapons, spec, &mut field);
+        let outcomes = delivered(&events, Part::Beam, hull);
+        assert_eq!(outcomes.len(), 1, "{height}");
+        let available = outcomes[0].ledger.available;
+        assert!(
+            (available - 100.0 * share).abs() < 1.0e-3,
+            "{height}: {available}"
+        );
+        let charged = armor().remaining_precise() - field.left(HULL);
+        assert!((charged - f64::from(outcomes[0].consumed[0])).abs() < 1.0e-3);
+        // While the host shields it, it reports the same share meeting it.
+        field.shielded = vec![hull];
+        let spec = BeamSpec { height, ..beam(8) };
+        let events = fire_beam(&mut world, &mut weapons, spec, &mut field);
+        let reported = events.iter().find_map(|event| match event {
+            WeaponEvent::Excluded {
+                recipient,
+                reason: Exclusion::Protected,
+                energy,
+                ..
+            } if *recipient == hull => Some(*energy),
+            _ => None,
+        });
+        let reported = reported.unwrap_or_else(|| panic!("{height}: {events:?}"));
+        assert!(
+            (reported - 100.0 * share).abs() < 1.0e-3,
+            "{height}: {reported}"
+        );
+    }
+}
+
 /// Whether any event delivers energy to `recipient` or reports some reaching
 /// it.
 fn reached(events: &[WeaponEvent], recipient: Recipient) -> bool {
