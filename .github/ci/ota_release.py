@@ -763,7 +763,13 @@ class Publisher:
         require(not self.exclusive, 'Prepare candidates without the publisher lock')
         import ota_prepare  # Only candidate needs it, and its YAML parser; status and renew never import it.
         beside(ota_prepare, ota_prepare.build_inputs, ota_prepare.packager, ota_prepare.image_policy)
-        return ota_prepare.prepare(self, code_digests(), source, accept, generation)
+        # The checkout and the build get the owner's own umask, as from their shell: BitBake refuses the
+        # session's private one, and a checkout under it gives changed files modes git never recorded.
+        private = os.umask(self.umask)
+        try:
+            return ota_prepare.prepare(self, code_digests(), source, accept, generation)
+        finally:
+            os.umask(private)
 
     def nightly(self, candidate, previous_override=None):
         intent, selection, _ = self.select_nightly(candidate)

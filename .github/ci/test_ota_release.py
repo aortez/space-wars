@@ -5,7 +5,9 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
+import ota_prepare
 import ota_publisher_journal as journal
 import ota_release as release
 from ota_delivery import digest
@@ -158,6 +160,31 @@ class ConfigTests(unittest.TestCase):
             os.chmod(path, 0o620)
             with self.assertRaisesRegex(ValueError, 'others cannot write'):
                 release.Config.load(path)
+
+
+class CandidateTests(unittest.TestCase):
+    def test_preparation_runs_without_the_lock_under_the_owners_umask(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        config = release.Config(configuration(Path(temporary.name)))
+        session = release.Publisher(config, exclusive=False)
+        session.umask = 0o002  # What __enter__ saved before it set the session's private umask.
+        seen = []
+
+        def prepare(publisher, code, source, accept, generation):
+            seen.append(os.umask(0o022))
+            os.umask(seen[-1])
+            return dict(prepared=True)
+
+        private = os.umask(0o077)
+        try:
+            with patch.object(ota_prepare, 'prepare', prepare):
+                self.assertEqual(session.candidate(), dict(prepared=True))
+            self.assertEqual((seen, os.umask(0o077)), ([0o002], 0o077))
+        finally:
+            os.umask(private)
+        with self.assertRaisesRegex(ValueError, 'without the publisher lock'):
+            release.Publisher(config).candidate()
 
 
 class SelectionTests(unittest.TestCase):
