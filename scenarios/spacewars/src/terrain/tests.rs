@@ -155,34 +155,25 @@ fn real_cannon_commits_one_bounded_crater_on_the_following_tick() {
 }
 
 #[test]
-fn a_material_shot_digs_the_crater_a_shell_did() {
-    let craters = [false, true].map(|material| {
-        let mut state = SpacewarsScenario::init_terrain_fixture(42);
-        if material {
-            state.enable_material_weapons();
-        }
-        state.planets[0].mass = 0.0;
-        state.planets[0].wrapper_omega = 0.0;
+fn a_shot_digs_the_crater_a_shell_did() {
+    let mut state = SpacewarsScenario::init_terrain_fixture(42);
+    state.planets[0].mass = 0.0;
+    state.planets[0].wrapper_omega = 0.0;
+    step(&mut state);
+    SpacewarsScenario::step(
+        &mut state,
+        &[SpacewarsAction::set_cannon(0, true)],
+        Duration::from_secs_f64(1.0 / 60.0),
+    );
+    state.ships[0].set_cannon(false);
+    for _ in 0..61 {
         step(&mut state);
-        SpacewarsScenario::step(
-            &mut state,
-            &[SpacewarsAction::set_cannon(0, true)],
-            Duration::from_secs_f64(1.0 / 60.0),
-        );
-        state.ships[0].set_cannon(false);
-        for _ in 0..61 {
-            step(&mut state);
-        }
-        assert_eq!(state.terrain_cannon_hits(), 1, "material {material}");
-        assert!(state.physics.shot_ids().is_empty(), "material {material}");
-        assert!(
-            state.debris.iter().all(|d| d.kind != DebrisKind::Shell),
-            "material {material}"
-        );
-        state.terrain_removed_cells()
-    });
-    assert!(craters[0] > 0);
-    assert_eq!(craters[1], craters[0]);
+    }
+    assert_eq!(state.terrain_cannon_hits(), 1);
+    assert!(state.physics.shot_ids().is_empty());
+    assert!(state.debris.iter().all(|d| d.kind != DebrisKind::Shell));
+    // The cells an old shell's crater removed here.
+    assert_eq!(state.terrain_removed_cells(), 61);
 }
 
 #[test]

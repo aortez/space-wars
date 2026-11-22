@@ -1,7 +1,7 @@
 //! Ship lasers as material weapon beams (#330).
 //!
-//! A game that enables material weapons arms each ship's laser as one of the
-//! world's [`Weapons`](engine_rapier::world::weapon::Weapons) beams. Each tick
+//! The game arms each ship's laser as one of the world's
+//! [`Weapons`](engine_rapier::world::weapon::Weapons) beams. Each tick
 //! a laser shines, its beam fires one pulse from the muzzle along the ship's
 //! heading, as far as the beam has grown. The pulse's energy is the laser's
 //! base energy over that length, as the old damage was its base over the
@@ -28,9 +28,9 @@ use physics::LaserTrace;
 use shots::Bodies;
 use surface_sortie::{SurfacePilot, match_rules};
 
-/// A pulse's energy times the beam's length, as `LASER_BASE_DAMAGE` is the old
-/// damage times it. A ship's hull fails in the beam as fast as it did in the
-/// old laser.
+/// A pulse's energy times the beam's length, so a pulse weakens with range as
+/// the old laser's damage did. A ship's hull fails in the beam as fast as it
+/// did in the old laser.
 const LASER_BASE_ENERGY: f32 = 8_950.0;
 
 /// The beam's width. A face's safe limit grows with it, so a narrow beam loses
@@ -52,11 +52,11 @@ fn pulse_energy(length: f32) -> f32 {
     LASER_BASE_ENERGY / length.max(LASER_GROWTH_PER_TICK)
 }
 
-/// Arms each ship's laser as a beam that fires a pulse a tick for as long as
-/// the game lasts.
-pub(super) fn arm(state: &mut SpacewarsState) {
-    for index in 0..state.ships.len() {
-        let armed = state.physics.arm_beam(BeamSpec {
+/// Arms the laser of each of `ships` ships as a beam that fires a pulse a tick
+/// for as long as the game lasts.
+pub(super) fn arm(physics: &mut physics::SpacewarsPhysics, ships: usize) {
+    for index in 0..ships {
+        let armed = physics.arm_beam(BeamSpec {
             id: beam_id(index),
             owner: Some(index as u64),
             pulses: Pulses {
@@ -153,9 +153,8 @@ mod tests {
     const PIVOT: Vec2 = Vec2::new(940.0, 1_000.0);
 
     /// Two ships at rest in an empty universe, ship 0 shining its laser at
-    /// ship 1, whose pivot is 40 units on along the beam, with material
-    /// weapons or the old rules.
-    fn space(material: bool) -> SpacewarsState {
+    /// ship 1, whose pivot is 40 units on along the beam.
+    fn space() -> SpacewarsState {
         let config = SpacewarsConfig {
             use_planets: false,
             asteroid_probability_per_sec: 0.0,
@@ -164,9 +163,6 @@ mod tests {
             ..SpacewarsConfig::default()
         };
         let mut state = SpacewarsScenario::init(config, 123);
-        if material {
-            state.enable_material_weapons();
-        }
         state.ships[0].position = PIVOT - SHIP_PIVOT;
         state.ships[1].position = PIVOT + Vec2::X * 40.0 - SHIP_PIVOT;
         for ship in &mut state.ships {
@@ -196,8 +192,7 @@ mod tests {
 
     #[test]
     fn a_beam_charges_the_ship_it_ends_on_what_its_pulse_deposits() {
-        let mut state = space(true);
-        let mut old = space(false);
+        let mut state = space();
         // The beam grows a tick's length past where it last ended, as the old
         // laser did.
         let mut length = 0.0;
@@ -205,8 +200,8 @@ mod tests {
             length += LASER_GROWTH_PER_TICK;
             let before = state.ships[1].life;
             let map = state.ships[1].health_map();
+            state.particles.clear();
             step(&mut state);
-            step(&mut old);
             let [hit] = state.laser_hits[..] else {
                 panic!("{:?}", state.laser_hits);
             };
@@ -221,15 +216,18 @@ mod tests {
                 .physics
                 .cast_laser(0, beam.head, beam.direction, length);
             assert!(beam.tail.distance_to(ray.unwrap().point) < 1.0e-4);
-            // Sparks keep the old laser's size.
-            assert_eq!(state.particles, old.particles);
+            // Sparks keep the old laser's size: as many as the old damage made,
+            // whatever the beam charged.
+            let (_, _, scale) = impact_target_data(&state, hit.target).unwrap();
+            let sparks = (LASER_SPARK_STRENGTH / length * scale).ceil() as usize;
+            assert_eq!(state.particles.len(), sparks);
             length = beam.length();
         }
     }
 
     #[test]
     fn a_beam_ends_on_the_first_body_it_meets() {
-        let mut state = space(true);
+        let mut state = space();
         let rock = DebrisState::new(
             DebrisKind::Asteroid,
             PIVOT + Vec2::X * 20.0,
@@ -255,7 +253,7 @@ mod tests {
 
     #[test]
     fn two_beams_in_one_step_charge_a_body_no_more_than_it_has() {
-        let mut state = space(true);
+        let mut state = space();
         // Ship 1 shines back at ship 0, and a round at rest lies between them,
         // so both beams end on it in one step.
         let ship = &mut state.ships[1];
@@ -290,7 +288,6 @@ mod tests {
             ..SpacewarsConfig::default()
         };
         let mut state = SpacewarsScenario::init(config, 123);
-        state.enable_material_weapons();
         let planet = (0..state.planets.len())
             .filter(|&at| state.planets[at].radius >= ROVER_MIN_PLANET_RADIUS)
             .max_by(|&a, &b| state.planets[a].radius.total_cmp(&state.planets[b].radius))
@@ -333,27 +330,13 @@ mod tests {
     }
 
     #[test]
-    fn choosing_material_weapons_twice_changes_nothing() {
-        let mut once = space(true);
-        let mut twice = space(true);
-        twice.enable_material_weapons();
-        for _ in 0..5 {
-            step(&mut once);
-            step(&mut twice);
-            assert_eq!(twice.laser_hits, once.laser_hits);
-            assert_eq!(twice.ships, once.ships);
-        }
-        assert!(!once.laser_hits.is_empty());
-    }
-
-    #[test]
     fn a_game_with_lasers_plays_the_same_twice_and_from_a_clone() {
         let play = |ticks: usize, state: &mut SpacewarsState| {
             for _ in 0..ticks {
                 step(state);
             }
         };
-        let mut first = space(true);
+        let mut first = space();
         let mut second = first.clone();
         play(60, &mut first);
         let before = first.ships[1].life;

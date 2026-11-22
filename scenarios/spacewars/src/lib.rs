@@ -135,12 +135,16 @@ const DEBRIS_BODY_DAMAGE_SCALAR: f32 = 0.05;
 const CANNON_SHELL_SPEED: f32 = 300.0;
 const CANNON_RECOIL_SPEED: f32 = 200.0;
 const CANNON_COOLDOWN_SECS: f32 = 0.5;
-const CANNON_SHELL_DAMAGE_SCALAR: f32 = 0.1;
 const CANNON_SHELL_OMEGA: f32 = 2.0;
 const CANNON_SHELL_SPAWN_OFFSET: f32 = 5.0;
 const CANNON_SHELL_RADIUS: f32 = 2.0;
+/// A shell hit's spark strength per unit of its impact speed, as the old
+/// shell's damage was.
+const CANNON_SHELL_SPARK_STRENGTH: f32 = 0.1;
 const LASER_GROWTH_PER_TICK: f32 = 50.0;
-const LASER_BASE_DAMAGE: f32 = 10.0;
+/// A laser hit's spark strength times its beam's length, as the old laser's
+/// damage was.
+const LASER_SPARK_STRENGTH: f32 = 10.0;
 const ASTEROID_RNG_SALT: u64 = 0xA57E_201D_5EED;
 const MAX_ASTEROIDS: usize = 1_000;
 const ASTEROID_SPAWN_RADIUS_FACTOR: f32 = 0.99;
@@ -636,8 +640,7 @@ pub struct LaserHit {
     pub shooter: usize,
     pub target: LaserTarget,
     pub point: Vec2,
-    /// The health the hit costs its target: what the beam charged it under
-    /// material weapons, and the old damage otherwise.
+    /// The health the hit costs its target: what the beam charged it.
     pub damage: f32,
 }
 
@@ -1572,25 +1575,6 @@ impl SpacewarsScenario {
 }
 
 impl SpacewarsState {
-    /// Carries cannon shells as material weapon shots and lasers as beams
-    /// (#330). A shell charges the region of the body it hits by the impact
-    /// law, a laser's pulse charges the body it ends on by the deposit law, and
-    /// that body loses the health the work costs. Select it before the first
-    /// step. Selecting it again changes nothing. The old damage rules stay the
-    /// default until the game's baselines move with it.
-    pub fn enable_material_weapons(&mut self) {
-        assert_eq!(self.tick, 0, "select material weapons before stepping");
-        if self.material_weapons() {
-            return;
-        }
-        self.physics.enable_weapons();
-        lasers::arm(self);
-    }
-
-    pub fn material_weapons(&self) -> bool {
-        self.physics.weapons_enabled()
-    }
-
     fn apply_action(&mut self, action: SpacewarsAction) {
         match action {
             SpacewarsAction::ZoomIn { player } => {
@@ -2244,29 +2228,13 @@ fn update_ship_lasers(state: &mut SpacewarsState, dt: f32) {
     }
 }
 
-/// Each shining laser's hit. Under material weapons a hit's damage is the
-/// health its beam charged the body, and otherwise the old damage.
+/// Each shining laser's hit, whose damage is the health its beam charged the
+/// body it ended on (#330).
 fn resolve_laser_hits(
     state: &mut SpacewarsState,
     pilots: &[surface_sortie::SurfacePilot],
 ) -> Vec<LaserHit> {
-    let traces = if state.material_weapons() {
-        lasers::fire(state, pilots)
-    } else {
-        state
-            .ships
-            .iter()
-            .enumerate()
-            .filter_map(|(shooter, ship)| {
-                let beam = ship.laser_beam?;
-                let trace =
-                    state
-                        .physics
-                        .cast_laser(shooter, beam.head, beam.direction, beam.length())?;
-                Some((shooter, beam, trace, laser_damage(beam)))
-            })
-            .collect::<Vec<_>>()
-    };
+    let traces = lasers::fire(state, pilots);
     let mut hits = Vec::new();
 
     for (shooter, beam, trace, damage) in traces {
@@ -2306,8 +2274,8 @@ fn resolve_laser_hits(
             continue;
         }
 
-        // Sparks keep the old damage's size, whatever the beam charged.
-        spawn_laser_hit_particles(state, beam.direction, hit, laser_damage(beam));
+        // Sparks keep the old laser's size, whatever the beam charged.
+        spawn_laser_hit_particles(state, beam.direction, hit, laser_spark_strength(beam));
         apply_laser_hit(state, hit);
         hits.push(hit);
     }
@@ -2563,8 +2531,10 @@ fn asteroid_chip_fragments(
     fragments
 }
 
-fn laser_damage(beam: LaserBeamState) -> f32 {
-    LASER_BASE_DAMAGE / beam.length().max(REALLY_SMALL)
+/// How hard a hit by `beam` sparks, falling off with the beam's length as the
+/// old laser's damage did.
+fn laser_spark_strength(beam: LaserBeamState) -> f32 {
+    LASER_SPARK_STRENGTH / beam.length().max(REALLY_SMALL)
 }
 
 fn asteroid_count(state: &SpacewarsState) -> usize {
@@ -3077,19 +3047,23 @@ fn resolve_physics_collisions(
                 if ship >= state.ships.len() || debris_index >= state.debris.len() {
                     continue;
                 }
-                // A shot's hit counts only on the body it stopped on.
-                let damage = if state.debris[debris_index].shot {
+                let speed = impact_speed(
+                    contact.impulse_magnitude,
+                    state.ships[ship].mass(),
+                    Some(state.debris[debris_index].mass()),
+                );
+                // A shell's hit is its shot's, and counts only on the body the
+                // shot stopped on. Its sparks keep the old shell's size.
+                let (damage, sparks) = if state.debris[debris_index].kind == DebrisKind::Shell {
                     let Some(damage) =
                         shots::charged(state, debris_id, MechanicalEntity::Ship(ship))
                     else {
                         continue;
                     };
-                    damage
+                    (damage, speed * CANNON_SHELL_SPARK_STRENGTH)
                 } else {
-                    let ship_mass = state.ships[ship].mass();
-                    let debris_mass = state.debris[debris_index].mass();
-                    impact_speed(contact.impulse_magnitude, ship_mass, Some(debris_mass))
-                        * state.debris[debris_index].damage_scalar
+                    let damage = speed * state.debris[debris_index].damage_scalar;
+                    (damage, damage)
                 };
                 let normal = contact.normal;
                 let ship_position = state.ships[ship].position;
@@ -3114,7 +3088,7 @@ fn resolve_physics_collisions(
                     ship_position,
                     intercept,
                     ship_color,
-                    damage,
+                    sparks,
                     10.0,
                     0x51DE_BA5E ^ ship as u64 ^ ((debris_index as u64) << 16),
                 );
@@ -3134,16 +3108,20 @@ fn resolve_physics_collisions(
                 let Some(rover_mass) = state.physics.rover_total_mass(&rover) else {
                     continue;
                 };
-                let damage = if debris.shot {
+                let speed =
+                    impact_speed(contact.impulse_magnitude, rover_mass, Some(debris.mass()));
+                // A shell's hit is its shot's, and its sparks keep the old
+                // shell's size.
+                let (damage, sparks) = if debris.kind == DebrisKind::Shell {
                     let Some(damage) =
                         shots::charged(state, debris_id, MechanicalEntity::Rover(rover_id))
                     else {
                         continue;
                     };
-                    damage
+                    (damage, speed * CANNON_SHELL_SPARK_STRENGTH)
                 } else {
-                    impact_speed(contact.impulse_magnitude, rover_mass, Some(debris.mass()))
-                        * debris.damage_scalar
+                    let damage = speed * debris.damage_scalar;
+                    (damage, damage)
                 };
                 let rover_position = state
                     .physics
@@ -3166,7 +3144,7 @@ fn resolve_physics_collisions(
                     rover_position,
                     intercept,
                     rover_color,
-                    damage,
+                    sparks,
                     10.0,
                     0x707E_BA5E ^ rover_id ^ ((debris_index as u64) << 16),
                 );
@@ -3234,16 +3212,25 @@ fn resolve_physics_collisions(
                     a_state.mass(),
                     Some(b_state.mass()),
                 );
-                // A shot's hit stands in for its shell's damage.
-                let damage_to_a = if b_state.shot {
-                    shots::charged(state, b_id, MechanicalEntity::Debris(a_id)).unwrap_or(0.0)
+                // A shell's hit is its shot's, and its sparks keep the old
+                // shell's size.
+                let (damage_to_a, sparks_on_a) = if b_state.kind == DebrisKind::Shell {
+                    (
+                        shots::charged(state, b_id, MechanicalEntity::Debris(a_id)).unwrap_or(0.0),
+                        speed * CANNON_SHELL_SPARK_STRENGTH,
+                    )
                 } else {
-                    speed * b_state.damage_scalar
+                    let damage = speed * b_state.damage_scalar;
+                    (damage, damage)
                 };
-                let damage_to_b = if a_state.shot {
-                    shots::charged(state, a_id, MechanicalEntity::Debris(b_id)).unwrap_or(0.0)
+                let (damage_to_b, sparks_on_b) = if a_state.kind == DebrisKind::Shell {
+                    (
+                        shots::charged(state, a_id, MechanicalEntity::Debris(b_id)).unwrap_or(0.0),
+                        speed * CANNON_SHELL_SPARK_STRENGTH,
+                    )
                 } else {
-                    speed * a_state.damage_scalar
+                    let damage = speed * a_state.damage_scalar;
+                    (damage, damage)
                 };
                 let normal = contact.normal;
                 let intercept = contact.point.unwrap_or(a_state.position);
@@ -3269,7 +3256,7 @@ fn resolve_physics_collisions(
                     b_state.position,
                     intercept,
                     b_state.color,
-                    damage_to_a,
+                    sparks_on_a,
                     5.0,
                     0xDEB1_0000 ^ a as u64 ^ ((b as u64) << 16),
                 );
@@ -3279,7 +3266,7 @@ fn resolve_physics_collisions(
                     a_state.position,
                     intercept,
                     a_state.color,
-                    damage_to_b,
+                    sparks_on_b,
                     5.0,
                     0xDEB2_0000 ^ a as u64 ^ ((b as u64) << 16),
                 );
@@ -5219,12 +5206,14 @@ impl DebrisState {
         velocity: Vec2,
         rotation_radians: f32,
     ) -> Self {
+        // A shell's hits are its shot's, so its contacts do no damage of their
+        // own.
         let mut shell = Self::new(
             DebrisKind::Shell,
             position,
             velocity,
             CANNON_SHELL_RADIUS,
-            CANNON_SHELL_DAMAGE_SCALAR,
+            0.0,
             Color::DIM_GREY,
         );
         shell.rotation_radians = rotation_radians;
@@ -5616,9 +5605,9 @@ impl ShipState {
                 -self.direction.angle_radians(),
             );
             shell.rail_launched = mount.is_some();
-            if mount.is_some() {
-                shell.inertial_mass = Some(weapons::ROUND_MASS);
-            }
+            // A classic shell weighs what a supplied round does, so a hit costs
+            // about what a round's does and a laser stops it as fast.
+            shell.inertial_mass = Some(weapons::ROUND_MASS);
             self.velocity -= self.direction * recoil;
             self.cannon_cooldown_remaining = CANNON_COOLDOWN_SECS;
             self.queued_cannon_fire = false;
@@ -9987,7 +9976,9 @@ mod tests {
         assert_close(shell.life, 1.0);
         assert_close(shell.life_max, 1.0);
         assert_close(shell.radius, CANNON_SHELL_RADIUS);
-        assert_close(shell.damage_scalar, CANNON_SHELL_DAMAGE_SCALAR);
+        // A shell's hits are its shot's, and it weighs what a round does.
+        assert_close(shell.damage_scalar, 0.0);
+        assert_close(shell.mass(), weapons::ROUND_MASS);
         assert_close(shell.omega, CANNON_SHELL_OMEGA);
         assert_close(
             shell.rotation_radians,
@@ -10123,18 +10114,10 @@ mod tests {
         step(&mut state, &[SpacewarsAction::set_laser(0, true)]);
         let first = state.ships[0].laser_beam.expect("laser should start");
         assert_close(first.length(), LASER_GROWTH_PER_TICK);
-        assert_close(
-            laser_damage(first),
-            LASER_BASE_DAMAGE / LASER_GROWTH_PER_TICK,
-        );
 
         step(&mut state, &[SpacewarsAction::set_laser(0, true)]);
         let second = state.ships[0].laser_beam.expect("laser should continue");
         assert_close(second.length(), LASER_GROWTH_PER_TICK * 2.0);
-        assert_close(
-            laser_damage(second),
-            LASER_BASE_DAMAGE / (LASER_GROWTH_PER_TICK * 2.0),
-        );
     }
 
     #[test]
@@ -11821,10 +11804,11 @@ mod tests {
 
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].target, LaserTarget::Rover(rover_id));
-        assert_close(state.rovers[0].life, initial_life - laser_damage(beam));
+        assert!(hits[0].damage > 0.0);
+        assert_close(state.rovers[0].life, initial_life - hits[0].damage);
         assert!(!state.rovers[0].dead);
 
-        state.rovers[0].life = laser_damage(beam) * 0.5;
+        state.rovers[0].life = hits[0].damage * 0.5;
         state.ships[1].laser_beam = Some(beam);
         let hits = resolve_laser_hits(&mut state, &[]);
         assert_eq!(hits[0].target, LaserTarget::Rover(rover_id));
@@ -11855,7 +11839,7 @@ mod tests {
     }
 
     #[test]
-    fn armed_shell_contact_damages_both_shell_and_rover() {
+    fn a_shell_contact_without_a_shot_charges_nothing() {
         let mut state = init_rover_world(123);
         let planet = largest_rover_planet(&state);
         deploy_rover_on_next_step(&mut state, planet, 0);
@@ -11873,38 +11857,91 @@ mod tests {
             -Vec2::X * CANNON_SHELL_SPEED,
             0.0,
         ));
+        // The shell has a body, but no shot carries it.
         let _ = reconcile_physics(&mut state, 1.0 / 60.0);
-        let debris_id = state.debris[0].physics_id;
-        assert_ne!(debris_id, 0);
+        let shell = state.debris[0].physics_id;
+        assert_ne!(shell, 0);
+        assert!(!state.debris[0].shot);
+        let ship_life = state.ships[0].life;
+        let contact = |a| MechanicalContact {
+            a,
+            b: MechanicalEntity::Debris(shell),
+            point: Some(rover_position),
+            normal: Vec2::X,
+            impulse_magnitude: 2_000.0,
+            closing_speed: 100.0,
+            started: true,
+        };
+
+        resolve_physics_collisions(
+            &mut state,
+            &[
+                contact(MechanicalEntity::Rover(rover.id)),
+                contact(MechanicalEntity::Ship(0)),
+            ],
+            &BTreeSet::new(),
+        );
+
+        // A shell's hit is its shot's, so however hard the contact pushes, it
+        // costs nothing and records nothing.
+        assert!(state.rover_debris_collisions.is_empty());
+        assert!(state.ship_debris_collisions.is_empty());
+        assert_eq!(state.rovers[0].life, rover.life);
+        assert_eq!(state.ships[0].life, ship_life);
+        assert_eq!(state.debris[0].life, 1.0);
+    }
+
+    #[test]
+    fn a_shot_that_charges_a_ship_nothing_still_sparks_as_a_shell_did() {
+        let mut state = init_rover_world(123);
+        let ship_position = state.ships[1].position;
+        let mut shell = DebrisState::new_shell(
+            0,
+            state.tick.saturating_sub(1),
+            ship_position + Vec2::X * 20.0,
+            -Vec2::X * CANNON_SHELL_SPEED,
+            0.0,
+        );
+        shell.inertial_mass = Some(weapons::ROUND_MASS);
+        state.debris.push(shell);
+        let _ = reconcile_physics(&mut state, 1.0 / 60.0);
+        let shell = state.debris[0].physics_id;
+        // The shot stopped on ship 1 uncharged, as protection or a pod outside
+        // a match would leave it.
+        state.shot_hits.insert(
+            shell,
+            shots::ShotHit {
+                target: MechanicalEntity::Ship(1),
+                health: 0.0,
+            },
+        );
+        let impulse = 30.0;
+        let speed = impact_speed(impulse, state.ships[1].mass(), Some(state.debris[0].mass()));
+        let life = state.ships[1].life;
+        let particles = state.particles.len();
 
         resolve_physics_collisions(
             &mut state,
             &[MechanicalContact {
-                a: MechanicalEntity::Rover(rover.id),
-                b: MechanicalEntity::Debris(debris_id),
-                point: Some(rover_position),
+                a: MechanicalEntity::Ship(1),
+                b: MechanicalEntity::Debris(shell),
+                point: Some(ship_position),
                 normal: Vec2::X,
-                impulse_magnitude: 2_000.0,
+                impulse_magnitude: impulse,
                 closing_speed: 100.0,
                 started: true,
             }],
             &BTreeSet::new(),
         );
 
+        // The hit costs nothing and still counts, and its sparks are the old
+        // shell's: its damage was a tenth of the impact speed.
+        assert_eq!(state.ships[1].life, life);
+        assert!(state.ship_debris_collisions.iter().any(|c| c.ship == 1));
         assert_eq!(
-            state.rover_debris_collisions,
-            vec![RoverDebrisCollision {
-                rover: rover.id,
-                debris: 0,
-            }]
+            state.particles.len() - particles,
+            (speed * 0.1 * 10.0).ceil() as usize
         );
-        assert!(state.rovers[0].dead);
-        assert!(state.debris[0].dead);
-
-        handle_rover_deaths(&mut state);
-        assert!(state.rovers.is_empty());
-        assert_eq!(state.debris.len(), 7);
-        assert_eq!(state.rover_builds[planet].progress, 0.0);
     }
 
     #[test]
