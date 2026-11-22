@@ -1,4 +1,5 @@
-//! Observed-shot comparisons; no hidden trial trajectories or reset between shots.
+//! Observed-shot comparisons with no reset between shots. Only the plotted bot
+//! traces trial trajectories, and it traces them through the world it fires into.
 use clap::Parser;
 use engine_common::Scenario;
 use engine_rapier::terrain::GrainShape;
@@ -13,7 +14,7 @@ use std::time::Duration;
 struct Args {
     #[arg(long, default_value = "flat", value_parser = ["flat", "uphill", "downhill", "ridge", "duel"])]
     case: String,
-    #[arg(long, default_value = "calibrated", value_parser = ["sweep", "calibrated", "reactive"])]
+    #[arg(long, default_value = "calibrated", value_parser = ["sweep", "calibrated", "reactive", "plotted"])]
     bot: String,
     #[arg(long, default_value = "angular", value_parser = ["round", "angular"])]
     shape: String,
@@ -29,6 +30,7 @@ fn run(args: &Args) -> Value {
     let policy = match args.bot.as_str() {
         "reactive" => CpuPolicy::Reactive,
         "calibrated" => CpuPolicy::Calibrated,
+        "plotted" => CpuPolicy::Plotted,
         _ => CpuPolicy::Sweep,
     };
     let shape = if args.shape == "round" {

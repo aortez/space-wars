@@ -1,5 +1,57 @@
 use super::*;
-use engine_rapier::world::weapon::Recipients;
+use engine_rapier::world::{RayHit, weapon::Recipients};
+
+/// The ray a shell at `position` casts across its next tick of flight, and the
+/// movement that tick covers if the ray meets nothing. The ray passes through
+/// the shooter for the shell's first eight ticks. Fired shells and the plotted
+/// CPU's traced shells both fly by it.
+pub(crate) fn shell_ray(
+    physics: &PhysicsWorld,
+    placement: &host::Placement,
+    shooter: PhysicsId,
+    position: Vec2,
+    velocity: Vec2,
+    age: u32,
+) -> (Vec2, Option<RayHit>) {
+    let movement = velocity * DT + Vec2::new(0.0, -0.5 * GRAVITY * DT * DT);
+    let hit = physics.cast_ray(
+        placement.point_to_world(position),
+        movement,
+        RayCastOptions {
+            max_distance: movement.length() * placement.scale,
+            exclude_entity: (age < 8).then_some(shooter),
+            ..Default::default()
+        },
+    );
+    (movement, hit)
+}
+
+/// What a shell's ray met: the shooter's opponent, the shooter, or anything
+/// else, which Scorched counts as terrain.
+pub(crate) fn struck(tanks: [PhysicsId; 2], owner: usize, hit: &RayHit) -> &'static str {
+    if hit.collider.entity == tanks[1 - owner] {
+        "opponent"
+    } else if hit.collider.entity == tanks[owner] {
+        "self"
+    } else {
+        "terrain"
+    }
+}
+
+/// Why a shell that met nothing in its last tick stops flying, if it does.
+pub(crate) fn flight_end(
+    placement: &host::Placement,
+    position: Vec2,
+    age: u32,
+) -> Option<&'static str> {
+    if age >= SHELL_LIFETIME_TICKS {
+        Some("expired")
+    } else if !placement.bounds.contains(position) {
+        Some("out of bounds")
+    } else {
+        None
+    }
+}
 
 impl Duel {
     pub(crate) fn insert(
@@ -442,6 +494,7 @@ impl Duel {
             }
         } else if self.config.course.is_none() && self.firing && self.fighting() {
             for (player, support_check) in support_checks.into_iter().enumerate() {
+                self.advance_plot(physics, player);
                 if (self.config.demo || player != self.selected)
                     && self.tick >= self.tanks[player].next_shot
                     && self.bot_allows_fire(player)
@@ -470,16 +523,15 @@ impl Duel {
         let mut finished = Vec::new();
         let placement = &self.placement;
         let retired = self.retired;
+        let entities = self.tanks.map(|tank| tank.body.entity);
         self.shells.retain_mut(|shell| {
-            let movement = shell.velocity * DT + Vec2::new(0.0, -0.5 * GRAVITY * DT * DT);
-            let world_hit = physics.cast_ray(
-                placement.point_to_world(shell.position),
-                movement,
-                RayCastOptions {
-                    max_distance: movement.length() * placement.scale,
-                    exclude_entity: (shell.age < 8).then_some(self.tanks[shell.owner].body.entity),
-                    ..Default::default()
-                },
+            let (movement, world_hit) = shell_ray(
+                physics,
+                placement,
+                entities[shell.owner],
+                shell.position,
+                shell.velocity,
+                shell.age,
             );
             let hit = world_hit.map(|mut hit| {
                 hit.point = placement.point_from_world(hit.point);
@@ -500,34 +552,18 @@ impl Duel {
                 flight.observe(shell.position, end, target);
             }
             if let Some(hit) = hit {
-                let kind = if hit.collider.entity == self.tanks[1 - shell.owner].body.entity {
-                    "opponent"
-                } else if hit.collider.entity == self.tanks[shell.owner].body.entity {
-                    "self"
-                } else {
-                    "terrain"
-                };
+                let kind = struck(entities, shell.owner, &hit);
                 finished.push((shell.clone(), hit.point, kind, world_hit));
                 return false;
             }
             shell.position += movement;
             shell.velocity.y -= GRAVITY * DT;
             shell.age += 1;
-            let alive =
-                shell.age < SHELL_LIFETIME_TICKS && placement.bounds.contains(shell.position);
-            if !alive {
-                finished.push((
-                    shell.clone(),
-                    shell.position,
-                    if shell.age >= SHELL_LIFETIME_TICKS {
-                        "expired"
-                    } else {
-                        "out of bounds"
-                    },
-                    None,
-                ));
+            if let Some(kind) = flight_end(placement, shell.position, shell.age) {
+                finished.push((shell.clone(), shell.position, kind, None));
+                return false;
             }
-            alive
+            true
         });
         for (mut shell, point, kind, hit) in finished {
             let health = self.tanks.map(|tank| tank.health);
