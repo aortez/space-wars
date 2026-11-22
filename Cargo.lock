@@ -5406,6 +5406,7 @@ dependencies = [
  "engine-common",
  "engine-core",
  "engine-gravity",
+ "engine-material",
  "engine-rapier",
  "engine-terrain",
  "image",

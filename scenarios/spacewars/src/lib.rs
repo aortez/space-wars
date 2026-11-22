@@ -4,6 +4,7 @@
 //! collision response, damage, debris, asteroids, weapons, exhaust trails, and
 //! escape pods. Sounds, scoring, and final HUD polish land in later slices.
 
+pub mod integrity;
 mod physics;
 pub mod ship_geometry;
 pub mod spaceling_geometry;
