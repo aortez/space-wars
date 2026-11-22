@@ -18,7 +18,8 @@ in the pure crate. `engine_rapier::world::weapon` flies real shots and beams
 [in a physics world](#in-the-physics-world),
 [Material Lab](material-lab.md#shell-through-moss) fires one shell through moss
 into a plate, and [Scorched](#scorched-tanks) charges its tanks' armor from
-shells it sweeps itself.
+shells it sweeps itself. [Spacewars](#spacewars-bodies) keeps a region over the
+health of each body a weapon can harm.
 
 ## Deliveries
 
@@ -271,6 +272,46 @@ Contacts charge nothing yet, so a tank that falls or rams something is
 unharmed. They wait on an experiment with measured contacts.
 [Scorched Earth](../scorched-earth.md#armor-and-shells) has the calibration.
 
+## Spacewars bodies
+
+For [#330](https://github.com/aortez/space-wars/issues/330), each Spacewars
+body a weapon can harm has a material region, which
+`scenarios/spacewars/src/integrity.rs` defines. A hull is plate 0.2 deep
+around its collision shape's perimeter.
+
+| Body | Material | How much | Capacity at full health | Work per point of health |
+|---|---|---|---|---|
+| Ship hull | hull | plate around the open-winged hull's 28.35 perimeter, 2 deep into the screen | 22,681, for 100 health | 226.8 |
+| Escape pod hull, in a match | hull | plate around the pod's 7.39 perimeter, 1 deep | 2,954, for 100 health | 29.5 |
+| Pilot on foot | soft tissue | the pilot's capsule, 0.3 deep | 4.51, for 100 health | 0.045 |
+| Asteroid, chip or breakup fragment | rock | what the body weighed when made | 37.7 per unit of radius | 12 |
+| Cannon shell | shell | what the shell weighed when fired | 4,712, or 375 for a supplied round, for 1 health | 4,712 or 375 |
+| Rover hull | hull | plate around the chassis's 11.2 perimeter, 2 deep | 8,960, for 25 health | 358.4 |
+
+The game still stores health, and a body's region is a view of it: the
+region's integrity is the body's health over its full health. Contacts, solar
+heat, repairs and rebuilding still change health, so they change the region
+with it, and play is unchanged. `HealthMap` turns the work charged to a region
+into the health it costs, and health back into work, as healing paid for in
+energy would need ([#246](https://github.com/aortez/space-wars/issues/246)).
+
+- **Debris breaks early.** By the game's rule, debris breaks once it loses a
+  fifth of its health. So a fifth of the capacity in the table breaks it, and
+  its region never fails.
+- **Work per point.** A ship or a rover built with more health has more hull,
+  not tougher hull, so a point of its health stands for the same work however
+  it was built. Rock takes the same work per point at any size, because its
+  health and its weight both grow with its radius. Two kinds of debris
+  differ: a supplied round's breakup pieces weigh what the round did, and
+  each shell's 1 health stands for what that shell weighs.
+- **Region mass.** A hull region is the plate a weapon can harm, which can
+  weigh more than its body. A hit takes the body's mass from the physics, not
+  from the region.
+
+No weapon charges these regions yet, so nothing has calibrated the plate
+depths or the depths into the screen; they are estimates from each body's
+size.
+
 ## Once only
 
 - A shot reaches each recipient once. Another report of the same recipient,
@@ -485,3 +526,24 @@ Scorched's shells:
   burst shared with moss and stopped by a body in its way, tissue the law
   refuses stopping energy rather than spoiling the tanks' shares, and moss
   losing the same share of its capacity at scales 1 and 3.
+
+`scenarios/spacewars/src/integrity.rs` covers:
+
+- the hulls' perimeters, measured on the ship's, the pod's and the rover's
+  collision shapes, the area of the pilot's capsule, and each section the
+  plate or tissue its volume counts;
+- the capacities, work per point and sections of the table above, and each
+  form of a ship with its own hull;
+- each body's region at full, half, a quarter and no health, health past full
+  held to full, health that is not a number refused, and no region for a full
+  health that is zero, negative or not finite;
+- work and health converting both ways, with full health standing for the
+  whole capacity;
+- a ship built with five times the health, and a rover with twice, having
+  that much more hull at the same work per point;
+- debris regions weighing what the debris weighed when made, rock taking the
+  same work per point at any size, and chipping and shrinking leaving the
+  region alone;
+- debris breaking by the game's rule while its region is still nearly four
+  fifths whole;
+- a contact's damage, a repair and a rover's damage moving the region.

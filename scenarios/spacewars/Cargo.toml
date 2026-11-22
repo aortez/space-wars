@@ -22,6 +22,7 @@ required-features = ["ccd-diagnostics"]
 engine-common = { workspace = true }
 engine-core = { workspace = true }
 engine-gravity = { workspace = true }
+engine-material = { workspace = true }
 engine-rapier = { workspace = true }
 engine-terrain = { workspace = true }
 serde = { workspace = true }
