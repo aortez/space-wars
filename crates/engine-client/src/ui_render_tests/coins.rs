@@ -203,18 +203,19 @@ fn coins_render_the_turn_cascade_pile_return_and_controls_at_target_sizes() {
                     ..Default::default()
                 },
             );
-            if live {
+            let menu = if live {
                 ui.set_ingame_menu_visible(true);
                 ui.set_ingame_clock_visible(true);
-                crate::clock_menu::show(&ui, crate::clock_menu::Page::Events, Some("coins"));
-                // The list scrolls to the row in a change handler, which runs
-                // with the timers.
-                slint::platform::update_timers_and_animations();
+                crate::clock_menu::Menu::Pause
             } else {
                 ui.set_launcher_visible(true);
                 ui.set_launcher_settings_visible(true);
-                ui.set_launcher_settings_focus_index(21);
-            }
+                crate::clock_menu::Menu::Launcher
+            };
+            crate::clock_menu::show(&ui, menu, crate::clock_menu::Page::Events, Some("coins"));
+            // The list scrolls to the row in a change handler, which runs
+            // with the timers.
+            slint::platform::update_timers_and_animations();
             let pixels = capture(window, viewport);
             if let Some(path) = &output {
                 write_png(

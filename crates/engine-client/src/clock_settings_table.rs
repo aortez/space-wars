@@ -86,7 +86,7 @@ impl Section {
 /// The settings in the order the pages list them: the Look page's, then the
 /// Events page's, how often first and then the events by group, alphabetical
 /// within each.
-pub(crate) static SETTINGS: [&dyn ClockSetting; 22] = [
+pub(crate) static SETTINGS: [&dyn ClockSetting; 21] = [
     &Choice::<ClockTimeFormat> {
         about: about("time-format", "Time", Look, "24-hour or 12-hour digits."),
         value: |settings| &mut settings.time_format,
@@ -181,22 +181,14 @@ pub(crate) static SETTINGS: [&dyn ClockSetting; 22] = [
         ),
         on: |settings| &mut settings.events.falling,
     },
-    &Switch {
+    &OffOr::<ClockMarqueePreset> {
         about: about(
             "marquee",
             "Marquee",
             Digits,
-            "The digits move and light up in a 12-second show. Recipe picks which.",
+            "The digits move and light up in a 12-second show. Random picks a different one each time.",
         ),
         on: |settings| &mut settings.events.marquee,
-    },
-    &Choice::<ClockMarqueePreset> {
-        about: about(
-            "marquee-preset",
-            "Recipe",
-            Digits,
-            "Which Marquee show plays. Random picks one each time.",
-        ),
         value: |settings| &mut settings.marquee_preset,
     },
     &Switch {
@@ -437,8 +429,19 @@ impl Choices for ClockLampMode {
     }
 }
 
+/// Random first, as Rain and Crow put Varied first, so that a step back from
+/// the default turns Marquee off.
 impl Choices for ClockMarqueePreset {
-    const ALL: &'static [Self] = &ClockMarqueePreset::ALL;
+    const ALL: &'static [Self] = &[
+        Self::Random,
+        Self::ClockChase,
+        Self::ClockWave,
+        Self::ClockSpin,
+        Self::DigitSpin,
+        Self::TextScroll,
+        Self::TextRibbon,
+        Self::TextSpin,
+    ];
     fn label(self) -> &'static str {
         ClockMarqueePreset::label(self)
     }
@@ -458,12 +461,12 @@ impl Choices for ClockThemeChoice {
     }
 }
 
-/// The defaults, then the defaults with every setting stepped one to seven
+/// The defaults, then the defaults with every setting stepped one to eight
 /// places, one place at a time. Among them each switch is both ways round,
-/// and Rain and Crow are off keeping Heavy and Hardy.
+/// and Rain, Crow and Marquee are off keeping Heavy, Hardy and Text spin.
 #[cfg(test)]
 pub(crate) fn starting_points() -> Vec<ClockSettings> {
-    (0..8)
+    (0..9)
         .map(|places| {
             let mut settings = ClockSettings::default();
             for setting in SETTINGS {
@@ -514,8 +517,18 @@ mod tests {
         );
         assert_eq!(labels("crow"), ["Off", "Varied", "Shy", "Hardy"]);
         assert_eq!(
-            labels("marquee-preset"),
-            ClockMarqueePreset::ALL.map(ClockMarqueePreset::label)
+            labels("marquee"),
+            [
+                "Off",
+                "Random",
+                "Clock chase",
+                "Clock wave",
+                "Clock spin",
+                "Digit spin",
+                "Text scroll",
+                "Text ribbon",
+                "Text spin",
+            ]
         );
         for id in [
             "show-date",
@@ -525,7 +538,6 @@ mod tests {
             "digit-slide",
             "explosion",
             "falling",
-            "marquee",
             "meltdown",
             "slot-machine",
             "duck",
@@ -560,11 +572,15 @@ mod tests {
         }
     }
 
-    /// Rain and Crow keep their amount and tolerance while Off, so a step back
-    /// turns them on again as they were.
+    /// Rain, Crow and Marquee keep their amount, tolerance and recipe while
+    /// Off, so a step back turns them on again as they were.
     #[test]
-    fn rain_and_crow_keep_their_value_while_off() {
-        for (id, last) in [("rain", "Heavy"), ("crow", "Hardy")] {
+    fn rain_crow_and_marquee_keep_their_value_while_off() {
+        for (id, last) in [
+            ("rain", "Heavy"),
+            ("crow", "Hardy"),
+            ("marquee", "Text spin"),
+        ] {
             let setting = find(id).unwrap();
             let labels = setting.labels();
             let mut on = ClockSettings::default();
@@ -626,7 +642,7 @@ mod tests {
                         "theme" => rest.theme = start.theme,
                         "lamps" => rest.lamps = start.lamps,
                         "event-profile" => rest.event_profile = start.event_profile,
-                        "marquee-preset" => rest.marquee_preset = start.marquee_preset,
+                        "marquee" => rest.marquee_preset = start.marquee_preset,
                         "rain" => rest.rain_amount = start.rain_amount,
                         "crow" => rest.crow_water_tolerance = start.crow_water_tolerance,
                         _ => {}
@@ -642,43 +658,29 @@ mod tests {
         }
     }
 
-    /// Both pages offer every setting in the table, and nothing else there
-    /// changes a setting. A setting missing from the table would need its own
-    /// code on each page.
+    /// Each menu's pages offer every setting in the table once, and nothing
+    /// else there changes a setting.
     #[test]
-    fn both_pages_offer_every_setting_in_the_table() {
-        use crate::clock_menu::{self, Page};
-        let table = SETTINGS
+    fn each_menu_offers_every_setting_once() {
+        use crate::clock_menu::{self, Menu, Page};
+        let mut table = SETTINGS
             .iter()
             .map(|setting| setting.id())
-            .collect::<BTreeSet<_>>();
-        let pause = [Page::Top, Page::Look, Page::Events]
-            .into_iter()
-            .flat_map(|page| clock_menu::rows(page, &ClockSettings::default()))
-            .filter(|row| row.kind != crate::SettingsRowKind::Heading)
-            .map(|row| format!("pause.clock.{}", row.id))
             .collect::<Vec<_>>();
-        let launcher = crate::ui_inventory::LAUNCHER_CLOCK_FOCUS_ORDER.map(str::to_owned);
-        for (controls, prefix, others) in [
-            (&pause[..], "pause.clock.", &["look", "events", "fonts"][..]),
-            (&launcher[..], "launcher.settings.clock.", &["fonts"][..]),
-        ] {
-            let names = controls
-                .iter()
-                .filter_map(|control| control.strip_prefix(prefix))
+        table.sort_unstable();
+        for menu in [Menu::Pause, Menu::Launcher] {
+            let rows = [Page::Top, Page::Look, Page::Events]
+                .into_iter()
+                .flat_map(|page| clock_menu::rows(menu, page, &ClockSettings::default()))
+                .filter(|row| row.kind != crate::SettingsRowKind::Heading)
                 .collect::<Vec<_>>();
-            let settings = names
+            let (mut settings, rest): (Vec<_>, Vec<_>) = rows
                 .iter()
-                .copied()
-                .filter(|id| find(id).is_some())
-                .collect::<BTreeSet<_>>();
-            let rest = names
-                .iter()
-                .copied()
-                .filter(|id| find(id).is_none())
-                .collect::<Vec<_>>();
-            assert_eq!(settings, table, "{prefix}");
-            assert_eq!(rest, others, "{prefix}");
+                .map(|row| row.id.as_str())
+                .partition(|id| find(id).is_some());
+            settings.sort_unstable();
+            assert_eq!(settings, table, "{menu:?}");
+            assert_eq!(rest, ["look", "events", "fonts"], "{menu:?}");
         }
     }
 }

@@ -62,6 +62,10 @@ pub enum UiScreen {
     LauncherNetwork,
     #[serde(rename = "launcher.settings")]
     LauncherSettings,
+    #[serde(rename = "launcher.clock-look")]
+    LauncherClockLook,
+    #[serde(rename = "launcher.clock-events")]
+    LauncherClockEvents,
     #[serde(rename = "launcher.clock-fonts")]
     LauncherClockFonts,
     #[serde(rename = "launcher.controls")]
@@ -111,6 +115,8 @@ impl UiScreen {
             Self::LauncherControllers => "launcher.controllers",
             Self::LauncherNetwork => "launcher.network",
             Self::LauncherSettings => "launcher.settings",
+            Self::LauncherClockLook => "launcher.clock-look",
+            Self::LauncherClockEvents => "launcher.clock-events",
             Self::LauncherClockFonts => "launcher.clock-fonts",
             Self::LauncherControls => "launcher.controls",
             Self::LauncherTouchTest => "launcher.touch-test",
@@ -142,7 +148,9 @@ impl UiScreen {
                 | Self::LauncherInfo
                 | Self::LauncherAutostart
                 | Self::LauncherControllers
+                | Self::LauncherClockEvents
                 | Self::LauncherClockFonts
+                | Self::LauncherClockLook
                 | Self::LauncherNetwork
                 | Self::LauncherSettings
                 | Self::LauncherControls
@@ -633,6 +641,8 @@ mod tests {
             (UiScreen::LauncherSound, "launcher.sound"),
             (UiScreen::LauncherInfo, "launcher.info"),
             (UiScreen::LauncherSettings, "launcher.settings"),
+            (UiScreen::LauncherClockLook, "launcher.clock-look"),
+            (UiScreen::LauncherClockEvents, "launcher.clock-events"),
             (UiScreen::LauncherControls, "launcher.controls"),
             (UiScreen::LauncherTouchTest, "launcher.touch-test"),
             (UiScreen::Gameplay, "gameplay"),

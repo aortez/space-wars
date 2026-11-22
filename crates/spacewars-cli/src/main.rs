@@ -195,6 +195,10 @@ enum UiScreenArg {
     LauncherNetwork,
     #[value(name = "launcher.settings")]
     LauncherSettings,
+    #[value(name = "launcher.clock-look")]
+    LauncherClockLook,
+    #[value(name = "launcher.clock-events")]
+    LauncherClockEvents,
     #[value(name = "launcher.clock-fonts")]
     LauncherClockFonts,
     #[value(name = "launcher.controls")]
@@ -244,6 +248,8 @@ impl From<UiScreenArg> for UiScreen {
             UiScreenArg::LauncherControllers => Self::LauncherControllers,
             UiScreenArg::LauncherNetwork => Self::LauncherNetwork,
             UiScreenArg::LauncherSettings => Self::LauncherSettings,
+            UiScreenArg::LauncherClockLook => Self::LauncherClockLook,
+            UiScreenArg::LauncherClockEvents => Self::LauncherClockEvents,
             UiScreenArg::LauncherClockFonts => Self::LauncherClockFonts,
             UiScreenArg::LauncherControls => Self::LauncherControls,
             UiScreenArg::LauncherTouchTest => Self::LauncherTouchTest,

@@ -1,5 +1,8 @@
-//! Live Clock menu operations. Touch, keyboard, gamepad and guarded UI control
-//! all enter here; the host applies changes at a simulation boundary.
+//! The Clock's settings pages in both menus: Clock Controls over the paused
+//! Clock, where the host applies a change at a simulation boundary, and the
+//! launcher's Scenario Settings, which keep their changes on the pages until
+//! Start saves them. Touch, keyboard, gamepad and guarded UI control all
+//! enter here.
 
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
@@ -8,40 +11,13 @@ use engine_common::{ClockSettings, Settings};
 use slint::{ComponentHandle, Model};
 use spacewars_control::UiAction;
 
-use crate::{MainWindow, SettingsRowKind, clock_menu, clock_settings_table, host};
+use crate::clock_menu::{self, Menu};
+use crate::{MainWindow, SettingsRowKind, clock_settings_table, host};
 
+/// Shows `settings` on the pages of both menus, and in the fonts picker.
 pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     crate::clock_fonts::publish(window, settings.fonts);
     clock_menu::publish(window, &settings);
-    window.set_launcher_clock_show_date(settings.show_date);
-    window.set_launcher_clock_time_format(
-        crate::clock_time_format_label(settings.time_format).into(),
-    );
-    window.set_launcher_clock_event_profile(
-        crate::clock_event_profile_label(settings.event_profile).into(),
-    );
-    window.set_launcher_clock_falling_enabled(settings.events.falling);
-    window.set_launcher_clock_color_cycle_enabled(settings.events.color_cycle);
-    window.set_launcher_clock_meltdown_enabled(settings.events.meltdown);
-    window.set_launcher_clock_duck_enabled(settings.events.duck);
-    window.set_launcher_clock_crow_enabled(settings.events.crow);
-    window.set_launcher_clock_crow_water_tolerance(settings.crow_water_tolerance.label().into());
-    window.set_launcher_clock_lamps(settings.lamps.label().into());
-    window.set_launcher_clock_theme(settings.theme.label().into());
-    window.set_launcher_clock_explosion_enabled(settings.events.explosion);
-    window.set_launcher_clock_aquarium_enabled(settings.events.aquarium);
-    window.set_launcher_clock_marquee_enabled(settings.events.marquee);
-    window.set_launcher_clock_digit_slide_enabled(settings.events.digit_slide);
-    window.set_launcher_clock_cell_swap_enabled(settings.events.cell_swap);
-    window.set_launcher_clock_slot_machine_enabled(settings.events.slot_machine);
-    window.set_launcher_clock_spider_enabled(settings.events.spider);
-    window.set_launcher_clock_coins_enabled(settings.events.coins);
-    window.set_launcher_clock_tanks_enabled(settings.events.tanks);
-    window.set_launcher_clock_grass_enabled(settings.events.grass);
-    window.set_launcher_clock_rain_enabled(settings.events.rain);
-    window.set_launcher_clock_rain_amount(settings.rain_amount.label().into());
-    window.set_launcher_clock_marquee_preset(settings.marquee_preset.label().into());
-    window.set_launcher_clock_marquee_message(settings.marquee_message.as_str().into());
 }
 
 pub(crate) fn install(
@@ -70,13 +46,18 @@ pub(crate) fn install(
     let adjust_controls = Rc::clone(&controls);
     window.on_clock_menu_adjust(move |index, delta| {
         let Some(window) = weak.upgrade() else { return };
-        if !takes_input(&window) {
+        let Some(menu) = takes_input(&window) else {
+            return;
+        };
+        menu.set_focus(&window, index);
+        let Some(row) = clock_menu::row(&window, menu, index) else {
+            return;
+        };
+        if menu == Menu::Launcher {
+            adjust_launcher_row(&window, &row.id, delta);
             return;
         }
-        window.set_ingame_clock_focus_index(index);
-        let Some(setting) =
-            clock_menu::row(&window, index).and_then(|row| clock_settings_table::find(&row.id))
-        else {
+        let Some(setting) = clock_settings_table::find(&row.id) else {
             return;
         };
         let mut controls = adjust_controls.borrow_mut();
@@ -93,12 +74,12 @@ pub(crate) fn install(
     let play_controls = Rc::clone(&controls);
     window.on_clock_menu_play(move |index| {
         let Some(window) = weak.upgrade() else { return };
-        if !takes_input(&window) {
+        if takes_input(&window) != Some(Menu::Pause) {
             return;
         }
         window.set_ingame_clock_focus_index(index);
         let Some(event) =
-            clock_menu::row(&window, index).and_then(|row| clock_menu::event(&row.id))
+            clock_menu::row(&window, Menu::Pause, index).and_then(|row| clock_menu::event(&row.id))
         else {
             return;
         };
@@ -110,17 +91,17 @@ pub(crate) fn install(
     let weak = window.as_weak();
     window.on_clock_menu_activate(move |index| {
         let Some(window) = weak.upgrade() else { return };
-        if takes_input(&window) {
-            window.set_ingame_clock_focus_index(index);
-            clock_menu::open_row(&window, index);
+        if let Some(menu) = takes_input(&window) {
+            menu.set_focus(&window, index);
+            clock_menu::open_row(&window, menu, index);
         }
     });
 
     let weak = window.as_weak();
     window.on_clock_menu_back(move || {
         let Some(window) = weak.upgrade() else { return };
-        if takes_input(&window) {
-            clock_menu::back(&window);
+        if let Some(menu) = takes_input(&window) {
+            clock_menu::back(&window, menu);
         }
     });
 
@@ -130,7 +111,7 @@ pub(crate) fn install(
         if window.get_install_fenced() {
             return;
         }
-        let Ok(clock) = crate::clock_setup_from_window(&window) else {
+        let Some(clock) = clock_menu::settings(&window) else {
             return;
         };
         let snapshot = {
@@ -144,6 +125,29 @@ pub(crate) fn install(
         window.set_settings_save_error("".into());
         window.set_clock_settings_error("".into());
     });
+}
+
+/// Changes the launcher's row named `id` by `delta`: a Clock setting, which
+/// the pages keep until Start saves it, or the renderer or its scale.
+fn adjust_launcher_row(window: &MainWindow, id: &str, delta: i32) {
+    let Some(settings) = clock_menu::settings(window) else {
+        return;
+    };
+    match id {
+        "renderer" => crate::cycle_renderer(window, delta),
+        "raster-scale" => crate::cycle_raster_scale(window, delta),
+        _ => {
+            if let Some(setting) = clock_settings_table::find(id) {
+                publish_settings(
+                    window,
+                    clock_settings_table::stepped(setting, settings, delta),
+                );
+            }
+            return;
+        }
+    }
+    // The rows show the renderer's new value.
+    clock_menu::publish(window, &settings);
 }
 
 pub(crate) fn log_settings_change(previous: ClockSettings, next: ClockSettings, source: &str) {
@@ -166,12 +170,13 @@ pub(crate) fn log_settings_change(previous: ClockSettings, next: ClockSettings, 
         "Clock settings changed.");
 }
 
-/// Whether Clock Controls take a tap or a press now: showing, and not
-/// waiting on the host to apply a change.
-fn takes_input(window: &MainWindow) -> bool {
-    !window.get_install_fenced()
-        && window.get_ingame_clock_visible()
-        && !window.get_clock_controls_pending()
+/// The menu showing the pages, if it takes a tap or a press now: not while
+/// the host applies a change to Clock Controls.
+fn takes_input(window: &MainWindow) -> Option<Menu> {
+    if window.get_install_fenced() || window.get_clock_controls_pending() {
+        return None;
+    }
+    Menu::showing(window)
 }
 
 /// Shows Clock Controls from the pause menu, on the page and row they were
@@ -183,37 +188,114 @@ pub(crate) fn open(window: &MainWindow) {
     }
 }
 
-/// A press on Clock Controls. Up and Down move between the rows and Back.
-/// Left and Right change a row's setting, and Right opens a page. A / Enter
-/// plays an event's row, opens a page, steps a setting on, or presses Back.
-/// Back goes up a page, Controls closes them, and Start resumes.
-pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
+/// A press on the pages in `menu`. Up and Down move between the rows and
+/// Back. Left and Right change a row's setting, and Right opens a page. A /
+/// Enter plays an event's row in Clock Controls, opens a page, steps a setting
+/// on, or presses Back. Back goes up a page. Controls closes Clock Controls,
+/// or turns Scenario Settings to the launcher's Controls. Start resumes the
+/// Clock, or starts it.
+pub(crate) fn handle_action(window: &MainWindow, menu: Menu, action: UiAction) {
     if window.get_clock_controls_pending() {
         return;
     }
-    let index = window.get_ingame_clock_focus_index();
-    let row = clock_menu::row(window, index);
+    let index = menu.focus(window);
+    let row = clock_menu::row(window, menu, index);
     match action {
         UiAction::Up | UiAction::Down => {
-            let rows = window.get_clock_menu_rows().iter().collect::<Vec<_>>();
-            window.set_ingame_clock_focus_index(clock_menu::moved_focus(&rows, index, action));
+            let rows = clock_menu::page_rows(window, menu)
+                .iter()
+                .collect::<Vec<_>>();
+            menu.set_focus(window, clock_menu::moved_focus(&rows, index, action));
         }
         UiAction::Left | UiAction::Right => match row.map(|row| row.kind) {
             Some(SettingsRowKind::Choice | SettingsRowKind::Switch) => window
                 .invoke_clock_menu_adjust(index, if action == UiAction::Left { -1 } else { 1 }),
             Some(SettingsRowKind::Page) if action == UiAction::Right => {
-                clock_menu::open_row(window, index)
+                clock_menu::open_row(window, menu, index)
             }
             _ => {}
         },
         UiAction::Confirm => match row {
-            None => clock_menu::back(window),
+            None => clock_menu::back(window, menu),
             Some(row) if row.playable => window.invoke_clock_menu_play(index),
-            Some(row) if row.kind == SettingsRowKind::Page => clock_menu::open_row(window, index),
+            Some(row) if row.kind == SettingsRowKind::Page => {
+                clock_menu::open_row(window, menu, index)
+            }
             Some(_) => window.invoke_clock_menu_adjust(index, 1),
         },
-        UiAction::Back => clock_menu::back(window),
-        UiAction::Controls => window.set_ingame_clock_visible(false),
-        UiAction::Start => window.invoke_ingame_resume(),
+        UiAction::Back => clock_menu::back(window, menu),
+        UiAction::Controls => match menu {
+            Menu::Pause => window.set_ingame_clock_visible(false),
+            Menu::Launcher => {
+                window.set_launcher_settings_visible(false);
+                window.set_launcher_controls_visible(true);
+            }
+        },
+        UiAction::Start => match menu {
+            Menu::Pause => window.invoke_ingame_resume(),
+            Menu::Launcher => window.invoke_launcher_start_game(),
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
+    use slint::platform::{Platform, PlatformError, WindowAdapter};
+
+    use super::*;
+
+    struct TestPlatform;
+
+    impl Platform for TestPlatform {
+        fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
+            Ok(MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer))
+        }
+    }
+
+    /// In the launcher, a row's ‹ and › step its setting as the settings table
+    /// does, and the pages keep it for Start to save. Renderer and Raster
+    /// Scale step the launcher's own choices, which their rows then show.
+    #[test]
+    fn launcher_rows_step_their_settings_and_keep_them_on_the_pages() {
+        slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+        let window = MainWindow::new().unwrap();
+        for setting in clock_settings_table::SETTINGS {
+            for start in clock_settings_table::starting_points() {
+                for delta in [1, -1] {
+                    publish_settings(&window, start);
+                    adjust_launcher_row(&window, setting.id(), delta);
+                    assert_eq!(
+                        clock_menu::settings(&window),
+                        Some(clock_settings_table::stepped(setting, start, delta)),
+                        "{} by {delta}",
+                        setting.id()
+                    );
+                }
+            }
+        }
+        window.set_launcher_renderer("raster".into());
+        window.set_launcher_raster_scale_text("1.0".into());
+        publish_settings(&window, ClockSettings::default());
+        adjust_launcher_row(&window, "renderer", 1);
+        adjust_launcher_row(&window, "raster-scale", -1);
+        let shown = window
+            .get_clock_menu_launcher()
+            .top
+            .iter()
+            .map(|row| (row.id.to_string(), row.value.to_string()))
+            .collect::<Vec<_>>();
+        assert!(
+            shown.contains(&("renderer".into(), "vector".into())),
+            "{shown:?}"
+        );
+        assert!(
+            shown.contains(&("raster-scale".into(), "3.0×".into())),
+            "{shown:?}"
+        );
+        assert_eq!(
+            clock_menu::settings(&window),
+            Some(ClockSettings::default())
+        );
     }
 }

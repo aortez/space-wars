@@ -260,8 +260,8 @@ fn lamps_render_rest_track_present_and_outage_and_come_back_at_target_sizes() {
         }
         // The ball handed over: the right lamp followed it too.
         assert_eq!(state.lamps_state().handoffs, 1, "{width}x{height}");
-        // The Lamps control, selected, on the live Clock page and in the
-        // launcher's Clock settings, beside the profile's longest value.
+        // The Lamps row, selected, on the Look page of Clock Controls and of
+        // the launcher's Clock settings.
         for live in [false, true] {
             reset_panels(&ui);
             ui.set_launcher_scenario("clock".into());
@@ -273,20 +273,19 @@ fn lamps_render_rest_track_present_and_outage_and_come_back_at_target_sizes() {
                     ..ClockSettings::default()
                 },
             );
-            assert_eq!(ui.get_launcher_clock_lamps(), "Lively");
-            assert_eq!(ui.get_launcher_clock_event_profile(), "Demo");
-            if live {
+            let menu = if live {
                 ui.set_ingame_menu_visible(true);
                 ui.set_ingame_clock_visible(true);
-                crate::clock_menu::show(&ui, crate::clock_menu::Page::Look, Some("lamps"));
-                // The list scrolls to the row in a change handler, which runs
-                // with the timers.
-                slint::platform::update_timers_and_animations();
+                crate::clock_menu::Menu::Pause
             } else {
                 ui.set_launcher_visible(true);
                 ui.set_launcher_settings_visible(true);
-                ui.set_launcher_settings_focus_index(23);
-            }
+                crate::clock_menu::Menu::Launcher
+            };
+            crate::clock_menu::show(&ui, menu, crate::clock_menu::Page::Look, Some("lamps"));
+            // The list scrolls to the row in a change handler, which runs
+            // with the timers.
+            slint::platform::update_timers_and_animations();
             let pixels = capture(window, viewport);
             if let Some(path) = &output {
                 let page = if live { "live" } else { "launcher" };

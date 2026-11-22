@@ -1534,12 +1534,17 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
         ingame_menu: window.get_ingame_menu_visible(),
         ingame_controls: window.get_ingame_controls_visible(),
         ingame_clock: window.get_ingame_clock_visible(),
-        clock_page: crate::clock_menu::page(window),
+        clock_page: if crate::clock_menu::Menu::showing(window).is_some() {
+            crate::clock_menu::page(window)
+        } else {
+            crate::clock_menu::Page::Top
+        },
         clock_fonts: window.get_clock_fonts_visible(),
         game_over: window.get_game_over_visible(),
     });
     let runtime = runtime_status_for_screen(screen, window.get_runtime_diagnostics().as_str())?;
     let selected_scenario = window.get_launcher_scenario().to_string();
+    let clock_menu = crate::clock_menu::Menu::showing(window);
     let inventory = inventory_for_screen(
         screen,
         &UiInventoryContext {
@@ -1609,15 +1614,15 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             launcher_settings_focus_index: window.get_launcher_settings_focus_index(),
             launcher_controls_focus_index: window.get_launcher_controls_focus_index(),
             ingame_menu_focus_index: window.get_ingame_menu_focus_index(),
-            clock_controls: if window.get_ingame_clock_visible() {
-                crate::clock_menu::targets(window)
-                    .into_iter()
-                    .map(|(control, _, _)| control)
-                    .collect()
-            } else {
-                Vec::new()
-            },
-            clock_selected: Some(crate::clock_menu::selected(window)),
+            clock_controls: clock_menu
+                .map(|menu| {
+                    crate::clock_menu::targets(window, menu)
+                        .into_iter()
+                        .map(|(control, _, _)| control)
+                        .collect()
+                })
+                .unwrap_or_default(),
+            clock_selected: clock_menu.map(|menu| crate::clock_menu::selected(window, menu)),
             clock_controls_pending: window.get_clock_controls_pending(),
             clock_settings_error: non_empty(window.get_clock_settings_error().as_str()),
             game_over_focus_index: window.get_game_over_focus_index(),
@@ -1650,36 +1655,6 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             pizza_event_can_trigger: window.get_pizza_event_can_trigger(),
             pizza_event_status: window.get_pizza_event_status().to_string(),
             expedition_players: window.get_launcher_expedition_players().to_string(),
-            clock_time_format: window.get_launcher_clock_time_format().to_string(),
-            clock_show_date: window.get_launcher_clock_show_date(),
-            clock_event_profile: window.get_launcher_clock_event_profile().to_string(),
-            clock_falling_enabled: window.get_launcher_clock_falling_enabled(),
-            clock_color_cycle_enabled: window.get_launcher_clock_color_cycle_enabled(),
-            clock_meltdown_enabled: window.get_launcher_clock_meltdown_enabled(),
-            clock_duck_enabled: window.get_launcher_clock_duck_enabled(),
-            clock_crow: if window.get_launcher_clock_crow_enabled() {
-                window.get_launcher_clock_crow_water_tolerance().to_string()
-            } else {
-                "Off".into()
-            },
-            clock_lamps: window.get_launcher_clock_lamps().to_string(),
-            clock_theme: window.get_launcher_clock_theme().to_string(),
-            clock_explosion_enabled: window.get_launcher_clock_explosion_enabled(),
-            clock_aquarium_enabled: window.get_launcher_clock_aquarium_enabled(),
-            clock_marquee_enabled: window.get_launcher_clock_marquee_enabled(),
-            clock_digit_slide_enabled: window.get_launcher_clock_digit_slide_enabled(),
-            clock_cell_swap_enabled: window.get_launcher_clock_cell_swap_enabled(),
-            clock_grass_enabled: window.get_launcher_clock_grass_enabled(),
-            clock_slot_machine_enabled: window.get_launcher_clock_slot_machine_enabled(),
-            clock_spider_enabled: window.get_launcher_clock_spider_enabled(),
-            clock_coins_enabled: window.get_launcher_clock_coins_enabled(),
-            clock_tanks_enabled: window.get_launcher_clock_tanks_enabled(),
-            clock_rain: if window.get_launcher_clock_rain_enabled() {
-                window.get_launcher_clock_rain_amount().to_string()
-            } else {
-                "Off".into()
-            },
-            clock_marquee_preset: window.get_launcher_clock_marquee_preset().to_string(),
             nes_cartridge_name: window.get_launcher_nes_rom_name().to_string(),
         },
     );
@@ -2871,10 +2846,13 @@ mod tests {
         );
     }
 
+    /// Every control on each page of both menus is listed, validates and
+    /// presses as its row's input does. The press is logged where it would
+    /// reach the host, the Fonts page or the launch.
     #[test]
     fn every_clock_control_is_listed_on_its_page_and_activates_as_its_input_does() {
         use crate::SettingsRowKind;
-        use crate::clock_menu::{self, Page};
+        use crate::clock_menu::{self, Menu, Page};
         use engine_common::{ClockEventKind, ClockSettings};
         use slint::Model;
         use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
@@ -2891,9 +2869,7 @@ mod tests {
         slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
         let window = MainWindow::new().unwrap();
         window.set_launcher_scenario("clock".into());
-        window.set_ingame_menu_visible(true);
         clock_menu::publish(&window, &ClockSettings::default());
-        // What reaches the host, or the Fonts page, from each press.
         let pressed = Rc::new(RefCell::new(Vec::new()));
         let log = Rc::clone(&pressed);
         window.on_clock_menu_adjust(move |index, delta| {
@@ -2903,89 +2879,131 @@ mod tests {
         window.on_clock_menu_play(move |index| log.borrow_mut().push(format!("play {index}")));
         let log = Rc::clone(&pressed);
         window.on_clock_fonts_open(move || log.borrow_mut().push("fonts".to_owned()));
+        let log = Rc::clone(&pressed);
+        window.on_launcher_start_game(move || log.borrow_mut().push("start".to_owned()));
+        // Shows `page` in `menu`, as a script would find it.
+        let open = |menu, page| {
+            window.set_launcher_visible(menu == Menu::Launcher);
+            window.set_launcher_settings_visible(menu == Menu::Launcher);
+            window.set_ingame_menu_visible(menu == Menu::Pause);
+            window.set_ingame_clock_visible(menu == Menu::Pause);
+            clock_menu::show(&window, menu, page, None);
+        };
         let mut tracker = UiStateTracker::default();
         let mut listed = Vec::new();
-        for (page, screen) in [
-            (Page::Top, UiScreen::PauseClock),
-            (Page::Look, UiScreen::PauseClockLook),
-            (Page::Events, UiScreen::PauseClockEvents),
-        ] {
-            window.set_ingame_clock_visible(true);
-            clock_menu::show(&window, page, None);
-            let rows = window.get_clock_menu_rows().iter().collect::<Vec<_>>();
-            let state = ui_state(&window, &mut tracker).unwrap();
-            assert_eq!(state.screen, screen);
-            let ids = state
-                .controls
-                .iter()
-                .map(|control| control.id.clone())
-                .collect::<Vec<_>>();
-            assert_eq!(
-                ids,
-                clock_menu::targets(&window)
+        for menu in [Menu::Pause, Menu::Launcher] {
+            let prefix = match menu {
+                Menu::Pause => "pause.clock.",
+                Menu::Launcher => "launcher.settings.clock.",
+            };
+            for page in [Page::Top, Page::Look, Page::Events] {
+                open(menu, page);
+                let rows = clock_menu::page_rows(&window, menu)
+                    .iter()
+                    .collect::<Vec<_>>();
+                let screen = page.screen(menu);
+                let state = ui_state(&window, &mut tracker).unwrap();
+                assert_eq!(state.screen, screen);
+                let ids = state
+                    .controls
+                    .iter()
+                    .map(|control| control.id.clone())
+                    .collect::<Vec<_>>();
+                let mut targets = clock_menu::targets(&window, menu)
                     .into_iter()
                     .map(|(control, _, _)| control.id)
-                    .collect::<Vec<_>>()
-            );
-            for id in ids {
-                // Each control is pressed from the page, as a script would.
-                window.set_ingame_clock_visible(true);
-                clock_menu::show(&window, page, None);
-                let state = ui_state(&window, &mut tracker).unwrap();
-                let request = UiActivateRequest {
-                    schema_version: UI_STATE_SCHEMA_VERSION,
-                    control_id: id.clone(),
-                    expected_screen: Some(screen),
-                    expected_revision: Some(state.revision),
-                };
-                assert!(validate_ui_activate(&request, &state).is_ok(), "{id}");
-                pressed.borrow_mut().clear();
-                assert!(crate::ui_activation::activate(&window, &id), "{id}");
-                let name = id.strip_prefix("pause.clock.").unwrap();
-                let (base, end) = name.split_once('.').unwrap_or((name, ""));
-                let Some(row) = rows.iter().position(|row| row.id == base) else {
-                    // Back goes up a page, onto the row that opened it, or
-                    // from the top page out of Clock Controls.
-                    assert_eq!(id, "pause.clock.back");
-                    if page == Page::Top {
-                        assert!(!window.get_ingame_clock_visible());
-                    } else {
-                        assert_eq!(clock_menu::page(&window), Page::Top);
-                        assert_eq!(
-                            clock_menu::selected(&window),
-                            format!("pause.clock.{}", page.name())
-                        );
-                    }
-                    listed.push(id);
-                    continue;
-                };
-                let expected = match (end, rows[row].kind) {
-                    ("previous", SettingsRowKind::Choice) => vec![format!("adjust {row} -1")],
-                    ("next", SettingsRowKind::Choice) | ("", SettingsRowKind::Switch) => {
-                        vec![format!("adjust {row} 1")]
-                    }
-                    ("play", _) => vec![format!("play {row}")],
-                    ("", SettingsRowKind::Page) if base == "fonts" => vec!["fonts".to_owned()],
-                    ("", SettingsRowKind::Page) => {
-                        assert_eq!(clock_menu::page(&window), Page::named(base), "{id}");
-                        Vec::new()
-                    }
-                    other => panic!("{id} names no press on its row: {other:?}"),
-                };
-                assert_eq!(*pressed.borrow(), expected, "{id}");
-                if rows[row].kind != SettingsRowKind::Page {
-                    assert_eq!(window.get_ingame_clock_focus_index(), row as i32, "{id}");
+                    .collect::<Vec<_>>();
+                if menu == Menu::Launcher {
+                    targets.push("launcher.settings.start".into());
                 }
-                listed.push(id);
+                assert_eq!(ids, targets);
+                for id in ids {
+                    open(menu, page);
+                    let state = ui_state(&window, &mut tracker).unwrap();
+                    let request = UiActivateRequest {
+                        schema_version: UI_STATE_SCHEMA_VERSION,
+                        control_id: id.clone(),
+                        expected_screen: Some(screen),
+                        expected_revision: Some(state.revision),
+                    };
+                    assert!(validate_ui_activate(&request, &state).is_ok(), "{id}");
+                    pressed.borrow_mut().clear();
+                    assert!(crate::ui_activation::activate(&window, &id), "{id}");
+                    listed.push(id.clone());
+                    // Renderer, Raster Scale, Back and Start keep the names
+                    // they have in every scenario's settings.
+                    let name = id
+                        .strip_prefix(prefix)
+                        .or_else(|| id.strip_prefix("launcher.settings."))
+                        .unwrap();
+                    let (base, end) = name.split_once('.').unwrap_or((name, ""));
+                    if base == "start" {
+                        assert_eq!(*pressed.borrow(), ["start"]);
+                        continue;
+                    }
+                    let Some(row) = rows.iter().position(|row| row.id == base) else {
+                        // Back goes up a page, onto the row that opened it, or
+                        // from the top page out of the menu.
+                        assert_eq!(base, "back", "{id}");
+                        if page == Page::Top {
+                            assert_eq!(Menu::showing(&window), None, "{id}");
+                        } else {
+                            assert_eq!(clock_menu::page(&window), Page::Top);
+                            assert_eq!(
+                                clock_menu::selected(&window, menu),
+                                format!("{prefix}{}", page.name())
+                            );
+                        }
+                        continue;
+                    };
+                    let expected = match (end, rows[row].kind) {
+                        ("previous", SettingsRowKind::Choice) => vec![format!("adjust {row} -1")],
+                        ("next", SettingsRowKind::Choice) | ("", SettingsRowKind::Switch) => {
+                            vec![format!("adjust {row} 1")]
+                        }
+                        ("play", _) => vec![format!("play {row}")],
+                        ("", SettingsRowKind::Page) if base == "fonts" => vec!["fonts".to_owned()],
+                        ("", SettingsRowKind::Page) => {
+                            assert_eq!(clock_menu::page(&window), Page::named(base), "{id}");
+                            Vec::new()
+                        }
+                        other => panic!("{id} names no press on its row: {other:?}"),
+                    };
+                    assert_eq!(*pressed.borrow(), expected, "{id}");
+                    if rows[row].kind != SettingsRowKind::Page {
+                        assert_eq!(menu.focus(&window), row as i32, "{id}");
+                    }
+                }
             }
         }
-        // Every event can be played, and these IDs, which scripts and the
-        // docs use, keep their names.
+        // Every event can be played from Clock Controls, but not from the
+        // launcher, and these IDs, which scripts and the docs use, keep their
+        // names.
         for kind in ClockEventKind::ALL {
             let play = format!("pause.clock.{}.play", kind.as_str());
             assert!(listed.contains(&play), "{play}");
         }
+        assert!(
+            !listed
+                .iter()
+                .any(|id| id.starts_with("launcher.") && id.ends_with(".play"))
+        );
         for id in [
+            "launcher.settings.back",
+            "launcher.settings.clock.crow.next",
+            "launcher.settings.clock.duck",
+            "launcher.settings.clock.event-profile.previous",
+            "launcher.settings.clock.events",
+            "launcher.settings.clock.fonts",
+            "launcher.settings.clock.look",
+            "launcher.settings.clock.marquee.next",
+            "launcher.settings.clock.rain.previous",
+            "launcher.settings.clock.show-date",
+            "launcher.settings.clock.theme.next",
+            "launcher.settings.clock.time-format.next",
+            "launcher.settings.raster-scale.next",
+            "launcher.settings.renderer.next",
+            "launcher.settings.start",
             "pause.clock.crow.next",
             "pause.clock.event-profile.next",
             "pause.clock.events",
@@ -2993,7 +3011,7 @@ mod tests {
             "pause.clock.grass",
             "pause.clock.lamps.next",
             "pause.clock.look",
-            "pause.clock.marquee-preset.next",
+            "pause.clock.marquee.next",
             "pause.clock.rain.previous",
             "pause.clock.show-date",
             "pause.clock.theme.next",
@@ -3001,10 +3019,20 @@ mod tests {
         ] {
             assert!(listed.iter().any(|listed| listed == id), "{id}");
         }
-        assert!(
-            !listed
-                .iter()
-                .any(|id| id == "pause.clock.marquee-preset.play")
-        );
+
+        // A display that draws only raster fixes the renderer, but not its
+        // scale or anything else.
+        window.set_raster_only(true);
+        clock_menu::publish(&window, &ClockSettings::default());
+        open(Menu::Launcher, Page::Top);
+        let state = ui_state(&window, &mut tracker).unwrap();
+        for control in &state.controls {
+            assert_eq!(
+                control.enabled,
+                !control.id.starts_with("launcher.settings.renderer."),
+                "{}",
+                control.id
+            );
+        }
     }
 }

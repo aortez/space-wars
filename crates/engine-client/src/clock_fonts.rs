@@ -95,8 +95,11 @@ pub(crate) fn install(window: &MainWindow, controls: host::SharedScenarioControl
             _ => return,
         }
         if window.get_launcher_visible() {
-            // Launcher choices are durably saved with the existing Play flow.
-            publish(&window, fonts);
+            // The launcher's pages keep the choice until Start saves it.
+            if let Some(mut settings) = crate::clock_menu::settings(&window) {
+                settings.fonts = fonts;
+                crate::clock_controls::publish_settings(&window, settings);
+            }
         } else {
             let mut controls = controls.borrow_mut();
             let Some(state) = controls.clock_state() else {

@@ -657,7 +657,7 @@ pub fn start_scenario_loop(
         .publish_pizza_status(&scenario, scenario_revision, paused, window);
     if scenario_name == "clock" {
         crate::clock_controls::publish_settings(window, settings.clock);
-        crate::clock_menu::reset(window);
+        crate::clock_menu::reset(window, crate::clock_menu::Menu::Pause);
     }
     window.set_clock_controls_pending(false);
     let mut performance = PerformanceStats::new(tick_model, last_tick);

@@ -1,17 +1,79 @@
 //! The Clock's settings as pages of rows: the top page and the two it opens,
-//! Look and Events, where each event's row can also play it. The rows come
-//! from the settings table, so a setting added there appears on its page with
-//! nothing to change here.
+//! Look and Events. Two menus show them. Clock Controls, in the pause menu,
+//! can also play each event from its row. The Clock's Scenario Settings, in
+//! the launcher, also choose the renderer on their top page. The rows come
+//! from the settings table, so a setting added there appears on its page in
+//! both menus, with nothing to change here.
 //!
-//! The window holds which page shows and the focused row. Keyboard, gamepad,
-//! touch and control-ID activation all move between pages through here.
+//! The window holds which page shows and the focused row, and the rows' models
+//! hold the settings they show. Keyboard, gamepad, touch and control-ID
+//! activation all move between pages through here.
+
+use std::any::Any;
 
 use engine_common::{ClockEventKind, ClockSettings};
-use slint::{Model, ModelRc, VecModel};
+use slint::{Model, ModelRc, ModelTracker, VecModel};
 use spacewars_control::{UiAction, UiControl, UiScreen};
 
 use crate::clock_settings_table::{self, ClockSetting, Section};
-use crate::{MainWindow, SettingsListRow, SettingsRowKind};
+use crate::{ClockMenuPages, MainWindow, SettingsListRow, SettingsRowKind};
+
+/// A menu that shows the pages.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Menu {
+    /// Clock Controls, in the pause menu over the running Clock.
+    Pause,
+    /// The Clock's Scenario Settings, in the launcher.
+    Launcher,
+}
+
+impl Menu {
+    /// The menu showing the pages, if one is.
+    pub(crate) fn showing(window: &MainWindow) -> Option<Self> {
+        if window.get_launcher_visible() {
+            (window.get_launcher_settings_visible() && window.get_launcher_scenario() == "clock")
+                .then_some(Self::Launcher)
+        } else {
+            window.get_ingame_clock_visible().then_some(Self::Pause)
+        }
+    }
+
+    /// The focused row on the page showing, or Back after the last row.
+    pub(crate) fn focus(self, window: &MainWindow) -> i32 {
+        match self {
+            Self::Pause => window.get_ingame_clock_focus_index(),
+            Self::Launcher => window.get_launcher_settings_focus_index(),
+        }
+    }
+
+    pub(crate) fn set_focus(self, window: &MainWindow, index: i32) {
+        match self {
+            Self::Pause => window.set_ingame_clock_focus_index(index),
+            Self::Launcher => window.set_launcher_settings_focus_index(index),
+        }
+    }
+
+    /// The control API's name for the row named `id`, or for Back. In the
+    /// launcher, Renderer, Raster Scale and Back keep the names they have in
+    /// every scenario's settings.
+    fn control(self, id: &str) -> String {
+        match (self, id) {
+            (Self::Pause, _) => format!("pause.clock.{id}"),
+            (Self::Launcher, "renderer" | "raster-scale" | "back") => {
+                format!("launcher.settings.{id}")
+            }
+            (Self::Launcher, _) => format!("launcher.settings.clock.{id}"),
+        }
+    }
+
+    /// The menu's pages, as the window holds them.
+    fn pages(self, window: &MainWindow) -> ClockMenuPages {
+        match self {
+            Self::Pause => window.get_clock_menu_pause(),
+            Self::Launcher => window.get_clock_menu_launcher(),
+        }
+    }
+}
 
 /// A Clock settings page.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -41,12 +103,15 @@ impl Page {
         }
     }
 
-    /// The screen the control API reports while the page shows.
-    pub(crate) const fn screen(self) -> UiScreen {
-        match self {
-            Self::Top => UiScreen::PauseClock,
-            Self::Look => UiScreen::PauseClockLook,
-            Self::Events => UiScreen::PauseClockEvents,
+    /// The screen the control API reports while `menu` shows the page.
+    pub(crate) const fn screen(self, menu: Menu) -> UiScreen {
+        match (menu, self) {
+            (Menu::Pause, Self::Top) => UiScreen::PauseClock,
+            (Menu::Pause, Self::Look) => UiScreen::PauseClockLook,
+            (Menu::Pause, Self::Events) => UiScreen::PauseClockEvents,
+            (Menu::Launcher, Self::Top) => UiScreen::LauncherSettings,
+            (Menu::Launcher, Self::Look) => UiScreen::LauncherClockLook,
+            (Menu::Launcher, Self::Events) => UiScreen::LauncherClockEvents,
         }
     }
 
@@ -60,17 +125,56 @@ impl Page {
     }
 }
 
-/// Shows every page's rows for `settings`.
+/// Shows every page's rows for `settings` in both menus, and keeps the
+/// settings with the rows for [`settings`] to read back. The launcher's top
+/// page takes its renderer rows from the window, and its Clock card a line
+/// about the time and the events.
 pub(crate) fn publish(window: &MainWindow, settings: &ClockSettings) {
-    let model = |page| ModelRc::new(VecModel::from(rows(page, settings)));
-    window.set_clock_menu_top_rows(model(Page::Top));
-    window.set_clock_menu_look_rows(model(Page::Look));
-    window.set_clock_menu_events_rows(model(Page::Events));
+    let model = |rows| -> ModelRc<SettingsListRow> {
+        ModelRc::new(PageRows {
+            settings: *settings,
+            rows: VecModel::from(rows),
+        })
+    };
+    let pages = |menu| ClockMenuPages {
+        top: model(rows(menu, Page::Top, settings)),
+        look: model(rows(menu, Page::Look, settings)),
+        events: model(rows(menu, Page::Events, settings)),
+    };
+    window.set_clock_menu_pause(pages(Menu::Pause));
+    let mut top = rows(Menu::Launcher, Page::Top, settings);
+    top.extend(renderer_rows(window));
+    window.set_clock_menu_launcher(ClockMenuPages {
+        top: model(top),
+        ..pages(Menu::Launcher)
+    });
+    window.set_clock_menu_summary(
+        format!(
+            "{}  ·  local time  ·  {} events",
+            value("time-format", settings),
+            value("event-profile", settings)
+        )
+        .into(),
+    );
 }
 
-/// The rows of `page`, each named by its control's ID after `pause.clock.`.
-pub(crate) fn rows(page: Page, settings: &ClockSettings) -> Vec<SettingsListRow> {
-    let mut rows = Rows::default();
+/// The settings the pages show, as last published.
+pub(crate) fn settings(window: &MainWindow) -> Option<ClockSettings> {
+    window
+        .get_clock_menu_pause()
+        .top
+        .as_any()
+        .downcast_ref::<PageRows>()
+        .map(|rows| rows.settings)
+}
+
+/// The Clock's rows on `page` in `menu`, each named by its control's ID after
+/// the menu's prefix: `pause.clock.` or `launcher.settings.clock.`.
+pub(crate) fn rows(menu: Menu, page: Page, settings: &ClockSettings) -> Vec<SettingsListRow> {
+    let mut rows = Rows {
+        playable: menu == Menu::Pause,
+        ..Rows::default()
+    };
     match page {
         Page::Top => {
             rows.page(
@@ -83,7 +187,10 @@ pub(crate) fn rows(page: Page, settings: &ClockSettings) -> Vec<SettingsListRow>
                 "events",
                 "Events",
                 &events_summary(settings),
-                "How often events come, which ones, and Play to see one now.",
+                match menu {
+                    Menu::Pause => "How often events come, which ones, and Play to see one now.",
+                    Menu::Launcher => "How often events come, and which ones.",
+                },
             );
         }
         Page::Look => {
@@ -131,54 +238,65 @@ pub(crate) fn page(window: &MainWindow) -> Page {
     Page::named(&window.get_clock_menu_page())
 }
 
-/// The row at `index` on the page showing, or `None` for Back, which follows
-/// the rows.
-pub(crate) fn row(window: &MainWindow, index: i32) -> Option<SettingsListRow> {
-    let index = usize::try_from(index).ok()?;
-    window.get_clock_menu_rows().row_data(index)
+/// The rows of the page showing in `menu`.
+pub(crate) fn page_rows(window: &MainWindow, menu: Menu) -> ModelRc<SettingsListRow> {
+    let pages = menu.pages(window);
+    match page(window) {
+        Page::Top => pages.top,
+        Page::Look => pages.look,
+        Page::Events => pages.events,
+    }
 }
 
-/// Shows `page`, focused on its row named `focus`, or on its first row.
-pub(crate) fn show(window: &MainWindow, page: Page, focus: Option<&str>) {
+/// The row at `index` on the page showing in `menu`, or `None` for Back,
+/// which follows the rows.
+pub(crate) fn row(window: &MainWindow, menu: Menu, index: i32) -> Option<SettingsListRow> {
+    let index = usize::try_from(index).ok()?;
+    page_rows(window, menu).row_data(index)
+}
+
+/// Shows `page` in `menu`, focused on its row named `focus`, or on its first
+/// row.
+pub(crate) fn show(window: &MainWindow, menu: Menu, page: Page, focus: Option<&str>) {
     window.set_clock_menu_page(page.name().into());
     let index = focus
-        .and_then(|id| {
-            window
-                .get_clock_menu_rows()
-                .iter()
-                .position(|row| row.id == id)
-        })
+        .and_then(|id| page_rows(window, menu).iter().position(|row| row.id == id))
         .unwrap_or(0);
-    window.set_ingame_clock_focus_index(index as i32);
+    menu.set_focus(window, index as i32);
 }
 
-/// Starts Clock Controls over on the top page, for a launch of the Clock.
-/// Until the next launch, Restart included, they open where they were left.
-pub(crate) fn reset(window: &MainWindow) {
-    show(window, Page::Top, None);
+/// Starts `menu` over on the top page. Clock Controls start over for each
+/// launch of the Clock, and until the next one, Restart included, they open
+/// where they were left. Scenario Settings start over each time the launcher
+/// shows, or its scenario changes.
+pub(crate) fn reset(window: &MainWindow, menu: Menu) {
+    show(window, menu, Page::Top, None);
 }
 
 /// Opens the page that the row at `index` names, if it names one.
-pub(crate) fn open_row(window: &MainWindow, index: i32) {
-    let Some(row) = row(window, index) else {
+pub(crate) fn open_row(window: &MainWindow, menu: Menu, index: i32) {
+    let Some(row) = row(window, menu, index) else {
         return;
     };
     match row.id.as_str() {
-        "look" => show(window, Page::Look, None),
-        "events" => show(window, Page::Events, None),
+        "look" => show(window, menu, Page::Look, None),
+        "events" => show(window, menu, Page::Events, None),
         "fonts" => window.invoke_clock_fonts_open(),
         _ => {}
     }
 }
 
 /// Back: to the page that opens this one, on the row that opens it, or from
-/// the top page out of Clock Controls, which next open on their first row.
-pub(crate) fn back(window: &MainWindow) {
+/// the top page out of the menu, which next opens on its first row.
+pub(crate) fn back(window: &MainWindow, menu: Menu) {
     match page(window).parent() {
-        Some((parent, row)) => show(window, parent, Some(row)),
+        Some((parent, row)) => show(window, menu, parent, Some(row)),
         None => {
-            reset(window);
-            window.set_ingame_clock_visible(false);
+            reset(window, menu);
+            match menu {
+                Menu::Pause => window.set_ingame_clock_visible(false),
+                Menu::Launcher => window.set_launcher_settings_visible(false),
+            }
         }
     }
 }
@@ -204,16 +322,16 @@ pub(crate) fn moved_focus(rows: &[SettingsListRow], focus: i32, action: UiAction
     stops[next % stops.len()] as i32
 }
 
-/// The controls on the page showing, as the control API lists them, each with
-/// its row and the action that presses it there: a switch by its name, a
-/// choice by its ‹ and ›, a page by its name, Play, and Back.
-pub(crate) fn targets(window: &MainWindow) -> Vec<(UiControl, i32, UiAction)> {
-    let rows = window.get_clock_menu_rows();
+/// The controls on the page showing in `menu`, as the control API lists them,
+/// each with its row and the action that presses it there: a switch by its
+/// name, a choice by its ‹ and ›, a page by its name, Play, and Back.
+pub(crate) fn targets(window: &MainWindow, menu: Menu) -> Vec<(UiControl, i32, UiAction)> {
+    let rows = page_rows(window, menu);
     let mut targets = Vec::new();
     for (index, row) in rows.iter().enumerate() {
         let index = index as i32;
-        let id = format!("pause.clock.{}", row.id);
-        let named = |label: &str| UiControl::new(id.as_str(), label, true);
+        let id = menu.control(&row.id);
+        let named = |label: &str| UiControl::new(id.as_str(), label, row.enabled);
         match row.kind {
             SettingsRowKind::Heading => continue,
             SettingsRowKind::Choice => {
@@ -221,7 +339,7 @@ pub(crate) fn targets(window: &MainWindow) -> Vec<(UiControl, i32, UiAction)> {
                     ("previous", "‹", UiAction::Left),
                     ("next", "›", UiAction::Right),
                 ] {
-                    let control = UiControl::new(format!("{id}.{end}"), label, true);
+                    let control = UiControl::new(format!("{id}.{end}"), label, row.enabled);
                     targets.push((control.with_value(row.value.as_str()), index, action));
                 }
             }
@@ -237,24 +355,22 @@ pub(crate) fn targets(window: &MainWindow) -> Vec<(UiControl, i32, UiAction)> {
             )),
         }
         if row.playable {
-            let control = UiControl::new(format!("{id}.play"), "Play", true);
+            let control = UiControl::new(format!("{id}.play"), "Play", row.enabled);
             targets.push((control, index, UiAction::Confirm));
         }
     }
     targets.push((
-        UiControl::new("pause.clock.back", "Back", true),
+        UiControl::new(menu.control("back"), "Back", true),
         rows.row_count() as i32,
         UiAction::Confirm,
     ));
     targets
 }
 
-/// The focused row, as the control API names it.
-pub(crate) fn selected(window: &MainWindow) -> String {
-    row(window, window.get_ingame_clock_focus_index()).map_or_else(
-        || "pause.clock.back".to_owned(),
-        |row| format!("pause.clock.{}", row.id),
-    )
+/// The focused row in `menu`, as the control API names it.
+pub(crate) fn selected(window: &MainWindow, menu: Menu) -> String {
+    row(window, menu, menu.focus(window))
+        .map_or_else(|| menu.control("back"), |row| menu.control(&row.id))
 }
 
 /// The label of the setting's current value.
@@ -296,11 +412,66 @@ fn fonts_summary(settings: &ClockSettings) -> String {
     }
 }
 
+/// The renderer and its scale, which the launcher's settings choose for every
+/// scenario, as rows after the Clock's own on its top page. A display that can
+/// draw only raster fixes the renderer.
+fn renderer_rows(window: &MainWindow) -> Vec<SettingsListRow> {
+    let fixed = window.get_raster_only();
+    let mut rows = Rows::default();
+    rows.push(
+        "renderer",
+        if fixed { "Renderer (fixed)" } else { "Renderer" },
+        &window.get_launcher_renderer(),
+        "Raster draws each frame as an image, on any screen. Vector draws the shapes themselves, and needs a GPU.",
+        SettingsRowKind::Choice,
+        false,
+    );
+    rows.rows[0].enabled = !fixed;
+    rows.push(
+        "raster-scale",
+        "Raster Scale",
+        &format!("{}×", window.get_launcher_raster_scale_text()),
+        "Draws raster frames this many times the screen's size, then fits them to it: smoother, but slower.",
+        SettingsRowKind::Choice,
+        false,
+    );
+    rows.rows
+}
+
+/// A page's rows, with the settings they show. The window holds both, so a
+/// press steps the setting itself rather than reading it back from its label.
+struct PageRows {
+    settings: ClockSettings,
+    rows: VecModel<SettingsListRow>,
+}
+
+impl Model for PageRows {
+    type Data = SettingsListRow;
+
+    fn row_count(&self) -> usize {
+        self.rows.row_count()
+    }
+
+    fn row_data(&self, row: usize) -> Option<SettingsListRow> {
+        self.rows.row_data(row)
+    }
+
+    fn model_tracker(&self) -> &dyn ModelTracker {
+        self.rows.model_tracker()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
 /// A page's rows as they are added, counting the headings so far.
 #[derive(Default)]
 struct Rows {
     rows: Vec<SettingsListRow>,
     headings: i32,
+    /// Whether an event's row has a Play button.
+    playable: bool,
 }
 
 impl Rows {
@@ -318,7 +489,7 @@ impl Rows {
             value(about.id, settings),
             about.help,
             kind,
-            event(about.id).is_some(),
+            self.playable && event(about.id).is_some(),
         );
     }
 
