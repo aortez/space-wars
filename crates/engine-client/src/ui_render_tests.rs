@@ -14,6 +14,7 @@ mod cell_swap;
 mod coins;
 mod lamps;
 mod pizza;
+mod scorched;
 mod tanks;
 
 #[test]

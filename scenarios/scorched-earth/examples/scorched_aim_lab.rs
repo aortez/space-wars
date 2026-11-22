@@ -12,7 +12,7 @@ use std::time::Duration;
 
 #[derive(Parser)]
 struct Args {
-    #[arg(long, default_value = "flat", value_parser = ["flat", "uphill", "downhill", "ridge", "duel"])]
+    #[arg(long, default_value = "flat", value_parser = ["flat", "uphill", "downhill", "ridge", "wall", "duel"])]
     case: String,
     #[arg(long, default_value = "calibrated", value_parser = ["sweep", "calibrated", "reactive", "plotted"])]
     bot: String,
@@ -57,6 +57,7 @@ fn run(args: &Args) -> Value {
                 "uphill" => AimCase::Uphill,
                 "downhill" => AimCase::Downhill,
                 "ridge" => AimCase::Ridge,
+                "wall" => AimCase::Wall,
                 _ => AimCase::Flat,
             },
             policy,

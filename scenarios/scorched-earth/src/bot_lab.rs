@@ -10,7 +10,17 @@ pub enum AimCase {
     Uphill,
     Downhill,
     Ridge,
+    /// A closed dirt room on flat ground, divided halfway between the tanks
+    /// by a wall with one window through it. The window is the only way from
+    /// one tank to the other.
+    Wall,
 }
+
+/// The bottom and top of the window through the wall case's wall.
+pub const WALL_WINDOW: (f32, f32) = (1.0, 4.0);
+/// The underside of the wall case's roof. Arcs steeper than about 72° strike
+/// it.
+const WALL_ROOF: f32 = 28.0;
 
 pub fn stationary_case(shape: GrainShape, case: AimCase, policy: CpuPolicy) -> ScorchedState {
     let floor = |x: f32| match case {
@@ -41,7 +51,13 @@ pub fn stationary_case(shape: GrainShape, case: AimCase, policy: CpuPolicy) -> S
         |c| {
             let x = (c.x as f32 + 0.5 - 193.0 * 0.5) * CELL_SIZE;
             let y = (c.y as f32 + 0.5 - 129.0 * 0.5) * CELL_SIZE;
-            if y <= floor(x) {
+            // The walls are three cells wide. The outer walls hold the roof up,
+            // so the dirt above the window stays joined to the ground.
+            let wall = matches!(case, AimCase::Wall)
+                && (y >= WALL_ROOF
+                    || x.abs() >= 47.0
+                    || (x.abs() <= 0.5 && !(WALL_WINDOW.0..WALL_WINDOW.1).contains(&y)));
+            if y <= floor(x) || wall {
                 DIRT
             } else {
                 MaterialId::VOID

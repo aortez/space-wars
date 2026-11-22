@@ -21,25 +21,18 @@ fn first_shot(state: &mut ScorchedState, player: usize) -> ShotObservation {
 }
 
 /// A wall halfway between the stationary tanks, too tall for any arc to
-/// clear, with one opening from `low` to `high`.
-fn wall_with_opening(state: &mut ScorchedState, low: f32, high: f32) {
+/// clear, with no opening.
+fn solid_wall(state: &mut ScorchedState) {
     let id = PhysicsId::new(1_000_000);
-    let part = |index, bottom: f32, top: f32| {
-        let mut part = ColliderSpec::cuboid(
-            ColliderId::new(id, ColliderRole::PRIMARY, index),
-            0.5,
-            (top - bottom) * 0.5,
-        );
-        part.local_position = Vec2::new(0.0, (bottom + top) * 0.5);
-        part
-    };
+    let mut part = ColliderSpec::cuboid(ColliderId::new(id, ColliderRole::PRIMARY, 0), 0.5, 62.5);
+    part.local_position = Vec2::new(0.0, 57.5);
     assert!(state.physics.insert_body(
         BodyId::new(id, BodyRole::PRIMARY),
         BodySpec {
             kind: BodyKind::Fixed,
             ..Default::default()
         },
-        &[part(0, -5.0, low), part(1, high, 120.0)],
+        &[part],
     ));
     // Rays meet a body once a step has indexed it.
     let next_shot = state.tanks[0].next_shot;
@@ -48,14 +41,25 @@ fn wall_with_opening(state: &mut ScorchedState, low: f32, high: f32) {
     state.tanks[0].next_shot = next_shot.max(state.tick);
 }
 
+/// The height at which a fired shell crosses the middle wall. Shells fly
+/// exact parabolas between ticks.
+fn height_at_wall(shot: &ShotObservation) -> f32 {
+    let launch = shot.launch;
+    let t = -launch.origin.x / launch.velocity.x;
+    launch.origin.y + launch.velocity.y * t - 0.5 * GRAVITY * t * t
+}
+
 #[test]
 fn a_plotted_shot_goes_through_the_only_opening_in_a_wall() {
+    use crate::bot_lab::WALL_WINDOW;
+    let through =
+        |shot: &ShotObservation| (WALL_WINDOW.0..WALL_WINDOW.1).contains(&height_at_wall(shot));
     for shape in [GrainShape::Round, GrainShape::Hexagon] {
-        let mut state = stationary_case(shape, AimCase::Flat, CpuPolicy::Plotted);
-        wall_with_opening(&mut state, 1.0, 3.5);
+        let mut state = stationary_case(shape, AimCase::Wall, CpuPolicy::Plotted);
         let shot = first_shot(&mut state, 0);
         assert_eq!(shot.termination, "opponent", "{shape:?}: {shot:?}");
         assert_eq!(shot.assessment, "useful hit");
+        assert!(through(&shot), "{shape:?}: {}", height_at_wall(&shot));
         let plot = state.bots[0].plot.as_ref().unwrap();
         let band: Vec<_> = plot
             .arcs
@@ -63,7 +67,7 @@ fn a_plotted_shot_goes_through_the_only_opening_in_a_wall() {
             .filter(|arc| arc.reaches())
             .map(|arc| arc.elevation.to_degrees().round() as u16)
             .collect();
-        // Only the arcs through the opening reach, and the shot took the
+        // Only the arcs through the window reach, and the shot took the
         // middle one.
         assert!(band.len() >= 3, "{band:?}");
         assert!(
@@ -71,27 +75,36 @@ fn a_plotted_shot_goes_through_the_only_opening_in_a_wall() {
             "{band:?}"
         );
         assert!(
-            band.iter().all(|degrees| (20..35).contains(degrees)),
+            band.iter().all(|degrees| (15..40).contains(degrees)),
             "{band:?}"
         );
         assert_eq!(
             shot.launch.elevation.to_degrees().round() as u16,
             band[(band.len() - 1) / 2]
         );
+        // The window survives the blast, and the next shot goes through it
+        // too.
+        while state.shot_observations().len() < 2 {
+            step(&mut state);
+            assert!(state.tick < 1200, "no second shot");
+        }
+        let second = state.shot_observations()[1];
+        assert_eq!(second.assessment, "useful hit", "{shape:?}: {second:?}");
+        assert!(through(&second), "{shape:?}: {}", height_at_wall(&second));
 
-        // Learning's first shot meets the wall.
-        let mut learning = stationary_case(shape, AimCase::Flat, CpuPolicy::Calibrated);
-        wall_with_opening(&mut learning, 1.0, 3.5);
+        // Learning's first shot strikes the wall above the window.
+        let mut learning = stationary_case(shape, AimCase::Wall, CpuPolicy::Calibrated);
         let shot = first_shot(&mut learning, 0);
         assert_eq!(shot.termination, "terrain", "{shot:?}");
-        assert!((shot.end.x + 0.5).abs() < 0.01, "{shot:?}");
+        assert!(shot.end.x.abs() < 1.0, "{shot:?}");
+        assert!(shot.end.y > WALL_WINDOW.1, "{shot:?}");
     }
 }
 
 #[test]
 fn with_no_opening_a_plotted_tank_fires_the_burst_nearest_the_target() {
     let mut state = stationary_case(GrainShape::Hexagon, AimCase::Flat, CpuPolicy::Plotted);
-    wall_with_opening(&mut state, 60.0, 60.0);
+    solid_wall(&mut state);
     let shot = first_shot(&mut state, 0);
     let plot = state.bots[0].plot.as_ref().unwrap();
     assert_eq!(plot.reaching, 0);

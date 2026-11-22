@@ -224,7 +224,8 @@ extend the interval. Bank/Drop/Hillside/Roof/Barrage and driving courses retain
 their scripts; the learned and plotted policies are only used in ordinary duels.
 
 Reproduce a controlled comparison with fixed tanks and the actual shell/blast
-path (cases: `flat`, `uphill`, `downhill`, `ridge`; `duel` uses normal moving tanks):
+path (cases: `flat`, `uphill`, `downhill`, `ridge`, `wall`; `duel` uses normal moving
+tanks):
 
 ```sh
 cargo +1.89.0 run --locked --profile ci -p scenario-scorched-earth \
@@ -424,6 +425,24 @@ label above the tank shows `plotting`, `plotted hit`, `plotted near miss`, `no
 plotted shot` or `waiting to plot`. Clock's Tanks event still uses Learning +
 move.
 
+The aiming lab's `wall` case shuts the fixed tanks in a dirt room, divided
+halfway by a wall with one window, so the window is the only way through.
+Plotting fires through it; Learning's shells strike the wall:
+
+| Plotting + move: through the window | Learning: into the wall |
+| --- | --- |
+| ![A plotted shell passing through the window in the wall](screenshots/scorched-earth/plotted-800x480-wall-plotting.png) | ![Learning's first shell bursting on the wall above the window](screenshots/scorched-earth/plotted-800x480-wall-learning.png) |
+
+In an ordinary duel both tanks plot, then both shells fly:
+
+| Both tanks have plotted a hit | Both shells in the air |
+| --- | --- |
+| ![Two plotted tanks labelled plotted hit, waiting to fire](screenshots/scorched-earth/plotted-800x480-duel-aimed.png) | ![Two shells in flight between tanks labelled watching shot](screenshots/scorched-earth/plotted-800x480-duel-crossing.png) |
+
+These are display-free captures through the client's raster renderer and native
+text overlay, not device screenshots. Regenerate them with
+`SPACEWARS_SCORCHED_ARTIFACTS=<dir> cargo test --locked --profile ci -p engine-client plotted_shots_and_labels`.
+
 ### Plotted aim review, 2026-11-22
 
 The runs are kept locally in `target/scorched-plotted-675/`, with the temporary
@@ -434,10 +453,14 @@ survey example and summary script that made them.
   needs 2, 1, 4 and 2 on Flat, Uphill, Downhill and Ridge. Plotting kills in
   three shots on Flat, Downhill and Ridge and four Uphill, against Learning's
   five, five, six and four. Over the ridge it lobs at 68°.
-- The tests stand a wall too tall to clear between fixed tanks, with one
-  opening. Plotting's first shot goes through the opening, at the middle of the
-  band of arcs that reach; Learning's strikes the wall. On every aiming-lab
-  terrain the plotted shell lands where its trial did.
+- In the `wall` case, Plotting's first shot goes through the window, at the
+  middle of the band of arcs that reach, and so does every later one: it kills
+  in four shots. Learning's shells strike the wall at 50°, 60° and 70°, then
+  the roof at 80°, and do no damage in 30 s. The room has outer walls so that
+  the dirt above the window stays joined to the ground. Without them, the
+  first blast splits that dirt off as a loose body, and it falls into the
+  window. With no opening at all, Plotting fires the burst nearest the target.
+  On every aiming-lab terrain the plotted shell lands where its trial did.
 - Ordinary duels, 32 per pairing (seeds 1, 62, …, 916 on both shapes, sprung
   wheels and footing, each to its first kill): Learning + move against itself
   reaches its first kill at a median of 36.8 s, close to the calibration
