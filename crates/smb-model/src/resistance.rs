@@ -80,6 +80,60 @@ pub fn leading_pixel(state: &SmbState, side: Side) -> u16 {
     }
 }
 
+/// Pixels across one level cell. The level is laid out on this grid in world pixels,
+/// independently of the scroll, which is why the boundary test below divides the world
+/// pixel rather than the screen pixel.
+pub const LEVEL_CELL_PIXELS: u16 = 8;
+
+/// How far past the nearest cell boundary the body's leading edge sits, measured in the
+/// direction it was going. Zero means flush against the boundary.
+pub fn overshoot_past_cell_edge(state: &SmbState, side: Side) -> u16 {
+    let lead = leading_pixel(state, side);
+    match side {
+        Side::Right => lead % LEVEL_CELL_PIXELS,
+        Side::Left => (LEVEL_CELL_PIXELS - lead % LEVEL_CELL_PIXELS) % LEVEL_CELL_PIXELS,
+    }
+}
+
+/// Whether the body sits where a cell could have left it.
+///
+/// The level is laid out on a grid, and the game stops a sideways body by taking the
+/// speed out and setting it down against the cell that refused it, so a frame the level
+/// decided leaves the box flush on a boundary. Measured over twelve runs of six levels
+/// with both players, 5098 of the 5123 frames that carry the zeroed-speed signature with
+/// something drawn at the leading edge are flush, and the flush test alone is what keeps
+/// the game's own clamps out: a body that has fallen into a pit and been pinned to the
+/// edge of a locked screen zeroes its speed every frame with no cell involved, at an
+/// offset the grid does not explain — 4 frames of the camera-limit gym, where the leading
+/// edge sits six past an edge, and 87 at the 5-1 scroll limit, five past one.
+///
+/// The other 25 frames split in two, and only one half is a wall. Sixteen sit one or two
+/// pixels past a boundary at a pipe or a solid block: the frame a body first touches a
+/// cell, before the game has pulled it back to the boundary, naming the same cell the
+/// flush frame names. Nine sit five past one at the 5-1 scroll limit and are clamps.
+///
+/// A touch frame is dropped while the body is on the ground and kept while it is in the
+/// air, which is a completeness argument rather than a tolerance. On the ground the game
+/// holds a body at the boundary for as long as the direction is held, so the flush frame
+/// follows and the touch adds a second report of a cell already reported. In the air the
+/// speed comes out, the body falls away, and the boundary is never reached: the two cells
+/// the reflex learns in 1-1 about the pipe body at absolute X 912, and the one it learns
+/// in 6-2 about the solid block at 816, are named by airborne touch frames and by nothing
+/// else, and a flush-only ledger has never heard of them. The bound on how far past a
+/// boundary such a frame may sit is the distance the body covered that frame, which is the
+/// most an entering body can get past an edge it has not been pushed back from.
+pub fn body_at_cell_edge(asked: Motion, produced: &SmbState, side: Side) -> bool {
+    let overshoot = overshoot_past_cell_edge(produced, side);
+    if overshoot == 0 {
+        return true;
+    }
+    if asked.grounded {
+        return false;
+    }
+    let travel = i32::from(produced.absolute_x) - i32::from(asked.x);
+    overshoot <= u16::try_from(travel.abs()).unwrap_or(u16::MAX)
+}
+
 /// Rows above the feet row that his body occupies: small Mario is two tiles tall.
 pub const BODY_ROWS: i16 = 2;
 
@@ -107,6 +161,13 @@ pub fn cell_beyond(
 
 /// What the body was doing on the frame a command was issued, so that the next
 /// frame can say what the game did with it.
+///
+/// All four fields end up in the signature, in two steps. `h_speed` and `asked` are the
+/// refusal itself: a speed the buttons had built came back zero while the direction was
+/// still held. `grounded` and `x` belong to the harder question of where the game leaves
+/// a body it has stopped, which [`body_at_cell_edge`] answers — the stance decides
+/// whether a frame sitting part-past a cell boundary counts at all, and the position
+/// bounds how far past it may sit, by the ground the body covered that frame.
 #[derive(Clone, Copy, Debug)]
 pub struct Motion {
     pub x: u16,
@@ -125,6 +186,24 @@ impl Motion {
             asked: buttons,
         }
     }
+}
+
+/// Whether a frame carries the game's sideways-refusal signature on one side, without
+/// looking at what is drawn there.
+///
+/// These are the three conditions [`Resistance::observe`] charges a cell on, split out so
+/// the `solidity` example can print the same census the ledger keeps rather than a
+/// hand-copied approximation of it that drifts whenever the condition moves.
+pub fn refusal_signature(asked: Motion, produced: &SmbState, side: Side) -> bool {
+    let moving = match side {
+        Side::Right => asked.h_speed > 0,
+        Side::Left => asked.h_speed < 0,
+    };
+    moving
+        && produced.h_speed == 0
+        && produced.is_in_control()
+        && side.opposed_by(asked.asked)
+        && body_at_cell_edge(asked, produced, side)
 }
 
 /// A single refusal, recorded where it happened so a claim about it can be replayed.
@@ -190,11 +269,34 @@ impl Resistance {
     /// produced, and attribute the difference to the cell at the body's leading
     /// edge.
     ///
-    /// The three conditions are the game's own signature, not a threshold: the
-    /// direction was held without its opposite, the body gained no ground at all,
-    /// and the speed the buttons had built up came back zero, which is what the
-    /// core does when it subtracts a blocked move. A frame that merely moved
-    /// slowly is not a refusal, so nothing here needs a tuning constant.
+    /// Three conditions, each the game's own signature rather than a threshold. The
+    /// direction was held without its opposite, and the speed the buttons had built up
+    /// came back zero: nothing else writes zero over a speed the core was building while
+    /// the body is in control and still being told to go, so a frame that merely moved
+    /// slowly is not a refusal and no tuning constant is needed. And the body sits flush
+    /// against a cell boundary on that side, or inside the cell by no more than the frame
+    /// covered, which is where the game leaves a body it has stopped, and which
+    /// [`body_at_cell_edge`] explains with the twelve-run census behind it.
+    ///
+    /// There used to be a different third condition — that the body gained no ground at
+    /// all — and it was not the game's signature. On the frame a body is refused, the
+    /// core clamps it *to* the wall, so the position still moves; on the frame after, the
+    /// speed this method would have asked about is already zero. Read together the two say
+    /// a refusal lasts exactly one frame and this detector was looking for it on neither of
+    /// them, which is survivable while the body walks into the wall and fatal when it
+    /// arrives in the air. Measured over six levels under the reflex: 1806 frames carry the
+    /// zeroed-speed signature, and in 6-2 and 2-2 — the two where both players end up
+    /// pressed against a pipe body — **none** of them is grounded on both sides of the
+    /// frame, because a body that reaches a wall by jumping is never standing on the frame
+    /// the game says no on. The old detector recorded nothing in either level, so
+    /// `wall_ahead` still called those pipes scenery six hundred frames later and the
+    /// script hopped at them until its stall budget ran out.
+    ///
+    /// The boundary test is what keeps the widened signature honest, and it is not the
+    /// blank-cell rule doing that job. A speed change with nothing drawn at the leading
+    /// edge already records nothing, and of the 1806 frames only 79 have nothing there;
+    /// the rest of the false positives are the game's own clamps, which have plenty drawn
+    /// beside them and were being recorded as lessons until the flush test went back in.
     pub fn observe(
         &mut self,
         asked: Motion,
@@ -203,19 +305,9 @@ impl Resistance {
         origin_x: u16,
         at_frame: u64,
     ) -> Option<Refusal> {
-        if !asked.grounded || !produced.is_grounded() || !produced.is_in_control() {
-            return None;
-        }
-        if produced.absolute_x != asked.x {
-            return None;
-        }
         let mut first = None;
         for side in [Side::Right, Side::Left] {
-            let moving = match side {
-                Side::Right => asked.h_speed > 0,
-                Side::Left => asked.h_speed < 0,
-            };
-            if !moving || produced.h_speed != 0 || !side.opposed_by(asked.asked) {
+            if !refusal_signature(asked, produced, side) {
                 continue;
             }
             // The run of drawn cells from the row his body rests on upwards, in the

@@ -6,6 +6,10 @@
 //! does not hold has to fail as itself instead of becoming a strange result two
 //! hundred frames later.
 //!
+//! Both sweeps walk `gyms::ALL` and not a list kept here, so a gym cannot join the
+//! tree with a tape nobody replays or a verdict nobody re-measures. The list used to
+//! be hand-picked, and had quietly become three of the six gyms the tree carries.
+//!
 //! Like the reader's test, these skip when no cartridge is present.
 //!
 //! The determinism check is the one DirtSim's `ReplayFromRootIsDeterministic` makes,
@@ -17,18 +21,11 @@
 
 use engine_nes::{CartridgeIdentity, ControllerButtons, NesMachine, StateHash};
 use smb_ai::{
-    gym::{Gym, LedgerSeed, Start, Tape},
+    gym::{LedgerSeed, Start, Tape},
     gyms,
 };
 use smb_model::cartridge;
 use smb_model::profile::read_state;
-
-/// Every committed gym, so a new one cannot join without being measured.
-const ALL: &[Gym; 3] = &[
-    gyms::CAMERA_LIMIT,
-    gyms::CAMERA_LIMIT_REMEMBERING,
-    gyms::PIT_1379,
-];
 
 /// Hold one button for a while and report where he got to, frame by frame, and the
 /// bits the run ended on. A comparison of two start states has to see the game
@@ -70,7 +67,7 @@ fn a_committed_tape_replays_to_the_bits_it_was_recorded_at() {
     let Some(rom) = cartridge::read_or_skip() else {
         return;
     };
-    for gym in ALL {
+    for gym in gyms::ALL {
         let start = gym
             .tape
             .replay(&rom, gym.seed)
@@ -89,12 +86,24 @@ fn a_committed_tape_replays_to_the_bits_it_was_recorded_at() {
              start by pushing at a world that is not listening: {state:?}",
             gym.name,
         );
-        // The game numbers worlds and levels from zero, so 1-1 is (0, 0).
+        // The game numbers worlds and levels from zero, so 1-1 is (0, 0) — where a tape
+        // that writes no start has to land. A tape that carries one lands in the level
+        // its two bytes name, which is the same claim about a level the setup script
+        // never visits. The golden hash above already pins the landing bit for bit;
+        // what this adds is the answer in the words a reader checks, because a replay
+        // that dropped the write would boot into 1-1 and fail here by name rather than
+        // as a verdict about the wrong area.
+        let (want_world, want_level) = gym.tape.start.unwrap_or((0, 0));
         assert_eq!(
             (state.world, state.level),
-            (0, 0),
-            "{}: the tape was cut in 1-1 and landed elsewhere: {state:?}",
+            (want_world, want_level),
+            "{}: its tape writes world {} slot {:#04x} and landed in world {} on level \
+             byte {:#04x}: {state:?}",
             gym.name,
+            want_world + 1,
+            want_level,
+            state.world,
+            state.level,
         );
         // A tape cut *at* the stop lands on the furthest X its verdict reports; a tape
         // cut upstream of it, which is what makes a gym winnable at all, lands short
@@ -182,14 +191,14 @@ fn rewinding_to_the_end_of_a_tape_lands_on_the_same_bits_as_replaying_it() {
     );
 }
 
-/// A gym's verdict is a measurement, so it reproduces. `ALL` is every committed gym,
-/// which is what stops a gym joining the list with a verdict nobody re-measured.
+/// A gym's verdict is a measurement, so it reproduces, on every gym the tree carries
+/// and not on a subset chosen to keep the test quick.
 #[test]
 fn every_committed_gym_still_measures_the_verdict_it_carries() {
     let Some(rom) = cartridge::read_or_skip() else {
         return;
     };
-    for gym in ALL {
+    for gym in gyms::ALL {
         let verdict = gym
             .run(&rom)
             .unwrap_or_else(|error| panic!("{}: could not run: {error}", gym.name));

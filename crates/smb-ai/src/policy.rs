@@ -59,6 +59,30 @@ pub fn run_right_buttons(
     buttons
 }
 
+/// The first refusal a run recorded whose artwork the level offers again later, and
+/// that later refusal.
+///
+/// Phase 1's A/B is a claim about recognizing an artwork, so it needs one the level
+/// draws twice: a model is handed the memory of the first meeting and dropped in
+/// front of the second, where nothing it can see yet tells it anything. The first
+/// refusal of a run will not do, and in 1-1 it is not even a pipe — the cold reflex
+/// is stopped by two airborne block bumps at absolute X 306 and 338 before it
+/// reaches one, and neither of those patterns comes again. The pipe body at 594 and
+/// the one at 899 are drawn from the same CHR pattern, which is what the pair is for.
+///
+/// `gap` is the least distance allowed between the two meetings. A caller takes its
+/// checkpoint a fixed run-up before the second one, so the gap has to exceed that
+/// run-up or the lesson lands under the checkpoint instead of behind it: the tails
+/// need the refusal in their past and the obstacle in their future at the same time.
+pub fn recurring_refusal(log: &[Refusal], gap: u64) -> Option<(&Refusal, &Refusal)> {
+    log.iter().enumerate().find_map(|(seen, first)| {
+        log[seen + 1..]
+            .iter()
+            .find(|later| later.pattern == first.pattern && later.frame >= first.frame + gap)
+            .map(|later| (first, later))
+    })
+}
+
 /// What any player of this game does on a frame, whether it is the reflex below, a
 /// script of measured skills, or Phase 5's search.
 ///

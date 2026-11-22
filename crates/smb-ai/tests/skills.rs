@@ -731,7 +731,7 @@ fn without_a_wall_skill(bot: BaseBot) -> Box<dyn Bot> {
 /// which is the frame *after* the game refused him there. That ordering is the whole
 /// gym's design. The pipe's artwork is not in the load-bearing set and the ledger starts
 /// empty, so nothing in the picture calls that column solid until the game has said so;
-/// the run earns one refusal and then spends it.
+/// the run earns its lesson inside itself and then spends it.
 ///
 /// Take the skill out and the same start state, the same objective and the same model
 /// — which by then knows the pipe, and knows it eighteen times over — come to `Stuck`
@@ -745,9 +745,9 @@ fn without_a_wall_skill(bot: BaseBot) -> Box<dyn Bot> {
 /// That is the sharpest form this evidence could have come in, because the failure is not
 /// the model's. The refusal signature is recorded against the CHR pattern that made it,
 /// the ledger has held it since the first of the eighteen, and `wall_ahead` names the
-/// column at 608 on the frames he is in front of it — the model knows the pipe is solid and
-/// the library still has no thing to do about it. Knowing a wall and clearing one are two layers, and only one of
-/// them had a gym.
+/// column at 608 on the frames he is in front of it — the model knows the pipe is solid
+/// and the library still has no thing to do about it. Knowing a wall and clearing one are
+/// two layers, and only one of them had a gym.
 #[test]
 fn the_pipe_gym_fails_without_the_skill_that_acts_on_a_wall() {
     let Some(rom) = cartridge::read_or_skip() else {
@@ -869,7 +869,7 @@ fn minus(name: &'static str) -> gym::Driver {
 /// **And the cap and the deletion are the same measurement.** `MAX_WALL_ROWS` raised from
 /// eight to twelve — the honest height of the flagpole, measured once already and
 /// reported by `affordances` against the constant — moves this gym to `Stuck` after 666
-/// frames at absolute X 3155 with ninety-two refusals, and moves none of the other four.
+/// frames at absolute X 3155 with ninety-two refusals, and moves none of the other five.
 /// Frame count, position and refusal count identical to the ablation above, because a
 /// height gate that fires on the only wall in a gym *is* a deleted skill, and this is the
 /// gym where that equivalence shows up. It is why the cap is still eight and why the
@@ -942,4 +942,57 @@ fn the_level_exit_needs_the_wall_skill_and_not_a_taller_one() {
              are about the wall skill and nothing else: {other:?} vs {cleared:?}"
         );
     }
+}
+
+/// A wall that is inside what the bots can do, lost by one and cleared by the other,
+/// from one tape.
+///
+/// `plant-wall-304` is 6-2's first pipe column with a plant standing in it, cut at
+/// absolute X 242 at running speed. The reader reports the column as `wall 64 px at 304`,
+/// which is eight cells of drawing and not [`smb_model::affordances::MAX_WALL_ROWS`]'s
+/// ceiling: raising that constant to twelve leaves this column at 64 px, so the height
+/// gate lets the attempt start and what loses the gym is the run-up spent getting there.
+/// `hop-obstacle` fires at the plant 48 pixels ahead, its four-frame hold lands him flush
+/// at X 290, and `clear-wall` wins the next choice from a pixel with no run-up left and
+/// attacks with the long hold. Fifteen refusals and one hundred and forty-one frames later
+/// the stall window closes on absolute X 291, the pixel he arrived on.
+///
+/// The reflex is refused by the same column — the ledger learns the same cells — and gets
+/// past it, because its jump hold is twenty frames where the hop's is four, so it is
+/// airborne before the wall is flush: `Met` after 68 frames and one refusal, at absolute X
+/// 335, against fifteen refusals and a stall for the script. That is the whole finding:
+/// the obstacle is inside what these bots can do, and the library is what is missing.
+/// Pinning both halves is the point, because a gym that only records the failure cannot
+/// tell a hard obstacle from a broken test.
+#[test]
+fn the_script_hammers_a_wall_the_reflex_jumps() {
+    let Some(rom) = cartridge::read_or_skip() else {
+        return;
+    };
+    let wall = gyms::PLANT_WALL_304;
+
+    let hammered = wall
+        .run(&rom)
+        .expect("the scripted plant-wall gym should run");
+    assert_eq!(
+        hammered, wall.recorded,
+        "the gym's recorded verdict is this run's, and the tall-wall skill owed to Phase 3 \
+         is owed precisely because it is not met: {hammered:?}"
+    );
+
+    let jumped = reflex(wall)
+        .run(&rom)
+        .expect("the same tape under the reflex should run");
+    assert_eq!(
+        jumped.outcome,
+        gym::Outcome::Met,
+        "the reflex clears the same column from the same bits, so this gym is about the \
+         library and not about what a body can do here: {jumped:?} against the scripted \
+         {hammered:?}"
+    );
+    assert!(
+        jumped.furthest_x > hammered.furthest_x,
+        "the reflex has to be past the column the script is stopped against at 291: \
+         {jumped:?} vs {hammered:?}"
+    );
 }

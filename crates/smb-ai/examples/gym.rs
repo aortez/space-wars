@@ -89,6 +89,13 @@ fn record(rom: &[u8], args: &[String]) -> Result<(), Box<dyn Error>> {
         );
     }
     println!("]),");
+    match cut.tape.start {
+        None => println!("start: None,"),
+        Some((world, slot)) => println!(
+            "start: Some(({world}, {slot:#04x})), // world {}, level byte {slot:#04x}",
+            world + 1
+        ),
+    }
     println!("frame: {},", cut.tape.frame);
     let hash = cut.tape.golden_hash;
     println!(

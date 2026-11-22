@@ -17,9 +17,11 @@
 //!                              the same watch from a raw level byte, which is how the
 //!                              pipe travel slot — the one `level_slot` will not name —
 //!                              gets watched and filmed
-//! levels [ROM] drive W L [FRAMES] [--shots DIR] [--player script|reflex]
+//! levels [ROM] drive W L [FRAMES] [--shots DIR] [--player script|reflex] [--trace]
 //!                              one player loose on one start, its stop, and a PNG per
-//!                              frame for the same cutter the gyms use
+//!                              frame for the same cutter the gyms use; `--trace` prints
+//!                              the frame the player changed its mind on, including what
+//!                              every entry in the library said about it
 //! levels [ROM] drive-all [FRAMES]
 //!                              all thirty-two starts under both players at once, which
 //!                              is the only way to tell a hard level from a weak player
@@ -41,7 +43,11 @@ use std::{
 use engine_nes::{
     ControllerButtons, CpuBus, FRAME_HEIGHT, FRAME_PIXELS, FRAME_WIDTH, NesMachine, write_rgb888,
 };
-use smb_ai::{gym, policy::BaseBot, skills};
+use smb_ai::{
+    gym,
+    policy::BaseBot,
+    skills::{self, Call},
+};
 use smb_model::{
     affordances::{WALL_LOOK_COLUMNS, wall_ahead},
     cartridge,
@@ -53,6 +59,7 @@ use smb_model::{
         SmbState, WORLD, boot_to_gameplay, boot_to_level, boot_to_level_load, level_slot,
         read_state, wait_for_handover,
     },
+    resistance::Resistance,
 };
 
 /// The current picture as RGB888, or `None` while the PPU has nothing to show.
@@ -191,10 +198,12 @@ fn shots_dir(args: &[String]) -> Option<PathBuf> {
 
 /// `--player script|reflex`, defaulting to the script.
 ///
-/// The default is the scripted player because it is the stronger of the two and a person
-/// typing this command is usually asking "how far does the best thing I have get". The
-/// flag exists so one start can be re-run under the reflex without recompiling, which is
-/// the smallest version of the comparison `drive-all` makes for all thirty-two.
+/// The default is the scripted player because it is the one the library was built in and a
+/// person typing this command is usually asking about it — not because it is stronger. On
+/// thirty-one of the thirty-two starts neither player leaves the level, and on nineteen of
+/// them the reflex gets further, which is SMB-027's finding and the reason this flag is
+/// not decorative: the smallest version of the comparison `drive-all` makes for all
+/// thirty-two is one start re-run both ways without recompiling.
 fn driver_arg(args: &[String]) -> Result<gym::Driver, Box<dyn Error>> {
     match args
         .iter()
@@ -209,6 +218,70 @@ fn driver_arg(args: &[String]) -> Result<gym::Driver, Box<dyn Error>> {
             .copied()
             .ok_or_else(|| format!("no player named {name}: try {}", driver_names()).into()),
     }
+}
+
+/// Whether `--trace` was asked for.
+fn trace_arg(args: &[String]) -> bool {
+    args.iter().any(|arg| arg == "--trace")
+}
+
+/// What every entry in the library said about one frame, in library order.
+///
+/// `S` starts, `W` is "still my problem, not my frame yet", `.` is "not mine". This is the
+/// question a table row cannot answer: a stop with no death behind it and no wall named in
+/// front of it is still one of those three marks, and which one decides whether the level
+/// stopped the bot or the bot stopped itself. The situation the marks were read from is
+/// printed beside them, because `W` with no numbers next to it is a new mystery rather than
+/// an answer.
+fn library_calls(machine: &NesMachine, ledger: &Resistance) -> String {
+    let marks = skills::SCRIPT
+        .iter()
+        .map(|skill| {
+            let mark = match skill.call(&skill.look(machine, ledger)) {
+                Call::Start => 'S',
+                Call::Wait => 'W',
+                Call::None => '.',
+            };
+            format!("{}:{mark}", skill.name)
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    // The situation is the same for every skill except the landing box, which is read at
+    // each envelope's own reach; the hole and the wall are not, and those are the two
+    // numbers a `W` is a decision about.
+    let at = skills::CLEAR_GAP.look(machine, ledger);
+    let gap = at.gap.map_or_else(
+        || "gap none".to_owned(),
+        |gap| {
+            format!(
+                "gap {}..{} ({} px, far {})",
+                gap.near_x,
+                gap.far_x,
+                gap.width_pixels(),
+                if gap.far_edge_seen {
+                    "seen"
+                } else {
+                    "off-picture"
+                }
+            )
+        },
+    );
+    let wall = at.wall.map_or_else(
+        || "wall none".to_owned(),
+        |wall| format!("wall {} px at {}", wall.height_pixels(), wall.x),
+    );
+    // The stance and the enemy distance go on the line because the 6-2 stall is unreadable
+    // without them: `hop-obstacle: S` on every frame made sense only once the line also
+    // said an enemy was 22 px ahead and he was not on the ground, and a reader who has to
+    // write a probe to find out what a skill saw will not read one.
+    format!(
+        "{marks}  landing {}  {gap}  {wall}  enemy {}  grounded {} in control {}",
+        if at.landing_is_solid { "solid" } else { "air" },
+        at.enemy_pixels
+            .map_or_else(|| "none".to_owned(), |pixels| format!("{pixels} px"),),
+        at.grounded,
+        at.in_control,
+    )
 }
 
 /// Every level in the cartridge, started and described.
@@ -601,6 +674,7 @@ fn run_start(
     level: u8,
     frames: u64,
     shots: Option<&Path>,
+    trace: bool,
 ) -> Result<Stop, Box<dyn Error>> {
     // `world` is a byte and `level` is already the number the status bar prints.
     let asked = format!("{}.{}", world + 1, level);
@@ -616,6 +690,9 @@ fn run_start(
     let mut played = 0u64;
     let mut ended = Ended::OutOfFrames;
     let mut change = None;
+    // The frame the trace last spoke on, so a six-hundred-frame stall prints the frames
+    // inside it that differ rather than all six hundred.
+    let mut last_seen = (0u16, 0u8, 0u8, 0usize);
     for _ in 0..frames {
         let frame_id = machine.ppu().frame_id();
         if let Some(dir) = shots
@@ -667,6 +744,25 @@ fn run_start(
             break;
         }
         let buttons = player.buttons(&machine);
+        if trace {
+            let seen = (
+                state.absolute_x,
+                state.player_state,
+                buttons.bits(),
+                player.started().len(),
+            );
+            if seen != last_seen {
+                println!(
+                    "frame {frame_id} x {:>5} state {:#04x} buttons {:#04x} started {}: {}",
+                    state.absolute_x,
+                    state.player_state,
+                    buttons.bits(),
+                    seen.3,
+                    library_calls(&machine, player.ledger()),
+                );
+                last_seen = seen;
+            }
+        }
         if state.absolute_x > furthest {
             furthest = state.absolute_x;
             no_progress_for = 0;
@@ -791,6 +887,7 @@ fn drive(
     level: u8,
     frames: u64,
     shots: Option<&Path>,
+    trace: bool,
 ) -> Result<(), Box<dyn Error>> {
     if let Some(dir) = shots {
         std::fs::create_dir_all(dir)?;
@@ -798,7 +895,7 @@ fn drive(
     }
     println!(
         "{}",
-        run_start(rom, driver, world, level, frames, shots)?.line()
+        run_start(rom, driver, world, level, frames, shots, trace)?.line()
     );
     Ok(())
 }
@@ -818,8 +915,8 @@ fn drive_all(rom: &[u8], frames: u64) -> Result<(), Box<dyn Error>> {
                     (1..=4u8)
                         .map(|level| {
                             let run = |driver: gym::Driver| {
-                                run_start(rom, driver, world, level, frames, None).unwrap_or_else(
-                                    |reason| Stop {
+                                run_start(rom, driver, world, level, frames, None, false)
+                                    .unwrap_or_else(|reason| Stop {
                                         asked: format!("{}.{}", world + 1, level),
                                         driver: driver.name,
                                         ended: Ended::OutOfFrames,
@@ -832,8 +929,7 @@ fn drive_all(rom: &[u8], frames: u64) -> Result<(), Box<dyn Error>> {
                                         wall: None,
                                         in_control: false,
                                         ledger: 0,
-                                    },
-                                )
+                                    })
                             };
                             (run(DRIVERS[0]), run(DRIVERS[1]))
                         })
@@ -1017,6 +1113,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 level,
                 args.get(4).map_or(6000, |a| a.parse().unwrap_or(6000)),
                 shots.as_deref(),
+                trace_arg(&args),
             )
         }
         Some("drive-all") => {

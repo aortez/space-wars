@@ -58,6 +58,7 @@ const CAMERA_LIMIT_TAPE: Tape = Tape {
         (0x83, 20),  // A|B|RIGHT
         (0x82, 92),  // B|RIGHT
     ]),
+    start: None,
     frame: 1167,
     golden_hash: engine_nes::StateHash {
         version: 3,
@@ -154,6 +155,7 @@ const PIT_1379_TAPE: Tape = Tape {
         (0x82, 38),  // B|RIGHT
         (0x83, 6),   // A|B|RIGHT
     ]),
+    start: None,
     frame: 1040,
     golden_hash: engine_nes::StateHash {
         version: 3,
@@ -228,6 +230,7 @@ const PIPE_608_TAPE: Tape = Tape {
         (0x83, 20),  // A|B|RIGHT
         (0x82, 41),  // B|RIGHT
     ]),
+    start: None,
     frame: 616,
     golden_hash: engine_nes::StateHash {
         version: 3,
@@ -247,11 +250,13 @@ const PIPE_608_TAPE: Tape = Tape {
 /// The start state is sixty-two pixels short of it at full running speed with a cold
 /// ledger, which is what makes the verdict about the library rather than about the
 /// memory: the pipe's artwork is not in the load-bearing set, so nothing in the picture
-/// says *wall* until the game has refused him, and the run therefore earns one refusal and
-/// then has to use it. `Met` after 108 frames at absolute X 698 with exactly that one
-/// refusal is the script being told the pipe is solid and jumping it anyway; take
-/// `clear-wall` out of the library and the same start state has no answer to a solid
-/// column at all, however well the model knows it.
+/// says *wall* until the game has refused him, and the run therefore earns its lesson
+/// inside itself and then has to use it. `Met` after 108 frames at absolute X 698 with
+/// exactly two refusals is the script being told the pipe is solid and jumping it anyway:
+/// the first is the pipe body at tile `$68` on frame 642, flush at absolute X 594, and the
+/// second is the cell above it at tile `$64` on frame 650, which the jump it had already
+/// committed records on its way past. Take `clear-wall` out of the library and the same
+/// start state has no answer to a solid column at all, however well the model knows it.
 pub const PIPE_608: Gym = Gym {
     name: "pipe-608",
     objective: Objective::ReachX { at_least: 700 },
@@ -266,7 +271,7 @@ pub const PIPE_608: Gym = Gym {
         // The harness reads the objective before it reads the position, so the frame that
         // satisfies `at_least: 700` reports the X it stood on one frame earlier.
         furthest_x: 698,
-        refusals: 1,
+        refusals: 2,
     },
 };
 
@@ -337,6 +342,7 @@ const FLAGPOLE_3168_TAPE: Tape = Tape {
         (0x83, 20),  // A|B|RIGHT
         (0x82, 13),  // B|RIGHT
     ]),
+    start: None,
     frame: 1900,
     golden_hash: engine_nes::StateHash {
         version: 3,
@@ -383,13 +389,75 @@ pub const FLAGPOLE_3168: Gym = Gym {
     },
 };
 
+/// The run-up the plant-wall gym starts from: this gym's own driver — the script — from
+/// power-on in 6-2 to frame 390, which is absolute X 240 on the ground at full running
+/// speed, upstream of the frame the plant three cells ahead comes inside its trigger.
+///
+/// Recorded, not authored — `gym --record 390 plant-wall-304` cut it and replayed it
+/// before printing it. This is the first tape here that does not start in world 1, which
+/// is what [`Tape::start`] is for: the run-up is the script's own approach to the wall,
+/// and the level it happens in is a pair of bytes written before the Start press.
+const PLANT_WALL_304_TAPE: Tape = Tape {
+    cartridge: smb_model::cartridge::SMB_IDENTITY,
+    runs: Cow::Borrowed(&[
+        (0x00, 119), // NONE
+        (0x08, 1),   // START
+        (0x00, 167), // NONE: the level is still being placed
+        (0x82, 103), // B|RIGHT
+    ]),
+    start: Some((5, 0x01)),
+    frame: 390,
+    golden_hash: engine_nes::StateHash {
+        version: 3,
+        value: 0xe732_3458_6e15_0259,
+    },
+};
+
+/// A wall the library is tall enough for, lost to the run-up it spent getting there.
+///
+/// The column at absolute X 304 is pipe body with a plant on top of it, and the reader
+/// reports it as `wall 64 px at 304`: eight cells of drawing, and not a cap. Raising
+/// [`smb_model::affordances::MAX_WALL_ROWS`] to twelve leaves this number where it is and
+/// moves 2-2's column from 64 px to 96 px, so the height gate is not what stops the script
+/// here — sixty-four is inside the long jump's measured seventy-five pixels of rise, and
+/// the gate lets the attempt start. What the record shows instead is the approach:
+/// `hop-obstacle` fires at the plant 48 pixels ahead, its four-frame hold lands him flush
+/// at X 290, and `clear-wall` then wins the choice from a pixel with no run-up left and
+/// attacks with the twenty-frame hold. It is refused, he lands back on that pixel, and
+/// nothing about the failed takeoff is kept: fifteen refusals in a hundred and forty-one
+/// frames, all of them against the same cell.
+///
+/// The reflex is refused once by the same column and is past it, because its
+/// [`crate::policy::JUMP_HOLD_FRAMES`] is twenty where the hop's is four: it is airborne
+/// before the wall is flush, and a wall is only unjumpable from the pixel you are pressed
+/// against. That pair is why this gym exists and why `tests/skills.rs` pins both halves.
+/// The library does not need a taller jump here; it needs a skill that does not spend its
+/// run-up on the way to the thing it is about to jump, and a takeoff that failed its own
+/// postcondition has to leave a trace for that to be learnable at all.
+pub const PLANT_WALL_304: Gym = Gym {
+    name: "plant-wall-304",
+    objective: Objective::ReachX { at_least: 336 },
+    seed: LedgerSeed::Cold,
+    tape: PLANT_WALL_304_TAPE,
+    driver: skills::SCRIPTED,
+    frame_budget: 240,
+    stall_frames: CAMERA_LIMIT.stall_frames,
+    recorded: Verdict {
+        outcome: Outcome::Stuck,
+        frames: 141,
+        furthest_x: 291,
+        refusals: 15,
+    },
+};
+
 /// Every committed gym, in the order a transcript prints them.
-pub const ALL: [Gym; 5] = [
+pub const ALL: [Gym; 6] = [
     CAMERA_LIMIT,
     CAMERA_LIMIT_REMEMBERING,
     FLAGPOLE_3168,
     PIPE_608,
     PIT_1379,
+    PLANT_WALL_304,
 ];
 
 /// The gym a command line means, by the name it carries.

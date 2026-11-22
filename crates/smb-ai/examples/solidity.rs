@@ -10,44 +10,58 @@
 //! Four passes, because the honest version of "the model saw it coming" needs a
 //! before and an after that differ in nothing but memory.
 //!
-//! 1. **Discovery.** Run the base policy with an empty ledger until the game refuses
-//!    him a move. That is the model learning what a wall is, the way a player learns
-//!    one by walking into it.
+//! 1. **Discovery.** Run the base policy with an empty ledger over the opening and
+//!    keep every refusal. That is the model learning what a wall is, the way a player
+//!    learns one by walking into it. The first refusal is not the one to test on: the
+//!    claim is about recognizing an artwork, so the level has to draw it twice, and
+//!    `recurring_refusal` picks the first pattern that comes back. In 1-1 the first
+//!    two refusals are airborne block bumps whose artwork never returns; the pipe body
+//!    at absolute X 594 is the first lesson the level teaches twice.
 //! 2. **Survey.** Run the same frames again from the handover with an empty ledger,
-//!    taking a checkpoint some seconds *after* that refusal.
+//!    taking a checkpoint `RUNUP_FRAMES` *before* the second meeting with it.
 //! 3. **Amnesiac.** Restore that checkpoint and run the tail with an empty ledger.
-//! 4. **Remembering.** Restore the same checkpoint and run the same tail holding the
-//!    refusals of pass 1.
+//! 4. **Remembering.** Restore the same checkpoint and run the same tail holding what
+//!    pass 1 was refused on that one frame.
 //!
 //! Passes 3 and 4 start from the same machine state bit for bit, run the same policy,
 //! and can only differ through what they remember. The memory they differ on is of
 //! something that happened before the checkpoint, so it cannot be a reaction to what
-//! is in front of him: it is the generalization, which is the whole claim.
+//! is in front of him: it is the generalization, which is the whole claim. The
+//! obstacle that tests it is still ahead of both of them, which is why the checkpoint
+//! sits before the second meeting rather than after the first.
 //!
 //! Pass 2 is there to keep pass 3 honest. A model that learns as it goes picks the
 //! refusal up again mid-run, so a cold run is not a model that cannot know, only one
 //! that has not yet been told.
 //!
-//! `--signature` prints the raw motion of every frame where he held right, was
-//! grounded and gained no ground, next to the cells that motion was refused by. Read
-//! it before changing the ledger's condition or the body reach.
+//! `--signature` prints the raw motion of every frame the ledger's own condition calls a
+//! refusal, next to the cells that motion was refused by, so the census and the memory are
+//! the same measurement and cannot drift apart. Read it before changing either.
 
 use std::{env, error::Error, path::PathBuf};
 
-use smb_ai::policy::run_right_buttons;
+use smb_ai::policy::{recurring_refusal, run_right_buttons};
 use smb_model::affordances::{WALL_LOOK_COLUMNS, wall_within_reach};
 use smb_model::frame::{
     PpuBytes, pattern_bytes, pattern_hash, player_tile, scroll_x, snapshot, tile_grid,
 };
 use smb_model::profile::{boot_to_gameplay, read_state, wait_for_handover};
-use smb_model::resistance::{Motion, Refusal, Resistance, Side, cell_beyond, leading_pixel};
+use smb_model::resistance::{
+    Motion, Refusal, Resistance, Side, cell_beyond, leading_pixel, refusal_signature,
+};
 
 use engine_nes::{ControllerButtons, MachineCheckpoint, NesMachine};
 
-/// Frames between the refusal and the checkpoint the two memory passes start from.
-/// Long enough that the refusal is behind him and short enough that what it taught
-/// him is still the thing in front of him.
-const RUNUP_FRAMES: u64 = 120;
+/// The least distance allowed between the two meetings with one artwork. The tails
+/// start RUNUP_FRAMES before the second one, so this is what keeps the lesson in their
+/// past rather than under them.
+const LESSON_GAP: u64 = 180;
+
+/// How far before the second meeting the two memory passes start. Short enough that
+/// the amnesiac still arrives at the artwork with no run-up left, which is where
+/// memory is worth the most, and long enough that the remembering pass has frames to
+/// act on what it knows. Short enough, too, that the tail is the same level.
+const RUNUP_FRAMES: u64 = 60;
 
 /// What one pass is worth reporting.
 struct Pass {
@@ -71,7 +85,6 @@ struct Plan {
     report: bool,
     /// Take a checkpoint on this frame id and keep it in the pass.
     checkpoint_at: Option<u64>,
-    stop_at_first_refusal: bool,
 }
 
 /// One pass of the base policy, recording refusals into `ledger` as it goes.
@@ -172,12 +185,7 @@ fn run(
         let produced = read_state(machine);
         let after: PpuBytes = snapshot(machine);
         let after_origin = scroll_x(&after);
-        if plan.signature
-            && asked.grounded
-            && produced.is_grounded()
-            && buttons.contains(ControllerButtons::RIGHT)
-            && produced.absolute_x == asked.x
-        {
+        if plan.signature && refusal_signature(asked, &produced, Side::Right) {
             // The raw motion the ledger's condition is built from, next to the cells
             // that motion was refused by. Each cell is named by the world pixel its
             // left edge falls on, and read through the exact channel on purpose: the
@@ -238,10 +246,6 @@ fn run(
                     refusal.absolute_x,
                 );
             }
-            if plan.stop_at_first_refusal {
-                pass.frames_run += 1;
-                break;
-            }
         }
         if a_down {
             pass.a_frames += 1;
@@ -288,7 +292,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let root = machine.checkpoint();
     let root_hash = machine.state_hash();
 
-    println!("\npass 1, discovery: an empty ledger, until the game says no");
+    println!("\npass 1, discovery: an empty ledger over the opening, keeping every refusal");
     machine.restore(&root)?;
     let discovery = run(
         &mut machine,
@@ -298,22 +302,35 @@ fn main() -> Result<(), Box<dyn Error>> {
             signature,
             report: true,
             checkpoint_at: None,
-            stop_at_first_refusal: true,
         },
     )?;
-    let Some(first) = discovery.refusals.first() else {
-        println!("  nothing refused him, so there is nothing to predict");
+    let Some((taught, met)) = recurring_refusal(&discovery.refusals, LESSON_GAP) else {
+        println!(
+            "  {} refusals and none of them an artwork the level draws twice again, so there \
+             is nothing to predict",
+            discovery.refusals.len(),
+        );
         return Ok(());
     };
-    let refused_frame = first.frame;
-    let refused_x = first.absolute_x;
-    let known = Resistance::from_log(&discovery.refusals);
+    let refused_frame = taught.frame;
+    let refused_x = taught.absolute_x;
+    // Everything the game refused on that one frame, which is the whole of what a body
+    // learns from being stopped once.
+    let memory: Vec<Refusal> = discovery
+        .refusals
+        .iter()
+        .copied()
+        .filter(|r| r.frame == refused_frame)
+        .collect();
+    let known = Resistance::from_log(&memory);
 
-    let checkpoint_at = refused_frame + RUNUP_FRAMES;
+    let checkpoint_at = met.frame - RUNUP_FRAMES;
     println!(
         "\npass 2, survey: an empty ledger from the handover, checkpoint at {checkpoint_at}, \
-         {} frames after the refusal",
-        checkpoint_at - refused_frame
+         {} frames after the lesson on frame {refused_frame} and {RUNUP_FRAMES} before the same \
+         artwork at absolute X {}",
+        checkpoint_at - refused_frame,
+        met.absolute_x,
     );
     machine.restore(&root)?;
     assert_eq!(machine.state_hash(), root_hash, "restore must be exact");
@@ -325,7 +342,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             signature,
             report: true,
             checkpoint_at: Some(checkpoint_at),
-            stop_at_first_refusal: false,
         },
     )?;
     let Some((checkpoint_frame, start)) = survey.checkpoint else {
@@ -346,7 +362,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             signature: false,
             report: true,
             checkpoint_at: None,
-            stop_at_first_refusal: false,
         },
     )?;
 
@@ -364,18 +379,21 @@ fn main() -> Result<(), Box<dyn Error>> {
             signature: false,
             report: true,
             checkpoint_at: None,
-            stop_at_first_refusal: false,
         },
     )?;
 
     println!(
-        "\nThe game first refused him on frame {refused_frame} at absolute X {refused_x}.\n\
+        "\nThe game refused him the artwork drawn ${:02x} on frame {refused_frame} at absolute \
+         X {refused_x}, and drew it again on frame {} at absolute X {}.\n\
          Passes 3 and 4 start from the same frame {checkpoint_frame} state and differ only in \
          that memory.\n\
          Amnesiac: first wall the ledger knows but the tile ids do not: {}.\n\
          Remembering: {}.\n\
          Amnesiac furthest absolute X {}, {} refusals. \
          Remembering furthest absolute X {}, {} refusals.",
+        taught.tile,
+        met.frame,
+        met.absolute_x,
         at(amnesiac.first_ledger_wall),
         at(remembering.first_ledger_wall),
         amnesiac.furthest_x,

@@ -412,6 +412,20 @@ pub fn boot_to_level_load(
     boot_with_start(rom, Some((world, slot)))
 }
 
+/// [`boot_to_level_load`] with the slot byte already chosen instead of derived.
+///
+/// For a caller that recorded the write rather than the label it stood for. A gym tape
+/// keeps the two bytes it put in RAM, because a tape is the bytes that produced a verdict
+/// and the mapping from a level number to a slot is a second thing that could move under
+/// it; this is the entry point that lets such a tape boot the same way.
+pub fn boot_to_level_slot(
+    rom: &[u8],
+    world: u8,
+    slot: u8,
+) -> Result<(NesMachine, u64), Box<dyn std::error::Error>> {
+    boot_with_start(rom, Some((world, slot)))
+}
+
 /// The setup script, with an optional level start written one frame before the press.
 fn boot_with_start(
     rom: &[u8],

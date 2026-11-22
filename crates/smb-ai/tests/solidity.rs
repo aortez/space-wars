@@ -12,7 +12,7 @@
 
 use engine_nes::{ControllerButtons, MachineCheckpoint, NesMachine};
 use sha2::{Digest as _, Sha256};
-use smb_ai::policy::BaseBot;
+use smb_ai::policy::{BaseBot, recurring_refusal};
 use smb_model::affordances::TRIGGER_COLUMNS;
 use smb_model::cartridge;
 use smb_model::frame::{
@@ -144,6 +144,10 @@ fn the_tile_that_stops_the_player_is_not_one_the_reader_calls_solid() {
 struct Pass {
     /// Every refusal the game made during the pass, in the order it made them.
     refusals: Vec<Refusal>,
+    /// The furthest right the body got. The only number here that measures what a
+    /// pass achieved rather than what it believed, which is what the two tails are
+    /// finally compared on.
+    furthest_x: u16,
     /// The first frame the ledger called a cell a wall and the tile ids did not.
     /// The only number here that measures the ledger rather than the level.
     ledger_wall: Option<(u64, u16)>,
@@ -156,11 +160,9 @@ struct Pass {
 
 /// How a pass should end and what it should remember on the way.
 struct Plan {
-    /// A ceiling, not a target: a pass also ends on its checkpoint or its refusal.
+    /// A ceiling, not a target: a pass also ends on its checkpoint or on leaving the
+    /// level, and every refusal it makes on the way is kept.
     frames: u64,
-    /// End as soon as the game refuses him a move, so that refusal can be the thing
-    /// a later pass is handed.
-    stop_at_first_refusal: bool,
     /// End on this frame id with the machine state as it stood there.
     checkpoint_at: Option<u64>,
 }
@@ -172,6 +174,7 @@ fn play(machine: &mut NesMachine, bot: &mut BaseBot, plan: &Plan) -> Pass {
     };
     let mut pass = Pass {
         refusals: Vec::new(),
+        furthest_x: read_state(machine).absolute_x,
         ledger_wall: None,
         left_level: false,
         checkpoint: None,
@@ -195,11 +198,9 @@ fn play(machine: &mut NesMachine, bot: &mut BaseBot, plan: &Plan) -> Pass {
             .run_frame([buttons, ControllerButtons::NONE])
             .expect("frame should run");
         let produced = read_state(machine);
+        pass.furthest_x = pass.furthest_x.max(produced.absolute_x);
         if let Some(refusal) = bot.observe(&produced, machine, frame_id) {
             pass.refusals.push(refusal);
-            if plan.stop_at_first_refusal {
-                break;
-            }
         }
     }
     pass
@@ -222,14 +223,22 @@ fn handed_over(rom: &[u8]) -> NesMachine {
 /// decoder. The buttons asked for a move, the core handed back no move, and the cell
 /// at the body's leading edge is what said no.
 ///
-/// The claim needs an A/B whose only variable is that memory. Learn one refusal from
-/// the first pipe, then take a checkpoint from a cold run some seconds *after* it,
-/// and run the tail twice from that one state. Neither machine contains the refusal
-/// it starts with: for one of them the refusal is only in its past. The amnesiac tail
-/// has to be stopped by the next pipe before it can call it a wall; the remembering
-/// tail has to call the same artwork a wall before it arrives, and never be stopped
-/// at all. And because the wall it names is a different pipe further along, what it
-/// recognized is the artwork, not the place where it happened to be standing.
+/// The claim needs an A/B whose only variable is that memory, and the memory has to
+/// be of an artwork the level shows twice, or "recognized the artwork" and "walked
+/// into the same pipe again" do not come apart in the tail. So pass 1 runs the
+/// opening cold and [`recurring_refusal`] picks the first refusal whose pattern the
+/// level draws again: in 1-1 that is the pipe body at absolute X 594, met again at
+/// 899. The level's first refusal is not usable, and under the signature
+/// `resistance` now keeps it is not a pipe at all but two airborne block bumps at
+/// 306 and 338, whose artwork never returns.
+///
+/// Both tails then start from one cold checkpoint `RUNUP_FRAMES` before that second
+/// meeting, so the refusal is in one machine's past and in neither machine's state.
+/// The amnesiac tail has to be stopped by the second pipe before it can call it a
+/// wall; the remembering tail has to call the same artwork a wall before it arrives,
+/// and never be stopped by it at all. Because the wall it names is a different pipe
+/// further along, what it recognized is the artwork, not the place where it happened
+/// to be standing.
 #[test]
 fn remembering_a_refusal_names_a_wall_the_tile_ids_do_not() {
     let Some(rom) = cartridge::read_or_skip() else {
@@ -237,17 +246,27 @@ fn remembering_a_refusal_names_a_wall_the_tile_ids_do_not() {
     };
     assert_pinned_revision(&rom);
 
-    // Frames between the refusal and the checkpoint both tails start from. Far
-    // enough back that the pipe which refused him is behind him and the next one is
-    // still ahead; close enough that the tail is the same level.
-    const RUNUP_FRAMES: u64 = 120;
+    // The least distance allowed between the two meetings with one artwork. The tails
+    // start RUNUP_FRAMES before the second one, so this is what keeps the lesson in
+    // their past rather than under them.
+    const LESSON_GAP: u64 = 180;
+    // How far before the second meeting both tails start. Short enough that the
+    // amnesiac arrives at the artwork with no run-up left, which is where memory is
+    // worth the most; long enough that the remembering tail has frames to act on what
+    // it knows; short enough that the tail is still the same level.
+    const RUNUP_FRAMES: u64 = 60;
     // Room to reach the next pipe from that checkpoint. The measured events land
     // about a hundred frames in, so the rest is room for a core that decodes the
     // same level a little differently, and a pass ends on the level change anyway.
     const TAIL_FRAMES: u64 = 300;
+    // The opening pass 1 may walk to find an artwork the level draws twice. Measured,
+    // the pair is there inside nine hundred frames; the rest is room for a core that
+    // decodes the same level a little differently.
     const LEARN_LIMIT: u64 = 3000;
 
-    // Pass 1: learn. The first thing 1-1 refuses him is the first pipe.
+    // Pass 1: learn, cold, and keep every refusal the level made on the way. Stopping
+    // at the first one would hand the remembering tail a pattern the level never
+    // shows again, which is a weaker claim than the one made here.
     let mut learner = BaseBot::default();
     let mut machine = handed_over(&rom);
     let discovery = play(
@@ -255,44 +274,65 @@ fn remembering_a_refusal_names_a_wall_the_tile_ids_do_not() {
         &mut learner,
         &Plan {
             frames: LEARN_LIMIT,
-            stop_at_first_refusal: true,
             checkpoint_at: None,
         },
     );
     assert!(
         !discovery.left_level,
-        "the model left 1-1 before the game refused it anything"
+        "the model left 1-1 inside {LEARN_LIMIT} frames, so the pair picked below may come from \
+         a different level than the two tails run in",
     );
-    let refusal = discovery
-        .refusals
-        .first()
-        .expect("the game never refused the model a move, so there is nothing to remember");
-    let (refused_x, refused_frame) = (refusal.absolute_x, refusal.frame);
-    assert!(
-        refused_x > 300,
-        "the first refusal was at absolute X {refused_x}, which is the level load rather than          an obstacle",
-    );
+    let (taught, met) = recurring_refusal(&discovery.refusals, LESSON_GAP).unwrap_or_else(|| {
+        panic!(
+            "{LEARN_LIMIT} frames of 1-1 refused the model {} time(s) without ever drawing the \
+             same artwork twice, so the A/B has no obstacle to be about",
+            discovery.refusals.len(),
+        )
+    });
     assert!(
         !learner.ledger.is_empty(),
-        "the game refused him at absolute X {refused_x} and the ledger still says nothing, so          the refusal was not attributed to a cell",
+        "the game refused him at absolute X {} and the ledger still says nothing, so the refusal \
+         was not attributed to a cell",
+        taught.absolute_x,
     );
+    let refused_x = taught.absolute_x;
+    assert!(
+        refused_x > 300,
+        "the recurring refusal was at absolute X {refused_x}, which is the level load rather \
+         than an obstacle",
+    );
+    // Everything the game refused on that one frame, which is the whole of what a body
+    // learns from being stopped once: the two rows of one pipe are one lesson.
+    let memory: Vec<Refusal> = discovery
+        .refusals
+        .iter()
+        .copied()
+        .filter(|r| r.frame == taught.frame)
+        .collect();
 
-    // Pass 2: a cold run to a checkpoint past the refusal. Cold, so the checkpoint
-    // is where the same policy would be if it had never been told anything.
+    // Pass 2: a cold run to the checkpoint. Cold, so the checkpoint is where the same
+    // policy would be if it had never been told anything. The pair is at least
+    // LESSON_GAP apart by construction, which is more than the run-up taken off the
+    // second meeting, so the checkpoint cannot land before the lesson or underflow.
     let mut machine = handed_over(&rom);
     let mut survey_bot = BaseBot::default();
     let survey = play(
         &mut machine,
         &mut survey_bot,
         &Plan {
-            frames: refused_frame + 2 * RUNUP_FRAMES + LEARN_LIMIT,
-            stop_at_first_refusal: false,
-            checkpoint_at: Some(refused_frame + RUNUP_FRAMES),
+            frames: met.frame + LESSON_GAP + LEARN_LIMIT,
+            checkpoint_at: Some(met.frame - RUNUP_FRAMES),
         },
     );
     let (root_frame, root) = survey
         .checkpoint
         .expect("the cold run never reached the checkpoint frame");
+    assert!(
+        root_frame > taught.frame,
+        "the checkpoint is on frame {root_frame}, at or before the lesson on frame {}, so the \
+         remembering tail is reacting to the refusal rather than remembering it",
+        taught.frame,
+    );
     assert!(!survey.left_level, "the checkpoint is not in 1-1 any more");
     // The survey pass stops on the checkpoint frame, so the live state is the root.
     let root_hash = machine.state_hash();
@@ -314,12 +354,11 @@ fn remembering_a_refusal_names_a_wall_the_tile_ids_do_not() {
         &mut amnesiac_bot,
         &Plan {
             frames: TAIL_FRAMES,
-            stop_at_first_refusal: false,
             checkpoint_at: None,
         },
     );
 
-    // Tail B: the same state, bit for bit, holding pass 1's refusals.
+    // Tail B: the same state, bit for bit, holding pass 1's lesson.
     machine
         .restore(&root)
         .expect("the remembering tail should start from the checkpoint");
@@ -328,13 +367,12 @@ fn remembering_a_refusal_names_a_wall_the_tile_ids_do_not() {
         root_hash,
         "and from the same bits as the amnesiac tail, at frame {root_frame}",
     );
-    let mut remembering_bot = BaseBot::new(Resistance::from_log(learner.ledger.log()));
+    let mut remembering_bot = BaseBot::new(Resistance::from_log(&memory));
     let remembered = play(
         &mut machine,
         &mut remembering_bot,
         &Plan {
             frames: TAIL_FRAMES,
-            stop_at_first_refusal: false,
             checkpoint_at: None,
         },
     );
@@ -344,17 +382,22 @@ fn remembering_a_refusal_names_a_wall_the_tile_ids_do_not() {
         "a tail left 1-1, so the two are no longer comparing the same obstacle",
     );
 
-    // The amnesiac tail has to meet the wall for real, or its failure to see it
-    // coming would only mean the tail contains no wall.
+    // The amnesiac tail has to meet the artwork it is being tested on for real, or its
+    // failure to see it coming would only mean the tail contains no such obstacle.
     let stopped = amnesiac
         .refusals
-        .first()
-        .expect("the cold tail was never refused anything, so it proves nothing about memory");
+        .iter()
+        .find(|r| r.pattern == taught.pattern)
+        .expect(
+            "the cold tail was never refused by the artwork again, so it proves nothing \
+               about memory",
+        );
     assert!(
         amnesiac
             .ledger_wall
             .is_none_or(|(frame, _)| frame >= stopped.frame),
-        "the cold model called a cell a wall at frame {}, before the game had refused it          anything at frame {}",
+        "the cold model called a cell a wall at frame {}, before the game had refused it \
+         anything at frame {}",
         amnesiac.ledger_wall.map_or(0, |(frame, _)| frame),
         stopped.frame,
     );
@@ -363,19 +406,30 @@ fn remembering_a_refusal_names_a_wall_the_tile_ids_do_not() {
         .ledger_wall
         .expect("the ledger never named a wall, so memory did not reach the next pipe");
     assert!(
-        remembered.refusals.is_empty(),
-        "the remembering model was refused at absolute X {} on frame {} anyway, so it did not          act on what it remembered",
-        remembered.refusals[0].absolute_x,
-        remembered.refusals[0].frame,
-    );
-    assert!(
         frame < stopped.frame && x < stopped.absolute_x,
-        "the remembering model saw the wall at frame {frame} and absolute X {x}, which is not          ahead of the cold model's collision at frame {} and absolute X {}",
+        "the remembering model saw the wall at frame {frame} and absolute X {x}, which is not \
+         ahead of the cold model's collision at frame {} and absolute X {}",
         stopped.frame,
         stopped.absolute_x,
     );
     assert!(
         x > refused_x,
-        "the wall it named was at absolute X {x}, at or behind the pipe that taught it at          {refused_x}: that repeats a position instead of recognizing the artwork drawn there",
+        "the wall it named was at absolute X {x}, at or behind the pipe that taught it at \
+         {refused_x}: that repeats a position instead of recognizing the artwork drawn there",
+    );
+
+    // What the anticipation buys. The remembering tail is still refused here, because
+    // the jump it starts on frame {frame} is three frames from contact and he is
+    // already pressed against the pipe: the ledger buys the run-up, not immunity. What
+    // it buys is the run-up. Measured, the amnesiac arrives flush, jumps flush, fails,
+    // and spends the rest of the tail against the same pipe, while the remembering tail
+    // clears it and goes on to the pit that stops both players.
+    assert!(
+        remembered.furthest_x > amnesiac.furthest_x,
+        "the two tails differ only in a memory and ended at the same absolute X {}, so the \
+         wall named {} frames and {} pixels early changed nothing about what the body did",
+        amnesiac.furthest_x,
+        stopped.frame - frame,
+        stopped.absolute_x - x,
     );
 }

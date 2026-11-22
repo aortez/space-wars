@@ -215,7 +215,10 @@ pub const WALL_LOOK_COLUMNS: i16 = 1;
 /// deleting `clear-wall` from the library: `flagpole-3168`, 1-1's own exit, comes to
 /// `Stuck` after 666 frames at absolute X 3155 with ninety-two refusals under either
 /// change, frame count, position and refusal count identical, and neither moves any of the
-/// other four gyms. What both stop against is the flagpole, which the model reads correctly
+/// other five gyms — `plant-wall-304` included, which is the useful half of that result:
+/// the column in 6-2 reports 64 px under this cap and 64 px under twelve, so its height is
+/// a count of eight cells of drawing and not the ceiling, while 2-2's column moves from 64
+/// px to 96 px and is the ceiling wearing a height. What both stop against is the flagpole, which the model reads correctly
 /// as a solid column and correctly counts as twelve rows of drawing, and which no jump in
 /// the library gets over; the jump that ends the level is the one taken *into* that column
 /// rather than over it, so a gate that fires on height alone strands the bot against the

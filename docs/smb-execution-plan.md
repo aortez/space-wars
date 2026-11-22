@@ -13,9 +13,9 @@ moves. Where it disagrees with the mission's ordering, it says so.
 | --- | --- | --- | --- |
 | 0 seam | where the model lives, what a skill may ask | cheapest moment to decide; touches every later file | done: both crates exist |
 | 1 solidity | L3, learned from the game's reactions | turns every later failure from mystery into a named hole | met; the stop it could not name turned out not to be a wall |
-| 2 gyms | the harness, not the gyms | turns every later iteration from minutes into seconds | met: five gyms, three of them winnable |
+| 2 gyms | the harness, not the gyms | turns every later iteration from minutes into seconds | met: six gyms, three of them winnable |
 | 3 skills | the library, and a scripted bot that finishes a level | the unit everything else is measured in | exit met: three skills, each with a gym that fails without it; the flagpole's gym exists, the skill it measures does not |
-| 4 breadth | arbitrary-level start, 32-level inventory | generality is only testable once the model makes a claim | met: the start, the inventory, and a second player on every row; nobody leaves more than 1 level in 32, and the reflex is further than the script on 19 of the 32 |
+| 4 breadth | arbitrary-level start, 32-level inventory | generality is only testable once the model makes a claim | met: the start, the inventory, and a second player on every row; nobody leaves more than 1 level in 32, and the reflex is further than the script on 14 of the 32 |
 | 5 search | A* over skills | needs a cost model and a baseline to be compared against | not started |
 | 6 fabrication | levels we author | should be aimed at holes that turned out to be real | not started |
 
@@ -31,7 +31,8 @@ death where the reflex spends two lives at 1553. That is the first distance in t
 project that a library rather than a deleted rule produced, and the first level it ever
 finished. Phase 4's instrument then cost that result most of its apparent size: run the
 script and the reflex over all thirty-two starts and the script is further ahead on only
-five of them, so the library that finished 1-1 is a 1-1 library.
+eight of them besides the one level it leaves, so the library that finished 1-1 is a 1-1
+library.
 
 ## The ordering principle
 

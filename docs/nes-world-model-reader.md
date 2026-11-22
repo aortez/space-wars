@@ -322,12 +322,55 @@ for and the motion that came out is a verdict from the game rather than an infer
 from the picture, and it can be attributed to the cell the body is pressed against.
 `Resistance` in the reader records that verdict and nothing else, on three conditions
 that are all the game's own rather than a threshold: the direction was held without its
-opposite, the body gained no ground to the pixel, and the speed the buttons had built
-up came back exactly zero.
+opposite, the speed the buttons had built up came back exactly zero, and the body sits
+where a cell could have left it.
+
+The third condition is the one that took a measurement to get right, and it used to read
+"the body gained no ground to the pixel". That is what pushing looks like *from the
+ground*, and it is not what a refusal is. On the frame a body is stopped the game clamps
+it **to** the wall, so the position still moves; on the frame after, the speed the
+detector would have asked about is already zero. A refusal lasts one frame and the old
+test looked for it on neither of them. Survivable while a body walks into a wall, fatal
+when it arrives in the air: measured over six levels under the reflex, 1806 frames carry
+the zeroed-speed signature, and in 2-2 and 6-2 — the two levels where both players end up
+pressed against a pipe body — **not one of them is grounded on both sides of the frame**,
+because a body that reaches a wall by jumping is never standing on the frame the game says
+no on. The ledger recorded nothing in either level, so `wall_ahead` went on calling those
+pipes scenery six hundred frames later and the script hopped at them until its budget ran
+out.
+
+What replaces it is where the game leaves a body it has stopped: flush against a cell
+boundary, with the cell that refused it on the far side of that boundary. The two
+refusals that fixed the body reach above are the first two samples — held at 594 against
+a pipe edge at 608, at 898 against an edge at 912 — and both leading pixels land on a
+multiple of eight because the box reach is the remainder. Over twelve runs of six levels
+with both players, 5098 of the 5123 frames that carry the zeroed-speed signature with
+something drawn at the leading edge are flush. The 25 that are not split in two, and the
+split is the whole reason the condition is not just the flush test:
+
+| where the leading edge sits | frames | what it is |
+| --- | --- | --- |
+| flush on a boundary | 5098 | the game, having clamped the body to the cell |
+| 1–2 px past a boundary, in the air or on the ground | 16 | the frame a body first touches a pipe or a block, before the game pulls it back |
+| 5 px past a boundary, at one scroll limit in 5-1 | 9 | the screen edge, with ground drawn beside it |
+
+A touch frame counts only while the body is in the air, which is a completeness argument
+and not a tolerance. On the ground the game holds a body at the boundary for as long as
+the direction is held, so the flush frame follows and the touch is a second report of a
+cell already reported; in the air the speed comes out, the body falls away, and the
+boundary is never reached. The two cells the reflex learns in 1-1 about the pipe body at
+absolute X 912, and the one it learns in 6-2 about the solid block at 816, are named by
+airborne touch frames and by nothing else. The bound on how far past a boundary such a
+frame may sit is the distance the body covered that frame — the most an entering body can
+get past an edge it has not been pushed back from — and it is what rejects the clamps: a
+body pinned to the edge of a locked screen has covered nothing, so it can claim no cell.
+That is 4 frames of the camera-limit gym, six pixels past a boundary, and 87 at the 5-1
+scroll limit, five past one, which the old position test caught only by accident and the
+blank-cell rule does not catch at all, because those frames have ground drawn beside them.
 
 What the signature actually looks like is a sawtooth. Pinned against the first pipe his
 speed runs `0, 1, 2, 3, 0` while his position does not move at all, and against the
-second `0, 1, 2, 3, 4, 0`. Only the frame that resets to zero satisfies the third
+second `0, 1, 2, 3, 4, 0`. Only the frame that resets to zero satisfies the speed
 condition, so one contact records one refusal rather than one per frame of pushing.
 
 The verdict is stored against the CHR pattern hash of the tile that refused him, the
@@ -354,23 +397,34 @@ wrong at first.
   the PPU's own mirroring from the world coordinate instead of through a column number.
 
 Whether that counts as memory or only as reaction needs an A/B whose single variable is
-the memory, so `smb-ai`'s `solidity` runs four passes: learn one refusal; take a
-checkpoint from a cold run 120 frames *after* it; restore that checkpoint and run the
-tail with an empty ledger; restore the same checkpoint and run the same tail holding the
-first pass's refusals. Both tails start from the same bits, and the thing they differ on
-happened before either of them began.
+the memory, and building one needed a construction the level does not supply by accident.
+`smb-ai`'s `solidity` runs four passes. Pass 1 runs cold and keeps every refusal the game
+makes; the lesson it teaches is the first refusal whose *artwork* turns up again at least
+180 frames later, because the claim is about recognising a drawing and the level has to
+draw it twice for that to be a claim — 1-1's first two refusals are airborne block bumps
+at absolute X 306 and 338 whose patterns never come back. What does come back is the pipe
+body at tile `$68`, refused on frame 642 at absolute X 594 and drawn again on frame 856 at
+899. Pass 2 runs cold again and takes its checkpoint sixty frames *before* that second
+meeting, on frame 796 at absolute X 690, so the lesson is behind the start state and the
+obstacle is in front of it. Passes 3 and 4 restore that one checkpoint and run the same
+691-frame tail, one with an empty ledger and one holding every refusal the taught tile
+made. Both tails start from the same bits, and the thing they differ on happened before
+either of them began.
 
-| One 725-frame tail from the same frame 762 state | First cell the ledger calls a wall that the tile ids do not | Refusals in the tail | Furthest absolute X |
+| One 691-frame tail from the same frame 796 state | First cell the ledger calls a wall that the tile ids do not | Refusals in the tail | Furthest absolute X |
 | --- | --- | --- | --- |
-| nothing remembered | frame 864 at absolute X 898, flush against it, after being stopped | 1 | 1544 |
-| pass 1's refusals | frame 855 at absolute X 891, nine frames and seven pixels before contact | 0 | 1542 |
+| nothing remembered | frame 865 at absolute X 898, flush against it, after being stopped | 46 | 1192 |
+| the taught tile's refusals | frame 853 at absolute X 890, three frames and nine pixels before contact | 2 | 1544 |
 
-In this window the ledger buys anticipation and no collision, not distance: the
-amnesiac tail is stopped, jumps off the refusal and still gets through, and both tails
-end at the same place. What it is not is a reaction to what is in front of him, because
-the wall it names is a different pipe than the one that taught it.
+The memory is the difference between clearing the second pipe and spending the tail
+against it: three hundred and fifty-two pixels further on, and two refusals instead of
+forty-six. It is not immunity — the remembering tail is refused twice, because a jump
+started three frames from contact still touches the pipe on its way up — so what the
+ledger buys is the run-up and not a reprieve. What it is not is a reaction to what is in
+front of him, because the wall it names is a different pipe than the one that taught it.
 `remembering_a_refusal_names_a_wall_the_tile_ids_do_not` keeps that comparison in CI,
-including the exactness of the restore it is built on.
+including the exactness of the restore it is built on and the half of it that says the
+remembering tail gets further.
 
 The same run drawn on the picture is the shorter argument. At frame 641 he is pressed
 against the first pipe with no orange dots anywhere in the frame: the model has nothing
@@ -824,7 +878,7 @@ next wall at 736.
 
 ```text
 pipe-608        reach absolute X 700   player script
-  with    clear-wall   Met   after 108 frames, furthest absolute X 698, 1 refusal
+  with    clear-wall   Met   after 108 frames, furthest absolute X 698, 2 refusals
   without clear-wall   Stuck after 142 frames, furthest absolute X 595, 18 refusals
 ```
 
@@ -850,10 +904,15 @@ wall skill, like an enemy.
 behaviour is `clear-wall` on frame 643, from absolute X 594, about pixel 608 — the frame
 *after* the game refused him there. The pipe's artwork is not in the load-bearing set and
 this gym's ledger starts empty, so nothing in the picture calls that column solid until the
-game has said so. The run earns one refusal and spends it, which makes the verdict a
-measurement of refusal-then-action rather than of action alone. `camera-limit-remembering`
-is the same idea asked of memory and got `nothing changes` because nothing at the camera
-limit was ever refused; this is the case where the lesson exists to be used.
+game has said so. The run earns two refusals and spends both: the pipe body, tile `$68`, on
+frame 642 with the body flush at 594, and the cell above it, tile `$64`, on frame 650,
+recorded by a jump that had already left the ground. That second one is a refusal the
+detector committed before this change could not see at all, because it asked for a grounded
+pair on both sides of the frame, and it is the same reason 6-2 recorded nothing. Two
+refusals bought by one behaviour is still a verdict measured as refusal-then-action rather
+than as action alone. `camera-limit-remembering` is the same idea asked of memory and got
+`nothing changes` because nothing at the camera limit was ever refused; this is the case
+where the lesson exists to be used.
 
 **A skill can start three times at one wall and nothing knows it.** Run long enough past
 its own objective, the script on this tape meets the next pipe, at 736, and starts
@@ -866,7 +925,7 @@ leaves no trace, so the library will spend the same envelope again at the same p
 no memory that it just did. That is a different missing thing from the flagpole, and it is
 now a command line rather than a hypothesis — `transcript pipe-608` prints the behaviour
 list a verdict stops short of, and `transcript --without clear-wall` prints the ablated
-one, which is the other half of the pair above and eighty-one refusals by the time its own
+one, which is the other half of the pair above and eighty-seven refusals by the time its own
 budget runs out.
 
 Choosing that cut frame is why `bot` takes `--trace N`. A gym's start frame is a question
@@ -928,8 +987,12 @@ deleting the other two as well.
 cap a reported wall at eight rows, and its comment says raising it to the flagpole's honest
 twelve stopped a level run fourteen pixels short of the exit. Measured against this gym, the
 twelve-row cap gives `Stuck` after 666 frames at absolute X 3155 with ninety-two refusals —
-identical to the ablation above in frame count, position and refusal count — and moves none of
-the other four gyms. A height gate that fires on the only wall in a gym *is* a deleted skill.
+identical to the ablation above in frame count, position and refusal count — and moves none
+of the other five gyms, `plant-wall-304` included. The experiment is worth its own sentence
+for what it did not move: the 6-2 column that gym is cut from reports 64 px under this
+constant and 64 px under twelve, so that number is eight cells of drawing, while 2-2's column
+at pixel 176 moves to 96 px and turns out to have been the ceiling wearing a height. A height
+gate that fires on the only wall in a gym *is* a deleted skill.
 That is the constant's justification rewritten from a prediction into a number, and it is why
 the tall-wall skill is still owed rather than still wanted: `flagpole-3168` fails today in
 exactly the shape that skill has to fix, and the shape is now specific — a postcondition that
@@ -1000,6 +1063,21 @@ game reads them while it builds the level and it builds the level as part of sta
 on the press frame itself the patch is in place, reads back exactly what was asked for, and
 changes nothing: thirty-two asks give eight distinct screens, one per world, each that world's
 own first level. A byte can be present, correct and unread.
+
+**A tape can carry those two bytes.** `boot_to_level_slot` is `boot_to_level` with the slot
+byte already chosen rather than derived, and it exists so that a gym about a level the setup
+script never visits can be recorded and replayed at all. `Tape::start` is that write kept as
+the two bytes it puts in RAM — the world byte, where `0` is world 1, and the [`LEVEL`] slot
+rather than the number the status bar prints — and `Gym::record` boots through it when a gym
+carries one and copies it into the tape it prints. `plant-wall-304` is the first tape outside
+world 1: `start: Some((5, 0x01))`, world 6's second slot, the plant column that ends the
+script's run there. Bytes and not labels is deliberate. The mapping from a level number to a
+slot is a second thing that could move underneath a committed verdict, and a tape that
+reproduces a verdict has to name what was written rather than what it meant. A tape that
+names a start and is cut at or before `SETUP_PATCH_FRAME` is a contradiction — the frame it
+wants to start on is before the frame that decides where it starts — so it fails as
+`GymError::Setup` instead of booting into world 1 and reporting a verdict about the wrong
+area.
 
 **A load has three lengths**: 167 frames for a plain level in any world, 217 or 231 for the
 second level of a world entered by pipe, and 577 or 591 for the travel slot itself. The count
@@ -1103,19 +1181,19 @@ thirty-two pairs and the whole summary; the sixty-four rows between them are the
 
 ```text
 start driver outcome      frames furthest deaths refusals      feet  ctrl  model at the stop
-1.1   script left it        2327     3266      0        2  (20, 25)  game  nothing standing against him
-1.1   reflex stuck          2046     1553      2        1  (29, 10)  his   nothing standing against him
+1.1   script left it        2327     3266      0       22  (21, 25)  game  nothing standing against him
+1.1   reflex stuck          2046     1553      2        8  (29, 10)  his   nothing standing against him
   only script left it: the other stops at absolute X 1553, so the level asks for something one player has and the other has not
-2.2   script stuck           736      162      0        1   (9, 23)  his   a wall 64 px tall starting at pixel 176
-2.2   reflex stuck           702      162      0        0  (13, 22)  his   nothing standing against him
+2.2   script stuck           736      162      0       77   (9, 23)  his   a wall 64 px tall starting at pixel 176
+2.2   reflex stuck           702      162      0       75  (13, 22)  his   a wall 64 px tall starting at pixel 176
   both stop at absolute X 162 within 0 px: the stop is the level's, not the driver's, so it is a gym candidate
 
 == what two players on the same thirty-two starts say ==
 both players clear the level:
 one player clears it and the other stops: 1.1
-both stop on the same pixel — the level's own obstacles: 1.4 2.2 3.2 4.4 6.4 7.2 8.4
-one player gets a screen further — a stop about the player: 1.2 1.3 2.1 2.3 2.4 3.1 3.3 3.4 4.1 4.2 4.3 5.1 5.2 5.3 5.4 6.1 6.2 6.3 7.1 7.3 7.4 8.1 8.2 8.3
-…of those, stops the model has no name for: 1.4 3.2 4.4 6.4 8.4
+both stop on the same pixel — the level's own obstacles: 1.4 2.2 3.2 4.1 4.4 5.2 6.4 7.2 8.4
+one player gets a screen further — a stop about the player: 1.2 1.3 2.1 2.3 2.4 3.1 3.3 3.4 4.2 4.3 5.1 5.3 5.4 6.1 6.2 6.3 7.1 7.3 7.4 8.1 8.2 8.3
+…of those, stops the model has no name for: 1.4 3.2 4.1 4.4 5.2 6.4 8.4
 the same level under 2 names: 1.3 5.3 — both players' runs match to the frame
 the same level under 2 names: 1.4 6.4 — both players' runs match to the frame
 the same level under 2 names: 2.2 7.2 — both players' runs match to the frame
@@ -1124,19 +1202,36 @@ the same level under 2 names: 2.4 5.4 — both players' runs match to the frame
 
 **One of the thirty-two reaches its ending, and it is the same one as ever**: 1-1 at
 absolute X 3266 with no death under the script, and the reflex dying twice and stopping at
-1553. **The two players disagree on twenty-four starts, and the reflex is further ahead on
-nineteen of them**; the script's own advantage is 1-2, 2-3, 3-4, 7-3 and 7-4. The scripted
-player is not the stronger player on the cartridge, it is the stronger player on two
-levels, and that is only sayable now that something else has been run there. **Seven stops
-belong to the level**: 1-4, 2-2, 3-2, 4-4, 6-4, 7-2 and 8-4 stop both players within one
-cell of each other, which is the only test here that says *level* rather than *player*.
-Two of the seven name the same wall — 64 px tall at pixel 176, `MAX_WALL_ROWS` times
-eight, the height gate's own ceiling, in two different worlds — and five name nothing at
-all, which is Phase 6's silence arriving early. **6-2 is the disagreement with no wall in
-it**: the script stops at absolute X 291 having never died, with the game still in control
-of him, no refusals, an empty ledger and nothing standing against him where he stands,
-while the reflex reaches 883 past the same pixel. **Four pairs of starts run identically
-under both players** — 1-3 with 5-3, 1-4 with 6-4, 2-2 with 7-2, 2-4 with 5-4, same
+1553. **The two players disagree on twenty-three starts, and the reflex is further ahead on
+fourteen of them**; the script's own advantage is 1-2, 2-3, 3-4, 7-1, 7-3, 7-4, 8-1 and
+8-3, on top of the one level it leaves. The scripted player is not the stronger player on
+the cartridge, it is the stronger player on nine starts, and that is only sayable now that
+something else has been run there. **Nine stops belong to the level**: 1-4, 2-2, 3-2, 4-1,
+4-4, 5-2, 6-4, 7-2 and 8-4 stop both players within one cell of each other, which is the
+only test here that says *level* rather than *player*. Two of the nine name the same wall —
+64 px tall at pixel 176, `MAX_WALL_ROWS` times eight, the height gate's own ceiling, in two
+different worlds — and seven name nothing at all, which is Phase 6's silence arriving
+early. That ceiling is measured and not inferred: raise `MAX_WALL_ROWS` to twelve and both
+of those rows report 96 px instead of 64, which is the one place in the inventory where the
+number the bot gates on is the count's limit rather than the level's. **6-2 is the
+disagreement the ledger now has a name for, and it is not that ceiling.** The reader reports
+the first pipe column there as a wall 64 px tall at pixel 304 — eight cells of drawing, and
+the cap experiment leaves the number where it is — so the height gate is not what stops the
+script, because sixty-four is inside the long jump's measured seventy-five pixels of rise
+and the gate lets the attempt start. What stops it is the approach: `hop-obstacle` fires at
+the plant 48 pixels ahead, its four-frame hold stops him at absolute X 290, `clear-wall`
+wins the next choice from a pixel with no run-up left, is refused, and lands back on that
+pixel. Eight of those — five against the column at 304 and three against the next one at
+448, each burst at forty-three-frame intervals — until one attempt lands him on top of the
+column and he walks off its far side, which is what standing on a pipe looks like to a
+reader whose load-bearing set has no pipe top in it, and then a death at 576. The reflex is
+refused forty-two times by the same columns
+and reaches 883, because its jump hold is twenty frames where the hop's is four and it is
+airborne before the wall is flush. `plant-wall-304` is that first column cut at absolute X
+242 with both players asked of the same bits: `Stuck` after 141 frames and 15 refusals for
+the script, `Met` after 68 and one refusal for the reflex — a wall the library is tall
+enough for, lost to the run-up the library spent getting to it. **Four pairs of starts run
+identically under both players** — 1-3 with 5-3, 1-4 with 6-4, 2-2 with 7-2, 2-4 with 5-4, same
 frames, same pixel, same deaths — so the cartridge ships fewer than thirty-two levels
 under thirty-two names, and since the ledger is keyed on pattern hash and those pairs draw
 their shared geometry with different artwork, a bot taught 1-3 arrives at 5-3 having been
@@ -1224,9 +1319,9 @@ free of a filesystem, clock, thread and renderer.
   which at running speed is past the picture's own edge — so the crossing works because the
   hole reports its far lip, and it would stop working on a hole whose far lip is not the
   ground return. Three skills is also three skills: one level, one cartridge, one start, and
-  the only tapes ever run under them are the level's own beginning and five gyms cut out of
-  runs that stopped — three of them about the hole, and the other two, the pipe and the
-  level's exit, the only ones that ask the wall skill anything.
+  the only tapes ever run under them are the level's own beginning and six gyms cut out of
+  runs that stopped — three of them about the hole, and the other three, the pipe, the
+  level's exit and the plant column in 6-2, the only ones that ask the wall skill anything.
 - A takeoff that fails its own postcondition leaves no trace, and the library will spend the
   same envelope at the same pixel again with nothing new known. On the pipe tape the script
   starts `clear-wall` from absolute X 722 about pixel 736 on frames 740, 783 and 826 — three
@@ -1241,14 +1336,14 @@ can start. It has three macro-actions written inline in an
 example where DirtSim has eleven, no reward or termination wiring, no item or block
 state, five enemy slots because that is all the game keeps live, a sideways
 solidity model that knows only what one bot has already walked into, three skills that
-between them clear one level and cannot name the thing that ends it, and five golden hashes —
-the frames five tapes start on — so a core change that quietly alters SMB is caught where a
+between them clear one level and cannot name the thing that ends it, and six golden hashes —
+the frames six tapes start on — so a core change that quietly alters SMB is caught where a
 gym happens to stand and is still invisible everywhere else.
 
 ## What is in the tree now
 
 One model in four layers, one policy, a three-entry skill library that clears 1-1, one
-harness, five gyms, ten drivers, thirty-three tests — twenty-two of them skipped when the
+harness, six gyms, ten drivers, thirty-four tests — twenty-three of them skipped when the
 cartridge is absent, the eleven that hold the skill rules needing no game at all — and one
 film cutter.
 
@@ -1265,7 +1360,7 @@ film cutter.
 | `crates/smb-ai/src/gyms.rs` | instrument | the gyms this project has actually needed |
 | `crates/smb-model/examples/{probe,tiles,rollout}.rs` | | read-side exploration: decoded state, the tile grid and the pixel comparison, branch and rewind |
 | `crates/smb-ai/examples/{bot,solidity,gym,transcript,film,limit}.rs` | | the bot, its overlay films and the transcript of behaviours it started, the A/B that tells memory from reaction, the tape recorder, the behaviours behind a gym's verdict and the library entries that produce them, the films a gym's own driver was measured under, the instrument that asks a stop what it actually is |
-| `crates/smb-ai/examples/levels.rs` | | the whole cartridge: the thirty-two-start table, a level's playfield as a map, a load watched frame by frame from a level or from a raw byte, either player loose on any start, and both of them on all thirty-two |
+| `crates/smb-ai/examples/levels.rs` | | the whole cartridge: the thirty-two-start table, a level's playfield as a map, a load watched frame by frame from a level or from a raw byte, either player loose on any start with the run printed one frame per line, and both of them on all thirty-two |
 | `crates/smb-model/tests/reader.rs` | | the optional cartridge test: the RAM map, the tile frame, a frame-exact restore, and the frame a button arrives on |
 | `crates/smb-ai/tests/{gyms,levels,solidity,skills}.rs` | | a gym's verdict is what its driver does, the two players disagreeing about a level start in both directions, the A/B that tells memory from reaction, and the skill rules and their ablation |
 | `tools/nes-reference/film-smb-run.py` | | cuts films, clips and a contact sheet from a `--shots` directory, and checks the overlay survived the encoder |
@@ -1316,6 +1411,9 @@ cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes wat
 cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes natural
 cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes drive-all
 cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes drive 8 3 2400 --shots data/shots/level-8-3
+# The same run one frame per line: position, speed, grounded, control, what the reader
+# reports and what the player decided. This is how a stop gets read instead of inferred.
+cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes drive 6 2 1200 --player script --trace
 cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes drive 6 2 1200 --shots data/shots/6-2-script --player script
 cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes drive 6 2 1200 --shots data/shots/6-2-reflex --player reflex
 cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes slot 1 01 700 --shots data/shots/travel-1
@@ -1363,24 +1461,31 @@ Observed on x86-64 Linux with a release build:
 - `solidity` runs the four passes behind the A/B table above and prints, for both
   tails, the first cell the ledger calls a wall that the tile ids do not, the refusals
   the tail itself collected and the furthest absolute X, all from one checkpoint state
-  captured 120 frames after the refusal was learned.
+  captured 60 frames before the taught artwork appears a second time. The lesson sits
+  behind the start state and the obstacle in front of it, which is the only arrangement
+  where remembering and reacting are distinguishable by anything but the prose.
 - `gym` replays every committed gym and says whether each still measures the verdict it
-  carries; all five do. `gym --record FRAME [NAME]` cuts a tape instead: it runs the gym's
+  carries; all six do. `gym --record FRAME [NAME]` cuts a tape instead: it runs the gym's
   own driver through the run-up, replays what it recorded before printing it, and prints the
-  run-up, the golden hash and the verdict measured from it — which is how `pit-1379` and
-  `flagpole-3168` got their bytes, and why neither has hand-typed ones.
+  run-up, the start bytes, the golden hash and the verdict measured from it — which is how
+  `pit-1379`, `flagpole-3168` and `plant-wall-304` got their bytes, and why none of the three
+  has hand-typed ones. The recorder prints `start:` beside `runs:` because a tape cut in a
+  level the setup script never visits is only reproducible with the two bytes it wrote.
 - `levels` boots all thirty-two starts on eight threads and prints the table above, then,
   with `drive-all`, runs both players from every one of them — sixty-four runs in sixteen
   seconds of wall clock, because a run now ends at its own level byte: one start is left by
-  anyone, seven stop both players on the same pixel, twenty-four stop the two players in
-  different places and nineteen of those favour the reflex, and four pairs of starts match
-  frame for frame under both players. `slot 1 01 700 --shots DIR` is the same
-  watch from a raw byte, and it is how the travel gets filmed: the screen it arrives on is
-  `4f646cbfb458b1af`, the table's own hash for 1-2, which is the travel slot and a patched
-  start agreeing without anyone asserting it. `natural` is the control the whole table
-  leans on — clearing 1-1 without writing a byte and reading back what the game says it
-  landed on, byte `$02`, status bar "1-2". `--shots` writes the PNG series the cutter
-  expects, so a start anywhere in the cartridge is filmable.
+  anyone, nine stop both players on the same pixel, twenty-three stop the two players in
+  different places and fourteen of those favour the reflex, and four pairs of starts match
+  frame for frame under both players. `drive W L FRAMES --player P --trace` prints one of
+  those runs a frame per line — position, speed, grounded, control, what the reader reports
+  and what the player decided — which is how the 6-2 account earlier in this document is a
+  reading of a run rather than an inference from a verdict. `slot 1 01 700 --shots DIR` is
+  the same watch from a raw byte, and it is how the travel gets filmed: the screen it
+  arrives on is `4f646cbfb458b1af`, the table's own hash for 1-2, which is the travel slot
+  and a patched start agreeing without anyone asserting it. `natural` is the control the
+  whole table leans on — clearing 1-1 without writing a byte and reading back what the game
+  says it landed on, byte `$02`, status bar "1-2". `--shots` writes the PNG series the
+  cutter expects, so a start anywhere in the cartridge is filmable.
 - `limit [FRAME]` is the instrument behind the pit section: it cuts a run-up to any frame
   with the base policy, checkpoints the end of it, and asks the same question of the game
   and of the picture — what the policy knew as it approached, what the state bytes say the
@@ -1506,11 +1611,13 @@ the reference hashes are opaque rather than meaningful, and the only semantic
 game-state assertion anywhere was
 `scenarios/falling/src/lib.rs::observation_has_a_stable_decodable_v1_shape`.
 
-Three test files close that, one per layer that can be wrong:
+Five test files close that, one per layer that can be wrong:
 `crates/smb-model/tests/reader.rs` for the reading,
-`crates/smb-ai/tests/solidity.rs` for what the model concludes from it, and
-`crates/smb-ai/tests/gyms.rs` for the harness that replays it. All three are
-optional by necessity rather than preference: `.gitignore` keeps all of `data/`
+`crates/smb-ai/tests/solidity.rs` for what the model concludes from it,
+`crates/smb-ai/tests/gyms.rs` for the harness that replays it,
+`crates/smb-ai/tests/skills.rs` for the envelopes the library spends and the rules
+that spend them, and `crates/smb-ai/tests/levels.rs` for two players on one start.
+All five are optional by necessity rather than preference: `.gitignore` keeps all of `data/`
 out of the repository, so no cartridge is checked in and CI has nothing to boot.
 Each skips with a one-line note when the image is absent, and passes in 0.00s:
 
@@ -1521,12 +1628,14 @@ SPACEWARS_SMB_ROM=/path/to/smb.nes \
 ```
 
 The default is `data/roms/smb.nes` resolved from `CARGO_MANIFEST_DIR`, so it
-works from any working directory. With the cartridge present the ten tests take
-about 95 seconds in a debug build, nearly all of it emulator frames: the reader
-test 15 s, the solidity pair 37 s, and the gym tests 41 s, which is six replays of
-a 1167-frame tape because a gym's whole claim is that a replay lands where it was
-recorded. The gym figure swings with machine load, from 41 s to 50 s here, so treat
-these as orders of magnitude and never as a budget.
+works from any working directory. With the cartridge present the thirty-four tests
+take about ten minutes in a debug build, nearly all of it emulator frames: the
+reader six 25 s, the solidity pair 80 s, the gym sweeps 124 s — every committed
+tape replayed and every committed verdict re-measured, which is what a gym's claim
+costs — the two-player level test 135 s, and the skills suite 219 s, one test of
+which replays a 1900-frame tape five times to attribute a level's ending to one
+library entry. Every one of those figures swings with machine load, by half again
+here, so treat them as orders of magnitude and never as a budget.
 
 What each one pins down:
 
@@ -1557,7 +1666,12 @@ What each one pins down:
   anything in the rows his body occupies. The game has stopped him; the tile that
   did it is not in the load-bearing set and `wall_ahead` says nothing is there.
   That is trap 7 as a regression test: the day the set learns about walls, this
-  fails and says which section to rewrite. It also pins trap 8 from the other
+  fails and says which section to rewrite. What it pins is narrower than it read
+  when it was written, and worth saying exactly: a later layer does name that
+  column now, once the game has refused him, and
+  `remembering_a_refusal_names_a_wall_the_tile_ids_do_not` measures that half.
+  This one is the floor underneath it — a cold model holding one frame has no wall
+  to name, however much the nametable draws. It also pins trap 8 from the other
   side, because it waits for the level load to hold for eight consecutive frames
   before it starts, and the run it measures is the one the document reports.
 
@@ -1565,21 +1679,42 @@ What each one pins down:
   a regression test: one checkpoint state, two tails, and the ledger as the only
   difference between them. It asserts the restore is exact before it asserts
   anything about memory, because a leaky restore would produce the same "the warm
-  tail did better" result for the wrong reason.
+  tail did better" result for the wrong reason. The refusal it teaches is picked by
+  construction — the first one whose artwork the level draws again at least 180 frames
+  later, with the checkpoint taken 60 frames before that second drawing — because 1-1's
+  first two refusals are airborne block bumps whose patterns never come back, and a test
+  built on one of those would pass while measuring nothing. It asserts the remembering
+  tail's furthest absolute X as well as the frame and pixel its ledger names, so a memory
+  that only ever delayed the body by a frame cannot satisfy it.
 - **`a_committed_tape_replays_to_the_bits_it_was_recorded_at`** — every committed
   gym's tape lands on its golden hash, on the frame it claims, with the player in
-  control in 1-1 at the absolute X its recorded verdict says. This is the golden
-  hash doing its job: a core change that moves SMB fails here, by name.
+  control, in the level its own start bytes name, at or behind the absolute X its
+  recorded verdict reports. The level assertion follows `tape.start` rather than
+  hard-coding 1-1, because a replay that dropped the write would boot into world 1
+  and still be a tape someone could call a pass. This is the golden hash doing its
+  job: a core change that moves SMB fails here, by name.
 - **`replaying_the_same_tape_twice_lands_on_the_same_bits`** — DirtSim's
   `ReplayFromRootIsDeterministic`: one tape replayed twice, 60 frames of one button
   from each landing, same absolute X every frame, same final hash.
-- **`every_committed_gym_still_measures_the_verdict_it_carries`** — iterates the
-  list of committed gyms, so a gym cannot join it with a verdict nobody re-measured.
+- **`every_committed_gym_still_measures_the_verdict_it_carries`** — walks
+  `gyms::ALL`, so a gym cannot join the tree with a verdict nobody re-measured. The
+  sweep used to walk a list hand-copied into this file, and had become three of the
+  six gyms without anyone noticing; both sweeps now read the same table the examples
+  do.
 - **`remembering_the_run_up_changes_nothing_at_the_camera_limit`** — the cold and
   warm pair, and the finding that they agree.
 - **`a_tape_that_does_not_hold_fails_as_itself`** — a truncated tape, a tape on
   another cartridge, and a replay that lands one bit away, each reported as
   `ShortTape`, `WrongCartridge` and `Drifted` rather than as a strange verdict.
+- **`the_script_hammers_a_wall_the_reflex_jumps`** — one tape, two players, and the
+  pair that says what `plant-wall-304` is about. The script comes to `Stuck` after 141
+  frames at absolute X 291 with fifteen refusals; the reflex is `Met` after 68 frames
+  and one refusal at 335. Both are refused by the same column, so the gym cannot be
+  read as a hard obstacle: the column is 64 px, inside the long jump's measured rise,
+  and the reflex clears it with a longer hold. What the script loses is its own run-up —
+  `hop-obstacle` lands it flush against the wall it then has to jump from — and a
+  takeoff that fails its own postcondition leaves no trace in the model at all, which is
+  the finding the tall-wall skill has to be written against.
 
 The tests **fail closed on a different ROM revision** rather than misreading
 it: they check the cartridge's SHA-256 against the image the map was verified

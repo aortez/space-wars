@@ -28,10 +28,13 @@
 
 use std::{borrow::Cow, error::Error, fmt};
 
-use engine_nes::{CartridgeIdentity, ControllerButtons, MachineError, NesMachine, StateHash};
+use engine_nes::{
+    CartridgeIdentity, ControllerButtons, CpuBus, MachineError, NesMachine, StateHash,
+};
 use smb_model::cartridge::{self, Unusable};
 use smb_model::profile::{
-    MODE_END_GAME, SmbState, boot_to_gameplay, read_state, setup_buttons, wait_for_handover,
+    LEVEL, MODE_END_GAME, SETUP_PATCH_FRAME, SmbState, WORLD, boot_to_gameplay, boot_to_level_slot,
+    read_state, setup_buttons, wait_for_handover,
 };
 use smb_model::resistance::Motion;
 
@@ -93,6 +96,17 @@ pub struct Tape {
     /// just made, so the recorder can replay and verify the tape it is about to
     /// print rather than printing something nothing has run.
     pub runs: Cow<'static, [(u8, u32)]>,
+    /// The two bytes written at [`SETUP_PATCH_FRAME`], one frame before the Start
+    /// press, or `None` for the game's own opening.
+    ///
+    /// Buttons alone cannot name a level: from power-on the game is always in world 1, so
+    /// a gym about a pipe in world six has to write the start the way
+    /// [`smb_model::profile::boot_to_level`] does. This is that write, kept as the two
+    /// bytes it puts in RAM — the world byte, where `0` is world 1, and the [`LEVEL`] slot
+    /// rather than the number the status bar prints. A tape records bytes and not
+    /// intentions, and the mapping from a level number to a slot is a second thing that
+    /// could move underneath a committed verdict.
+    pub start: Option<(u8, u8)>,
     /// The frame id the gym starts on. Recorded rather than derived so that a tape
     /// truncated by a careless edit fails as [`GymError::ShortTape`] instead of
     /// quietly starting somewhere else.
@@ -126,11 +140,25 @@ impl Tape {
                 actual,
             });
         }
+        if self.start.is_some() && self.frame <= SETUP_PATCH_FRAME {
+            return Err(GymError::Setup(
+                "a tape that names a level has to run past the frame it writes it on".to_owned(),
+            ));
+        }
         let mut bot = BaseBot::default();
         let mut frame = 0u64;
         for &(mask, count) in self.runs.iter() {
             let buttons = ControllerButtons::from_bits(mask);
             for _ in 0..count {
+                // The level start goes in on the frame the profile writes it on, so a
+                // replayed tape and a boot_to_level call reach the same bits. `frame`
+                // counts frames already run, so the one about to run is frame + 1.
+                if let Some((world, slot)) = self.start
+                    && frame + 1 == SETUP_PATCH_FRAME
+                {
+                    machine.bus_mut().write(WORLD, world);
+                    machine.bus_mut().write(LEVEL, slot);
+                }
                 // A warm replay has to watch the game refuse things as they happen,
                 // which means knowing what each frame's buttons were asking for. A
                 // cold one does not, and skipping the read keeps the replay cheap.
@@ -344,8 +372,11 @@ impl Gym {
     /// are about to be committed are the bytes that produced the verdict printed
     /// beside them.
     pub fn record(&self, rom: &[u8], until: u64) -> Result<Recording, GymError> {
-        let (mut machine, gameplay_frame) =
-            boot_to_gameplay(rom).map_err(|e| GymError::Setup(e.to_string()))?;
+        let booted = match self.tape.start {
+            None => boot_to_gameplay(rom),
+            Some((world, slot)) => boot_to_level_slot(rom, world, slot),
+        };
+        let (mut machine, gameplay_frame) = booted.map_err(|e| GymError::Setup(e.to_string()))?;
         let handover =
             wait_for_handover(&mut machine).map_err(|e| GymError::Setup(e.to_string()))?;
         if until <= handover {
@@ -373,6 +404,7 @@ impl Gym {
         let tape = Tape {
             cartridge: machine.cartridge_identity(),
             runs: Cow::Owned(runs),
+            start: self.tape.start,
             frame: until,
             golden_hash: machine.state_hash(),
         };

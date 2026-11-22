@@ -997,3 +997,144 @@ and stands there for ten seconds while the right half walks past the same pixel,
 883, and loses the life there. The fourth is `data/shots/1-1-script/1-1-script.mp4`, from
 `drive 1 1 3000 --shots data/shots/1-1-script`: the other side of the same finding, the only
 level anyone finishes, and the series the pixel comparison above is run against.
+
+## SMB-028 — 2026-11-21 — A refusal in the air is still a refusal, and two levels had never recorded one
+
+The refusal detector's third condition read "the body gained no ground to the pixel".
+That is what pushing looks like from the ground, and it is not what a refusal is: on the
+frame the game stops a body it clamps it **to** the wall, so the position still moves, and
+on the frame after, the speed the detector asked about is already zero. A refusal lasts
+one frame and the test looked for it on neither of them. Under the reflex across six
+levels, 1806 frames carry the zeroed-speed signature, and in 2-2 and 6-2 — the two levels
+where both players end up pressed against a pipe body — not one of them is grounded on
+both sides of the frame, because a body that reaches a wall by jumping is never standing
+on the frame the game says no on. The ledger recorded nothing in either level.
+
+Rationale: the position test survived as long as it did because every gym in the tree is
+cut in 1-1 at a wall a bot walks into, and a walking body does hold its position. It was
+never wrong about 1-1; it was wrong about arriving, which is how both players arrive at a
+pipe in 6-2. The replacement is where the game leaves a body it has stopped: flush against
+a cell boundary with the refusing cell on the far side of it. The two refusals that fixed
+the body reach at 14 pixels are the first two samples of the flush test — held at 594
+against an edge at 608, at 898 against an edge at 912 — and both leading pixels land on a
+multiple of eight because the box reach is the remainder.
+
+Evidence: **the flush test alone is not the condition.** Twelve runs over six levels with
+both players put 5123 frames at "zeroed speed with something drawn at the leading edge":
+5098 of them flush, 16 sitting one or two pixels past a boundary and 9 sitting five past
+one at a scroll limit in 5-1. The 16 are the frame a body first touches a pipe or a block,
+before the game pulls it back; the 9 are a screen edge with ground drawn beside it. A
+touch counts only in the air — on the ground the game holds the body at the boundary while
+the direction is held, so the flush frame follows and the touch would be a second report
+of a cell already reported — and how far past a boundary it may sit is the distance the
+body covered that frame, the most an entering body can get past an edge it has not been
+pushed back from. That bound is what rejects the clamps: a body pinned to the edge of a
+locked screen has covered nothing, so it can claim no cell. It is 4 frames of the
+camera-limit gym, six pixels past a boundary, and 87 at the 5-1 scroll limit, five past
+one — which the old position test caught only by accident and the blank-cell rule does not
+catch at all, because those frames have ground drawn beside them. The two cells the reflex
+learns in 1-1 about the pipe body at 912 and the one it learns in 6-2 about the solid block
+at 816 are named by airborne touch frames and by nothing else.
+
+**What the detector was hiding in the inventory.** `drive-all` re-measured: nine stops
+bring both players to the same pixel where seven did, and the two new ones — 4-1 and 5-2 —
+were stops one player had been walking through on a ledger that had never been told
+anything. The disagreements fall from twenty-four to twenty-three and the reflex's share
+from nineteen to fourteen, so the script now gets further on nine starts including the one
+level it leaves. Two of the nine level-owned stops name the same wall — 2-2 and 7-2, both
+at absolute X 162 against a 64-px column at pixel 176 — where before this change the
+reflex named nothing at either. **6-2 is the third stop the ledger can now name, and
+reading it off a trace instead of inferring it from a verdict is what kept this finding
+honest.** The reader calls 6-2's first pipe column `wall 64 px at 304`, and the temptation
+was to notice that sixty-four is `MAX_WALL_ROWS` times eight and file it beside 2-2. It is
+not that. The script's run there, off a traced drive: `hop-obstacle` at the plant 48 pixels
+ahead on frame 399, its four-frame hold landing him flush at absolute X 290, then
+`clear-wall` winning the next choice from a pixel with no run-up left, being refused, and
+landing back on that pixel — eight times across the drive, five against the column at 304
+and three against the next at 448, each burst at forty-three-frame intervals — until one
+attempt lands him on top of the column and he walks off its far side, which is what
+standing on a pipe looks like to a reader whose load-bearing set has no pipe top in it. A
+death at 576 ends the life. The reflex is refused forty-two times by the same columns and
+reaches 883, because its jump hold is twenty frames where the hop's is four and it is
+airborne before the wall is flush.
+
+**A cap and a measurement are the same number until you lift the cap.** `MAX_WALL_ROWS`
+holds a reported wall at eight rows, sixty-four pixels, under the long jump's measured rise
+of seventy-five, so no wall the reader names is taller than the envelope asked to clear it
+and `clear-wall`'s height gate never fires. That is a gate standing in for a skill the
+library does not have, and the only way to tell a stand-in from a measurement is to raise
+it. At twelve rows — about how far above his head the nametable can still be read — 6-2's
+column is still 64 px and 2-2's is 96 px: one is eight cells of drawing, the other is the
+ceiling wearing a height. The gym sweep says the same thing from the other end. Five of the
+six gyms do not move a frame under the raised cap, `plant-wall-304` included at `Stuck`
+after 141 frames, absolute X 291, fifteen refusals. Only `flagpole-3168` moves, to `Stuck`
+after 666 frames at absolute X 3155 with ninety-two refusals — frame count, position and
+refusal count identical to deleting `clear-wall` from the library and running the same
+tape. A height gate that fires on the only wall in a gym *is* a deleted skill, and the
+flagpole is where that equivalence shows up. The cap went back to eight with the
+equivalence written into its comment, because the alternative is a bot stranded fourteen
+pixels short of 1-1's exit.
+
+**The A/B that told memory from reaction was measuring the wrong thing, and the finding
+flipped.** The old construction learned the first refusal, took a checkpoint 120 frames
+*after* it and ran two 725-frame tails; both tails ended at the same absolute X, and the
+document reported that memory buys anticipation and no distance. The lesson it taught was
+1-1's first refusal — an airborne block bump at absolute X 306 whose artwork the level
+never draws again — so the remembering tail was recognizing a drawing it would not meet
+again and the comparison was about a tile. The construction now searches for the first
+refusal whose *pattern* comes back at least 180 frames later, because the claim is about
+recognising a drawing and the level has to draw it twice for that to be a claim. What comes
+back is the pipe body at tile `$68`, refused on frame 642 at absolute X 594 and drawn again
+on frame 856 at 899; the checkpoint is taken sixty frames *before* that second meeting, on
+frame 796, so the lesson is behind the start state and the obstacle in front of it. Both
+tails then run the same 691 frames from the same bits. The amnesiac is stopped flush at
+898, jumps off the refusal and spends the rest of the tail against the same pipe — 46
+refusals, furthest absolute X 1192. The remembering tail names the cell at 890, three
+frames and nine pixels before contact, clears the pipe and goes on to the pit — 2 refusals,
+furthest 1544. Three hundred and fifty-two pixels, and the memory is the difference rather
+than a decoration on it. It is not immunity: the remembering tail is refused twice, because
+a jump started three frames from contact still touches the pipe on the way up. What the
+ledger buys is the run-up.
+
+**A gym about a level the setup script never visits needs its start in the tape.**
+`plant-wall-304` is 6-2's first column cut at absolute X 242, and buttons alone cannot name
+a level: from power-on the game is always in world 1. `Tape::start` keeps the two bytes
+written at `SETUP_PATCH_FRAME` — the world byte and the level *slot*, not the number the
+status bar prints — because a tape is the bytes that produced a verdict and the mapping
+from a level number to a slot is a second thing that could move underneath it;
+`boot_to_level_slot` is the entry point that lets such a tape boot, and `Gym::record` boots
+through it and copies it into what it prints. A tape that names a start and is cut at or
+before the frame that writes it fails as `GymError::Setup` rather than booting into world 1
+and reporting a verdict about the wrong area. Asked of the same bits, the script comes to
+`Stuck` after 141 frames and 15 refusals at absolute X 291 and the reflex comes to `Met`
+after 68 frames and one refusal at 335. The pair is the point, and so is what the script's
+half is a record of: not a wall too tall — sixty-four is inside the rise — but a run-up
+spent before the wall arrived. `hop-obstacle` fires at the plant forty-eight pixels ahead,
+its four-frame hold parks him flush at 290, and `clear-wall` attacks from that pixel with
+the long hold and is refused fifteen times against the same cell. Nothing about a takeoff
+that fails its own postcondition is kept anywhere, so the next attempt starts from the same
+pixel as the last one. This is the first gym here whose tape is not in 1-1, and
+`the_script_hammers_a_wall_the_reflex_jumps` holds the pair.
+
+**A hand-picked list of gyms had quietly become three of six.** `tests/gyms.rs` kept its
+own `ALL` while `gyms::ALL` grew, so the tape-replay and verdict sweeps had stopped
+covering the pipe, the flagpole and now the plant column. Both sweeps walk `gyms::ALL`
+now, and the landing assertion follows `tape.start` instead of asserting 1-1 for every
+tape in the tree.
+
+Consequence: the detector change is the cheapest kind of finding this project has had —
+one condition, no new machinery — and it moved the inventory, renamed a stop in three
+worlds, and turned a null result about memory into a three-hundred-pixel one. It also
+sharpens the debt rather than paying it, and splits it in two. The tall-wall debt is 2-2
+and 7-2 at ninety-six pixels under a raised cap and 1-1's flagpole at twelve honest rows,
+and `flagpole-3168` is where that skill gets scored. The other debt is the one
+`plant-wall-304` exists for: a bot that arrives at a wall with no run-up left has no skill
+that knows it arrived that way, and a failed takeoff leaves no trace for the next attempt
+to read. The pattern-hash ledger key is still the cheapest experiment left, and the seven
+level-owned stops the model cannot name are still Phase 6's silence.
+
+Films, outside the repository: `data/shots/6-2-script/6-2-script.mp4`,
+`data/shots/6-2-reflex/6-2-reflex.mp4` and the time-aligned pair
+`data/shots/6-2-compare/6-2-script-left-reflex-right.mp4`, re-cut after this change, plus
+`data/shots/8-1-script/8-1-script.mp4` — the start where the script is 1105 px ahead of
+the reflex, which is the other half of the same finding.
