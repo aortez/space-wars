@@ -1049,8 +1049,13 @@ any event but Tanks, goes from 1679 to 1898 primitives at 800×480 (1.23 against
 1.13 ms) and from 1642 to 1801 at 1024×768 (2.01 against 1.88 ms). That passes
 the 1800 this page gives as the Clock's frame ceiling, which only
 `presentation::tests::all_recipes_are_bounded_deterministic_clipped_and_restore_the_exact_face`
-holds a frame to; Tanks passes it in Normal at every aspect. No cabinet has run
-the theme yet, and #462 checks the devices.
+holds a frame to; Tanks passes it in Normal at every aspect.
+
+[Christmas qualification](clock-christmas-validation.md) has the theme on a
+Pi 4 and a Pi 5 cabinet. Every theme held the display's full rate, at rest,
+during Rain and through the fade, and the string added about 1 ms of loop CPU
+on the Pi 4 and 0.3 ms on the Pi 5. The report also gathers the tests behind
+each rule, with pictures of every font and five events at each screen size.
 
 The tests are `theme::tests`, `render::string_lights::tests`,
 `presentation::tests::every_lighting_starts_from_the_looks_colors_and_cycles_back_to_them`
@@ -1076,7 +1081,7 @@ the IDs, and the fade:
 The string's tests hold:
 
 - its place from rail to rail under the canopy, clear of the face, at seven
-  aspects and both time formats;
+  aspects, in both time formats and every font;
 - that nothing of it reaches the canopy, and the hatch nothing below it, across
   241 aspects;
 - its bounds and its bulbs' colors;

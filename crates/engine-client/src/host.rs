@@ -91,7 +91,7 @@ enum ScenarioControlRequest {
     Restart,
     NewMatch,
     Benchmark,
-    ClockBenchmark(client_scenarios::ClockBenchmarkCase),
+    ClockBenchmark(client_scenarios::ClockBenchmarkConfig),
     ClockEvent(engine_common::ClockEventKind),
     ClockSettings(engine_common::ClockSettings),
     ClockPreview(engine_common::ClockEventKind),
@@ -186,11 +186,14 @@ impl ScenarioControls {
         );
     }
 
-    pub fn request_clock_benchmark(&mut self, case: client_scenarios::ClockBenchmarkCase) -> bool {
+    pub fn request_clock_benchmark(
+        &mut self,
+        fixture: client_scenarios::ClockBenchmarkConfig,
+    ) -> bool {
         if self.request.is_some() || self.clock_state.is_none() {
             return false;
         }
-        self.request = Some(ScenarioControlRequest::ClockBenchmark(case));
+        self.request = Some(ScenarioControlRequest::ClockBenchmark(fixture));
         true
     }
 
@@ -1281,14 +1284,14 @@ fn step_scenario_inner(
                 };
             }
             ScenarioControlRequest::Benchmark | ScenarioControlRequest::ClockBenchmark(_) => {
-                let clock_case = match request {
-                    ScenarioControlRequest::ClockBenchmark(case) if scenario_name == "clock" => {
-                        Some(case)
+                let clock_fixture = match request {
+                    ScenarioControlRequest::ClockBenchmark(fixture) if scenario_name == "clock" => {
+                        Some(fixture)
                     }
                     ScenarioControlRequest::ClockBenchmark(_) => return HostStepResult::default(),
                     _ => None,
                 };
-                if scenario.registration().capabilities.benchmark || clock_case.is_some() {
+                if scenario.registration().capabilities.benchmark || clock_fixture.is_some() {
                     return match start_benchmark_scenario(
                         scenario,
                         scenario_name,
@@ -1299,7 +1302,7 @@ fn step_scenario_inner(
                         benchmark_active,
                         settings,
                         viewport,
-                        clock_case,
+                        clock_fixture,
                     ) {
                         Ok(()) => HostStepResult::scenario_restarted(),
                         Err(error) => {
@@ -1556,12 +1559,12 @@ fn start_benchmark_scenario(
     benchmark_active: &mut bool,
     settings: &Settings,
     viewport: Viewport,
-    clock_case: Option<client_scenarios::ClockBenchmarkCase>,
+    clock_fixture: Option<client_scenarios::ClockBenchmarkConfig>,
 ) -> Result<(), HostError> {
     let asset = scenario.asset.clone();
     let mut configuration = BenchmarkConfiguration::default();
-    if let Some(case) = clock_case {
-        configuration.clock.case = case;
+    if let Some(fixture) = clock_fixture {
+        configuration.clock = fixture;
     }
     replace_scenario(scenario, || {
         HostedScenario::new_with_asset(
@@ -2411,7 +2414,7 @@ impl BenchmarkRow {
 fn write_benchmark_header(mut writer: impl Write) -> io::Result<()> {
     write!(
         writer,
-        "benchmark_version,seed,viewport_width,viewport_height,internal_width,internal_height,warmup_seconds,clock_case,clock_recipe,max_bodies,max_colliders,max_scene_items,event_active_frames,"
+        "benchmark_version,seed,viewport_width,viewport_height,internal_width,internal_height,warmup_seconds,clock_case,clock_recipe,clock_theme,max_bodies,max_colliders,max_scene_items,event_active_frames,"
     )?;
     writeln!(
         writer,
@@ -2431,7 +2434,7 @@ fn write_benchmark_row(
     };
     write!(
         writer,
-        "2,{},{},{},{},{},{},{},{},{},{},{},{},",
+        "3,{},{},{},{},{},{},{},{},{},{},{},{},{},",
         options.seed,
         options.viewport.width,
         options.viewport.height,
@@ -2445,6 +2448,11 @@ fn write_benchmark_row(
         },
         if options.scenario == "clock" {
             options.configuration.clock.marquee_preset.as_str()
+        } else {
+            ""
+        },
+        if options.scenario == "clock" {
+            options.configuration.clock.theme.as_str()
         } else {
             ""
         },
@@ -4348,11 +4356,21 @@ mod tests {
 
     #[test]
     fn clock_benchmark_control_matches_headless_fixtures_and_restart_exits() {
-        use client_scenarios::ClockBenchmarkCase;
+        use client_scenarios::{ClockBenchmarkCase, ClockBenchmarkConfig, ClockBenchmarkTheme};
         let dt = Duration::from_nanos(16_666_667);
         let mut settings = Settings::default();
         settings.clock.event_profile = engine_common::ClockEventProfile::Demo;
-        for case in [ClockBenchmarkCase::Idle, ClockBenchmarkCase::Rain] {
+        for (case, theme) in [
+            (ClockBenchmarkCase::Idle, ClockBenchmarkTheme::Normal),
+            (ClockBenchmarkCase::Rain, ClockBenchmarkTheme::Normal),
+            (ClockBenchmarkCase::Idle, ClockBenchmarkTheme::Christmas),
+            (ClockBenchmarkCase::Rain, ClockBenchmarkTheme::Turning),
+        ] {
+            let fixture = ClockBenchmarkConfig {
+                case,
+                theme,
+                ..Default::default()
+            };
             let mut scenario = HostedScenario::new(
                 "clock",
                 42,
@@ -4362,7 +4380,7 @@ mod tests {
             )
             .unwrap();
             let mut configuration = BenchmarkConfiguration::default();
-            configuration.clock.case = case;
+            configuration.clock = fixture;
             let mut expected = HostedScenario::new(
                 "clock",
                 42,
@@ -4373,13 +4391,13 @@ mod tests {
             .unwrap();
             let mut controls = ScenarioControls::default();
             assert!(
-                !controls.request_clock_benchmark(case),
+                !controls.request_clock_benchmark(fixture),
                 "needs active Clock"
             );
             controls.publish_clock_state(&scenario, 1, true);
-            assert!(controls.request_clock_benchmark(case));
+            assert!(controls.request_clock_benchmark(fixture));
             assert!(
-                !controls.request_clock_benchmark(case),
+                !controls.request_clock_benchmark(fixture),
                 "must not overwrite a request"
             );
             let mut input = ClientInput::default();
@@ -4425,6 +4443,12 @@ mod tests {
                 engine_common::ClockEventProfile::Off
             );
             assert_eq!(state.event_kind.is_some(), case == ClockBenchmarkCase::Rain);
+            if theme == ClockBenchmarkTheme::Christmas {
+                assert_eq!(
+                    state.theme.unwrap().theme,
+                    engine_common::ClockTheme::Christmas
+                );
+            }
 
             controls.request_restart();
             let result = step_scenario(

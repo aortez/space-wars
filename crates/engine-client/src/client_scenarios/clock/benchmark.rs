@@ -1,9 +1,13 @@
 //! Deterministic, repeating Clock fixtures for the shared headless host runner.
 //! No wall clock, input devices, saved Clock settings, or presentation sleeps.
 
-use engine_common::{Action, ClockEventKind, ClockEventProfile, ClockMarqueePreset, Scenario};
+use engine_common::{
+    Action, ClockEventKind, ClockEventProfile, ClockMarqueePreset, ClockSettings, ClockThemeChoice,
+    Scenario,
+};
 use scenario_clock::{
-    ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState, arena_fixture::FixtureStart,
+    ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState, THEME_FADE_TICKS,
+    arena_fixture::FixtureStart,
 };
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, clap::ValueEnum)]
@@ -97,14 +101,63 @@ impl ClockBenchmarkCase {
     }
 }
 
+/// The look a fixture wears, whatever theme is saved. Each draws the same
+/// scene, so runs in each compare what the look costs (#462).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, clap::ValueEnum)]
+pub enum ClockBenchmarkTheme {
+    #[default]
+    Normal,
+    Christmas,
+    /// Christmas and Normal in turn, each change as the last fade ends, so
+    /// the face is fading on every frame but the first.
+    Turning,
+}
+
+impl ClockBenchmarkTheme {
+    #[cfg(test)]
+    pub const ALL: [Self; 3] = [Self::Normal, Self::Christmas, Self::Turning];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Normal => "normal",
+            Self::Christmas => "christmas",
+            Self::Turning => "turning",
+        }
+    }
+
+    /// The theme the fixture starts in.
+    fn first(self) -> ClockThemeChoice {
+        match self {
+            Self::Christmas => ClockThemeChoice::Christmas,
+            Self::Normal | Self::Turning => ClockThemeChoice::Normal,
+        }
+    }
+
+    /// The theme to change to before `tick`'s step, if any. Turning starts
+    /// on the second step, since the Clock shows its first theme at once.
+    fn change(self, tick: u64) -> Option<ClockThemeChoice> {
+        let fade = u64::from(THEME_FADE_TICKS);
+        (self == Self::Turning && tick % fade == 1).then(|| {
+            if (tick / fade).is_multiple_of(2) {
+                ClockThemeChoice::Christmas
+            } else {
+                ClockThemeChoice::Normal
+            }
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ClockBenchmarkConfig {
     pub case: ClockBenchmarkCase,
     pub marquee_preset: ClockMarqueePreset,
+    pub theme: ClockBenchmarkTheme,
 }
 
 pub(super) struct Driver {
     config: ClockBenchmarkConfig,
+    /// The fixture's settings, which a change of theme keeps.
+    settings: ClockSettings,
     tick: u64,
 }
 
@@ -119,6 +172,7 @@ impl Driver {
                 marquee_preset: config.marquee_preset,
                 rain_amount: engine_common::ClockRainAmount::Heavy,
                 arena_fixture: config.case.arena_fixture(),
+                theme: config.theme.first(),
                 ..ClockConfig::default()
             },
             seed,
@@ -128,7 +182,15 @@ impl Driver {
             &[ClockAction::set_reading(reading(0))],
             std::time::Duration::ZERO,
         );
-        (state, Self { config, tick: 0 })
+        let settings = state.settings();
+        (
+            state,
+            Self {
+                config,
+                settings,
+                tick: 0,
+            },
+        )
     }
 
     pub fn next_actions(&mut self) -> Vec<Action> {
@@ -142,6 +204,13 @@ impl Driver {
             // Include event construction and cleanup in the measured workload.
             // Digit Slide intentionally previews every digit: a dense upper bound.
             actions.push(ClockAction::preview_event(event));
+        }
+        if let Some(theme) = self.config.theme.change(self.tick) {
+            // The live controls change the theme the same way (#458).
+            actions.push(ClockAction::configure(ClockSettings {
+                theme,
+                ..self.settings
+            }));
         }
         self.tick += 1;
         actions
@@ -158,9 +227,10 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
-    /// A report names each case as the command line that chose it does.
+    /// A report names each case and theme as the command line that chose it
+    /// does.
     #[test]
-    fn reports_name_every_case_as_the_command_line_does() {
+    fn reports_name_every_case_and_theme_as_the_command_line_does() {
         use clap::ValueEnum;
         assert_eq!(
             ClockBenchmarkCase::value_variants(),
@@ -168,6 +238,72 @@ mod tests {
         );
         for case in ClockBenchmarkCase::ALL {
             assert_eq!(case.as_str(), case.to_possible_value().unwrap().get_name());
+        }
+        assert_eq!(
+            ClockBenchmarkTheme::value_variants(),
+            ClockBenchmarkTheme::ALL
+        );
+        for theme in ClockBenchmarkTheme::ALL {
+            assert_eq!(
+                theme.as_str(),
+                theme.to_possible_value().unwrap().get_name()
+            );
+        }
+    }
+
+    /// Every theme runs the same fixture: the same events, bodies and
+    /// visitors on every tick, under its own look. Turning is fading on every
+    /// frame but the first, between Christmas and Normal in turn.
+    #[test]
+    fn every_theme_runs_the_same_scene_and_turning_always_fades() {
+        use engine_common::ClockTheme;
+        let tick = Duration::from_nanos(16_666_667);
+        let fade = u64::from(THEME_FADE_TICKS);
+        for case in ClockBenchmarkCase::ALL {
+            let mut runs = ClockBenchmarkTheme::ALL.map(|theme| {
+                let config = ClockBenchmarkConfig {
+                    case,
+                    theme,
+                    ..Default::default()
+                };
+                Driver::new(config, 7, 4.0 / 3.0)
+            });
+            for step in 0..case.cycle_ticks() {
+                for (state, driver) in &mut runs {
+                    let actions = driver.next_actions();
+                    ClockScenario::step(state, &actions, tick);
+                }
+                let [(normal, _), (christmas, _), (turning, _)] = &runs;
+                for themed in [christmas, turning] {
+                    assert_eq!(themed.event_kind(), normal.event_kind(), "{case:?} {step}");
+                    assert_eq!(themed.event_phase(), normal.event_phase());
+                    assert_eq!(themed.body_count(), normal.body_count());
+                    assert_eq!(themed.collider_count(), normal.collider_count());
+                    assert_eq!(themed.duck_state(), normal.duck_state());
+                    assert_eq!(themed.spider_state(), normal.spider_state());
+                    assert_eq!(themed.display(), normal.display());
+                }
+                assert_eq!(normal.theme_state().theme, ClockTheme::Normal);
+                assert_eq!(normal.theme_state().fade_milli, 1000);
+                assert_eq!(christmas.theme_state().theme, ClockTheme::Christmas);
+                assert_eq!(christmas.theme_state().fade_milli, 1000);
+                let state = turning.theme_state();
+                if step == 0 {
+                    assert_eq!((state.theme, state.fade_milli), (ClockTheme::Normal, 1000));
+                } else {
+                    let heading = if ((step - 1) / fade).is_multiple_of(2) {
+                        ClockTheme::Christmas
+                    } else {
+                        ClockTheme::Normal
+                    };
+                    let gone = ((step - 1) % fade + 1) * 1000 / fade;
+                    assert_eq!(
+                        (state.theme, u64::from(state.fade_milli)),
+                        (heading, gone),
+                        "{case:?} {step}"
+                    );
+                }
+            }
         }
     }
 

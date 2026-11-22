@@ -392,6 +392,11 @@ run were retained locally under `target/clock-benchmarks/run.zhYlok3O/`.
 # Fix the recipe explicitly, without borrowing the user's saved text/settings.
 ./benchmark-clock.sh --cases marquee --recipe text-ribbon
 
+# The same fixture in Christmas, or turning between Christmas and Normal so
+# that every frame but the first is in the middle of a fade (#462).
+./benchmark-clock.sh --cases idle,rain --theme christmas
+./benchmark-clock.sh --cases idle,rain --theme turning
+
 # Heavy rain, including duck entry, drainage and cleanup (42-second event).
 # Short default runs sample the shower only; use 45+ seconds for the full cycle.
 ./benchmark-clock.sh --cases rain --seconds 45 --repeats 3
@@ -426,6 +431,11 @@ intentionally rolls all four digits as a dense preview; ordinary minute changes
 usually move fewer.
 Marquee uses the specified recipe and the fixed default `SPACE WARS` message.
 Its 15-second cycle is the longest; use at least 15 seconds to cover every phase.
+Fixtures wear Normal unless `--theme` chooses `christmas`, or `turning`, which
+changes between Christmas and Normal through the settings, as the live controls
+do, each change as the last half-second fade ends. Every theme runs the same
+scene, tick for tick. The live fixture takes the same choice, as in
+`spacewars-cli host clock-benchmark rain --theme christmas`.
 
 Warm-up exercises the real renderer, retaining its buffers/caches; the scenario
 is reconstructed with the same seed before measurement, so warm-up length does
@@ -433,8 +443,9 @@ not change which simulation ticks are measured. Physics/event creation is still
 included in the first measured cycle. For steady-state comparisons, collect
 multiple complete cycles and repeats, and report cold-start effects separately.
 
-CSV **benchmark version 2** adds metadata/resource columns to the existing host
-report; consume columns by name, not numeric position:
+CSV **benchmark version 2** added metadata/resource columns to the existing
+host report, and **version 3** adds `clock_theme` after `clock_recipe`. Consume
+columns by name, not numeric position:
 
 - `viewport_width/height` are logical pixels; `internal_width/height` are the
   actual raster allocation dimensions (rounded up). Scale 2 means **four times

@@ -105,6 +105,8 @@ pub use events::{
 use layout::Layout;
 /// How long a spider's visit may go on past its budget on its way out.
 pub use spider::visit::EXIT_GRACE_TICKS as SPIDER_EXIT_GRACE_TICKS;
+/// How long a change of theme takes to fade in (#457).
+pub use theme::FADE_TICKS as THEME_FADE_TICKS;
 
 pub const CLOCK_ACTION_VERSION: u16 = 15;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;

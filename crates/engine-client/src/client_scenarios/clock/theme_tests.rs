@@ -97,3 +97,49 @@ fn christmas_dresses_the_face_and_lights_its_bulbs_in_the_rasters_pixels() {
         );
     }
 }
+
+/// Auto's nights go by the host's local time, as the reading takes it, so one
+/// instant can be a December evening in one zone and the afternoon before in
+/// the next. A zone that changes takes the theme of the reading it gives,
+/// either way, with nothing made up in between.
+#[test]
+fn autos_nights_follow_the_hosts_local_time_in_every_zone() {
+    use chrono::{FixedOffset, TimeZone, Utc};
+    use engine_common::ClockTheme::{Christmas, Normal};
+    let config = ClockConfig {
+        theme: ClockThemeChoice::Auto,
+        event_profile: ClockEventProfile::Off,
+        ..ClockConfig::default()
+    };
+    let mut state = ClockScenario::init(config, 7);
+    let mut wears = |utc: chrono::DateTime<Utc>, hours: i32| {
+        let zone = FixedOffset::east_opt(hours * 3600).unwrap();
+        let reading = clock_reading_from_local(utc.with_timezone(&zone));
+        ClockScenario::step(
+            &mut state,
+            &[ClockAction::set_reading(reading)],
+            Duration::ZERO,
+        );
+        state.theme()
+    };
+    let first = Utc.with_ymd_and_hms(2026, 12, 2, 2, 0, 0).unwrap();
+    // 17:00 on December 1.
+    assert_eq!(wears(first, -9), Normal);
+    // 18:00 on December 1, the first evening.
+    assert_eq!(wears(first, -8), Christmas);
+    // 02:00 on December 2, still December 1's night.
+    assert_eq!(wears(first, 0), Christmas);
+    // 07:00 on December 2, the morning after.
+    assert_eq!(wears(first, 5), Normal);
+    // The zone set back to 17:00 on December 1.
+    assert_eq!(wears(first, -9), Normal);
+    let last = Utc.with_ymd_and_hms(2027, 1, 1, 14, 0, 0).unwrap();
+    // 05:00 on January 1, still December 31's night.
+    assert_eq!(wears(last, -9), Christmas);
+    // 06:00 on January 1, when the last night ends.
+    assert_eq!(wears(last, -8), Normal);
+    // 04:00 on January 2, a January night.
+    assert_eq!(wears(last, 14), Normal);
+    // The zone set back to 05:00 on January 1.
+    assert_eq!(wears(last, -9), Christmas);
+}

@@ -28,7 +28,7 @@ mod surface_sortie;
 mod terrain_grains;
 mod terrain_lab;
 
-pub use clock::benchmark::{ClockBenchmarkCase, ClockBenchmarkConfig};
+pub use clock::benchmark::{ClockBenchmarkCase, ClockBenchmarkConfig, ClockBenchmarkTheme};
 
 #[cfg(test)]
 pub(crate) use pizza::PizzaClientScenario;

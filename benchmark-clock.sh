@@ -15,6 +15,7 @@ bench_cases=idle,falling,color-cycle,meltdown,duck,marquee,digit-slide,rain,aqua
 bench_renderer=raster
 bench_recipe=clock-wave
 bench_seed=7
+bench_theme=normal
 
 bench_environment() {
     date -u '+collected_utc=%Y-%m-%dT%H:%M:%SZ'
@@ -43,12 +44,13 @@ usage() {
         '  --renderer NAME   raster or vector (default: raster)' \
         '  --recipe NAME     Fixed Marquee recipe (default: clock-wave)' \
         '  --seed N          Fixed seed (default: 7)' \
+        '  --theme NAME      normal, christmas, or turning between them (default: normal)' \
         'Reports are CPU-only: they exclude Slint drawing, display upload and vsync.'
 }
 while (( $# )); do
     case "$1" in
         --help|-h) usage; exit 0 ;;
-        --client|--output|--repeats|--seconds|--warmup|--width|--height|--scales|--cases|--renderer|--recipe|--seed)
+        --client|--output|--repeats|--seconds|--warmup|--width|--height|--scales|--cases|--renderer|--recipe|--seed|--theme)
             if (( $# < 2 )); then printf 'Missing value for %s\n' "$1" >&2; exit 2; fi
             case "$1" in
                 --client) bench_client=$2 ;; --output) bench_output=$2 ;;
@@ -57,6 +59,7 @@ while (( $# )); do
                 --height) bench_height=$2 ;; --scales) bench_scales=$2 ;;
                 --cases) bench_cases=$2 ;; --renderer) bench_renderer=$2 ;;
                 --recipe) bench_recipe=$2 ;; --seed) bench_seed=$2 ;;
+                --theme) bench_theme=$2 ;;
             esac
             shift 2 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; exit 2 ;;
@@ -66,6 +69,9 @@ done
 [[ "$bench_repeats" =~ ^[1-9][0-9]?$ ]] || { printf 'Repeats must be 1–99\n' >&2; exit 2; }
 [[ "$bench_renderer" == raster || "$bench_renderer" == vector ]] || {
     printf 'Renderer must be raster or vector\n' >&2; exit 2;
+}
+[[ "$bench_theme" == normal || "$bench_theme" == christmas || "$bench_theme" == turning ]] || {
+    printf 'Theme must be normal, christmas or turning\n' >&2; exit 2;
 }
 [[ "$bench_scales" != ,* && "$bench_scales" != *, && "$bench_scales" != *,,* \
     && "$bench_cases" != ,* && "$bench_cases" != *, && "$bench_cases" != *,,* ]] || {
@@ -103,9 +109,9 @@ printf 'Reports: %s\n' "$bench_run"
     bench_environment
     uname -a
     sha256sum -- "$bench_client"
-    printf 'renderer=%s viewport=%sx%s scales=%s cases=%s recipe=%s seed=%s seconds=%s warmup=%s repeats=%s\n' \
+    printf 'renderer=%s viewport=%sx%s scales=%s cases=%s recipe=%s theme=%s seed=%s seconds=%s warmup=%s repeats=%s\n' \
         "$bench_renderer" "$bench_width" "$bench_height" "$bench_scales" "$bench_cases" \
-        "$bench_recipe" "$bench_seed" "$bench_seconds" "$bench_warmup" "$bench_repeats"
+        "$bench_recipe" "$bench_theme" "$bench_seed" "$bench_seconds" "$bench_warmup" "$bench_repeats"
 } > "$bench_run/metadata.txt"
 
 for bench_case in "${bench_case_list[@]}"; do
@@ -117,7 +123,7 @@ for bench_case in "${bench_case_list[@]}"; do
             if ! "$bench_client" --scenario clock --benchmark-headless --seed "$bench_seed" \
                 --config-dir "$bench_run/unused-settings" --renderer "$bench_renderer" \
                 --raster-scale "$bench_scale" --clock-benchmark-case "$bench_case" \
-                --clock-benchmark-recipe "$bench_recipe" \
+                --clock-benchmark-recipe "$bench_recipe" --clock-benchmark-theme "$bench_theme" \
                 --benchmark-width "$bench_width" --benchmark-height "$bench_height" \
                 --benchmark-seconds "$bench_seconds" --benchmark-warmup-seconds "$bench_warmup" \
                 > "$bench_run/$bench_name.csv" 2> "$bench_run/$bench_name.log"; then

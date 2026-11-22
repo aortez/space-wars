@@ -4,8 +4,8 @@ use crate::theme::tests::world;
 use crate::theme::{Appearance, FADE_TICKS};
 use crate::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario, ClockState};
 use engine_common::{
-    Action, ClockEventKind, ClockEventProfile, ClockLampMode, ClockMarqueePreset, ClockRainAmount,
-    ClockSettings, ClockTheme, ClockThemeChoice, ClockTimeFormat, Scenario,
+    Action, ClockEventKind, ClockEventProfile, ClockFont, ClockLampMode, ClockMarqueePreset,
+    ClockRainAmount, ClockSettings, ClockTheme, ClockThemeChoice, ClockTimeFormat, Scenario,
 };
 use std::time::Duration;
 
@@ -172,8 +172,16 @@ fn simple(points: &[RenderPoint]) -> bool {
 #[test]
 fn the_string_hangs_under_the_canopy_from_rail_to_rail_and_clear_of_the_face() {
     for aspect in ASPECTS {
-        for format in [ClockTimeFormat::TwelveHour, ClockTimeFormat::TwentyFourHour] {
-            let state = clock(aspect, ClockThemeChoice::Christmas, format);
+        for (format, font) in [ClockTimeFormat::TwelveHour, ClockTimeFormat::TwentyFourHour]
+            .into_iter()
+            .flat_map(|format| ClockFont::ALL.map(|font| (format, font)))
+        {
+            let state = clock_with(aspect, ClockThemeChoice::Christmas, |config| {
+                config.time_format = format;
+                config.fonts.selected = font;
+                config.fonts.rotate = false;
+            });
+            assert_eq!(state.active_font(), font);
             let frame = crate::render::render_frame(&state);
             let layout = Layout::new(state.aspect_ratio());
             let lights = string(layout);
@@ -218,7 +226,7 @@ fn the_string_hangs_under_the_canopy_from_rail_to_rail_and_clear_of_the_face() {
                 .fold(f32::MIN, f32::max);
             assert!(
                 y0 > face,
-                "{aspect} {format:?}: lights reach {y0}, face {face}"
+                "{aspect} {format:?} {font:?}: lights reach {y0}, face {face}"
             );
         }
     }
