@@ -14,12 +14,25 @@
 //! work, which healing paid for in energy needs (#246). A ship or a rover built
 //! with more health has more hull rather than tougher hull, so a point of its
 //! health stands for the same work however it was built.
+//!
+//! The hulls and asteroid rock keep their reference materials' stiffness and
+//! strength, with a toughness set in the match tests' fixture: a still target
+//! struck every two seconds by a supplied round closing at 300. There a round
+//! fails a fresh ship's hull on the fourth hit, a fresh pod's on the second and
+//! a pilot on foot on the first, the survival #330 set. In open space a still
+//! ship takes a fifth. A round breaks the small asteroids the game spawns, as a
+//! shell did, and costs rock of radius 40 to 150 about the 15 health a shell's
+//! damage did. A hit's cost follows its energy, so it rises steeply with
+//! closing speed.
 use super::*;
 use engine_material::{HULL, Material, ROCK, Region, SHELL, SOFT_TISSUE, Section};
 use surface_sortie::match_rules::{PILOT_HEALTH, POD_HULL_HEALTH};
 
 /// Depth of hull plate behind a struck face, `wu`.
 const PLATE_DEPTH: f32 = 0.2;
+/// Depth of rock that gives way behind a struck face, `wu`: about the width
+/// of the patch a shell strikes, whatever the rock's size.
+const ROCK_DEPTH: f32 = 1.0;
 /// Represented depth into the screen of ships, rovers and debris, `wu`.
 const THICKNESS: f32 = 2.0;
 /// Represented depth of an escape pod into the screen, `wu`.
@@ -44,6 +57,31 @@ const PILOT_AREA: f32 =
         + 4.0 * spaceling_geometry::RADIUS * spaceling_geometry::HALF_SEGMENT;
 const PILOT_VOLUME: f32 = PILOT_AREA * PILOT_THICKNESS;
 
+/// A ship's hull: the reference hull's stiffness and strength, tough enough
+/// that a supplied round fails a fresh ship's hull on the fourth hit in the
+/// match tests' fixture, the survival #330 set. In open space a still ship
+/// takes a fifth.
+pub const SHIP_HULL: Material = Material {
+    name: "ship hull",
+    toughness: 7_800.0,
+    ..HULL
+};
+/// An escape pod's hull, tougher for its size, so that a supplied round fails
+/// a fresh pod's hull on the second hit in that fixture, as a match's missile
+/// rule did.
+pub const POD_HULL: Material = Material {
+    name: "pod hull",
+    toughness: 12_000.0,
+    ..HULL
+};
+/// Asteroid rock: the reference rock, tough enough that a supplied round costs
+/// rock of radius 40 to 150 about the 15 health a shell's damage did.
+pub const ASTEROID_ROCK: Material = Material {
+    name: "asteroid rock",
+    toughness: 1_750.0,
+    ..ROCK
+};
+
 /// A body's material at full health, and the health that stands for it. A hull
 /// region is the plate a weapon can harm, which can weigh more than its body:
 /// a hit takes the body's mass from the physics, not from the region.
@@ -61,7 +99,7 @@ impl HealthMap {
     /// health the ship is built with.
     pub fn ship_hull(full_health: f32) -> Self {
         Self {
-            material: HULL,
+            material: SHIP_HULL,
             section: Section::new(THICKNESS, PLATE_DEPTH),
             volume: SHIP_HULL_VOLUME * (full_health / SHIP_HEALTH),
             full_health,
@@ -72,7 +110,7 @@ impl HealthMap {
     /// tracks the rebuild instead.
     pub fn pod_hull() -> Self {
         Self {
-            material: HULL,
+            material: POD_HULL,
             section: Section::new(POD_THICKNESS, PLATE_DEPTH),
             volume: POD_HULL_VOLUME,
             full_health: POD_HULL_HEALTH,
@@ -101,20 +139,21 @@ impl HealthMap {
     }
 
     /// Rock, or a shell's casing, weighing what the debris weighed when it
-    /// was made, with its radius then behind a struck face. The debris breaks
-    /// below `DEBRIS_DEATH_LIFE_FACTOR` of its full health, while its region
-    /// still holds that much of its capacity.
+    /// was made. Rock gives way a patch's depth behind a struck face, and a
+    /// shell crushes through its radius. The debris breaks below
+    /// `DEBRIS_DEATH_LIFE_FACTOR` of its full health, while its region still
+    /// holds that much of its capacity.
     pub fn debris(debris: &DebrisState) -> Self {
-        let material = match debris.kind {
-            DebrisKind::Shell => SHELL,
-            DebrisKind::Asteroid | DebrisKind::Fragment => ROCK,
+        let (material, depth) = match debris.kind {
+            DebrisKind::Shell => (SHELL, debris.base_radius),
+            DebrisKind::Asteroid | DebrisKind::Fragment => (ASTEROID_ROCK, ROCK_DEPTH),
         };
         let mass = debris
             .inertial_mass
             .unwrap_or_else(|| debris_mass(debris.base_radius));
         Self {
             material,
-            section: Section::new(THICKNESS, debris.base_radius),
+            section: Section::new(THICKNESS, depth),
             volume: mass / material.density,
             full_health: debris.life_max,
         }
@@ -281,14 +320,27 @@ mod tests {
     }
 
     #[test]
+    fn calibration_changes_only_toughness() {
+        for (calibrated, reference) in [(SHIP_HULL, HULL), (POD_HULL, HULL), (ASTEROID_ROCK, ROCK)]
+        {
+            let restored = Material {
+                name: reference.name,
+                toughness: reference.toughness,
+                ..calibrated
+            };
+            assert_eq!(restored, reference, "{}", calibrated.name);
+        }
+    }
+
+    #[test]
     fn regions_hold_what_the_design_note_lists() {
         let close = |value: f32, expected: f32| (value - expected).abs() <= 1.0e-3 * expected;
         assert_eq!(ship(100).health_map(), HealthMap::ship_hull(100.0));
         assert_eq!(pod().health_map(), HealthMap::pod_hull());
         // Each section is its thickness into the screen, then its depth.
         let rows = [
-            (ship(100).health_map(), 22_681.0, 226.8, (2.0, 0.2)),
-            (pod().health_map(), 2_954.0, 29.54, (1.0, 0.2)),
+            (ship(100).health_map(), 88_455.0, 884.55, (2.0, 0.2)),
+            (pod().health_map(), 17_724.0, 177.24, (1.0, 0.2)),
             (HealthMap::pilot(), 4.512, 0.045_12, (0.3, 0.15)),
             (
                 RoverState::new(1, 0, 0, 0).health_map(),
@@ -296,7 +348,7 @@ mod tests {
                 358.4,
                 (2.0, 0.2),
             ),
-            (asteroid(3.0).health_map(), 37.70 * 3.0, 12.0, (2.0, 3.0)),
+            (asteroid(3.0).health_map(), 13_195.0, 1_400.0, (2.0, 1.0)),
             (shell().health_map(), 4_712.4, 4_712.4, (2.0, 2.0)),
             (round().health_map(), 375.0, 375.0, (2.0, 2.0)),
         ];
@@ -366,7 +418,7 @@ mod tests {
         );
         let ratio = durable.work_per_health() / standard.work_per_health();
         assert!((ratio - 1.0).abs() < 1.0e-6);
-        assert_eq!(standard.capacity(), HULL.toughness * SHIP_HULL_VOLUME);
+        assert_eq!(standard.capacity(), SHIP_HULL.toughness * SHIP_HULL_VOLUME);
         let rover = HealthMap::rover_hull(ROVER_LIFE_MAX);
         let sturdy = HealthMap::rover_hull(2.0 * ROVER_LIFE_MAX);
         assert_eq!(sturdy.capacity(), 2.0 * rover.capacity());
@@ -381,7 +433,7 @@ mod tests {
             assert!((region.mass() - debris.mass()).abs() <= 1.0e-5 * debris.mass());
         }
         assert_eq!(shell().health_map().material, SHELL);
-        assert_eq!(fragment().health_map().material, ROCK);
+        assert_eq!(fragment().health_map().material, ASTEROID_ROCK);
         // Rock takes the same work per point of health at any size.
         let grit = asteroid(0.5).health_map().work_per_health();
         let boulder = asteroid(6.0).health_map().work_per_health();

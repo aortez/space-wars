@@ -9,6 +9,7 @@ use engine_rapier::{
         BodyId as PhysicsBodyId, BodyKind, BodyMotion, BodyRole, BodySpec, ColliderId,
         ColliderRole, ColliderSpec, CollisionGroups, PhysicsId, PhysicsStepMetrics, PhysicsWorld,
         PhysicsWorldConfig, RayCastOptions,
+        weapon::{Prepared, Recipients, ShotSpec, WeaponEvent, Weapons},
     },
 };
 
@@ -273,6 +274,9 @@ pub(super) struct SpacewarsPhysics {
     rovers: BTreeMap<u64, RoverPhysicsEntry>,
     debris_keys: BTreeMap<u64, DebrisColliderKey>,
     next_debris_entity: u64,
+    /// The cannon shells' shots, when the game carries its shells as material
+    /// weapon shots (#330).
+    weapons: Option<Weapons>,
 }
 
 pub(super) struct PhysicsReconcileInput<'a> {
@@ -340,7 +344,73 @@ impl SpacewarsPhysics {
             rovers: BTreeMap::new(),
             debris_keys: BTreeMap::new(),
             next_debris_entity: DEBRIS_ENTITY_BASE,
+            weapons: None,
         }
+    }
+
+    /// Carries the game's cannon shells as material weapon shots from now on.
+    pub(super) fn enable_weapons(&mut self) {
+        self.weapons.get_or_insert_with(Weapons::new);
+    }
+
+    pub(super) fn weapons_enabled(&self) -> bool {
+        self.weapons.is_some()
+    }
+
+    /// The physics ids of the shells that shots carry now.
+    #[cfg(test)]
+    pub(super) fn shot_ids(&self) -> Vec<u64> {
+        self.weapons
+            .iter()
+            .flat_map(|weapons| weapons.shots().map(|(id, _)| id))
+            .collect()
+    }
+
+    /// Launches a shot on a body already in the world. False when material
+    /// weapons are off or the shot is refused.
+    pub(super) fn launch_shot(&mut self, spec: ShotSpec) -> bool {
+        self.weapons
+            .as_mut()
+            .is_some_and(|weapons| weapons.launch(&self.world, spec).is_ok())
+    }
+
+    /// Records the motion each body brings into the step, while any shot
+    /// flies.
+    pub(super) fn prepare_shots(&self, dt_seconds: f32) -> Option<Prepared> {
+        self.weapons
+            .as_ref()
+            .filter(|weapons| weapons.shots().next().is_some())
+            .map(|weapons| weapons.prepare(&self.world, dt_seconds))
+    }
+
+    /// Stops and retires the shots after a step, and returns what they did.
+    pub(super) fn settle_shots(
+        &mut self,
+        prepared: Prepared,
+        dt_seconds: f32,
+        recipients: &mut impl Recipients,
+    ) -> Vec<WeaponEvent> {
+        let Some(weapons) = &mut self.weapons else {
+            return Vec::new();
+        };
+        weapons.settle(prepared, &mut self.world, dt_seconds, recipients);
+        weapons.take_events()
+    }
+
+    /// Retires the live shots that `done` picks by id, with their bodies.
+    pub(super) fn retire_shots(&mut self, mut done: impl FnMut(u64) -> bool) {
+        let Some(weapons) = &mut self.weapons else {
+            return;
+        };
+        let ids: Vec<u64> = weapons
+            .shots()
+            .map(|(id, _)| id)
+            .filter(|id| done(*id))
+            .collect();
+        for id in ids {
+            let _ = weapons.retire(&mut self.world, id);
+        }
+        weapons.take_events();
     }
 
     #[cfg(feature = "sensor-profile")]

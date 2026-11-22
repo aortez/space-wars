@@ -782,6 +782,62 @@ fn paused_steps_change_nothing_and_a_replay_matches() {
     assert_eq!(play(2), first);
 }
 
+/// A host that keeps its world in a cloneable state, such as one that copies
+/// a game to look ahead, clones its weapons with the world. The clone plays on
+/// as the original does.
+#[test]
+fn a_clone_of_the_world_and_its_weapons_plays_on_as_the_original() {
+    let mut world = world();
+    let plate = plate(&mut world, Some(armor()), &[(0.0, 2.0)]);
+    let mut field = Field::new(&BLADES).with_plate(plate, 8.0);
+    let mut weapons = Weapons::new();
+    fire(&mut world, &mut weapons, Some(PAYLOAD));
+    // One step short of the moss leaves nothing charged, so a fresh field is
+    // the same as the one the original keeps.
+    let prepared = weapons.prepare(&world, DT);
+    world.step(DT);
+    weapons.settle(prepared, &mut world, DT, &mut field);
+    assert!(weapons.take_events().is_empty());
+    assert!(weapons.shots().next().is_some());
+    let (mut twin, mut twin_weapons) = (world.clone(), weapons.clone());
+    let mut twin_field = Field::new(&BLADES).with_plate(plate, 8.0);
+    let events = run(&mut world, &mut weapons, &mut field, 0);
+    assert!(!events.is_empty());
+    assert_eq!(
+        run(&mut twin, &mut twin_weapons, &mut twin_field, 0),
+        events
+    );
+    assert_eq!(
+        twin.loading_material_remaining(token(plate)),
+        world.loading_material_remaining(token(plate))
+    );
+}
+
+#[test]
+fn a_shot_flies_on_when_its_host_replaces_its_body() {
+    let mut world = world();
+    let plate = plate(&mut world, Some(armor()), &[(0.0, 2.0)]);
+    let mut field = Field::new(&BLADES).with_plate(plate, 8.0);
+    let mut weapons = Weapons::new();
+    fire(&mut world, &mut weapons, Some(PAYLOAD));
+    let prepared = weapons.prepare(&world, DT);
+    world.step(DT);
+    weapons.settle(prepared, &mut world, DT, &mut field);
+    assert!(weapons.take_events().is_empty());
+    let (mut twin, mut twin_weapons) = (world.clone(), weapons.clone());
+    let mut twin_field = Field::new(&BLADES).with_plate(plate, 8.0);
+    // The twin's host rebuilds the shot's body where it was, under its id.
+    let motion = twin.motion(body(SHOT)).unwrap();
+    assert!(twin.remove_entity(PhysicsId::new(SHOT)));
+    shot_body(&mut twin, SHOT, motion.position, motion.linear_velocity);
+    let events = run(&mut world, &mut weapons, &mut field, 0);
+    assert!(!delivered(&events, Part::Kinetic, plate).is_empty());
+    assert_eq!(
+        run(&mut twin, &mut twin_weapons, &mut twin_field, 0),
+        events
+    );
+}
+
 #[test]
 fn an_unspent_shot_retires_once_when_its_lifetime_ends() {
     let mut world = world();

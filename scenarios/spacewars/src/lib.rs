@@ -7,6 +7,7 @@
 pub mod integrity;
 mod physics;
 pub mod ship_geometry;
+mod shots;
 pub mod spaceling_geometry;
 #[cfg(feature = "ccd-diagnostics")]
 pub mod step_diagnostics;
@@ -393,6 +394,8 @@ pub struct SpacewarsState {
     physics: physics::SpacewarsPhysics,
     gravity_solver: GravitySolver,
     gravity_participants: Vec<GravityParticipant>,
+    /// What each shell's shot charged in this step, by the shell's physics id.
+    shot_hits: BTreeMap<u64, shots::ShotHit>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -576,6 +579,8 @@ pub struct DebrisState {
     /// asteroids and historical shells retain their radius-based mass model.
     inertial_mass: Option<f32>,
     physics_id: u64,
+    /// Whether a material weapon shot carries this shell (#330).
+    shot: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1312,6 +1317,7 @@ impl Scenario for SpacewarsScenario {
             terrain: terrain::TerrainState::default(),
             gravity_solver: GravitySolver::new(),
             gravity_participants: Vec::new(),
+            shot_hits: BTreeMap::new(),
         }
     }
 
@@ -1458,6 +1464,7 @@ impl SpacewarsScenario {
 
         let lifecycle_started = Instant::now();
         let lifecycle = reconcile_physics(state, dt);
+        shots::launch(state);
         let lifecycle_time = lifecycle_started.elapsed() + terrain_time;
 
         motion_diagnostics_time +=
@@ -1482,6 +1489,7 @@ impl SpacewarsScenario {
         }
 
         terrain::loose::capture_impacts(state, dt);
+        let shots = shots::prepare(state, dt);
         let rapier = state.physics.step(dt);
         terrain::loose::sample_impacts(state);
         motion_diagnostics_time += terrain::capture_motion(state, TerrainMotionStage::AfterPhysics);
@@ -1506,6 +1514,7 @@ impl SpacewarsScenario {
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
 
         terrain::queue_cannon_hits(state);
+        shots::settle(state, surface_pilots, shots, dt);
         let contacts = state.physics.contacts();
         let port_intersections = state.physics.spaceport_contacts();
         let accepted_ports = if experimental {
@@ -1560,6 +1569,19 @@ impl SpacewarsScenario {
 }
 
 impl SpacewarsState {
+    /// Carries cannon shells as material weapon shots (#330): a shell charges
+    /// the region of the body it hits by the impact law, and that body loses
+    /// the health the work costs. Select it before the first step. The old
+    /// damage rules stay the default until the game's baselines move with it.
+    pub fn enable_material_weapons(&mut self) {
+        assert_eq!(self.tick, 0, "select material weapons before stepping");
+        self.physics.enable_weapons();
+    }
+
+    pub fn material_weapons(&self) -> bool {
+        self.physics.weapons_enabled()
+    }
+
     fn apply_action(&mut self, action: SpacewarsAction) {
         match action {
             SpacewarsAction::ZoomIn { player } => {
@@ -3031,10 +3053,20 @@ fn resolve_physics_collisions(
                 if ship >= state.ships.len() || debris_index >= state.debris.len() {
                     continue;
                 }
-                let ship_mass = state.ships[ship].mass();
-                let debris_mass = state.debris[debris_index].mass();
-                let damage = impact_speed(contact.impulse_magnitude, ship_mass, Some(debris_mass))
-                    * state.debris[debris_index].damage_scalar;
+                // A shot's hit counts only on the body it stopped on.
+                let damage = if state.debris[debris_index].shot {
+                    let Some(damage) =
+                        shots::charged(state, debris_id, MechanicalEntity::Ship(ship))
+                    else {
+                        continue;
+                    };
+                    damage
+                } else {
+                    let ship_mass = state.ships[ship].mass();
+                    let debris_mass = state.debris[debris_index].mass();
+                    impact_speed(contact.impulse_magnitude, ship_mass, Some(debris_mass))
+                        * state.debris[debris_index].damage_scalar
+                };
                 let normal = contact.normal;
                 let ship_position = state.ships[ship].position;
                 let ship_color = state.ships[ship].color;
@@ -3078,9 +3110,17 @@ fn resolve_physics_collisions(
                 let Some(rover_mass) = state.physics.rover_total_mass(&rover) else {
                     continue;
                 };
-                let damage =
+                let damage = if debris.shot {
+                    let Some(damage) =
+                        shots::charged(state, debris_id, MechanicalEntity::Rover(rover_id))
+                    else {
+                        continue;
+                    };
+                    damage
+                } else {
                     impact_speed(contact.impulse_magnitude, rover_mass, Some(debris.mass()))
-                        * debris.damage_scalar;
+                        * debris.damage_scalar
+                };
                 let rover_position = state
                     .physics
                     .rover_snapshot(&rover)
@@ -3170,8 +3210,17 @@ fn resolve_physics_collisions(
                     a_state.mass(),
                     Some(b_state.mass()),
                 );
-                let damage_to_a = speed * b_state.damage_scalar;
-                let damage_to_b = speed * a_state.damage_scalar;
+                // A shot's hit stands in for its shell's damage.
+                let damage_to_a = if b_state.shot {
+                    shots::charged(state, b_id, MechanicalEntity::Debris(a_id)).unwrap_or(0.0)
+                } else {
+                    speed * b_state.damage_scalar
+                };
+                let damage_to_b = if a_state.shot {
+                    shots::charged(state, a_id, MechanicalEntity::Debris(b_id)).unwrap_or(0.0)
+                } else {
+                    speed * a_state.damage_scalar
+                };
                 let normal = contact.normal;
                 let intercept = contact.point.unwrap_or(a_state.position);
 
@@ -5135,6 +5184,7 @@ impl DebrisState {
             rail_launched: false,
             inertial_mass: None,
             physics_id: 0,
+            shot: false,
         }
     }
 

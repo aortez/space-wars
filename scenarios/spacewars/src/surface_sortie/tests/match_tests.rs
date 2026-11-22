@@ -2,6 +2,7 @@ use super::*;
 use match_rules::{MatchOutcome, PILOT_HEALTH, POD_HULL_HEALTH, PilotDamageCause};
 
 mod durability;
+mod material_shots;
 mod pod_hull;
 
 #[test]

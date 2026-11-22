@@ -343,6 +343,37 @@ fn damage_targets(
     .flatten()
 }
 
+/// A match's pod or pilot on foot that weapons can harm, and whether its
+/// ejection protection covers it in this step.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Exposed {
+    pub entity: MechanicalEntity,
+    pub health: f32,
+    pub protected: bool,
+}
+
+/// The pods and pilots on foot that this step's weapons can harm, as
+/// [`damage_target`] would charge them.
+pub(crate) fn exposed(world: &SpacewarsState, pilots: &[SurfacePilot]) -> Vec<Exposed> {
+    let mut exposed = Vec::new();
+    for pilot in pilots {
+        let Some(vitals) = pilot.vitals else {
+            continue;
+        };
+        for (entity, _) in damage_targets(world, pilot) {
+            exposed.push(Exposed {
+                entity,
+                health: match entity {
+                    MechanicalEntity::Spaceling(_) => vitals.health,
+                    _ => world.ships[pilot.vehicle.0].life,
+                },
+                protected: world.tick + 1 < vitals.protected_until_tick,
+            });
+        }
+    }
+    exposed
+}
+
 fn damage_target(
     world: &mut SpacewarsState,
     pilot: &mut SurfacePilot,
@@ -425,13 +456,25 @@ pub(crate) fn apply_contacts(
                 let (amount, cause) = if let Some((index, shell)) =
                     debris.filter(|(_, d)| d.kind == DebrisKind::Shell)
                 {
-                    if shell.dead || !spent_shells.insert(index) {
+                    // A shot's hit stands in for a missile's damage, on the
+                    // body it stopped on alone. Its shell died with the shot.
+                    let amount = if shell.shot {
+                        let Some(amount) = shots::charged(world, shell.physics_id, entity) else {
+                            continue;
+                        };
+                        amount
+                    } else if shell.dead {
+                        continue;
+                    } else {
+                        MISSILE_DAMAGE * exposure
+                    };
+                    if !spent_shells.insert(index) {
                         continue;
                     }
                     if matches!(entity, MechanicalEntity::Spaceling(_)) {
                         external_hits.push((pilot.vehicle.0, shell.owner_id));
                     }
-                    (MISSILE_DAMAGE * exposure, PilotDamageCause::Missile)
+                    (amount, PilotDamageCause::Missile)
                 } else if debris.is_some_and(|(_, d)| d.damage_scalar == 0.0) {
                     // Breakup pieces already have zero direct damage in
                     // Spacewars. Their physical shove can still cause a crash.
