@@ -15,7 +15,7 @@ moves. Where it disagrees with the mission's ordering, it says so.
 | 1 solidity | L3, learned from the game's reactions | turns every later failure from mystery into a named hole | met; the stop it could not name turned out not to be a wall |
 | 2 gyms | the harness, not the gyms | turns every later iteration from minutes into seconds | met: five gyms, three of them winnable |
 | 3 skills | the library, and a scripted bot that finishes a level | the unit everything else is measured in | exit met: three skills, each with a gym that fails without it; the flagpole's gym exists, the skill it measures does not |
-| 4 breadth | arbitrary-level start, 32-level inventory | generality is only testable once the model makes a claim | not started |
+| 4 breadth | arbitrary-level start, 32-level inventory | generality is only testable once the model makes a claim | in progress: the start and the inventory are in the tree; the driver that has to fill the inventory out clears 1 level in 32 |
 | 5 search | A* over skills | needs a cost model and a baseline to be compared against | not started |
 | 6 fabrication | levels we author | should be aimed at holes that turned out to be real | not started |
 
@@ -265,14 +265,34 @@ An arbitrary-level start is a small patch job, and it unlocks two things at once
 the inventory, and underground gyms, which is how the load-bearing set's blindness
 gets measured rather than argued.
 
-The inventory walks right from each of the 32 levels and records what the reader saw
-and the first place it stopped with an explanation it could not give. It sits here
-rather than early because an inventory run today produces 32 copies of the same
-blindness; it becomes interesting the moment the model has a claim to check. It is
-also the cheapest source of gyms in the project, since every stop is a candidate.
+The inventory starts each of the 32 levels and records what the reader saw and the
+first place it stopped with an explanation it could not give. It sits here rather
+than early because an inventory run today produces 32 copies of the same blindness;
+it becomes interesting the moment the model has a claim to check. It is also the
+cheapest source of gyms in the project, since every stop is a candidate.
 
-Exit: a table of where each level stops a walk-right bot and what the model said
-about the thing that stopped it.
+Both halves are in the tree, and the start cost one correction: `$0760` is a
+slot and not a level number, and in the four worlds entered by pipe the game
+spends a slot on the pipe travel, so every level from the pipe level onward
+sits one higher than its number. SMB-026 is the measurement, `level_slot` is
+where the table lives, and the symptom of getting it wrong was four worlds
+whose starts never handed over inside the load budget the reader had.
+
+The driver is `skills::SCRIPTED` rather than the walk-right bot this section
+asked for, because the point of the inventory is a stop that means the same
+thing in every level and the script is the strongest player the tree has. That
+is also what the inventory found: the script clears exactly one of the
+thirty-two starts — 1-1, the level it was tuned in — and dies once in
+twenty-seven of the rest, usually inside the first 500 pixels. Two of the four
+stops that do not die name a 64-pixel wall at pixel 176 in two different
+worlds, which is the height gate's own ceiling and the tall-wall skill's
+second customer.
+
+Exit: a table of where each level stops a bot and what the model said about
+the thing that stopped it. The table exists; the exit is not met, because a bot
+that clears one level in thirty-two stops everywhere for a reason that is about
+itself, and the inventory cannot separate "this level is hard" from "this
+driver only knows 1-1" until a second driver runs on it.
 
 ## Phase 5 - Search over skills
 

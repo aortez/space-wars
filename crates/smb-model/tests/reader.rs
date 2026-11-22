@@ -12,17 +12,20 @@
 //! What a bot does with this reading is tested in `smb-ai`, the model's other
 //! consumer and the only one that can be wrong about a wall.
 
+use std::collections::BTreeSet;
+
 use sha2::{Digest as _, Sha256};
 
-use engine_nes::{ControllerButtons, StateHash};
+use engine_nes::{ControllerButtons, CpuBus, NesMachine, StateHash};
 use smb_model::cartridge;
 use smb_model::frame::{
     is_blank_tile, is_load_bearing, player_surface_row_from_sprites, player_tile,
     reconstruct_background, scroll_x, scroll_y, snapshot, sprite_covered_cells, tile_at, tile_grid,
 };
 use smb_model::profile::{
-    FLOAT_JUMPING, MODE_PLAYING, SETUP_START_FRAME, STATE_NORMAL, SmbState, boot_to_gameplay,
-    buttons_the_game_read, read_state, wait_for_handover,
+    FLOAT_JUMPING, HANDOVER_FRAMES, LEVEL, LEVEL_LOAD_FRAMES, MODE_PLAYING, SETUP_PATCH_FRAME,
+    SETUP_START_FRAME, STATE_NORMAL, STATE_TRAVEL, SmbState, WORLD, boot_to_gameplay,
+    boot_to_level, buttons_the_game_read, level_slot, read_state, wait_for_handover,
 };
 
 /// The one ROM revision this address map was verified against, as the SHA-256 a
@@ -430,4 +433,228 @@ fn the_game_takes_the_input_a_frame_was_handed_on_that_frame() {
             "the game did not take the buttons its frame was handed",
         );
     }
+}
+
+/// What the PPU is drawing below the status bar, at the scroll every fresh start uses.
+///
+/// The nametables rather than the CHR patterns, because the question asked of this is
+/// only whether two starts are in the same place, and 1,536 tile ids answer that without
+/// copying 12 KiB of pattern memory per start. Both nametables, because a level's second
+/// screen is generated during its load and is part of where the load put him, and rows
+/// 3..27 because the two above them are the score, the coin count and the timer, which
+/// are the same in every level in the game.
+fn playfield_fingerprint(machine: &NesMachine) -> u64 {
+    let nametables = machine.ppu().nametables();
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for (address, &tile) in nametables.iter().enumerate().take(2 * 0x400) {
+        let row = address % 0x400 / 32;
+        if !(3..27).contains(&row) {
+            continue;
+        }
+        hash ^= u64::from(tile);
+        hash = hash.wrapping_mul(0x100_0000_01b3);
+    }
+    hash
+}
+
+/// Start every level of every world with the two-byte patch, and ask the game rather
+/// than the patch what it got.
+///
+/// Four things have to hold together before Phase 4's inventory can be run at all, and
+/// each fails in its own way. The game has to hand the player over, or the start is
+/// unusable. The byte has to read back the slot that was written, or the patch did not
+/// reach the loader. The level the reader decodes has to be the level that was asked
+/// for, or every gym in the project is filed under the wrong name. And the screen under
+/// the camera has to differ from every other start's, or the patch moved a byte and not
+/// a world.
+///
+/// The third of those is the one that was wrong before it was measured. The obvious
+/// reading of `$0760` — the level minus one, since a boot leaves 0 there while the status
+/// bar reads 1-1 — puts four of the eight worlds one level short of where the game says
+/// they are, and nothing in the byte itself can tell you so.
+///
+/// The eight worlds boot in parallel threads, which is not how the rest of this file
+/// works: the debug core runs somewhere around eighty frames a second, thirty-two
+/// sequential starts put this one test past two minutes, and the wall clock a test costs
+/// is what decides whether it gets run at all.
+#[test]
+fn a_patched_start_hands_the_player_over_at_every_level_and_the_game_names_it_back() {
+    let Some(rom) = cartridge::read_or_skip() else {
+        return;
+    };
+    assert_pinned_revision(&rom);
+    let rom = rom.as_slice();
+
+    let starts = std::thread::scope(|scope| {
+        let booted: Vec<_> = (0..8u8)
+            .map(|world| {
+                scope.spawn(move || {
+                    (1..=4u8)
+                        .map(|level| Start {
+                            world,
+                            level,
+                            machine: boot_to_level(rom, world, level).unwrap_or_else(|error| {
+                                panic!(
+                                    "world {} level {level} never handed the player over: {error}",
+                                    world + 1,
+                                )
+                            }),
+                        })
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect();
+        booted
+            .into_iter()
+            .flat_map(|handle| handle.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+
+    let mut screens = BTreeSet::new();
+    for start in starts {
+        let world = start.world + 1;
+        let level = start.level;
+        let (machine, _) = start.machine;
+        let state = read_state(&machine);
+        assert!(
+            state.is_in_control() && state.is_grounded(),
+            "world {world} level {level} reported a handover in state {:02X}, float {:02X}, x {}",
+            state.player_state,
+            state.float_state,
+            state.absolute_x,
+        );
+        assert_eq!(
+            state.world, start.world,
+            "world {world} level {level} moved the world byte and not the level byte"
+        );
+        assert_eq!(
+            Some(state.level),
+            level_slot(start.world, level),
+            "world {world} level {level} is not playing the slot the start wrote",
+        );
+        assert_eq!(
+            state.level_number(),
+            Some(level),
+            "world {world} is playing slot {} while the start asked for level {level}",
+            state.level,
+        );
+        assert!(
+            screens.insert(playfield_fingerprint(&machine)),
+            "world {world} level {level} draws a screen some other start already drew",
+        );
+    }
+    assert_eq!(screens.len(), 32, "the 32 levels are not 32 screens");
+}
+
+/// One start that booted, kept whole because the assertions belong on the thread that
+/// joined the workers and not on the worker that cannot report a failure cleanly.
+struct Start {
+    world: u8,
+    level: u8,
+    machine: (NesMachine, u64),
+}
+
+/// The slot the level-start primitive never writes, measured because it is the reason
+/// the handover budget is what it is.
+///
+/// In the four pipe worlds `$01` is not a level: it is the game's own instruction to
+/// travel. A start written there loads for 157 frames, then walks him right across the
+/// *previous* level's screen for 334 frames in player state `$07` with his buttons
+/// ignored, advances the level byte to `$02` two frames before that walk ends, loads
+/// again, and hands him over 577 frames after the press — 591 in worlds 2 and 7. That is
+/// more than twice what a plain level needs and more than the 300 that used to be the
+/// constant. A caller that patches a byte by hand rather than going through
+/// [`boot_to_level`] can land here, and on the old number it would have concluded that
+/// four of the eight worlds cannot be started at all.
+///
+/// The wait is written out rather than called, because the frames
+/// [`wait_for_handover`] runs through and throws away are exactly what this test is
+/// about; the loop below is its loop, with the interior kept.
+#[test]
+fn the_pipe_travel_slot_hands_the_player_over_too_and_only_past_a_levels_budget() {
+    let Some(rom) = cartridge::read_or_skip() else {
+        return;
+    };
+    assert_pinned_revision(&rom);
+
+    let mut machine = cartridge::machine(&rom).expect("cartridge should load");
+    for frame in 1..=SETUP_START_FRAME {
+        if frame == SETUP_PATCH_FRAME {
+            machine.bus_mut().write(WORLD, 0);
+            machine.bus_mut().write(LEVEL, 1);
+        }
+        let buttons = if frame == SETUP_START_FRAME {
+            ControllerButtons::START
+        } else {
+            ControllerButtons::NONE
+        };
+        machine
+            .run_frame([buttons, ControllerButtons::NONE])
+            .expect("frame should run");
+    }
+
+    let mut in_control_for = 0;
+    let mut travel_for = 0;
+    let mut longest_travel = 0;
+    let mut byte_moved_midwalk = false;
+    let mut handed_over = 0;
+    for _ in 0..LEVEL_LOAD_FRAMES {
+        let state = read_state(&machine);
+        in_control_for = if state.is_in_control() && state.is_grounded() {
+            in_control_for + 1
+        } else {
+            0
+        };
+        travel_for = if state.player_state == STATE_TRAVEL {
+            travel_for + 1
+        } else {
+            0
+        };
+        byte_moved_midwalk |= state.player_state == STATE_TRAVEL && state.level != 1;
+        longest_travel = longest_travel.max(travel_for);
+        if in_control_for >= HANDOVER_FRAMES {
+            handed_over = machine.ppu().frame_id();
+            break;
+        }
+        machine
+            .run_frame([ControllerButtons::NONE, ControllerButtons::NONE])
+            .expect("frame should run");
+    }
+    assert_ne!(
+        handed_over, 0,
+        "the travel slot should hand the player over inside the {LEVEL_LOAD_FRAMES}-frame \
+         budget the model is built on",
+    );
+
+    let idle_frames = handed_over - SETUP_START_FRAME;
+    assert!(
+        idle_frames > 300,
+        "the travel walk was measured at 577 to 591 idle frames, which is what \
+         {LEVEL_LOAD_FRAMES} of budget buys; this cleared it in {idle_frames}, so the \
+         constant should be lowered rather than left oversized",
+    );
+    assert!(
+        idle_frames <= 640,
+        "{idle_frames} idle frames is past the 577 to 591 this was measured at, so either \
+         the walk has grown or a start is failing to hand over and timing out; either way \
+         {LEVEL_LOAD_FRAMES} needs a second look",
+    );
+    assert!(
+        longest_travel >= 300,
+        "the walk is the whole reason this slot is slow: measured at 334 consecutive frames \
+         of state {STATE_TRAVEL:#04x}, this run held it for {longest_travel}",
+    );
+    assert!(
+        byte_moved_midwalk,
+        "the level byte is documented to reach `$02` while he is still in {STATE_TRAVEL:#04x}, \
+         which is the clearest single frame showing the byte is not the label",
+    );
+
+    let state = read_state(&machine);
+    assert_eq!(
+        state.level_number(),
+        Some(2),
+        "the travel slot delivers the world's second level, and the byte it arrives on \
+         is the reason the byte is not the label",
+    );
 }

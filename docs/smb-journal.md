@@ -764,3 +764,141 @@ a paragraph of prediction. The stall-window rule goes into the plan's standing d
 because it will bite on every level in Phase 4 and cannot be inferred from a bot's behaviour.
 And the reflex winning a gym for the first time is worth recording for what it says about the
 other four: the script's advantage in this project has never been about walls.
+
+## SMB-026 — 2026-11-21 — The level byte is a slot, and only the game's own label numbers it
+
+`boot_to_level` starts the cartridge at any of its thirty-two levels. The primitive is two
+byte-writes and a wait; the finding is that the byte it writes is not a level number, and
+that four of the eight worlds only ever looked broken because the obvious mapping assumed it
+was.
+
+Rationale: Phase 4's inventory needs a start anywhere in the cartridge, and the patch the
+RAM map suggests — world byte into `$075F`, `level - 1` into `$0760`, one frame before the
+Start press — hands the player over in four worlds and never in the other four. The
+temptation at that moment is to believe the byte, because the byte is the thing that was
+written and the thing that reads back. What was measured instead is the screen, three ways:
+the playfield under the camera, the geometry of what is drawn there, and the label the game
+draws in its own status bar. All three are the game's claim rather than the reader's, and
+the mapping fell out of them rather than out of a map.
+
+Evidence: **the byte is a slot, and four worlds spend a slot on travel.** In worlds 1, 2, 4
+and 7 — bytes `0`, `1`, `3`, `6` — the game spends slot `$01` on the pipe travel between the
+first and second levels, so every level from the pipe level onward sits one higher than its
+number: `$00` is 1-1, `$01` is the travel, `$02` is 1-2, `$03` is 1-3, `$04` is 1-4. The
+other four worlds are the plain `level - 1`. `level_slot` and `level_at_slot` are the only
+places that arithmetic is allowed to live.
+
+**The castle settles it, by geometry.** The area with a black backdrop, a ceiling across the
+whole screen, a left wall twelve rows down and a top row of brick full across the width —
+the castle, the thing a world has exactly one of — appears exactly once per world in the
+thirty-two-row table: at `$04` in worlds 1, 2, 4 and 7 and at `$03` in worlds 3, 5, 6 and 8,
+and nowhere else. In world 1 slot `$03` is a blue-backdrop area with no ceiling at all, so
+slot three cannot be world 1's last level, and that single row is what rules out the simpler
+reading. (8-4 is the same family with an eight-row left wall, which is the only shape in the
+set that differs.)
+
+**The game says it back without being patched.** Clearing 1-1 with the scripted driver and
+no byte written anywhere: the level byte moves `$00` → `$01` on frame 2614 in player state
+`$05`, and the game hands him over on frame 3197 with the byte at `$02` and its own status
+bar reading "1-2". The label the game draws for slot `$02`'s area is 1-2, which is the
+mapping above and not `slot + 1`.
+
+**The patch has a frame, and a late one is invisible.** The two bytes go in on
+`SETUP_PATCH_FRAME`, one before the press, because the game reads them while it builds the
+level and it builds the level as part of starting. Swept both ways over all thirty-two asks:
+written on the press frame the byte reads back exactly what was asked for and the screen is
+that world's own first level — eight distinct screens in thirty-two asks; one frame earlier,
+thirty-two asks give thirty-two distinct playfields. A byte can be present, correct,
+verifiable and unread, which is the same reason the byte is not evidence about a start and
+the screen is.
+
+**The travel is a state, and it was unnamed.** Written out frame by frame, a start at world
+1's pipe slot is 157 frames of load, then `$07` for 334 frames while he walks right over the
+*previous* level's screen under his own power with his buttons ignored, the level byte
+reaching `$02` two frames before that walk ends, 24 more frames of load, 17 more of `$07`,
+and his own area from there. DirtSim's extractor names three of the thirteen values this
+byte takes and not this one; `STATE_TRAVEL` is the reader's name for it and `is_in_control`
+now excludes it, because a policy started inside it pushes at a world that has not let go of
+him. The name is about the long case and not the only one: a plain load passes through `$07`
+for a single frame and a pipe world's second level for seventeen, always between the load
+and the handover, so the state does not tell a caller that a level changed — only that he is
+not in charge, which `is_in_control` already answered, and the budget says how long that
+could last.
+
+**Three load lengths, and the budget that could not hold them.** A plain level places the
+player 167 frames after the press, in all eight worlds; a pipe world's second level 217 or
+231; and the travel slot itself — which `level_slot` never returns but a caller holding a
+byte writes easily — 577 or 591. `LEVEL_LOAD_FRAMES` was 300, which is precisely why four
+worlds looked unstartable under the obvious mapping: the obvious mapping writes the travel
+slot in them. It is 720, and the failure mode is worth keeping as a class: a budget sized by
+the common case silently turns "slow" into "impossible", and the only symptom is that a
+whole family of starts reads as broken.
+
+Two things about those numbers are worth saying out loud because both were assumed wrong
+here first. The anchor is the Start press, not the mode byte: the mode byte flips to play on
+the very frame the press runs on, so the two anchors are the same frame and a load that
+"starts at the mode byte" starts on the button. And the count is to the *confirmed*
+handover, which includes the eight standing-still frames the confirmation needs — 167
+against the 157 frames the game really spends loading a plain level. A number quoted without
+its anchor is how a table and a constant ended up a frame apart in this project's own notes.
+
+**The status bar is readable and stale.** In this font the tile id *is* the digit — `$00`
+through `$09`, with `$28` the dash — and the WORLD field is nametable row two, columns
+19–21, so the label can be read without believing a byte. It is drawn when a level changes
+and not again after, so every patched start shows the label from before it — all four
+world-1 starts read "1-1" — and the table prints it beside the byte rather than instead of
+it. The backdrop palette, by the way, is not an area-type oracle: 5-2 and 8-2, both
+known-underground, draw the overworld's blue, and world 7's castle-shaped slot draws the
+water palette. Geometry is the reliable channel, which is why the table prints ceiling, wall
+and floor rows.
+`a_patched_start_hands_the_player_over_at_every_level_and_the_game_names_it_back` boots all
+eight worlds on eight threads — the debug core runs around eighty frames a second and
+thirty-two sequential starts cost two minutes, which is the difference between a table that
+gets regenerated and one that does not — and asserts per start: in control and grounded, the
+world byte unchanged, `state.level == level_slot(world, level)`, `level_number() ==
+Some(level)`, and thirty-two distinct playfield fingerprints.
+`the_pipe_travel_slot_hands_the_player_over_too_and_only_past_a_levels_budget` writes the
+handover wait out by hand so the interior survives: it pins the walk at 300 frames or more,
+pins the idle window from both ends so the constant cannot quietly grow oversized, and
+asserts the level byte moves to `$02` while he is still in `$07` — the clearest single frame
+showing the byte is not the label. The suite is thirty-two tests, twenty-one of them skipped
+when the cartridge is absent.
+
+The inventory came out of the same instrument, and its first reading is about the player and
+not the levels. `levels drive-all` runs the scripted driver — the one that clears 1-1 — from
+all thirty-two starts. **One start reaches its ending**: 1-1, absolute X 3266, byte `$00` →
+`$01` on frame 2614, no death. Twenty-seven die once, most between absolute X 270 and 955
+and frames 618 and 1205. Four stop without dying, and three of those name a wall; the two
+that stop at absolute X 162 — 2-2 and 7-2, the two water levels this driver can start — name
+the same wall, 64 px tall at pixel 176, which is the height gate's own ceiling,
+`MAX_WALL_ROWS` times eight. In twenty-seven of the thirty-one stops the model's answer for
+the cell he is standing on is "nothing standing against him".
+
+Consequence: Phase 4's primitive is done and its inventory exists, so the phase is open
+rather than met — what is missing now is a driver that gets further than 1-1. The scripted
+player is a 1-1 specialist, and that is the honest baseline Phase 5's search will be
+compared against, measured on thirty-two starts rather than argued.
+
+The inventory is the gym source the plan predicted it would be. The two 64-px stops are the
+tall-wall skill's second customer — the skill SMB-025 left owed — and they say the
+postcondition has to be judged at a column the body reaches and cannot clear, in a level
+that is not 1-1. 4-1's stop against a 16-px wall at pixel 336 is a two-cell pipe the script
+fails to clear outside the level it was tuned in, which is a smaller gym and a different
+hole. The twenty-seven deaths where the model says nothing are neither: the model is not
+wrong there, it is silent, and silence is what a fabricated level will produce everywhere,
+which is Phase 6's problem arriving early.
+
+`levels drive 8 3 2400 --shots data/shots/level-8-3` and the usual cutter leave
+`data/shots/level-8-3/level-8-3.mp4` outside the repository: a thousand frames of the cloud
+level from a start the cartridge never offers on its own, which is the fastest way this
+project has found to see a level the reader has never been shown.
+
+`levels slot 1 01 700 --shots data/shots/travel-1` writes the same walk as a film,
+`data/shots/travel-1/travel-1.mp4`, from a mode that writes a raw byte instead of naming a
+level — the only way to watch a slot `level_slot` refuses to name. Two things fall out of
+it. The screen it arrives on fingerprints to `4f646cbfb458b1af`, which is the table's own
+hash for 1-2, so the travel slot and a patched start agree on an area without either one
+being told to; and the walk is visible as what it is: absolute X 40 to 160 across a level he
+is not in, then the load takes the screen, then he is at 40 in his own. The mode exists
+because the measurement needed a byte the primitive will not write, which is the same reason
+the primitive should not write it.

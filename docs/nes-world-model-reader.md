@@ -970,6 +970,124 @@ for sixty frames. So the alignment every envelope above assumes is pinned by a t
 byte is where a response probe can compare an ask against a take the way DirtSim's does
 before it starts timing a jump.
 
+### Starting the game at any level, and what the level byte indexes
+
+`boot_to_level(rom, world, level)` puts him at any of the cartridge's thirty-two levels and
+returns once the game has handed him over. `boot_to_level_load` stops one step earlier, at the
+mode byte, for anything that wants to watch a load happen. `world` is the byte and `level` is
+the number the game's own status bar prints, and why those two are not the same arithmetic in
+every world is what this section is about. SMB-026 is the measurement; what is here is the
+contract that came out of it.
+
+**`$0760` is a slot, not a number.** In worlds 1, 2, 4 and 7 the game spends slot `$01` on the
+pipe travel between the first and second levels, so from the pipe level onward every level
+sits one higher than its number. The other four worlds are the plain `level - 1`.
+
+| Worlds | `$00` | `$01` | `$02` | `$03` | `$04` |
+| --- | --- | --- | --- | --- | --- |
+| 1, 2, 4, 7 | 1st level | travel, delivers 2nd | 2nd level | 3rd level | 4th level |
+| 3, 5, 6, 8 | 1st level | 2nd level | 3rd level | 4th level | not a level |
+
+`level_slot` and `level_at_slot` are the only places that table may live, and
+`SmbState::level_number()` is what a bot reads. Reading the byte plus one is right in half the
+cartridge and one ahead in the other half: a bot that does it believes it is in 1-3 after
+clearing 1-1, while the label the game drew during the travel says 1-2. `None` is an honest
+answer as well — a byte one past a world's last slot still hands the player over, on an area
+that is not one of that world's four.
+
+**The two bytes go in one frame before the Start press**, on `SETUP_PATCH_FRAME`, because the
+game reads them while it builds the level and it builds the level as part of starting. Written
+on the press frame itself the patch is in place, reads back exactly what was asked for, and
+changes nothing: thirty-two asks give eight distinct screens, one per world, each that world's
+own first level. A byte can be present, correct and unread.
+
+**A load has three lengths**: 167 frames for a plain level in any world, 217 or 231 for the
+second level of a world entered by pipe, and 577 or 591 for the travel slot itself. The count
+runs from the frame the mode byte is first seen on to the frame the handover is confirmed, and
+that starting anchor is the Start press itself — the mode byte flips to play on the frame the
+press runs on — and it includes the eight standing-still frames the confirmation wants, which
+is why a plain level's 167 is longer than the 157 frames the game really spends loading it.
+`LEVEL_LOAD_FRAMES` is the largest of the three because the wait cannot tell them apart from
+behind.
+
+The travel slot is worth its own row of numbers, because it is three loads wearing one: 157
+frames of load, then player state `$07` for 334 frames while he walks over the *previous*
+level's screen under his own power with his buttons ignored, the level byte reaching `$02` two
+frames before that walk ends, 24 more frames of load, 17 more of `$07`, and his own area from
+there. `$07` is not a travel-only marker — a plain load passes through it for a single frame
+and a pipe world's second level for seventeen — so what a caller reads is `is_in_control` plus
+a budget, not a state.
+
+**The game's own label is readable, and stale.** In this font the tile id *is* the digit —
+`$00` through `$09`, `$28` the dash — and the WORLD field is nametable row two, columns 19–21.
+The field is drawn when a level changes and not again after, so a patched start shows the label
+from before it and a respawn shows the one before that; it is printed beside the byte, never
+instead of it. The backdrop palette is a worse oracle still — 5-2 and 8-2 draw the overworld's
+blue and world 7's castle-shaped slot draws the water's — so the geometry columns below are
+what the area type is read from.
+
+The instrument is `crates/smb-ai/examples/levels.rs`, and this is its answer to "what is each
+level", asked without believing a byte: `slot` is what was written, `byte` and `level` are what
+the machine reads afterwards, `hud` is the label the game drew, `idle` is the frames from the
+mode byte to the handover, and the last five columns are the playfield: absolute X, `ceil`
+for how many columns of the top row draw something, `wall` for how many rows of the left
+column do, `full` for the first row that is nearly all one thing — the ground surface at 25
+in an overworld and an underground, the brick ceiling at 3 in a castle — and a hash over both
+nametables below the status bar.
+
+```text
+asked  slot  byte  level  hud    idle    x     ceil wall full   screen
+1.1  0x00  0x00      1  1-1      167     40     0     0   25  4566b2ebe3dc7581
+1.2  0x02  0x02      2  1-1      217     40    20    16   25  4f646cbfb458b1af
+1.3  0x03  0x03      3  1-1      167     40     0     2   25  2d0f3f0ec60f2a44
+1.4  0x04  0x04      4  1-1      167     40    20    12    3  f55318e041692be3
+2.1  0x00  0x00      1  2-1      167     40     0    14   25  0960ba7e47b81aac
+2.2  0x02  0x02      2  2-1      231     40    20    16    3  c94c3146e1162052
+2.3  0x03  0x03      3  2-1      167     40     0     2   25  e0a2482c117b491b
+2.4  0x04  0x04      4  2-1      167     40    20    12    3  3d2bf5b11661a2c6
+3.1  0x00  0x00      1  3-1      167     40     0    14   25  0b7c79b15e9ad9b7
+3.2  0x01  0x01      2  3-1      167     40     0     2   25  dc9018b2d128c928
+3.3  0x02  0x02      3  3-1      167     40     0     2   25  752437e722053abc
+3.4  0x03  0x03      4  3-1      167     40    20    12    3  6ebb6350fc90a495
+4.1  0x00  0x00      1  4-1      167     40     0    14   25  f7f96b7e2c100fd6
+4.2  0x02  0x02      2  4-1      217     40    20    16    0  a7fbe3776b4b2643
+4.3  0x03  0x03      3  4-1      167     40     0     2   25  0cda9f384e5946f6
+4.4  0x04  0x04      4  4-1      167     40    20    12    3  0f6ab4eb6fe7699d
+5.1  0x00  0x00      1  5-1      167     40     0     2   25  f11a2930754e73a2
+5.2  0x01  0x01      2  5-1      167     40     0     2   25  baf4046fd75e5e43
+5.3  0x02  0x02      3  5-1      167     40     0     2   25  41c78045d1dd81d8
+5.4  0x03  0x03      4  5-1      167     40    20    12    3  296ce7b8d7eceed7
+6.1  0x00  0x00      1  6-1      167     40     0    14   25  68fe8ca685253554
+6.2  0x01  0x01      2  6-1      167     40     0     2   25  2a68a582e3c2fc08
+6.3  0x02  0x02      3  6-1      167     40     0     2   25  035a161c28608c5a
+6.4  0x03  0x03      4  6-1      167     40    20    12    3  1e903e74281e711e
+7.1  0x00  0x00      1  7-1      167     40     0    14   25  605d18478eb9f8b7
+7.2  0x02  0x02      2  7-1      231     40    20    16    3  84e4386ec4d3b6b5
+7.3  0x03  0x03      3  7-1      167     40     0     2   25  f2085b784e2cac30
+7.4  0x04  0x04      4  7-1      167     40    20    12    3  3ee165ad148f8944
+8.1  0x00  0x00      1  8-1      167     40     0    14   25  3b5a234a1e19d229
+8.2  0x01  0x01      2  8-1      167     40     0     2   25  4f241566a66b5db4
+8.3  0x02  0x02      3  8-1      167     40     0     2   25  0d702d6fdf524c11
+8.4  0x03  0x03      4  8-1      167     40    20     8    3  a5a4c2ae6b9ab086
+```
+
+A `full` row of 3 instead of 25 is the castle — its top row is brick across the whole width —
+and it lands on `$04` in the four pipe worlds and `$03` in the other four, once per world and
+nowhere else, which is what the mapping predicts. World 1's `$03` has no ceiling at all, so it
+is not that world's last level, and that one row is what rules out the naive reading. 4-2's
+`full` of 0 is the water: no row across the screen is nearly full. 8-4's eight-row wall is the
+one castle whose left wall differs from the rest. Thirty-two asks, thirty-two distinct screens,
+every one of them handing the player over in control and standing on ground.
+
+`drive-all` runs the scripted driver — the one that clears 1-1 — from all thirty-two, and that
+is Phase 4's inventory. **One of the thirty-two reaches its ending**: 1-1, absolute X 3266, no
+death. Twenty-seven die once, most between absolute X 270 and 955. Four stop without dying,
+three of them against a wall the model does name, and the two at absolute X 162 — 2-2 and 7-2 —
+name the same wall, 64 px tall at pixel 176, which is `MAX_WALL_ROWS` times eight: the height
+gate's own ceiling, in two different worlds. Everywhere else the model's answer for the cell he
+is standing on is "nothing standing against him", so the inventory's first finding is about the
+driver: it is a 1-1 specialist, and that is the baseline Phase 5 is measured against.
+
 ## Rollout and search
 
 `checkpoint` plus `restore` is enough for planning: DirtSim's DFS stores one
@@ -1075,7 +1193,7 @@ gym happens to stand and is still invisible everywhere else.
 ## What is in the tree now
 
 One model in four layers, one policy, a three-entry skill library that clears 1-1, one
-harness, five gyms, nine drivers, thirty tests — nineteen of them skipped when the
+harness, five gyms, ten drivers, thirty-two tests — twenty-one of them skipped when the
 cartridge is absent, the eleven that hold the skill rules needing no game at all — and one
 film cutter.
 
@@ -1092,6 +1210,7 @@ film cutter.
 | `crates/smb-ai/src/gyms.rs` | instrument | the gyms this project has actually needed |
 | `crates/smb-model/examples/{probe,tiles,rollout}.rs` | | read-side exploration: decoded state, the tile grid and the pixel comparison, branch and rewind |
 | `crates/smb-ai/examples/{bot,solidity,gym,transcript,film,limit}.rs` | | the bot, its overlay films and the transcript of behaviours it started, the A/B that tells memory from reaction, the tape recorder, the behaviours behind a gym's verdict and the library entries that produce them, the films a gym's own driver was measured under, the instrument that asks a stop what it actually is |
+| `crates/smb-ai/examples/levels.rs` | | the whole cartridge: the thirty-two-start table, a level's playfield as a map, a load watched frame by frame from a level or from a raw byte, the scripted driver loose on any start, and the same driver on all thirty-two |
 | `crates/smb-model/tests/reader.rs` | | the optional cartridge test: the RAM map, the tile frame, a frame-exact restore, and the frame a button arrives on |
 | `crates/smb-ai/tests/{gyms,solidity,skills}.rs` | | a gym's verdict is what its driver does, the A/B that tells memory from reaction, and the skill rules and their ablation |
 | `tools/nes-reference/film-smb-run.py` | | cuts films, clips and a contact sheet from a `--shots` directory, and checks the overlay survived the encoder |
@@ -1130,11 +1249,29 @@ cargo run --release --locked -p smb-ai --example transcript -- pipe-608 --withou
 # A gym film: the tape, the ledger and the player all come off the gym.
 cargo run --release --locked -p smb-ai --example film -- pit-1379 data/shots/pit-cross 200
 python3 tools/nes-reference/film-smb-run.py data/shots/pit-cross
+
+# Any level in the cartridge: the table, one level's map, one load watched, one start
+# driven, and the same driver loose on all thirty-two. `W` is 1-8 and `L` is 1-4 as the
+# game numbers them, not as the byte indexes them. `slot` is the one mode that writes a
+# byte instead of naming a level, which is how the pipe travel gets watched and filmed.
+cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes
+cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes map 1 4
+cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes watch 1 2 900
+cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes natural
+cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes drive-all
+cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes drive 8 3 2400 --shots data/shots/level-8-3
+cargo run --release --locked -p smb-ai --example levels -- data/roms/smb.nes slot 1 01 700 --shots data/shots/travel-1
+python3 tools/nes-reference/film-smb-run.py data/shots/level-8-3 --every 1
+python3 tools/nes-reference/film-smb-run.py data/shots/travel-1 --every 1
 ```
 
-The second-to-last line writes a PNG per frame, with the reader's green, orange, red
-and blue dots in a second copy of each, which is the fastest way to see what the model
-believes and, on the next pass, what it has learned.
+The `film` line writes a PNG per frame, with the reader's green, orange, red and blue dots
+in a second copy of each, which is the fastest way to see what the model believes and, on
+the next pass, what it has learned. The two `levels --shots` lines write the plain frames
+only, so the cutter gets one series and no overlay; the travel film is worth watching
+precisely because nothing is drawn over it — you can see the game walking him rightward
+over a level he is not in yet, at absolute X 40 to 160, before the load takes the screen
+away and puts him back at 40 in his own.
 
 Observed on x86-64 Linux with a release build:
 
@@ -1169,6 +1306,16 @@ Observed on x86-64 Linux with a release build:
   own driver through the run-up, replays what it recorded before printing it, and prints the
   run-up, the golden hash and the verdict measured from it — which is how `pit-1379` and
   `flagpole-3168` got their bytes, and why neither has hand-typed ones.
+- `levels` boots all thirty-two starts on eight threads and prints the table above, then,
+  with `drive-all`, runs the scripted driver from every one of them: one start reaches its
+  ending, twenty-seven die once, and the two stops that name a wall name the same 64-pixel
+  wall at the same pixel in two different worlds. `slot 1 01 700 --shots DIR` is the same
+  watch from a raw byte, and it is how the travel gets filmed: the screen it arrives on is
+  `4f646cbfb458b1af`, the table's own hash for 1-2, which is the travel slot and a patched
+  start agreeing without anyone asserting it. `natural` is the control the whole table
+  leans on — clearing 1-1 without writing a byte and reading back what the game says it
+  landed on, byte `$02`, status bar "1-2". `--shots` writes the PNG series the cutter
+  expects, so a start anywhere in the cartridge is filmable.
 - `limit [FRAME]` is the instrument behind the pit section: it cuts a run-up to any frame
   with the base policy, checkpoints the end of it, and asks the same question of the game
   and of the picture — what the policy knew as it approached, what the state bytes say the

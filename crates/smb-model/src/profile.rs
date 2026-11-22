@@ -12,7 +12,7 @@
 //! pinned revision. A different cartridge is refused rather than misread.
 
 use crate::cartridge;
-use engine_nes::{ControllerButtons, NesMachine};
+use engine_nes::{ControllerButtons, CpuBus, NesMachine};
 
 // Player and progression state. DirtSim NesSuperMarioBrosRamExtractor.cpp,
 // from the Data Crystal Super Mario Bros. RAM map.
@@ -66,6 +66,28 @@ pub const BUTTONS_P1: u16 = 0x074A;
 pub const STATE_LEFTMOST: u8 = 0x00;
 
 pub const STATE_PLAYER_DIES: u8 = 0x06;
+
+/// The game is moving him between areas, and his buttons do not reach him.
+///
+/// DirtSim's extractor names three of the thirteen modes this byte takes — `$00`,
+/// `$06` and `$0b` — and leaves the rest to whoever reads them, which is how this one
+/// went unnamed here while being the longest thing that happens to a level start. The
+/// name is the reader's, from what the byte does. Measured on a start patched into
+/// world 1's pipe slot, frame by frame from the Start press: 157 frames of load, then
+/// `$07` for 334 frames while he walks right over the *previous* level's screen under his
+/// own power, the level byte advancing to `$02` two frames before that walk ends, 24 more
+/// frames of load, 17 more of `$07`, and his own area from there. Buttons during it are
+/// ignored, so `is_in_control` has to exclude it and a handover wait sized for a plain
+/// level load gives up inside it — which is the only reason four of the eight worlds ever
+/// looked like levels that never started.
+///
+/// It is not a marker for travel alone. The same byte appears for one frame in the middle
+/// of a plain level load and for seventeen in the load of a pipe world's second level,
+/// always between the load and the handover, so the length is what separates a walk from
+/// a flicker. What a caller actually needs is the shorter question — is he in control —
+/// which [`SmbState::is_in_control`] answers for every one of these frames, and how long
+/// the wait for it could take, which is [`LEVEL_LOAD_FRAMES`].
+pub const STATE_TRAVEL: u8 = 0x07;
 
 pub const STATE_NORMAL: u8 = 0x08;
 
@@ -143,6 +165,13 @@ impl SmbState {
     /// at a world that has not handed him over, and any stuck detector measured in
     /// frames reads that as the bot giving up.
     ///
+    /// The states it excludes are the load (`$00`), the two deaths (`$06`, `$0b`), the
+    /// changing-size frames (`$09`, `$0a`) and the game's own travel between areas
+    /// (`$07`, [`STATE_TRAVEL`]). The last is the expensive one to get wrong: it is not
+    /// a short pause but a several-hundred-frame walk during which the level byte moves
+    /// under the player, so a caller that treats it as play starts a policy two screens
+    /// early and then has to explain a bot that ran right through a level it never saw.
+    ///
     /// This is also how a fall into a pit reports itself, and it is slow: measured on
     /// the pit at world pixel 1379 he leaves the ground on frame 1100 and the state
     /// only leaves `$08` on frame 1379, so a caller that wants a verdict has to wait
@@ -156,6 +185,20 @@ impl SmbState {
 
     pub fn is_grounded(&self) -> bool {
         self.float_state == FLOAT_GROUNDED && self.player_state == STATE_NORMAL
+    }
+
+    /// The level the game is playing, as its own status bar numbers it.
+    ///
+    /// `level + 1` is not this, and the difference is not cosmetic. In the four worlds
+    /// entered by pipe the byte runs one ahead of the label from the pipe level onward,
+    /// so a bot that reads `level + 1` after clearing 1-1 believes it is in world 1-3
+    /// while the status bar the game drew during the travel says 1-2 — measured, byte
+    /// `$02` against a status-bar field of `01 28 02`. `None` is an honest answer too:
+    /// a byte one past the world's last level still hands the player over, on an area
+    /// that is not one of the world's four, and inventing a label for it is how a
+    /// measurement quietly becomes a name.
+    pub fn level_number(&self) -> Option<u8> {
+        level_at_slot(self.world, self.level)
     }
 
     /// Whether this frame has cost him a life.
@@ -229,6 +272,88 @@ pub fn buttons_the_game_read(machine: &NesMachine) -> ControllerButtons {
     ControllerButtons::from_bits(machine.bus().peek(BUTTONS_P1).reverse_bits())
 }
 
+/// The frame a level start has to write its two bytes on: one before the Start press.
+///
+/// The game reads them when it builds the level, and it builds the level as part of
+/// starting the game, so a write that lands on the Start frame itself arrives after the
+/// loader looked. Swept both ways against all thirty-two level starts, and the late one
+/// is the instructive failure: it gives eight distinct screens in total, one per world,
+/// each of them that world's own first level, while the byte reads back exactly what was
+/// asked for. A patch can therefore be in place, verifiable, and completely unread by the
+/// game — which is the same reason the byte is not evidence about a start and the screen
+/// is. Writing here instead gives a start whose screen differs for every slot the mapping
+/// asks for.
+pub const SETUP_PATCH_FRAME: u64 = SETUP_START_FRAME - 1;
+
+/// The worlds whose second level is entered through a pipe rather than at its own start.
+///
+/// World *bytes*, so `0` is world 1, the way [`WORLD`] and [`SmbState::world`] read it.
+/// Measured rather than recalled: a start patched at level byte `$01` in these four
+/// spends 334 frames in [`STATE_TRAVEL`] walking over the previous level's screen before
+/// any area is drawn, and the other four draw an area after 167. They are the four
+/// worlds whose second level is reached by taking the pipe at the end of the first —
+/// 1-2, 2-2, 4-2 and 7-2 — and the walk is the game's own and not something the patch
+/// invented: clearing 1-1 with the scripted driver runs through the same frames.
+pub const WORLDS_ENTERED_BY_PIPE: [u8; 4] = [0, 1, 3, 6];
+
+/// The [`LEVEL`] byte that puts the game at a world's level.
+///
+/// `world` is the byte — 0 for world 1 — and `level` is the number the game's own status
+/// bar prints, 1 for the first level of a world. That asymmetry is the whole point of
+/// the function: it is the seam between the label a person or a bot uses and the slot
+/// the game indexes, and the two are not the same arithmetic in every world.
+///
+/// In the four worlds that are not entered by pipe the slot is the level minus one,
+/// which is what the map looks like from a boot: `$0760` reads 0 while the status bar
+/// reads 1-1. In the four that are, the game spends a slot on the pipe travel between
+/// the first and second levels, so every level from the pipe level onward sits one
+/// higher than its number: `$00` is 1-1, `$01` is the travel, `$02` is 1-2, `$03` is
+/// 1-3 and `$04` is 1-4.
+///
+/// Three readings of the screen, not of the byte, hold that up. The area the travel
+/// delivers is the area a start patched at `$02` draws, tile for tile, and the status
+/// bar the game draws during the travel reads "1-2". The castle — black backdrop, a
+/// ceiling across the whole screen, the alternating brick pattern — is at `$04` in the
+/// four pipe worlds and at `$03` in the other four, and nowhere else in the forty slots
+/// swept. And in world 1 slot `$03` is not a castle, so it cannot be the world's last
+/// level, which is what rules out the simpler reading where the byte is the level minus
+/// one everywhere.
+pub fn level_slot(world: u8, level: u8) -> Option<u8> {
+    if world >= 8 || level == 0 || level > 4 {
+        return None;
+    }
+    Some(if WORLDS_ENTERED_BY_PIPE.contains(&world) && level > 1 {
+        level
+    } else {
+        level - 1
+    })
+}
+
+/// The level a [`LEVEL`] byte value is playing, as the status bar numbers it.
+///
+/// The inverse of [`level_slot`], with the one thing an inverse cannot undo: slot `$01`
+/// in a pipe world is the travel, which is not a level and reports the level it is
+/// travelling to. Bytes past a world's last slot answer `None` rather than a label,
+/// because the game really does accept them — a start at `$04` in world 3 hands the
+/// player over on an area that is not one of world 3's four.
+pub fn level_at_slot(world: u8, slot: u8) -> Option<u8> {
+    if world >= 8 {
+        return None;
+    }
+    if WORLDS_ENTERED_BY_PIPE.contains(&world) {
+        match slot {
+            0 => Some(1),
+            1 => Some(2),
+            2..=4 => Some(slot),
+            _ => None,
+        }
+    } else if slot <= 3 {
+        Some(slot + 1)
+    } else {
+        None
+    }
+}
+
 /// The DirtSim setup script: nothing until frame 120, one Start press there.
 pub fn setup_buttons(frame: u64) -> ControllerButtons {
     if frame == SETUP_START_FRAME {
@@ -246,8 +371,60 @@ pub fn setup_buttons(frame: u64) -> ControllerButtons {
 /// only way to get the error this returns is a core that boots the right
 /// cartridge and still never reaches play.
 pub fn boot_to_gameplay(rom: &[u8]) -> Result<(NesMachine, u64), Box<dyn std::error::Error>> {
+    boot_with_start(rom, None)
+}
+
+/// Boot the cartridge and start it at one particular level, then wait for the game to
+/// hand the player over.
+///
+/// The two bytes go in on [`SETUP_PATCH_FRAME`], and the wait is
+/// [`wait_for_handover`] rather than the mode byte, because the mode byte says play from
+/// the first frame of a load and the load then takes another 167 to 231 frames before he
+/// is anyone's to control; a policy started at the mode byte spends all of them pushing
+/// at a world that has not let go of him. `world` is the byte and `level` the status-bar
+/// number, as in [`level_slot`]; the slot the byte is written with is that function's
+/// answer, so a caller asks for 4-2 and does not need to know that is `$04`.
+///
+/// Returns the machine and the frame the handover was confirmed on.
+pub fn boot_to_level(
+    rom: &[u8],
+    world: u8,
+    level: u8,
+) -> Result<(NesMachine, u64), Box<dyn std::error::Error>> {
+    let (mut machine, _) = boot_to_level_load(rom, world, level)?;
+    let handed_over = wait_for_handover(&mut machine)?;
+    Ok((machine, handed_over))
+}
+
+/// [`boot_to_level`] stopped one step earlier: the patch is in and the mode byte says
+/// play, but the level has not been placed and the player has not been handed over.
+///
+/// The instrument that watches a load needs this and the one that plays a level needs
+/// the other, and the frames in between are not idle time to a reader: the level byte
+/// moves during them in the pipe worlds, and the screen under the camera still belongs
+/// to the level before this one.
+pub fn boot_to_level_load(
+    rom: &[u8],
+    world: u8,
+    level: u8,
+) -> Result<(NesMachine, u64), Box<dyn std::error::Error>> {
+    let slot = level_slot(world, level).ok_or("no such world or level")?;
+    boot_with_start(rom, Some((world, slot)))
+}
+
+/// The setup script, with an optional level start written one frame before the press.
+fn boot_with_start(
+    rom: &[u8],
+    start: Option<(u8, u8)>,
+) -> Result<(NesMachine, u64), Box<dyn std::error::Error>> {
     let mut machine = cartridge::machine(rom)?;
     for frame in 1..=SETUP_FAILURE_FRAME {
+        if frame == SETUP_PATCH_FRAME
+            && let Some((world, slot)) = start
+        {
+            machine.bus_mut().write(WORLD, world);
+            machine.bus_mut().write(LEVEL, slot);
+        }
         machine.run_frame([setup_buttons(frame), ControllerButtons::NONE])?;
         if machine.bus().peek(GAME_MODE) == MODE_PLAYING {
             return Ok((machine, frame));
@@ -256,8 +433,27 @@ pub fn boot_to_gameplay(rom: &[u8]) -> Result<(NesMachine, u64), Box<dyn std::er
     Err("setup script never reached normal play".into())
 }
 
-/// Frames the game takes to place a level, counted from the mode byte saying play.
-pub const LEVEL_LOAD_FRAMES: u64 = 300;
+/// Frames to wait for a level to place the player, from the mode byte saying play.
+///
+/// Counted the way [`wait_for_handover`] counts: from the frame the mode byte is first
+/// seen on to the frame the handover is confirmed. That anchor is the Start press itself
+/// — the mode byte flips to play on the frame the press runs on, so "from the mode byte"
+/// and "from the press" are the same number here — and the count includes the
+/// [`HANDOVER_FRAMES`] of standing still the confirmation needs, which is why a plain
+/// level's 167 is more than the 157 frames the game spends loading it.
+///
+/// Measured against every start this reader can ask for, and there are three kinds. A
+/// plain level load takes 167 of them, in all eight worlds. A start at the second level
+/// of one of the four pipe worlds takes 217 or 231, because the game still has to place
+/// an area the world was entered past its own beginning. A start written at the travel
+/// slot itself — `$01` in those worlds, which [`level_slot`] never returns but a caller
+/// holding a byte can easily write — takes 577 or 591, because the game walks him over
+/// the *previous* level's screen before it draws his own. The mode byte says play for all
+/// three, so the wait cannot know which it is behind and the constant is the largest of
+/// the three. The margin costs anything only on a start that never hands over at all, and
+/// the number that used to be here, 300, is exactly why four worlds once looked like
+/// levels that never started: the obvious mapping writes the travel slot in them.
+pub const LEVEL_LOAD_FRAMES: u64 = 720;
 
 /// Consecutive frames of "in control and grounded" that count as a handover.
 pub const HANDOVER_FRAMES: u64 = 8;
