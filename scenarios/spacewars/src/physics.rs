@@ -276,9 +276,8 @@ pub(super) struct SpacewarsPhysics {
     rovers: BTreeMap<u64, RoverPhysicsEntry>,
     debris_keys: BTreeMap<u64, DebrisColliderKey>,
     next_debris_entity: u64,
-    /// The cannon shells' shots, when the game carries its shells as material
-    /// weapon shots (#330).
-    weapons: Option<Weapons>,
+    /// The cannon shells' shots and the lasers' beams (#330).
+    weapons: Weapons,
 }
 
 pub(super) struct PhysicsReconcileInput<'a> {
@@ -315,6 +314,7 @@ impl SpacewarsPhysics {
         for (index, ship) in ships.iter().enumerate() {
             let _ = physics.insert_ship(index, ship, false, false, false);
         }
+        super::lasers::arm(&mut physics, ships.len());
         physics
     }
 
@@ -346,44 +346,27 @@ impl SpacewarsPhysics {
             rovers: BTreeMap::new(),
             debris_keys: BTreeMap::new(),
             next_debris_entity: DEBRIS_ENTITY_BASE,
-            weapons: None,
+            weapons: Weapons::new(),
         }
-    }
-
-    /// Carries the game's cannon shells as material weapon shots, and its
-    /// lasers as beams, from now on.
-    pub(super) fn enable_weapons(&mut self) {
-        self.weapons.get_or_insert_with(Weapons::new);
-    }
-
-    pub(super) fn weapons_enabled(&self) -> bool {
-        self.weapons.is_some()
     }
 
     /// The physics ids of the shells that shots carry now.
     #[cfg(test)]
     pub(super) fn shot_ids(&self) -> Vec<u64> {
-        self.weapons
-            .iter()
-            .flat_map(|weapons| weapons.shots().map(|(id, _)| id))
-            .collect()
+        self.weapons.shots().map(|(id, _)| id).collect()
     }
 
-    /// Launches a shot on a body already in the world. False when material
-    /// weapons are off or the shot is refused.
+    /// Launches a shot on a body already in the world. False when the shot is
+    /// refused.
     pub(super) fn launch_shot(&mut self, spec: ShotSpec) -> bool {
-        self.weapons
-            .as_mut()
-            .is_some_and(|weapons| weapons.launch(&self.world, spec).is_ok())
+        self.weapons.launch(&self.world, spec).is_ok()
     }
 
     /// Records the motion each body brings into the step, while any shot
     /// flies.
     pub(super) fn prepare_shots(&self, dt_seconds: f32) -> Option<Prepared> {
-        self.weapons
-            .as_ref()
-            .filter(|weapons| weapons.shots().next().is_some())
-            .map(|weapons| weapons.prepare(&self.world, dt_seconds))
+        let flying = self.weapons.shots().next().is_some();
+        flying.then(|| self.weapons.prepare(&self.world, dt_seconds))
     }
 
     /// Stops and retires the shots after a step, and returns what they did.
@@ -393,50 +376,40 @@ impl SpacewarsPhysics {
         dt_seconds: f32,
         recipients: &mut impl Recipients,
     ) -> Vec<WeaponEvent> {
-        let Some(weapons) = &mut self.weapons else {
-            return Vec::new();
-        };
-        weapons.settle(prepared, &mut self.world, dt_seconds, recipients);
-        weapons.take_events()
+        self.weapons
+            .settle(prepared, &mut self.world, dt_seconds, recipients);
+        self.weapons.take_events()
     }
 
-    /// Arms a laser's beam. False when material weapons are off or the beam is
-    /// refused.
+    /// Arms a laser's beam. False when the beam is refused.
     pub(super) fn arm_beam(&mut self, spec: BeamSpec) -> bool {
-        self.weapons
-            .as_mut()
-            .is_some_and(|weapons| weapons.arm_beam(spec).is_ok())
+        self.weapons.arm_beam(spec).is_ok()
     }
 
     /// Fires one pulse of a laser's beam, and returns what it did. Nothing
-    /// when material weapons are off or the pulse is refused.
+    /// when the pulse is refused.
     pub(super) fn fire_beam(
         &mut self,
         id: u64,
         pulse: Pulse,
         recipients: &mut impl Recipients,
     ) -> Vec<WeaponEvent> {
-        let Some(weapons) = &mut self.weapons else {
-            return Vec::new();
-        };
-        let _ = weapons.fire(&mut self.world, id, pulse, recipients);
-        weapons.take_events()
+        let _ = self.weapons.fire(&mut self.world, id, pulse, recipients);
+        self.weapons.take_events()
     }
 
     /// Retires the live shots that `done` picks by id, with their bodies.
     pub(super) fn retire_shots(&mut self, mut done: impl FnMut(u64) -> bool) {
-        let Some(weapons) = &mut self.weapons else {
-            return;
-        };
-        let ids: Vec<u64> = weapons
+        let ids: Vec<u64> = self
+            .weapons
             .shots()
             .map(|(id, _)| id)
             .filter(|id| done(*id))
             .collect();
         for id in ids {
-            let _ = weapons.retire(&mut self.world, id);
+            let _ = self.weapons.retire(&mut self.world, id);
         }
-        weapons.take_events();
+        self.weapons.take_events();
     }
 
     #[cfg(feature = "sensor-profile")]
