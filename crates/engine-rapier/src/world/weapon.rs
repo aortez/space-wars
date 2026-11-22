@@ -270,15 +270,16 @@ pub struct Prepared {
     motions: BTreeMap<BodyId, BodyMotion>,
 }
 
-/// The live weapon sources of one world.
-#[derive(Debug, Default)]
+/// The live weapon sources of one world. A clone carries on as its original
+/// would, given a clone of the same world.
+#[derive(Debug, Clone, Default)]
 pub struct Weapons {
     shots: BTreeMap<SourceId, Shot>,
     beams: BTreeMap<SourceId, Beam>,
     events: Vec<WeaponEvent>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Shot {
     source: Source,
     body: BodyId,
@@ -295,7 +296,7 @@ struct Shot {
     shielded: BTreeSet<Recipient>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Beam {
     source: Source,
     pulse: f32,
@@ -316,7 +317,7 @@ struct Contact {
 }
 
 /// Each recipient's key in one source's record of what it reached.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 struct Keys(BTreeMap<Recipient, u64>);
 
 impl Keys {
@@ -420,10 +421,15 @@ impl Weapons {
         std::mem::take(&mut self.events)
     }
 
-    /// Takes over a shot's body, already moving at its launch velocity. A
-    /// refused launch changes nothing: the id is taken, the world collects no
-    /// contact events, the body cannot carry a shot, or the shot's geometry is
-    /// outside what the material laws accept.
+    /// Takes over a shot's body, already moving at its launch velocity. The
+    /// shot follows the body by its id, so a host may replace the body, and the
+    /// shot flies on with the new one. Nothing checks the new body again: it
+    /// must still be dynamic, alone in its entity and bound to no loading
+    /// region. A hard hit takes the new body's mass, while passes through
+    /// tissue keep the mass the shot launched with. A refused launch changes
+    /// nothing: the id is taken, the world collects no contact events, the
+    /// body cannot carry a shot, or the shot's geometry is outside what the
+    /// material laws accept.
     pub fn launch(&mut self, world: &PhysicsWorld, spec: ShotSpec) -> Result<(), WeaponError> {
         if self.shots.contains_key(&spec.id) || self.beams.contains_key(&spec.id) {
             return Err(WeaponError::Exists);

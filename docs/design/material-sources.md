@@ -19,7 +19,7 @@ in the pure crate. `engine_rapier::world::weapon` flies real shots and beams
 [Material Lab](material-lab.md#shell-through-moss) fires one shell through moss
 into a plate, and [Scorched](#scorched-tanks) charges its tanks' armor from
 shells it sweeps itself. [Spacewars](#spacewars-bodies) keeps a region over the
-health of each body a weapon can harm.
+health of each body a weapon can harm, and can fly its cannon shells as shots.
 
 ## Deliveries
 
@@ -161,11 +161,13 @@ the host lists `Body` circles for it that cover its colliders.
 - **Shots.** The host inserts the shot's body, moving at its launch velocity,
   and `launch` takes it over: the body's mass and speed are the projectile's.
   The body must be alone in its entity and bound to no loading region, and the
-  world must collect contact events. Around each step, `prepare` records the
-  motion each body brings into the step, a position-driven body's prescribed
-  velocity included, and `settle` uses it. `settle` sweeps each shot from where
-  the step found it to where it left it, passing the tissue on the way at the
-  speed the shot entered the step.
+  world must collect contact events. The shot follows its body by id, so a
+  host that replaces the body, as Spacewars does when a shell arms, keeps the
+  shot flying. Around each step, `prepare` records the motion each body brings
+  into the step, a position-driven body's prescribed velocity included, and
+  `settle` uses it. `settle` sweeps each shot from where the step found it to
+  where it left it, passing the tissue on the way at the speed the shot
+  entered the step.
 - **The hard hit.** Of the contacts a shot made in a step, the one that took
   the most impulse stops it. A touch that pushed nothing, such as a predicted
   contact the shot slides past, does not. The impact is measured at the
@@ -281,10 +283,10 @@ around its collision shape's perimeter.
 
 | Body | Material | How much | Capacity at full health | Work per point of health |
 |---|---|---|---|---|
-| Ship hull | hull | plate around the open-winged hull's 28.35 perimeter, 2 deep into the screen | 22,681, for 100 health | 226.8 |
-| Escape pod hull, in a match | hull | plate around the pod's 7.39 perimeter, 1 deep | 2,954, for 100 health | 29.5 |
+| Ship hull | ship hull | plate around the open-winged hull's 28.35 perimeter, 2 deep into the screen | 88,455, for 100 health | 884.6 |
+| Escape pod hull, in a match | pod hull | plate around the pod's 7.39 perimeter, 1 deep | 17,724, for 100 health | 177.2 |
 | Pilot on foot | soft tissue | the pilot's capsule, 0.3 deep | 4.51, for 100 health | 0.045 |
-| Asteroid, chip or breakup fragment | rock | what the body weighed when made | 37.7 per unit of radius | 12 |
+| Asteroid, chip or breakup fragment | asteroid rock | what the body weighed when made, giving way 1 deep behind a struck face | 4,398 per unit of radius | 1,400 |
 | Cannon shell | shell | what the shell weighed when fired | 4,712, or 375 for a supplied round, for 1 health | 4,712 or 375 |
 | Rover hull | hull | plate around the chassis's 11.2 perimeter, 2 deep | 8,960, for 25 health | 358.4 |
 
@@ -308,9 +310,57 @@ energy would need ([#246](https://github.com/aortez/space-wars/issues/246)).
   weigh more than its body. A hit takes the body's mass from the physics, not
   from the region.
 
-No weapon charges these regions yet, so nothing has calibrated the plate
-depths or the depths into the screen; they are estimates from each body's
-size.
+The ship hull, the pod hull and asteroid rock are the reference hull and rock
+with only their toughness raised. The match tests' fixture sets it: a still
+target, struck every two seconds by a supplied round closing at 300. There a
+round fails a fresh ship's hull on the 4th hit, a fresh pod's on the 2nd and a
+pilot on foot on the 1st, the survival #330 set. In open space a still ship
+takes a 5th.
+
+- **Rock.** Rock gives way 1 deep behind the face it is struck on, about the
+  width of the patch a shell strikes. Were the whole asteroid to give way, rock
+  would be soft enough to take nearly all of a shell's energy. A round breaks
+  the asteroids the game spawns, of radius 9 or less, as a shell did, and
+  costs rock of radius 40 to 150 about the 15 health a shell's damage did.
+  From radius 21 to 36, a shell broke the rock where a round chips it.
+- **Closing speed.** A hit's cost follows its energy, so closing speed matters
+  more than it did. Closing at 150, a round takes 5.3 from a fresh, still ship
+  in open space, where the old rules took 17.9. At 500 it takes 51.4, where
+  they took 29.4. Shells carry the firing ship's velocity, so a kill takes
+  about 2 to 19 rounds, against about 3 to 6 before.
+- **Estimates.** The rover keeps the reference hull, and a round still
+  destroys one. The plate depths and the depths into the screen are estimates
+  from each body's size, which the toughness absorbs.
+
+### Cannon shells as shots
+
+`SpacewarsState::enable_material_weapons`, chosen before the first step, flies
+each cannon shell as a `Weapons` shot from the step it is fired in. The game
+still replaces a shell's body when the shell arms, and the shot flies on with
+the new one. The shot stops on the body its strongest contact pushed, and the
+impact law charges that body's region. `HealthMap` turns the work into health,
+and the contact rules take that health where they took the shell's damage, so
+particles, telemetry and breakups follow as before. The old damage rules stay
+the default until the game's AI baselines move with the new ones.
+
+- The first contact that pushes anything stops a shell, so it no longer
+  bounces off the edge of the universe. Planets, the sun, terrain and the edge
+  stop it uncharged, and terrain still takes its crater.
+- An armed shell can hit its own ship, as before.
+- In a match, a pod or a pilot on foot takes a shot's hit unless ejection
+  protection covers it, and a protected one still stops the shell. Outside a
+  match, pods and pilots are outside the model and stop a shell uncharged: a
+  pod's health there is its rebuild's progress.
+- A shot whose shell dies earlier in the step, such as to a laser or terrain,
+  or leaves the game retires before it can land a hit. The old rules spared a
+  pod or a pilot on foot such a hit, but not a ship.
+- A classic cannon shell weighs 12.57 times a supplied round, and the impact
+  law charges its energy. It fails a fresh ship's hull on the 2nd hit, where
+  the old rules took the 3rd, and breaks asteroids up to a radius of about 120
+  in one hit, where the old rules broke those up to about 20. In a default game
+  with seed 7, the first classic shell takes all of the struck ship's health,
+  where the old rules left it 4.8. What a classic shell should weigh is not
+  settled yet.
 
 ## Once only
 
@@ -382,9 +432,10 @@ that fell gained speed.
   energy past a face's safe limit, so the same power in shorter pulses does
   less, and none once a pulse falls within the limit. A continuous beam keeps
   its pulse to the game's tick, not the physics substeps.
-- `Weapons` is not saved. A `Source` serializes for diagnostics, but nothing
-  restores live sources, so a host that saves replays them, as Material Lab
-  does.
+- `Weapons` is not saved. It clones, and a clone of the world and its weapons
+  plays on as the original would. A `Source` serializes for diagnostics, but
+  nothing restores live sources, so a host that saves replays them, as
+  Material Lab does.
 
 ## Qualification
 
@@ -479,6 +530,8 @@ world. It covers:
 - two shots striking one plate in one step, both charging it, and two shells
   meeting head on, each stopping on the other;
 - a shot launched after `prepare`, which passes the blade in its first step;
+- a clone of the world and its weapons, which plays on as the original, and a
+  shot whose host replaces its body, which flies on as it would have;
 - a beam and a shot retired early, with no blast, and a shot without a blast
   detonated;
 - beams passing a body outside their collision groups, ending on an unmodeled
@@ -546,4 +599,35 @@ Scorched's shells:
   region alone;
 - debris breaking by the game's rule while its region is still nearly four
   fifths whole;
-- a contact's damage, a repair and a rover's damage moving the region.
+- a contact's damage, a repair and a rover's damage moving the region;
+- the calibrated materials differing from the reference ones only in
+  toughness.
+
+`scenarios/spacewars/src/shots.rs` and the match and terrain tests cover
+shells as shots:
+
+- shells flying as shots from their first step, only once material weapons
+  are chosen, which they must be before the first step;
+- a shot charging the ship it stops on, which loses that and no old damage
+  besides, the contact still recorded and the shell gone with the shot, and a
+  hit counting for that body alone;
+- an armed shot hitting its own ship;
+- a shell stopping at the edge of the universe, where an old shell bounced;
+- a shot retiring in the step its shell dies to a laser, and when its shell
+  leaves the game;
+- a round that a laser destroys in the step it strikes a ship or a pod landing
+  no hit and counting none;
+- a shot recording no contact with a ship or a rover it did not charge;
+- two shots in one step charging a ship no more than it has;
+- a round costing asteroids of radius 10, 40 and 100 what it did under the
+  old rules, with the same chips and exactly what its shot charged;
+- a round destroying a rover under both rules, and a slow round costing a
+  rover what its shot charged;
+- a game with rounds in flight playing the same twice and from a clone made
+  mid-game, with a hit landing after the clone;
+- a round failing a match's ship on the 4th hit, a pod on the 2nd and a pilot
+  on foot on the 1st, each step's loss what the shot charged and each hit
+  counted as a cannon hit, with a hull shielding its pilot;
+- ejection protection covering a pod and a pilot on foot, which still stop the
+  round and are charged nothing, and ending in the tick the old rules' did;
+- a shot digging the crater a shell did.
