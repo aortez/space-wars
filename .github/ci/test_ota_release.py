@@ -18,7 +18,8 @@ CI_URL = 'https://github.com/aortez/space-wars/actions/runs/7'
 def configuration(root):
     return dict(schema=1, authority=str(root / 'authority'), workspace=str(root / 'workspace'),
                 root_sha256=digest(ROOT), tools_directory=str(root / 'tools'),
-                tools={name: 'f' * 64 for name in release.TOOLS}, code={name: 'c' * 64 for name in release.CODE})
+                tools={name: 'f' * 64 for name in release.TOOLS}, code={name: 'c' * 64 for name in release.CODE},
+                build=dict(cache=str(root / 'cache'), checkout=str(root / 'checkout'), directory=str(root / 'build')))
 
 
 def publisher(root):
@@ -26,8 +27,9 @@ def publisher(root):
     return release.Publisher(release.Config(configuration(root)))
 
 
-def prepared_candidate(directory, payload, embedded='a' * 40):
-    """A candidate directory as preparation leaves it, from source 'a' * 40, and its image_candidate output."""
+def prepared_candidate(directory, payload, embedded='a' * 40, baseline=None):
+    """A candidate directory as ota_release.py candidate leaves it, from source 'a' * 40, compared with the
+    baseline generation, and its image_candidate output."""
     (directory / 'candidate').mkdir(parents=True)
     descriptor = dict(schema=1, format='rootfs-ext4-zstd', expanded=dict(bytes=4096, sha256=digest(payload * 2)),
                       compressed=dict(bytes=len(payload), sha256=digest(payload)))
@@ -41,7 +43,8 @@ def prepared_candidate(directory, payload, embedded='a' * 40):
              'candidate/qualification.json': json.dumps(dict(schema=1, image=image)).encode()}
     for name, data in files.items():
         (directory / name).write_bytes(data)
-    report = dict(source='a' * 40, descriptor=descriptor,
+    report = dict(schema=2, prepared_by=dict(command='ota_release.py candidate', code={}), source='a' * 40,
+                  descriptor=descriptor, baseline=baseline and dict(generation=baseline),
                   artifacts={name: dict(bytes=len(data), sha256=digest(data)) for name, data in files.items()})
     (directory / 'preparation-result.json').write_text(json.dumps(report))
     return files['candidate/qualification.json']
@@ -142,6 +145,8 @@ class ConfigTests(unittest.TestCase):
             value = configuration(root)
             for case, changed in (('a missing tool', dict(value, tools={'feed_sign': 'f' * 64})),
                                   ('missing code pins', dict(value, code={})),
+                                  ('no build paths', dict(value, build={})),
+                                  ('a relative build path', dict(value, build=dict(value['build'], cache='cache'))),
                                   ('a relative path', dict(value, workspace='workspace')),
                                   ('an unknown field', dict(value, extra=1))):
                 with self.subTest(case), self.assertRaises(ValueError):
@@ -166,8 +171,10 @@ class SelectionTests(unittest.TestCase):
         """A prepared candidate, verified by a fake image_candidate and passed by a fake CI run on main."""
         directory = self.root / 'candidate'
         qualification = prepared_candidate(directory, b'compressed image', embedded)
+        self.publisher.state = genesis()
         self.publisher.run = lambda name, *args, timeout=120: qualification
-        self.ci = dict(status='completed', conclusion='success', event='push', headBranch='main', headSha='a' * 40)
+        self.ci = dict(status='completed', conclusion='success', event='push', headBranch='main', headSha='a' * 40,
+                       workflowName='CI')
         self.publisher.gh_json = lambda args: dict(self.ci, url=args[2])
         return directory, b'compressed image'
 
@@ -178,14 +185,30 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual((intent['image']['source_commit'], intent['image']['min_recovery_protocol']), ('a' * 40, 2))
         self.assertEqual((selection['ci']['url'], image), ('7', directory / 'candidate/image.ext4.zst'))
         for case, field, value in (('another branch', 'headBranch', 'feature'), ('another commit', 'headSha', 'b' * 40),
-                                   ('a failed run', 'conclusion', 'failure')):
+                                   ('a failed run', 'conclusion', 'failure'), ('another workflow', 'workflowName',
+                                                                             'Clock mixed-event regression')):
             with self.subTest(case), self.assertRaisesRegex(ValueError, 'has not passed CI on main'):
                 self.ci[field] = value
                 self.publisher.select_nightly(directory)
-            self.ci = dict(self.ci, headBranch='main', headSha='a' * 40, conclusion='success')
+            self.ci = dict(self.ci, headBranch='main', headSha='a' * 40, conclusion='success', workflowName='CI')
         (directory / 'candidate/candidate.json').write_text('{}')
         with self.assertRaisesRegex(ValueError, 'Preparation artifact changed'):
             self.publisher.select_nightly(directory)
+
+    def test_nightly_selection_requires_a_candidate_the_command_compared_with_the_newest_generation(self):
+        directory, _ = self.candidate()
+        path = directory / 'preparation-result.json'
+        report = json.loads(path.read_bytes())
+        path.write_text(json.dumps(dict(report, schema=1)))
+        with self.assertRaisesRegex(ValueError, 'Prepare candidates with ota_release.py candidate'):
+            self.publisher.select_nightly(directory)
+        path.write_text(json.dumps(report))
+        self.publisher.state = finish(journal.reserve(genesis(), nightly(), NOW), FakeTooling())
+        with self.assertRaisesRegex(ValueError, 'compared with generation None, but the newest published '
+                                                'generation is 1; prepare it again'):
+            self.publisher.select_nightly(directory)
+        path.write_text(json.dumps(dict(report, baseline=dict(generation=1))))
+        self.assertEqual(self.publisher.select_nightly(directory)[0]['image']['source_commit'], 'a' * 40)
 
     def test_nightly_selection_requires_the_embedded_source(self):
         directory, _ = self.candidate(embedded='c' * 40)

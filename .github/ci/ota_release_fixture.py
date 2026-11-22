@@ -86,7 +86,7 @@ class Publisher(release.Publisher):
 
     def gh_json(self, args):
         return dict(status='completed', conclusion='success', event='push', headBranch='main', headSha='a' * 40,
-                    url=CI_URL)
+                    url=CI_URL, workflowName='CI')
 
 
 def write_private(path, data):
@@ -165,7 +165,8 @@ def authority(directory, signer, inventory, now, timestamp_expires):
     write_private(path, json.dumps(dict(
         schema=1, authority=str(home), workspace=str(workspace), root_sha256=delivery.digest(root),
         tools_directory=str(tools), tools={name: release.file_blob(tools / name)['sha256'] for name in release.TOOLS},
-        code=release.code_digests())).encode())
+        code=release.code_digests(), build=dict(cache=str(directory / 'cache'), checkout=str(directory / 'checkout'),
+                                                directory=str(directory / 'build')))).encode())
     return release.Config.load(path), feed
 
 
@@ -227,7 +228,7 @@ def run(signer, inventory):
 
         first, second = directory / 'first', directory / 'second'
         prepared_candidate(first, b'first fixture image')
-        prepared_candidate(second, b'second fixture image')
+        prepared_candidate(second, b'second fixture image', baseline=1)  # Planned once the first is published.
         plan = call('nightly', first)
         check((plan['version'], plan['generation'], plan['targets_after']) == (2, 1, dict(release=0, nightly=1)),
               'Unexpected Nightly plan')
