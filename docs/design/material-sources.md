@@ -199,7 +199,8 @@ the host lists `Body` circles for it that cover its colliders.
   however far past the surface they lie, and what they miss goes on past. The
   bodies of one entity whose region the host keeps under one key are one
   recipient, whichever of them the ray meets. A surface whose recipient has no
-  circles takes all that reaches it.
+  circles takes all that reaches it, or, for a beam taller than the surface is
+  thick, the share its thickness spans, as a circle does.
 - **Retirement.** A shot retires when it stops or its lifetime ends, and the
   module removes its body's entity once every shot has flown that step, so two
   shots that meet both stop. A beam retires after its last pulse. `retire` ends
@@ -285,7 +286,7 @@ around its collision shape's perimeter.
 |---|---|---|---|---|
 | Ship hull | ship hull | plate around the open-winged hull's 28.35 perimeter, 2 deep into the screen | 88,455, for 100 health | 884.6 |
 | Escape pod hull, in a match | pod hull | plate around the pod's 7.39 perimeter, 1 deep | 17,724, for 100 health | 177.2 |
-| Pilot on foot | soft tissue | the pilot's capsule, 0.3 deep | 4.51, for 100 health | 0.045 |
+| Pilot on foot | pilot tissue | the pilot's capsule, 0.3 deep | 2,632, for 100 health | 26.3 |
 | Asteroid, chip or breakup fragment | asteroid rock | what the body weighed when made, giving way 1 deep behind a struck face | 4,398 per unit of radius | 1,400 |
 | Cannon shell | shell | what the shell weighed when fired | 4,712, or 375 for a supplied round, for 1 health | 4,712 or 375 |
 | Rover hull | hull | plate around the chassis's 11.2 perimeter, 2 deep | 8,960, for 25 health | 358.4 |
@@ -315,7 +316,8 @@ with only their toughness raised. The match tests' fixture sets it: a still
 target, struck every two seconds by a supplied round closing at 300. There a
 round fails a fresh ship's hull on the 4th hit, a fresh pod's on the 2nd and a
 pilot on foot on the 1st, the survival #330 set. In open space a still ship
-takes a 5th.
+takes a 5th. Pilot tissue is soft tissue with only its toughness raised, for
+the laser, as [Lasers as beams](#lasers-as-beams) says.
 
 - **Rock.** Rock gives way 1 deep behind the face it is struck on, about the
   width of the patch a shell strikes. Were the whole asteroid to give way, rock
@@ -362,6 +364,54 @@ the default until the game's AI baselines move with the new ones.
   where the old rules left it 4.8. What a classic shell should weigh is not
   settled yet.
 
+### Lasers as beams
+
+With material weapons, each ship's laser is also a `Weapons` beam. Each tick a
+laser shines, it fires one pulse from the muzzle along the ship's heading, as
+far as the beam has grown, a tick's growth past where it last ended. The
+pulse's energy is 8,950 over that length, as the old damage was 10 over it, so
+the beam keeps the old laser's falloff. The first solid surface ends the pulse,
+and the beam passes through its own ship. The body there takes the share of the
+pulse that its thickness spans of the beam's height, 2, by the deposit law, and
+`HealthMap` turns the work into health. The laser rules take that health where
+they took the old damage, so hits, records and deaths follow as before. Sparks
+keep their old size.
+
+- **Falloff.** A beam that spreads with range weakens only on targets narrower
+  than it, so a ship or an asteroid would take the whole pulse hundreds of
+  units away. The game sets each pulse's energy instead.
+- **Width.** The beam is 0.01 wide. A face's safe limit grows with the beam's
+  width, so a narrow beam loses little of a pulse to it.
+- **Calibration.** From 40 units off in the match tests' fixture, the beam
+  fails a fresh ship's hull in 13.87 seconds, where the old laser took 13.88.
+  A pod's hull is half as thick as the beam is tall, so it takes half of each
+  pulse and lasts 5.75 seconds, where it lasted 7.18. Pilot tissue has a
+  toughness of 35,000, so a pilot on foot lasts 2.87 seconds, where it lasted
+  3.62. Each form still lasts more than 1.8 times the next.
+- **Rounds on a pilot on foot.** Pilot tissue is tough enough to outlast a
+  slow round. A round kills a pilot on foot on the first hit only when it
+  closes at about 236 or faster, as the match tests' rounds do at 300. One
+  closing at 200 takes 71 of the pilot's 100 health, and one at 150 takes 40,
+  where the old rules' round killed at every speed from 50 to 300. A softer
+  pilot dies to slower rounds and sooner to the laser: at a toughness of
+  8,750, a round closing at 150 kills one, and the laser takes 0.72 seconds.
+- **Protection.** In a match, a pod or a pilot on foot takes a beam's hit
+  unless ejection protection covers it, and a protected one still ends the
+  beam. Outside a match, the beam ends on pods and pilots uncharged, as it ends
+  on planets, the sun, terrain and the edge of the universe.
+- **Other bodies.** Nothing else is calibrated for the beam yet:
+  - A rover keeps the reference hull, so each pulse costs it 2.5 times the old
+    damage. A rover 40 units off lasts 1.5 seconds in the beam, where it lasted
+    3.7 in the old laser.
+  - Rock takes 0.64 times the old damage from each pulse, so an asteroid lasts
+    about 1.6 times as long in the beam.
+  - A supplied round's 1 health stands for 375, so the beam destroys one about
+    as fast as the old laser did: in 1 tick from 40 units off and 10 from 300,
+    where the old laser took 2 and 12. A classic shell's stands for 4,712, so
+    the beam takes 10 ticks from 40 units off and 62 from 300.
+- **A muzzle inside a body.** The beam then ends at the muzzle, where the old
+  ray ended where it left the body.
+
 ## Once only
 
 - A shot reaches each recipient once. Another report of the same recipient,
@@ -373,7 +423,8 @@ the default until the game's AI baselines move with the new ones.
 - The payload is released once, and a beam fires at most its pulse count.
 - A release or a pulse may name each recipient only once. The host merges a
   recipient's colliders into one share, as `ContactGeometry::merge` merges
-  sub-contacts, so an extra collider cannot multiply a share.
+  sub-contacts, so an extra collider cannot multiply a share. A beam keys each
+  pulse afresh, so one that fires all game keeps nothing between pulses.
 - A refused call changes nothing. A release or pulse with one invalid share
   delivers none of them.
 
@@ -547,6 +598,9 @@ world. It covers:
   as an unshielded one would be;
 - a beam ending on a body the host keeps, charged with all that reaches it,
   and still ending there, uncharged, while the host shields it;
+- a body half as thick as a beam is tall taking half of what reaches it, and
+  one thicker than the beam taking all, with the same share reported while the
+  host shields it;
 - a beam stopping on a ball that covers half its width, reaching no tissue
   past it;
 - a ball off the ray taking its part of a beam and shadowing a blade, with the
@@ -631,3 +685,24 @@ shells as shots:
 - ejection protection covering a pod and a pilot on foot, which still stop the
   round and are charged nothing, and ending in the tick the old rules' did;
 - a shot digging the crater a shell did.
+
+`scenarios/spacewars/src/lasers.rs` and the match tests cover lasers as beams:
+
+- a beam charging the ship it ends on what its pulse deposits, which the ship
+  loses with no old damage besides, the beam ending where the old laser's ray
+  does and its sparks the old laser's size;
+- a beam ending on the first body it meets;
+- two beams in one step charging a body no more than it has;
+- a beam wearing a rover by its hull, and a rover with less left than a pulse
+  takes losing what it has and dying;
+- choosing material weapons twice changing nothing;
+- a game with lasers playing the same twice and from a clone;
+- the laser failing a match's ship in 13.87 seconds from 40 units off, a pod in
+  5.75 and a pilot on foot in 2.87, each step's loss what the beam charged and
+  a hull shielding its pilot;
+- a round closing at 240 killing a pilot on foot on the first hit, and one
+  closing at 230 not;
+- ejection protection covering a pod and a pilot on foot from the laser, which
+  still end the beam and are charged nothing;
+- the laser ending on a pod and a pilot on foot outside a match, charging
+  them nothing.

@@ -5,6 +5,7 @@
 //! escape pods. Sounds, scoring, and final HUD polish land in later slices.
 
 pub mod integrity;
+mod lasers;
 mod physics;
 pub mod ship_geometry;
 mod shots;
@@ -635,6 +636,8 @@ pub struct LaserHit {
     pub shooter: usize,
     pub target: LaserTarget,
     pub point: Vec2,
+    /// The health the hit costs its target: what the beam charged it under
+    /// material weapons, and the old damage otherwise.
     pub damage: f32,
 }
 
@@ -1509,7 +1512,7 @@ impl SpacewarsScenario {
 
         let collision_started = Instant::now();
         update_ship_lasers(state, dt);
-        state.laser_hits = resolve_laser_hits(state);
+        state.laser_hits = resolve_laser_hits(state, surface_pilots);
         surface_sortie::match_rules::apply_lasers(state, surface_pilots);
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
 
@@ -1569,13 +1572,19 @@ impl SpacewarsScenario {
 }
 
 impl SpacewarsState {
-    /// Carries cannon shells as material weapon shots (#330): a shell charges
-    /// the region of the body it hits by the impact law, and that body loses
-    /// the health the work costs. Select it before the first step. The old
-    /// damage rules stay the default until the game's baselines move with it.
+    /// Carries cannon shells as material weapon shots and lasers as beams
+    /// (#330). A shell charges the region of the body it hits by the impact
+    /// law, a laser's pulse charges the body it ends on by the deposit law, and
+    /// that body loses the health the work costs. Select it before the first
+    /// step. Selecting it again changes nothing. The old damage rules stay the
+    /// default until the game's baselines move with it.
     pub fn enable_material_weapons(&mut self) {
         assert_eq!(self.tick, 0, "select material weapons before stepping");
+        if self.material_weapons() {
+            return;
+        }
         self.physics.enable_weapons();
+        lasers::arm(self);
     }
 
     pub fn material_weapons(&self) -> bool {
@@ -2235,23 +2244,32 @@ fn update_ship_lasers(state: &mut SpacewarsState, dt: f32) {
     }
 }
 
-fn resolve_laser_hits(state: &mut SpacewarsState) -> Vec<LaserHit> {
-    let traces = state
-        .ships
-        .iter()
-        .enumerate()
-        .filter_map(|(shooter, ship)| {
-            let beam = ship.laser_beam?;
-            let trace =
-                state
-                    .physics
-                    .cast_laser(shooter, beam.head, beam.direction, beam.length())?;
-            Some((shooter, beam, trace))
-        })
-        .collect::<Vec<_>>();
+/// Each shining laser's hit. Under material weapons a hit's damage is the
+/// health its beam charged the body, and otherwise the old damage.
+fn resolve_laser_hits(
+    state: &mut SpacewarsState,
+    pilots: &[surface_sortie::SurfacePilot],
+) -> Vec<LaserHit> {
+    let traces = if state.material_weapons() {
+        lasers::fire(state, pilots)
+    } else {
+        state
+            .ships
+            .iter()
+            .enumerate()
+            .filter_map(|(shooter, ship)| {
+                let beam = ship.laser_beam?;
+                let trace =
+                    state
+                        .physics
+                        .cast_laser(shooter, beam.head, beam.direction, beam.length())?;
+                Some((shooter, beam, trace, laser_damage(beam)))
+            })
+            .collect::<Vec<_>>()
+    };
     let mut hits = Vec::new();
 
-    for (shooter, beam, trace) in traces {
+    for (shooter, beam, trace, damage) in traces {
         if let Some(current) = &mut state.ships[shooter].laser_beam {
             current.tail = trace.point;
         }
@@ -2282,13 +2300,14 @@ fn resolve_laser_hits(state: &mut SpacewarsState) -> Vec<LaserHit> {
             shooter,
             target,
             point: trace.point,
-            damage: laser_damage(beam),
+            damage,
         };
         if matches!(target, LaserTarget::Ship(ship) if ship == shooter) {
             continue;
         }
 
-        spawn_laser_hit_particles(state, beam.direction, hit);
+        // Sparks keep the old damage's size, whatever the beam charged.
+        spawn_laser_hit_particles(state, beam.direction, hit, laser_damage(beam));
         apply_laser_hit(state, hit);
         hits.push(hit);
     }
@@ -2315,7 +2334,12 @@ fn apply_laser_hit(state: &mut SpacewarsState, hit: LaserHit) {
     }
 }
 
-fn spawn_laser_hit_particles(state: &mut SpacewarsState, direction: Vec2, hit: LaserHit) {
+fn spawn_laser_hit_particles(
+    state: &mut SpacewarsState,
+    direction: Vec2,
+    hit: LaserHit,
+    strength: f32,
+) {
     let Some((center, color, scale)) = impact_target_data(state, hit.target) else {
         return;
     };
@@ -2325,7 +2349,7 @@ fn spawn_laser_hit_particles(state: &mut SpacewarsState, direction: Vec2, hit: L
         center,
         hit.point,
         color,
-        hit.damage,
+        strength,
         scale,
         laser_target_salt(hit.target),
     );
@@ -10184,7 +10208,7 @@ mod tests {
             on: true,
         });
         update_ship_lasers(&mut state, 1.0 / 60.0);
-        state.laser_hits = resolve_laser_hits(&mut state);
+        state.laser_hits = resolve_laser_hits(&mut state, &[]);
 
         let beam = state.ships[0]
             .laser_beam
@@ -11793,7 +11817,7 @@ mod tests {
         state.ships[1].laser_beam = Some(beam);
         let initial_life = state.rovers[0].life;
 
-        let hits = resolve_laser_hits(&mut state);
+        let hits = resolve_laser_hits(&mut state, &[]);
 
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].target, LaserTarget::Rover(rover_id));
@@ -11802,7 +11826,7 @@ mod tests {
 
         state.rovers[0].life = laser_damage(beam) * 0.5;
         state.ships[1].laser_beam = Some(beam);
-        let hits = resolve_laser_hits(&mut state);
+        let hits = resolve_laser_hits(&mut state, &[]);
         assert_eq!(hits[0].target, LaserTarget::Rover(rover_id));
         assert!(state.rovers[0].dead);
 

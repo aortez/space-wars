@@ -75,9 +75,10 @@ pub trait Recipients {
     /// find the body that stops it. A beam asks for its whole range, meets
     /// what lies across its path in the order it reaches it, and ends on the
     /// first solid surface its ray cast meets. That surface's recipient takes
-    /// the part of the beam its own circles within the range cover, or all
-    /// that reaches it if it has none, so a body's circles should cover its
-    /// colliders. The host bounds the set. A recipient with a circle the
+    /// the part of the beam its own circles within the range cover, so a
+    /// body's circles should cover its colliders. One without circles takes
+    /// all that reaches it, or the share of a taller beam its thickness
+    /// spans. The host bounds the set. A recipient with a circle the
     /// reach geometry refuses is refused whole, but a beam first leaves out
     /// the other recipients' circles it cannot meet.
     fn near(&self, center: Vec2, radius: f32) -> Vec<Reachable>;
@@ -141,6 +142,8 @@ pub struct BeamSpec {
     pub owner: Option<u64>,
     pub pulses: Pulses,
     pub width: f32,
+    /// How deep the beam is into the screen. A target thinner than that takes
+    /// the share of the beam its thickness spans.
     pub height: f32,
     /// The groups whose solid colliders stop the beam, as for a ray cast.
     pub collision_groups: CollisionGroups,
@@ -304,7 +307,6 @@ struct Beam {
     height: f32,
     collision_groups: CollisionGroups,
     protected: Option<PhysicsId>,
-    keys: Keys,
 }
 
 /// A contact a shot's body made in a step: the other collider, the normal
@@ -316,7 +318,10 @@ struct Contact {
     impulse: f32,
 }
 
-/// Each recipient's key in one source's record of what it reached.
+/// Each recipient's key among what one source reached. A shot keeps its keys
+/// for its whole flight, so its source can refuse a recipient it already
+/// struck. A beam's source checks only that a pulse names each key once, so a
+/// beam keys each pulse afresh and keeps nothing between pulses.
 #[derive(Debug, Clone, Default)]
 struct Keys(BTreeMap<Recipient, u64>);
 
@@ -522,7 +527,6 @@ impl Weapons {
                 height: spec.height,
                 collision_groups: spec.collision_groups,
                 protected: spec.protected,
-                keys: Keys::default(),
             },
         );
         Ok(())
@@ -688,7 +692,8 @@ impl Weapons {
         // the surface it lies. Other circles are left out before they are
         // checked, unless they cannot be placed: a center that is not finite,
         // or a radius that is negative or not finite. A stop the host lists no
-        // circles for takes all that passes the rest.
+        // circles for takes all that passes the rest, or the share of it that
+        // its thickness spans of a taller beam, as a circle does.
         let protected = beam.protected;
         let half = 0.5 * beam.width;
         let (front, invalid) = Front::new(
@@ -748,18 +753,25 @@ impl Weapons {
         }
         let body = hit.and_then(|hit| world.collider_body(hit.collider));
         if let Some(recipient) = stop.filter(|_| !circled) {
+            let spans = |section: Section| (section.thickness / beam.height).min(1.0);
             match entry(world, recipients, recipient, beam.width, path.through) {
-                Ok(entry) => entries.push(entry),
-                Err(reason) => events.push(WeaponEvent::Excluded {
-                    source: id,
-                    part: Part::Beam,
-                    recipient,
-                    reason,
-                    energy: energy * path.through,
-                }),
+                Ok(mut entry) => {
+                    entry.coupling *= spans(entry.face.section);
+                    entries.push(entry);
+                }
+                Err(reason) => {
+                    let share = section(world, recipients, recipient).map_or(1.0, spans);
+                    events.push(WeaponEvent::Excluded {
+                        source: id,
+                        part: Part::Beam,
+                        recipient,
+                        reason,
+                        energy: energy * path.through * share,
+                    });
+                }
             }
         }
-        let shares = shares(&mut beam.keys, &entries);
+        let shares = shares(&mut Keys::default(), &entries);
         let delivered = beam.source.pulse_of(energy, &shares);
         drop(shares);
         self.events.extend(events);
@@ -1177,6 +1189,20 @@ fn entry(
         face: Face::new(width, section),
         coupling,
     })
+}
+
+/// The section of the region the host keeps for `recipient`, if it keeps one.
+fn section(
+    world: &PhysicsWorld,
+    recipients: &impl Recipients,
+    recipient: Recipient,
+) -> Option<Section> {
+    let region = match recipient {
+        Recipient::Tissue(key) | Recipient::Body { key, .. } => recipients.region(key),
+        Recipient::Region(token) => world.loading_material(token),
+        Recipient::Unmodeled(_) => None,
+    };
+    region.map(|(_, section)| section)
 }
 
 fn shares<'a>(keys: &mut Keys, entries: &'a [Entry]) -> Vec<Share<'a>> {
