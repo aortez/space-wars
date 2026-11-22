@@ -113,7 +113,7 @@ impl Appearance {
 }
 
 /// How long a change of look takes: half a second of the scene's own time.
-pub(crate) const FADE_TICKS: u32 = 30;
+pub const FADE_TICKS: u32 = 30;
 
 /// The look on the face (#457): a fade from what was drawn when the theme
 /// last changed toward the theme it heads for. It moves only with the scene's

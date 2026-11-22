@@ -2,6 +2,15 @@
 use std::{collections::BTreeMap, fs, process::Command};
 
 fn run(case: &str, renderer: &str, warmup: u64) -> Vec<BTreeMap<String, String>> {
+    run_with(case, renderer, warmup, &[])
+}
+
+fn run_with(
+    case: &str,
+    renderer: &str,
+    warmup: u64,
+    extra: &[&str],
+) -> Vec<BTreeMap<String, String>> {
     let run = tempfile::tempdir().unwrap();
     let config = run.path().join("config");
     fs::create_dir(&config).unwrap();
@@ -32,6 +41,7 @@ fn run(case: &str, renderer: &str, warmup: u64) -> Vec<BTreeMap<String, String>>
             "--benchmark-warmup-seconds",
             &warmup.to_string(),
         ])
+        .args(extra)
         .arg("--config-dir")
         .arg(&config)
         .arg("--benchmark-report")
@@ -71,7 +81,7 @@ fn clock_csv_reports_real_dimensions_resources_and_cpu_only_work() {
     for renderer in ["vector", "raster"] {
         let rows = run("digit-slide", renderer, 0);
         for row in &rows {
-            assert_eq!(row["benchmark_version"], "2");
+            assert_eq!(row["benchmark_version"], "3");
             assert_eq!(row["seed"], "7");
             assert_eq!(row["viewport_width"], "80");
             assert_eq!(
@@ -83,6 +93,7 @@ fn clock_csv_reports_real_dimensions_resources_and_cpu_only_work() {
                 if renderer == "raster" { "96" } else { "64" }
             );
             assert_eq!(row["clock_case"], "digit-slide");
+            assert_eq!(row["clock_theme"], "normal");
             assert_eq!(row["frames"], "60");
             assert_eq!(row["updates"], "60");
             assert_eq!(row["max_bodies"], "0");
@@ -149,10 +160,40 @@ fn rain_fixture_uses_the_public_headless_runner_without_saved_settings() {
 }
 
 #[test]
+fn a_theme_runs_the_same_fixture_under_its_own_look() {
+    for renderer in ["raster", "vector"] {
+        let [normal, christmas, turning] = ["normal", "christmas", "turning"]
+            .map(|theme| run_with("idle", renderer, 0, &["--clock-benchmark-theme", theme]));
+        for (rows, theme) in [
+            (&normal, "normal"),
+            (&christmas, "christmas"),
+            (&turning, "turning"),
+        ] {
+            assert!(rows.iter().all(|r| r["clock_theme"] == theme), "{rows:?}");
+        }
+        let most = |rows: &[BTreeMap<String, String>]| -> Vec<usize> {
+            rows.iter()
+                .map(|r| r["max_scene_items"].parse().unwrap())
+                .collect()
+        };
+        // Christmas hangs its string of lights on every frame. A fade draws
+        // the same string, only fainter, so Turning draws as much.
+        for (normal, christmas) in most(&normal).into_iter().zip(most(&christmas)) {
+            assert!(
+                christmas > normal,
+                "{renderer}: {christmas} against {normal}"
+            );
+        }
+        assert_eq!(most(&turning), most(&christmas), "{renderer}");
+    }
+}
+
+#[test]
 fn invalid_benchmark_arguments_are_rejected_without_a_display() {
     for args in [
         vec!["--clock-benchmark-case", "bogus"],
         vec!["--clock-benchmark-recipe", "bogus"],
+        vec!["--clock-benchmark-theme", "bogus"],
         vec!["--benchmark-width", "0"],
         vec!["--benchmark-height", "9999999"],
         vec!["--benchmark-seconds", "0"],

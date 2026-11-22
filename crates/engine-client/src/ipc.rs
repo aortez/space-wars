@@ -75,7 +75,7 @@ enum ControlCommand {
     GpuText(crate::gpu_text::Mode),
     CameraZoom(crate::camera_probe::ZoomMode),
     RenderTrace(&'static str),
-    ClockBenchmark(crate::client_scenarios::ClockBenchmarkCase),
+    ClockBenchmark(crate::client_scenarios::ClockBenchmarkConfig),
 }
 
 #[cfg(unix)]
@@ -647,12 +647,30 @@ fn parse_command(body: &str) -> Result<ControlCommand, CommandParseError> {
                     ));
                 }
             };
+            // An optional line chooses the fixture's theme (#462).
+            let theme = match lines.next() {
+                None => crate::client_scenarios::ClockBenchmarkTheme::Normal,
+                Some("normal") => crate::client_scenarios::ClockBenchmarkTheme::Normal,
+                Some("christmas") => crate::client_scenarios::ClockBenchmarkTheme::Christmas,
+                Some("turning") => crate::client_scenarios::ClockBenchmarkTheme::Turning,
+                Some(_) => {
+                    return Err(invalid_mutation_request(
+                        "clock-benchmark's theme is normal, christmas or turning",
+                    ));
+                }
+            };
             if lines.next().is_some() {
                 return Err(invalid_mutation_request(
-                    "clock-benchmark accepts exactly one fixture line",
+                    "clock-benchmark accepts a fixture line and an optional theme line",
                 ));
             }
-            Ok(ControlCommand::ClockBenchmark(case))
+            Ok(ControlCommand::ClockBenchmark(
+                crate::client_scenarios::ClockBenchmarkConfig {
+                    case,
+                    theme,
+                    ..Default::default()
+                },
+            ))
         }
         Some(command) => Err(CommandParseError::Legacy(format!(
             "unknown command {command:?}"
@@ -1070,10 +1088,12 @@ fn handle_request(
                     .error("render-trace requires the LinuxKMS kiosk build");
             }
         }
-        ControlCommand::ClockBenchmark(case) => {
+        ControlCommand::ClockBenchmark(fixture) => {
             if window.get_launcher_visible()
                 || window.get_launcher_busy()
-                || !scenario_controls.borrow_mut().request_clock_benchmark(case)
+                || !scenario_controls
+                    .borrow_mut()
+                    .request_clock_benchmark(fixture)
             {
                 request
                     .response
@@ -1991,23 +2011,56 @@ mod tests {
     }
 
     #[test]
-    fn clock_benchmark_parser_accepts_only_one_known_fixture() {
-        use crate::client_scenarios::ClockBenchmarkCase;
-        for (name, expected) in [
-            ("idle", ClockBenchmarkCase::Idle),
-            ("rain", ClockBenchmarkCase::Rain),
-            ("aquarium", ClockBenchmarkCase::Aquarium),
+    fn clock_benchmark_parser_accepts_only_one_known_fixture_and_theme() {
+        use crate::client_scenarios::{ClockBenchmarkCase, ClockBenchmarkTheme};
+        for (body, case, theme) in [
+            (
+                "idle\n",
+                ClockBenchmarkCase::Idle,
+                ClockBenchmarkTheme::Normal,
+            ),
+            (
+                "rain\n",
+                ClockBenchmarkCase::Rain,
+                ClockBenchmarkTheme::Normal,
+            ),
+            (
+                "aquarium\n",
+                ClockBenchmarkCase::Aquarium,
+                ClockBenchmarkTheme::Normal,
+            ),
+            (
+                "idle\nnormal\n",
+                ClockBenchmarkCase::Idle,
+                ClockBenchmarkTheme::Normal,
+            ),
+            (
+                "rain\nchristmas\n",
+                ClockBenchmarkCase::Rain,
+                ClockBenchmarkTheme::Christmas,
+            ),
+            (
+                "aquarium\nturning\n",
+                ClockBenchmarkCase::Aquarium,
+                ClockBenchmarkTheme::Turning,
+            ),
         ] {
-            assert!(matches!(
-                parse_command(&format!("host clock-benchmark\n{name}\n")),
-                Ok(ControlCommand::ClockBenchmark(case)) if case == expected
-            ));
+            assert!(
+                matches!(
+                    parse_command(&format!("host clock-benchmark\n{body}")),
+                    Ok(ControlCommand::ClockBenchmark(fixture))
+                        if fixture.case == case && fixture.theme == theme
+                ),
+                "{body:?}"
+            );
         }
         for body in [
             "host clock-benchmark\n",
             "host clock-benchmark\nfalling\n",
             "host clock-benchmark\nRAIN\n",
             "host clock-benchmark\nrain\nstatus\n",
+            "host clock-benchmark\nrain\nCHRISTMAS\n",
+            "host clock-benchmark\nrain\nchristmas\nstatus\n",
         ] {
             assert!(parse_command(body).is_err(), "{body:?}");
         }

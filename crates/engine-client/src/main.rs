@@ -174,6 +174,11 @@ struct Args {
     #[arg(long, default_value = "clock-wave", value_parser = parse_clock_benchmark_recipe)]
     clock_benchmark_recipe: engine_common::ClockMarqueePreset,
 
+    /// The Clock fixture's theme, independent of saved settings: normal,
+    /// christmas, or turning between them, fading on every frame.
+    #[arg(long, value_enum, default_value = "normal")]
+    clock_benchmark_theme: client_scenarios::ClockBenchmarkTheme,
+
     /// Optional CSV file path for --benchmark-headless output.
     #[arg(long)]
     benchmark_report: Option<PathBuf>,
@@ -324,6 +329,7 @@ impl Args {
             clock: client_scenarios::ClockBenchmarkConfig {
                 case: self.clock_benchmark_case,
                 marquee_preset: self.clock_benchmark_recipe,
+                theme: self.clock_benchmark_theme,
             },
         }
     }
@@ -3118,6 +3124,7 @@ mod tests {
             benchmark_height: 720,
             clock_benchmark_case: client_scenarios::ClockBenchmarkCase::Idle,
             clock_benchmark_recipe: engine_common::ClockMarqueePreset::ClockWave,
+            clock_benchmark_theme: client_scenarios::ClockBenchmarkTheme::Normal,
             benchmark_report: None,
             pizza_benchmark_balls: scenario_pizza::DEFAULT_BENCHMARK_BALLS,
             pizza_benchmark_backend: PizzaBenchmarkBackendArg::Rapier,

@@ -32,8 +32,8 @@ SCRIPT_OPTIONS="-l --list -s --scenario -d --debug -p --profile -n --no-build -b
 CLIENT_FLAGS="--dev --debug-render --benchmark --benchmark-headless --fullscreen --windowed --kiosk --touch-test"
 CLIENT_VALUE_OPTIONS="--seed --rom --debug-triangles --benchmark-seconds --benchmark-warmup-seconds
     --benchmark-width --benchmark-height --clock-benchmark-case --clock-benchmark-recipe
-    --benchmark-report --pizza-benchmark-balls --pizza-benchmark-backend --pizza-benchmark-gravity
-    --pizza-benchmark-workload --config-dir --renderer --raster-scale"
+    --clock-benchmark-theme --benchmark-report --pizza-benchmark-balls --pizza-benchmark-backend
+    --pizza-benchmark-gravity --pizza-benchmark-workload --config-dir --renderer --raster-scale"
 
 usage() {
     cat <<'USAGE'

@@ -389,6 +389,10 @@ enum HostCommand {
     ClockBenchmark {
         #[arg(value_parser = ["idle", "rain", "aquarium"])]
         fixture: String,
+        /// The fixture's theme; turning changes between Christmas and Normal,
+        /// fading on every frame.
+        #[arg(long, default_value = "normal", value_parser = ["normal", "christmas", "turning"])]
+        theme: String,
         #[arg(long, default_value = "3s", value_parser = parse_timeout)]
         timeout: Duration,
     },
@@ -671,13 +675,26 @@ fn run() -> Result<(), CliError> {
             Ok(())
         }
         Command::Host {
-            command: HostCommand::ClockBenchmark { fixture, timeout },
-        } => request_benchmark_command(
-            &client,
-            timeout,
-            &format!("host clock-benchmark\n{fixture}\n"),
-        )
-        .map_err(human_error),
+            command:
+                HostCommand::ClockBenchmark {
+                    fixture,
+                    theme,
+                    timeout,
+                },
+        } => {
+            request_benchmark_command(&client, timeout, &clock_benchmark_request(&fixture, &theme))
+                .map_err(human_error)
+        }
+    }
+}
+
+/// Normal sends no theme line, so a client from before themes still accepts
+/// the request.
+fn clock_benchmark_request(fixture: &str, theme: &str) -> String {
+    if theme == "normal" {
+        format!("host clock-benchmark\n{fixture}\n")
+    } else {
+        format!("host clock-benchmark\n{fixture}\n{theme}\n")
     }
 }
 
@@ -992,7 +1009,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_only_explicit_clock_benchmark_fixtures() {
+    fn parses_only_explicit_clock_benchmark_fixtures_and_themes() {
         for expected in ["idle", "rain", "aquarium"] {
             let args = Args::try_parse_from([
                 "spacewars-cli",
@@ -1004,8 +1021,24 @@ mod tests {
             ])
             .unwrap();
             assert!(matches!(args.command,
-                Command::Host { command: HostCommand::ClockBenchmark { fixture, timeout } }
-                    if fixture == expected && timeout == Duration::from_secs(10)
+                Command::Host { command: HostCommand::ClockBenchmark { fixture, theme, timeout } }
+                    if fixture == expected && theme == "normal"
+                        && timeout == Duration::from_secs(10)
+            ));
+        }
+        for expected in ["normal", "christmas", "turning"] {
+            let args = Args::try_parse_from([
+                "spacewars-cli",
+                "host",
+                "clock-benchmark",
+                "rain",
+                "--theme",
+                expected,
+            ])
+            .unwrap();
+            assert!(matches!(args.command,
+                Command::Host { command: HostCommand::ClockBenchmark { theme, .. } }
+                    if theme == expected
             ));
         }
         for invalid in ["falling", "RAIN", "idle\nstatus", ""] {
@@ -1014,7 +1047,28 @@ mod tests {
                     .is_err()
             );
         }
+        for invalid in ["Christmas", "halloween", "christmas\nstatus", ""] {
+            assert!(
+                Args::try_parse_from([
+                    "spacewars-cli",
+                    "host",
+                    "clock-benchmark",
+                    "rain",
+                    "--theme",
+                    invalid
+                ])
+                .is_err()
+            );
+        }
         assert!(Args::try_parse_from(["spacewars-cli", "host", "clock-benchmark"]).is_err());
+        assert_eq!(
+            clock_benchmark_request("rain", "normal"),
+            "host clock-benchmark\nrain\n"
+        );
+        assert_eq!(
+            clock_benchmark_request("idle", "christmas"),
+            "host clock-benchmark\nidle\nchristmas\n"
+        );
     }
 
     #[test]
