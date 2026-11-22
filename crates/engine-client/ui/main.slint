@@ -9,6 +9,8 @@ export enum SettingsRowKind { choice, switch, page, heading }
 // heading names the rows below it. A playable row ends in a Play button.
 // Headings are shorter than rows, so each row says how many come before it.
 export struct SettingsListRow { id: string, label: string, value: string, help: string, kind: SettingsRowKind, playable: bool, enabled: bool, headings-before: int }
+// A menu's pages of the Clock's settings: the top page, Look and Events.
+export struct ClockMenuPages { top: [SettingsListRow], look: [SettingsListRow], events: [SettingsListRow] }
 export struct ScoreboardRow { player: string, controller: string, wins: string, losses: string, draws: string, won: bool }
 export struct TrainingPoint { best: float, median: float }
 
@@ -444,7 +446,10 @@ component SettingsListItem inherits Rectangle {
     callback play();
     property <bool> choice: root.item.kind == SettingsRowKind.choice;
     property <bool> switch: root.item.kind == SettingsRowKind.switch;
-    property <length> label-width: Math.min(self.width * 0.42, 190px);
+    // On a narrow row the label gives way, so that a choice keeps 99 px for
+    // its value between its arrows: room for Marquee's Text ribbon beside a
+    // Play button. Rows without Play are too wide for this to change them.
+    property <length> label-width: Math.min(Math.min(self.width * 0.42, 190px), root.value-end - 199px);
     // The value's room ends before the Play button, where there is one.
     property <length> value-end: root.item.playable ? self.width - 61px : self.width;
 
@@ -930,7 +935,6 @@ export component MainWindow inherits Window {
     in property <bool> pizza-event-can-trigger: false;
     in property <string> pizza-event-status;
     callback ingame-pizza-gravity();
-    in-out property <string> launcher-clock-time-format: "24-hour";
     in-out property <bool> clock-fonts-visible: false;
     in-out property <int> clock-font-focus: 0;
     in-out property <int> clock-font-selected: 0;
@@ -942,33 +946,6 @@ export component MainWindow inherits Window {
     in property <[image]> clock-font-previews;
     callback clock-fonts-open();
     callback clock-font-activate(int);
-    in-out property <bool> launcher-clock-show-date: false;
-    in-out property <string> launcher-clock-event-profile: "Calm";
-    in-out property <bool> launcher-clock-falling-enabled: true;
-    in-out property <bool> launcher-clock-color-cycle-enabled: true;
-    in-out property <bool> launcher-clock-meltdown-enabled: true;
-    in-out property <bool> launcher-clock-duck-enabled: true;
-    in-out property <bool> launcher-clock-crow-enabled: true;
-    in-out property <string> launcher-clock-crow-water-tolerance: "Varied";
-    in-out property <string> launcher-clock-lamps: "Lively";
-    in-out property <string> launcher-clock-theme: "Auto";
-    // What Auto does, shown while Theme is selected (#458, #461).
-    property <string> clock-theme-help: "Auto: Christmas on December nights, 6 pm to 6 am.";
-    in-out property <bool> launcher-clock-explosion-enabled: true;
-    in-out property <bool> launcher-clock-aquarium-enabled: true;
-    in-out property <bool> launcher-clock-marquee-enabled: true;
-    in-out property <bool> launcher-clock-digit-slide-enabled: true;
-    in-out property <bool> launcher-clock-cell-swap-enabled: true;
-    in-out property <bool> launcher-clock-grass-enabled: true;
-    in-out property <bool> launcher-clock-slot-machine-enabled: true;
-    in-out property <bool> launcher-clock-spider-enabled: true;
-    in-out property <bool> launcher-clock-coins-enabled: true;
-    in-out property <bool> launcher-clock-tanks-enabled: true;
-    in-out property <bool> launcher-clock-rain-enabled: true;
-    in-out property <string> launcher-clock-rain-amount: "Varied";
-    in-out property <string> launcher-clock-marquee-preset: "Random";
-    // Settings/CLI only for now; retained when other menu settings are saved.
-    in-out property <string> launcher-clock-marquee-message: "SPACE WARS";
     in-out property <string> launcher-nes-rom-id: "";
     in-out property <string> launcher-nes-rom-name: "No cartridges found";
     in-out property <string> launcher-nes-rom-status: "Copy a .nes file into the ROM library.";
@@ -1014,15 +991,17 @@ export component MainWindow inherits Window {
     callback ingame-resume();
     callback ingame-clock-open();
     // The Clock's settings pages: which one shows, "top", "look" or "events",
-    // each page's rows, and what a row's ‹ ›, a tap on it, its Play button,
-    // and Back ask for.
+    // each menu's pages, Clock Controls' and the launcher's, and what a row's
+    // ‹ ›, a tap on it, its Play button, and Back ask for.
     in property <string> clock-menu-page: "top";
-    in property <[SettingsListRow]> clock-menu-top-rows;
-    in property <[SettingsListRow]> clock-menu-look-rows;
-    in property <[SettingsListRow]> clock-menu-events-rows;
-    out property <[SettingsListRow]> clock-menu-rows: root.clock-menu-page == "look" ? root.clock-menu-look-rows
-        : root.clock-menu-page == "events" ? root.clock-menu-events-rows
-        : root.clock-menu-top-rows;
+    in property <ClockMenuPages> clock-menu-pause;
+    in property <ClockMenuPages> clock-menu-launcher;
+    property <ClockMenuPages> clock-menu-pages: root.launcher-visible ? root.clock-menu-launcher : root.clock-menu-pause;
+    out property <[SettingsListRow]> clock-menu-rows: root.clock-menu-page == "look" ? root.clock-menu-pages.look
+        : root.clock-menu-page == "events" ? root.clock-menu-pages.events
+        : root.clock-menu-pages.top;
+    // What the launcher's Clock card says of its settings.
+    in property <string> clock-menu-summary;
     callback clock-menu-adjust(int, int);
     callback clock-menu-activate(int);
     callback clock-menu-play(int);
@@ -1969,10 +1948,14 @@ export component MainWindow inherits Window {
             MenuPage {
                 available-width: parent.width; available-height: parent.height;
                 private property <bool> show-save-error: root.settings-save-error != "" && !root.launcher-controls-visible && !root.launcher-settings-visible;
-                // Scenario-specific forms retain their existing geometry in this pass.
-                height: Math.min(parent.height - 24px, root.launcher-controls-visible || root.launcher-settings-visible ? 440px : root.width < 600px ? 580px : 520px);
+                // The Clock's pages fit their rows, as Clock Controls do: up to
+                // the full height in portrait and 520 px in landscape. Other
+                // scenarios' forms keep their own geometry.
+                private property <bool> clock-settings: root.launcher-settings-visible && root.launcher-scenario == "clock";
+                height: self.clock-settings ? Math.min(root.height > root.width ? parent.height - 24px : Math.min(parent.height - 24px, 520px), 184px + root.clock-menu-list-height)
+                    : Math.min(parent.height - 24px, root.launcher-controls-visible || root.launcher-settings-visible ? 440px : root.width < 600px ? 580px : 520px);
                 heading: root.launcher-settings-visible ? "Scenario Settings" : root.launcher-controls-visible ? "Controls" : "Space-Wars";
-                subtitle: root.launcher-error-text != "" ? root.launcher-error-text : self.show-save-error ? "Save failed. Retry Save in App Settings." : root.launcher-settings-visible && root.launcher-material-match ? "World seed: " + root.launcher-seed-text : root.launcher-settings-visible && root.launcher-scenario == "clock" && root.launcher-settings-focus-index == 24 ? root.clock-theme-help : root.launcher-controls-visible || root.launcher-settings-visible ? root.launcher-scenario-title : root.autostart-caption != "" ? root.autostart-caption : "Choose a scenario";
+                subtitle: root.launcher-error-text != "" ? root.launcher-error-text : self.show-save-error ? "Save failed. Retry Save in App Settings." : root.launcher-settings-visible && root.launcher-material-match ? "World seed: " + root.launcher-seed-text : self.clock-settings && root.clock-menu-page != "top" ? root.launcher-scenario-title + (root.clock-menu-page == "look" ? " › Look" : " › Events") : root.launcher-controls-visible || root.launcher-settings-visible ? root.launcher-scenario-title : root.autostart-caption != "" ? root.autostart-caption : "Choose a scenario";
                 error: root.launcher-error-text != "" || self.show-save-error;
                 hint: root.launcher-controls-visible || root.launcher-settings-visible ? "" : root.launcher-focus-index == 0 ? (self.width < 600px ? "Left / Right browse · A confirm" : "Left / Right browse · A / Enter confirm · Start plays") : self.width < 600px ? "D-pad move · A select · Tap to choose" : "D-pad / arrows move · A / Enter selects · Tap to choose";
 
@@ -2040,7 +2023,7 @@ export component MainWindow inherits Window {
                             height: 32px;
                             wrap: word-wrap;
                             overflow: elide;
-                            text: root.launcher-material-travel ? "Choose planet · travel · land · claim · recover · depart" : root.launcher-scenario == "spacewars-terrain-jetpack" ? "Exit · fly over the ship · claim · cross back and board" : root.launcher-scenario == "spacewars-terrain-duel" ? (root.launcher-combat-mission == "Capture" ? "P1: capture and depart · P2: intercept" : "Physical dogfight · pod landing · rebuild and return") : root.launcher-scenario == "spacewars-terrain-combat" ? (root.launcher-combat-mission == "Capture" ? "Intercept P2 as it lands, captures and departs" : "Laser and cannon · destructible ground · recover and rejoin") : root.launcher-scenario == "spacewars-terrain-recovery" ? "Ship loss, pod landing, rebuilding and departure" : root.launcher-scenario == "spacewars-terrain-ai" ? "Fast circuit, brake, land and claim · watch P2 goals" : root.launcher-scenario == "spacewars-terrain" ? "Physical landing · surface flags · mining · ship recovery" : root.launcher-material-match ? ("P1 " + root.launcher-p1-controller + "  ·  P2 " + root.launcher-p2-controller + "  ·  Pilot death ends the round") : root.launcher-classic-spacewars ? (root.launcher-spacewars-preset + "  ·  health " + root.launcher-player-health-text + "%  ·  planets " + root.launcher-use-planets + "  ·  asteroids " + root.launcher-asteroids-enabled + "  ·  P2 " + root.launcher-p2-controller) : root.launcher-scenario == "pizza" ? (root.launcher-pizza-desired-balls-text + " balls  ·  spawn rate " + root.launcher-pizza-spawn-rate-text) : root.launcher-scenario == "clock" ? (root.launcher-clock-time-format + "  ·  local time  ·  " + root.launcher-clock-event-profile + " events") : root.launcher-scenario == "falling" ? "256×224 native video  ·  bounded 48 kHz audio" : root.launcher-scenario == "nes" ? (root.launcher-nes-rom-name + "  ·  " + root.launcher-nes-rom-status) : root.launcher-surface-comparison ? (root.launcher-expedition-players + " player(s)  ·  Land, walk, mine and rebuild  ·  Collision outlines") : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain") ? (root.launcher-expedition-players + " player(s)  ·  shared Surface V1 world  ·  no weapons") : "A semi-interactive mechanics scenario";
+                            text: root.launcher-material-travel ? "Choose planet · travel · land · claim · recover · depart" : root.launcher-scenario == "spacewars-terrain-jetpack" ? "Exit · fly over the ship · claim · cross back and board" : root.launcher-scenario == "spacewars-terrain-duel" ? (root.launcher-combat-mission == "Capture" ? "P1: capture and depart · P2: intercept" : "Physical dogfight · pod landing · rebuild and return") : root.launcher-scenario == "spacewars-terrain-combat" ? (root.launcher-combat-mission == "Capture" ? "Intercept P2 as it lands, captures and departs" : "Laser and cannon · destructible ground · recover and rejoin") : root.launcher-scenario == "spacewars-terrain-recovery" ? "Ship loss, pod landing, rebuilding and departure" : root.launcher-scenario == "spacewars-terrain-ai" ? "Fast circuit, brake, land and claim · watch P2 goals" : root.launcher-scenario == "spacewars-terrain" ? "Physical landing · surface flags · mining · ship recovery" : root.launcher-material-match ? ("P1 " + root.launcher-p1-controller + "  ·  P2 " + root.launcher-p2-controller + "  ·  Pilot death ends the round") : root.launcher-classic-spacewars ? (root.launcher-spacewars-preset + "  ·  health " + root.launcher-player-health-text + "%  ·  planets " + root.launcher-use-planets + "  ·  asteroids " + root.launcher-asteroids-enabled + "  ·  P2 " + root.launcher-p2-controller) : root.launcher-scenario == "pizza" ? (root.launcher-pizza-desired-balls-text + " balls  ·  spawn rate " + root.launcher-pizza-spawn-rate-text) : root.launcher-scenario == "clock" ? root.clock-menu-summary : root.launcher-scenario == "falling" ? "256×224 native video  ·  bounded 48 kHz audio" : root.launcher-scenario == "nes" ? (root.launcher-nes-rom-name + "  ·  " + root.launcher-nes-rom-status) : root.launcher-surface-comparison ? (root.launcher-expedition-players + " player(s)  ·  Land, walk, mine and rebuild  ·  Collision outlines") : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain") ? (root.launcher-expedition-players + " player(s)  ·  shared Surface V1 world  ·  no weapons") : "A semi-interactive mechanics scenario";
                             color: #9fb4cc;
                             font-size: 14px;
                         }
@@ -2156,11 +2139,12 @@ export component MainWindow inherits Window {
                     height: parent.height - 88px;
                     background: #00000000;
 
+                    // The Clock lists these two among its own rows.
                     ChoiceRow {
-                        visible: root.launcher-scenario != "falling" && root.launcher-scenario != "nes";
+                        visible: root.launcher-scenario != "falling" && root.launcher-scenario != "nes" && root.launcher-scenario != "clock";
                         x: 0px;
                         y: 0px;
-                        width: root.launcher-spacewars-settings || root.launcher-scenario == "clock" ? (parent.width - 12px) / 2 : parent.width;
+                        width: root.launcher-spacewars-settings ? (parent.width - 12px) / 2 : parent.width;
                         height: 48px;
                         label: root.raster-only ? "Renderer (fixed)" : "Renderer";
                         enabled: !root.raster-only;
@@ -2177,10 +2161,10 @@ export component MainWindow inherits Window {
                     }
 
                     ChoiceRow {
-                        visible: root.launcher-scenario != "falling" && root.launcher-scenario != "nes";
-                        x: root.launcher-spacewars-settings || root.launcher-scenario == "clock" ? parent.width / 2 + 6px : 0px;
-                        y: root.launcher-spacewars-settings || root.launcher-scenario == "clock" ? 0px : 52px;
-                        width: root.launcher-spacewars-settings || root.launcher-scenario == "clock" ? (parent.width - 12px) / 2 : parent.width;
+                        visible: root.launcher-scenario != "falling" && root.launcher-scenario != "nes" && root.launcher-scenario != "clock";
+                        x: root.launcher-spacewars-settings ? parent.width / 2 + 6px : 0px;
+                        y: root.launcher-spacewars-settings ? 0px : 52px;
+                        width: root.launcher-spacewars-settings ? (parent.width - 12px) / 2 : parent.width;
                         height: 48px;
                         label: "Raster Scale";
                         value: root.launcher-raster-scale-text + "×";
@@ -2406,270 +2390,44 @@ export component MainWindow inherits Window {
                         }
                     }
 
-                    // Keep Clock's settings in a conditional item tree, like
-                    // its live controls, to bound the root initializer stack.
-                    if root.launcher-scenario == "clock": Rectangle {
+                    // The Clock's settings, one page at a time as Clock
+                    // Controls show them, with Back after the page's rows in
+                    // the focus order and Start Game beside it. A conditional
+                    // item tree keeps these controls out of the large root
+                    // initializer.
+                    if root.launcher-scenario == "clock": clock-settings-page := Rectangle {
+                        x: 0px;
+                        y: 0px;
                         width: parent.width;
                         height: parent.height;
                         background: transparent;
+                        property <int> rows: root.clock-menu-rows.length;
+                        property <int> focused: root.launcher-settings-focus-index;
 
-                        // Time, Date, the lamps, the theme and fonts share the
-                        // row as five buttons, so each shows its value whole on
-                        // the portrait panel too.
-                        MenuButton {
+                        SettingsList {
                             x: 0px;
-                            y: 52px;
-                            width: (parent.width - 32px) / 5;
-                            height: 48px;
-                            text-size: parent.width < 500px ? 13px : 16px;
-                            text-padding: 2px;
-                            text: "Time\n" + root.launcher-clock-time-format;
-                            selected: root.launcher-settings-focus-index == 2;
-                            activated => { root.launcher-settings-focus-index = 2; root.ui-action(3); }
+                            y: 0px;
+                            width: parent.width;
+                            height: parent.height - 96px;
+                            rows: root.clock-menu-rows;
+                            focus-index: clock-settings-page.focused;
+                            previous(index) => { root.clock-menu-adjust(index, -1); }
+                            next(index) => { root.clock-menu-adjust(index, 1); }
+                            activated(index) => { root.clock-menu-activate(index); }
                         }
-                        MenuButton {
-                            x: (parent.width + 8px) / 5;
-                            y: 52px;
-                            width: (parent.width - 32px) / 5;
-                            height: 48px;
-                            text-size: parent.width < 500px ? 13px : 16px;
-                            text-padding: 2px;
-                            text: "Date\n" + (root.launcher-clock-show-date ? "On" : "Off");
-                            selected: root.launcher-settings-focus-index == 12;
-                            activated => { root.launcher-settings-focus-index = 12; root.ui-action(3); }
-                        }
-                        MenuButton {
-                            x: 2 * (parent.width + 8px) / 5;
-                            y: 52px;
-                            width: (parent.width - 32px) / 5;
-                            height: 48px;
-                            text-size: parent.width < 500px ? 13px : 16px;
-                            text-padding: 2px;
-                            text: "Lamps\n" + root.launcher-clock-lamps;
-                            selected: root.launcher-settings-focus-index == 23;
-                            activated => { root.launcher-settings-focus-index = 23; root.ui-action(3); }
-                        }
-                        MenuButton {
-                            x: 3 * (parent.width + 8px) / 5;
-                            y: 52px;
-                            width: (parent.width - 32px) / 5;
-                            height: 48px;
-                            text-size: parent.width < 500px ? 13px : 16px;
-                            text-padding: 2px;
-                            text: "Theme\n" + root.launcher-clock-theme;
-                            selected: root.launcher-settings-focus-index == 24;
-                            activated => { root.launcher-settings-focus-index = 24; root.ui-action(3); }
-                        }
-                        MenuButton {
-                            x: 4 * (parent.width + 8px) / 5;
-                            y: 52px;
-                            width: (parent.width - 32px) / 5;
-                            height: 48px;
-                            text-size: parent.width < 500px ? 13px : 16px;
-                            text-padding: 2px;
-                            text: "Fonts";
-                            selected: root.launcher-settings-focus-index == 15;
-                            activated => { root.clock-fonts-open(); }
-                        }
-
-                        MenuButton {
+                        Text {
                             x: 0px;
-                            y: 104px;
-                            width: (parent.width - 40px) / 6;
-                            height: 48px;
-                            text-size: parent.width < 500px ? 13px : 16px;
-                            text-padding: 4px;
-                            text: "Events\n" + root.launcher-clock-event-profile;
-                            selected: root.launcher-settings-focus-index == 4;
-                            activated => {
-                                root.launcher-settings-focus-index = 4;
-                                root.ui-action(3);
-                            }
+                            y: parent.height - 90px;
+                            width: parent.width;
+                            height: 36px;
+                            text: clock-settings-page.focused < clock-settings-page.rows ? root.clock-menu-rows[clock-settings-page.focused].help
+                                : root.clock-menu-page == "top" ? "Back to the launcher." : "Back to Scenario Settings.";
+                            color: #80d8ff;
+                            font-size: 13px;
+                            wrap: word-wrap;
+                            overflow: elide;
+                            vertical-alignment: center;
                         }
-                        MenuButton {
-                            x: (parent.width + 8px) / 6;
-                            y: 104px;
-                            width: (parent.width - 40px) / 6;
-                            height: 48px;
-                            text-size: parent.width < 500px ? 13px : 16px;
-                            text-padding: 4px;
-                            text: "Rain\n" + (root.launcher-clock-rain-enabled ? root.launcher-clock-rain-amount : "Off");
-                            selected: root.launcher-settings-focus-index == 11;
-                            activated => { root.launcher-settings-focus-index = 11; root.ui-action(3); }
-                        }
-                        MenuButton {
-                            x: 2 * (parent.width + 8px) / 6;
-                            y: 104px;
-                            width: (parent.width - 40px) / 6;
-                            height: 48px;
-                            text-size: parent.width < 500px ? 13px : 16px;
-                            text-padding: 4px;
-                            text: "Digit Slide\n" + (root.launcher-clock-digit-slide-enabled ? "On" : "Off");
-                            selected: root.launcher-settings-focus-index == 3;
-                            activated => { root.launcher-settings-focus-index = 3; root.ui-action(3); }
-                        }
-                        MenuButton {
-                            x: 3 * (parent.width + 8px) / 6;
-                            y: 104px;
-                            width: (parent.width - 40px) / 6;
-                            height: 48px;
-                            text-size: parent.width < 500px ? 13px : 16px;
-                            text-padding: 4px;
-                            text: "Spider\n" + (root.launcher-clock-spider-enabled ? "On" : "Off");
-                            selected: root.launcher-settings-focus-index == 20;
-                            activated => { root.launcher-settings-focus-index = 20; root.ui-action(3); }
-                        }
-                        MenuButton {
-                            x: 4 * (parent.width + 8px) / 6;
-                            y: 104px;
-                            width: (parent.width - 40px) / 6;
-                            height: 48px;
-                            text-size: parent.width < 500px ? 13px : 16px;
-                            text-padding: 4px;
-                            text: "Coins\n" + (root.launcher-clock-coins-enabled ? "On" : "Off");
-                            selected: root.launcher-settings-focus-index == 21;
-                            activated => { root.launcher-settings-focus-index = 21; root.ui-action(3); }
-                        }
-
-                        MenuButton {
-                            x: 5 * (parent.width + 8px) / 6;
-                            y: 104px;
-                            width: (parent.width - 40px) / 6;
-                            height: 48px;
-                            text-size: parent.width < 500px ? 13px : 16px;
-                            text-padding: 4px;
-                            text: "Tanks\n" + (root.launcher-clock-tanks-enabled ? "On" : "Off");
-                            selected: root.launcher-settings-focus-index == 22;
-                            activated => { root.launcher-settings-focus-index = 22; root.ui-action(3); }
-                        }
-
-                        MenuButton {
-                            x: 0px;
-                            y: 156px;
-                            width: (parent.width - 32px) / 5;
-                            height: 48px;
-                            text: "Falling\n" + (root.launcher-clock-falling-enabled ? "On" : "Off");
-                            selected: root.launcher-settings-focus-index == 5;
-                            activated => { root.launcher-settings-focus-index = 5; root.ui-action(3); }
-                        }
-                        MenuButton {
-                            x: (parent.width + 8px) / 5;
-                            y: 156px;
-                            width: (parent.width - 32px) / 5;
-                            height: 48px;
-                            text: "Color Cycle\n" + (root.launcher-clock-color-cycle-enabled ? "On" : "Off");
-                            selected: root.launcher-settings-focus-index == 6;
-                            activated => { root.launcher-settings-focus-index = 6; root.ui-action(3); }
-                        }
-                        MenuButton {
-                            x: 2 * (parent.width + 8px) / 5;
-                            y: 156px;
-                            width: (parent.width - 32px) / 5;
-                            height: 48px;
-                            text: "Cell Swap\n" + (root.launcher-clock-cell-swap-enabled ? "On" : "Off");
-                            selected: root.launcher-settings-focus-index == 17;
-                            activated => { root.launcher-settings-focus-index = 17; root.ui-action(3); }
-                        }
-                        MenuButton {
-                            x: 3 * (parent.width + 8px) / 5;
-                            y: 156px;
-                            width: (parent.width - 32px) / 5;
-                            height: 48px;
-                            text: "Grass\n" + (root.launcher-clock-grass-enabled ? "On" : "Off");
-                            selected: root.launcher-settings-focus-index == 18;
-                            activated => { root.launcher-settings-focus-index = 18; root.ui-action(3); }
-                        }
-                        MenuButton {
-                            x: 4 * (parent.width + 8px) / 5;
-                            y: 156px;
-                            width: (parent.width - 32px) / 5;
-                            height: 48px;
-                            text: "Slot Machine\n" + (root.launcher-clock-slot-machine-enabled ? "On" : "Off");
-                            selected: root.launcher-settings-focus-index == 19;
-                            activated => { root.launcher-settings-focus-index = 19; root.ui-action(3); }
-                        }
-
-                        MenuButton {
-                            x: 0px;
-                            y: 208px;
-                            width: (parent.width - 32px) / 5;
-                            height: 48px;
-                            text: "Meltdown\n" + (root.launcher-clock-meltdown-enabled ? "On" : "Off");
-                            selected: root.launcher-settings-focus-index == 7;
-                            activated => {
-                                root.launcher-settings-focus-index = 7;
-                                root.ui-action(3);
-                            }
-                        }
-
-                        MenuButton {
-                            x: (parent.width + 8px) / 5;
-                            y: 208px;
-                            width: (parent.width - 32px) / 5;
-                            height: 48px;
-                            text: "Duck\n" + (root.launcher-clock-duck-enabled ? "On" : "Off");
-                            selected: root.launcher-settings-focus-index == 8;
-                            activated => {
-                                root.launcher-settings-focus-index = 8;
-                                root.ui-action(3);
-                            }
-                        }
-
-                        MenuButton {
-                            x: 2 * (parent.width + 8px) / 5;
-                            y: 208px;
-                            width: (parent.width - 32px) / 5;
-                            height: 48px;
-                            text: "Crow\n" + (root.launcher-clock-crow-enabled ? root.launcher-clock-crow-water-tolerance : "Off");
-                            selected: root.launcher-settings-focus-index == 13;
-                            activated => { root.launcher-settings-focus-index = 13; root.ui-action(3); }
-                        }
-                        MenuButton {
-                            x: 3 * (parent.width + 8px) / 5;
-                            y: 208px;
-                            width: (parent.width - 32px) / 5;
-                            height: 48px;
-                            text: "Explosion\n" + (root.launcher-clock-explosion-enabled ? "On" : "Off");
-                            text-padding: 6px;
-                            selected: root.launcher-settings-focus-index == 14;
-                            activated => { root.launcher-settings-focus-index = 14; root.ui-action(3); }
-                        }
-
-                        MenuButton {
-                            x: 4 * (parent.width + 8px) / 5;
-                            y: 208px;
-                            width: (parent.width - 32px) / 5;
-                            height: 48px;
-                            text: "Aquarium\n" + (root.launcher-clock-aquarium-enabled ? "On" : "Off");
-                            text-padding: 6px;
-                            selected: root.launcher-settings-focus-index == 16;
-                            activated => { root.launcher-settings-focus-index = 16; root.ui-action(3); }
-                        }
-
-                        ChoiceRow {
-                            x: 0px;
-                            y: 260px;
-                            width: (parent.width - 12px) / 2;
-                            height: 48px;
-                            label: "Marquee";
-                            value: root.launcher-clock-marquee-enabled ? "On" : "Off";
-                            selected: root.launcher-settings-focus-index == 9;
-                            previous => { root.launcher-settings-focus-index = 9; root.ui-action(2); }
-                            next => { root.launcher-settings-focus-index = 9; root.ui-action(3); }
-                        }
-                        ChoiceRow {
-                            x: parent.width / 2 + 6px;
-                            y: 260px;
-                            width: (parent.width - 12px) / 2;
-                            height: 48px;
-                            label: "Recipe";
-                            label-fraction: 0.25;
-                            value: root.launcher-clock-marquee-preset;
-                            selected: root.launcher-settings-focus-index == 10;
-                            previous => { root.launcher-settings-focus-index = 10; root.ui-action(2); }
-                            next => { root.launcher-settings-focus-index = 10; root.ui-action(3); }
-                        }
-
                     }
 
                     ChoiceRow {
@@ -2784,19 +2542,23 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: 0px;
-                        y: root.launcher-scenario == "clock" ? 314px : root.launcher-material-combat || root.launcher-material-match ? 322px : root.launcher-material-travel ? 218px : root.launcher-scenario == "pizza" ? 322px : root.launcher-spacewars-settings ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "clock" ? parent.height - 44px : root.launcher-material-combat || root.launcher-material-match ? 322px : root.launcher-material-travel ? 218px : root.launcher-scenario == "pizza" ? 322px : root.launcher-spacewars-settings ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 25 : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 6 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? root.clock-menu-rows.length : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 6 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
                         activated => {
-                            root.launcher-settings-visible = false;
+                            if (root.launcher-scenario == "clock") {
+                                root.clock-menu-back();
+                            } else {
+                                root.launcher-settings-visible = false;
+                            }
                         }
                     }
 
                     MenuButton {
                         x: parent.width - 180px;
-                        y: root.launcher-scenario == "clock" ? 314px : root.launcher-material-combat || root.launcher-material-match ? 322px : root.launcher-material-travel ? 218px : root.launcher-scenario == "pizza" ? 322px : root.launcher-spacewars-settings ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "clock" ? parent.height - 44px : root.launcher-material-combat || root.launcher-material-match ? 322px : root.launcher-material-travel ? 218px : root.launcher-scenario == "pizza" ? 322px : root.launcher-spacewars-settings ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 180px;
                         height: 44px;
                         text: root.launcher-material-match ? "Play World" : "Start Game";

@@ -295,6 +295,8 @@ fn launcher_can_run_the_clock_menu_lifecycle() {
 
         state = harness.activate_guarded("launcher.settings", &state);
         assert_eq!(state.screen, UiScreen::LauncherSettings);
+        state = harness.activate_guarded("launcher.settings.clock.look", &state);
+        assert_eq!(state.screen, UiScreen::LauncherClockLook);
         assert_eq!(
             control_value(&state, "launcher.settings.clock.time-format.next"),
             Some("24-hour")
@@ -309,6 +311,9 @@ fn launcher_can_run_the_clock_menu_lifecycle() {
             control_value(&state, "launcher.settings.clock.time-format.next"),
             Some("24-hour")
         );
+        // Back goes up to the top page, then out of Scenario Settings.
+        state = harness.activate_guarded("launcher.settings.back", &state);
+        assert_eq!(state.screen, UiScreen::LauncherSettings);
         state = harness.activate_guarded("launcher.settings.back", &state);
         harness.capture_screenshot("clock-launcher.png");
 

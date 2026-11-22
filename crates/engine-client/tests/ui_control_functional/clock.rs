@@ -27,7 +27,7 @@ fn grass_admission_smoke(name: &'static str, renderer: &'static str) {
             control_value(&page, "launcher.settings.renderer.next"),
             Some(renderer)
         );
-        page = h.activate_guarded("launcher.settings.clock.event-profile.previous", &page);
+        page = h.activate_launcher_clock("launcher.settings.clock.event-profile.previous", &page);
         h.activate_guarded("launcher.settings.start", &page);
         h.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let initial = h.clock_state();
@@ -122,7 +122,7 @@ fn grass_progress(name: &'static str, renderer: &'static str) {
             control_value(&page, "launcher.settings.renderer.next"),
             Some(renderer)
         );
-        page = h.activate_guarded("launcher.settings.clock.event-profile.previous", &page);
+        page = h.activate_launcher_clock("launcher.settings.clock.event-profile.previous", &page);
         h.activate_guarded("launcher.settings.start", &page);
         h.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let initial = h.clock_state();
@@ -346,7 +346,7 @@ fn grass_shortage(name: &'static str, renderer: &'static str) {
             control_value(&page, "launcher.settings.renderer.next"),
             Some(renderer)
         );
-        page = h.activate_guarded("launcher.settings.clock.event-profile.previous", &page);
+        page = h.activate_launcher_clock("launcher.settings.clock.event-profile.previous", &page);
         h.activate_guarded("launcher.settings.start", &page);
         h.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let initial = h.clock_state();
@@ -405,10 +405,11 @@ fn cell_swap_preview_and_saved_switch_use_the_public_controls() {
         let page = h.wait_until_ready();
         let page = h.activate_until_scenario("clock", page);
         let page = h.activate_guarded("launcher.settings", &page);
-        let page = h.activate_guarded("launcher.settings.clock.event-profile.previous", &page);
-        let page = h.activate_guarded("launcher.settings.clock.cell-swap.next", &page);
+        let page =
+            h.activate_launcher_clock("launcher.settings.clock.event-profile.previous", &page);
+        let page = h.activate_launcher_clock("launcher.settings.clock.cell-swap", &page);
         assert_eq!(
-            control_value(&page, "launcher.settings.clock.cell-swap.next"),
+            control_value(&page, "launcher.settings.clock.cell-swap"),
             Some("Off")
         );
         h.activate_guarded("launcher.settings.start", &page);
@@ -474,11 +475,11 @@ fn aquarium_preview_pause_enablement_and_restart_use_the_public_ui() {
         let page = harness.wait_until_ready();
         let page = harness.activate_until_scenario("clock", page);
         let page = harness.activate_guarded("launcher.settings", &page);
-        let page =
-            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &page);
-        let page = harness.activate_guarded("launcher.settings.clock.aquarium.previous", &page);
+        let page = harness
+            .activate_launcher_clock("launcher.settings.clock.event-profile.previous", &page);
+        let page = harness.activate_launcher_clock("launcher.settings.clock.aquarium", &page);
         assert_eq!(
-            control_value(&page, "launcher.settings.clock.aquarium.next"),
+            control_value(&page, "launcher.settings.clock.aquarium"),
             Some("Off")
         );
         harness.capture_screenshot("aquarium-launcher-controls.png");
@@ -553,9 +554,9 @@ fn clock_fonts_save_live_choices_and_survive_restart() {
         let page = harness.wait_until_ready();
         let page = harness.activate_until_scenario("clock", page);
         let page = harness.activate_guarded("launcher.settings", &page);
-        let page =
-            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &page);
-        let page = harness.activate_guarded("launcher.settings.clock.fonts", &page);
+        let page = harness
+            .activate_launcher_clock("launcher.settings.clock.event-profile.previous", &page);
+        let page = harness.activate_launcher_clock("launcher.settings.clock.fonts", &page);
         assert_eq!(page.screen, UiScreen::LauncherClockFonts);
         let page = harness.activate_guarded("clock.fonts.select.sans", &page);
         let page = harness.activate_guarded("clock.fonts.pool.classic", &page);
@@ -579,7 +580,18 @@ fn clock_fonts_save_live_choices_and_survive_restart() {
         assert_eq!(page.screen, UiScreen::PauseClockFonts);
         let pending = harness.activate_guarded("clock.fonts.select.serif", &page);
         let page = harness.wait_clock_screen(UiScreen::PauseClockFonts, pending.revision);
-        let changed = harness.clock_state();
+        // UI enablement acknowledges the choice while its disk write may still
+        // be pending, so the comparison below starts once it is saved.
+        let deadline = Instant::now() + TRANSITION_TIMEOUT;
+        let changed = loop {
+            let current = harness.clock_state();
+            assert_eq!(current.settings_error, None);
+            if !current.settings_pending {
+                break current;
+            }
+            assert!(Instant::now() < deadline, "the font choice was not saved");
+            thread::sleep(Duration::from_millis(10));
+        };
         assert_eq!(changed.active_font, ClockFont::Serif);
         assert_eq!(changed.settings.fonts.selected, ClockFont::Serif);
         assert!(changed.paused);
@@ -622,11 +634,11 @@ fn explosion_controls_pause_recovery_and_restart_preserve_settings() {
         let state = harness.wait_until_ready();
         let state = harness.activate_until_scenario("clock", state);
         let state = harness.activate_guarded("launcher.settings", &state);
-        let state =
-            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
-        let state = harness.activate_guarded("launcher.settings.clock.explosion.previous", &state);
+        let state = harness
+            .activate_launcher_clock("launcher.settings.clock.event-profile.previous", &state);
+        let state = harness.activate_launcher_clock("launcher.settings.clock.explosion", &state);
         assert_eq!(
-            control_value(&state, "launcher.settings.clock.explosion.next"),
+            control_value(&state, "launcher.settings.clock.explosion"),
             Some("Off")
         );
         harness.activate_guarded("launcher.settings.start", &state);
@@ -688,9 +700,10 @@ fn crow_trigger_pause_settings_and_restart_preserve_the_resident_contract() {
         let state = harness.wait_until_ready();
         let state = harness.activate_until_scenario("clock", state);
         let state = harness.activate_guarded("launcher.settings", &state);
+        let state = harness
+            .activate_launcher_clock("launcher.settings.clock.event-profile.previous", &state);
         let state =
-            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
-        let state = harness.activate_guarded("launcher.settings.clock.crow.previous", &state);
+            harness.activate_launcher_clock("launcher.settings.clock.crow.previous", &state);
         assert_eq!(
             control_value(&state, "launcher.settings.clock.crow.next"),
             Some("Off")
@@ -786,11 +799,11 @@ fn digit_slide_controls_preview_cleanup_and_persistence() {
         let state = harness.wait_until_ready();
         let state = harness.activate_until_scenario("clock", state);
         let state = harness.activate_guarded("launcher.settings", &state);
-        let state =
-            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
-        let state = harness.activate_guarded("launcher.settings.clock.digit-slide.next", &state);
+        let state = harness
+            .activate_launcher_clock("launcher.settings.clock.event-profile.previous", &state);
+        let state = harness.activate_launcher_clock("launcher.settings.clock.digit-slide", &state);
         assert_eq!(
-            control_value(&state, "launcher.settings.clock.digit-slide.next"),
+            control_value(&state, "launcher.settings.clock.digit-slide"),
             Some("Off")
         );
         harness.capture_screenshot("clock-digit-slide-launcher.png");
@@ -881,7 +894,9 @@ fn marquee_preview_settings_and_recovery_smoke() {
         let page = h.wait_clock_screen(UiScreen::PauseClock, game.revision);
         let page = h.activate_guarded("pause.clock.events", &page);
         let page = h.change_clock_setting("pause.clock.event-profile.previous", "Off", &page);
-        h.change_clock_setting("pause.clock.marquee-preset.previous", "Text spin", &page);
+        // Before Random come Off and then Text spin, the last recipe.
+        let page = h.change_clock_setting("pause.clock.marquee.previous", "Off", &page);
+        h.change_clock_setting("pause.clock.marquee.previous", "Text spin", &page);
         let paused = h.clock_state();
         let configured = h.clock_message(&paused, "Smoke test");
         assert_eq!(configured.settings.marquee_message.as_str(), "SMOKE TEST");
@@ -913,34 +928,33 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         let state = harness.wait_until_ready();
         let state = harness.activate_until_scenario("clock", state);
         let mut state = harness.activate_guarded("launcher.settings", &state);
-        state = harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
-        state = harness.activate_guarded("launcher.settings.clock.marquee.next", &state);
+        state = harness
+            .activate_launcher_clock("launcher.settings.clock.event-profile.previous", &state);
         assert_eq!(
-            control_value(&state, "launcher.settings.clock.marquee-preset.next"),
+            control_value(&state, "launcher.settings.clock.marquee.next"),
             Some("Random")
         );
         harness.capture_screenshot("clock-marquee-random-launcher.png");
         // Launcher changes apply immediately; keep each returned revision for
         // the next guarded activation instead of waiting for live controls.
         for _ in 0..ClockMarqueePreset::ALL.len() {
-            assert_eq!(state.screen, UiScreen::LauncherSettings);
+            assert_eq!(state.screen, UiScreen::LauncherClockEvents);
             assert_eq!(state.error, None);
-            if control_value(&state, "launcher.settings.clock.marquee-preset.next")
-                == Some("Text ribbon")
+            if control_value(&state, "launcher.settings.clock.marquee.next") == Some("Text ribbon")
             {
                 break;
             }
-            state = harness.activate_guarded("launcher.settings.clock.marquee-preset.next", &state);
+            state = harness.activate_guarded("launcher.settings.clock.marquee.next", &state);
         }
         assert_eq!(
-            control_value(&state, "launcher.settings.clock.marquee-preset.next"),
+            control_value(&state, "launcher.settings.clock.marquee.next"),
             Some("Text ribbon")
         );
         harness.capture_screenshot("clock-marquee-launcher.png");
         harness.activate_guarded("launcher.settings.start", &state);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, state.revision);
         let initial = harness.clock_state();
-        assert!(!initial.settings.events.marquee);
+        assert!(initial.settings.events.marquee);
         assert_eq!(
             initial.settings.marquee_preset,
             ClockMarqueePreset::TextRibbon
@@ -967,8 +981,7 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         // controls and therefore legitimately change its revision.
         let page = harness.state();
         let page = harness.activate_guarded("pause.clock.events", &page);
-        let page =
-            harness.change_clock_setting("pause.clock.marquee-preset.next", "Text spin", &page);
+        let page = harness.change_clock_setting("pause.clock.marquee.next", "Text spin", &page);
         let configured = harness.clock_state();
         assert_eq!(
             configured.marquee.unwrap().preset,
@@ -994,9 +1007,10 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         harness.capture_screenshot("clock-marquee-recovered.png");
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
         let page = harness.wait_clock_screen(UiScreen::PauseClockEvents, gameplay.revision);
-        // Text spin immediately precedes Random; the live helper advances once
+        // After Text spin come Off and Random. The live helper advances once
         // and waits for the settings acknowledgement before returning.
-        let page = harness.change_clock_setting("pause.clock.marquee-preset.next", "Random", &page);
+        let page = harness.change_clock_setting("pause.clock.marquee.next", "Off", &page);
+        let page = harness.change_clock_setting("pause.clock.marquee.next", "Random", &page);
         assert_eq!(
             harness.clock_state().settings.marquee_preset,
             ClockMarqueePreset::Random
@@ -1066,10 +1080,10 @@ fn rain_settings_preview_pause_cleanup_and_persistence() {
         let state = harness.wait_until_ready();
         let state = harness.activate_until_scenario("clock", state);
         let state = harness.activate_guarded("launcher.settings", &state);
-        let mut state =
-            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
+        let mut state = harness
+            .activate_launcher_clock("launcher.settings.clock.event-profile.previous", &state);
         for _ in 0..3 {
-            state = harness.activate_guarded("launcher.settings.clock.rain.next", &state);
+            state = harness.activate_launcher_clock("launcher.settings.clock.rain.next", &state);
         }
         assert_eq!(
             control_value(&state, "launcher.settings.clock.rain.next"),
@@ -1257,7 +1271,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         let state = harness.activate_until_scenario("clock", state);
         let state = harness.activate_guarded("launcher.settings", &state);
         // This workflow checks explicit event IDs, not host wall-clock edges.
-        let state = harness.activate_guarded("launcher.settings.clock.digit-slide.next", &state);
+        let state = harness.activate_launcher_clock("launcher.settings.clock.digit-slide", &state);
         harness.activate_guarded("launcher.settings.start", &state);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, state.revision);
         let initial = harness.clock_state();
@@ -1285,10 +1299,11 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
             "spider",
             "coins",
             "tanks",
-            "marquee",
         ] {
             page = harness.change_clock_setting(&format!("pause.clock.{event}"), "Off", &page);
         }
+        // Off comes just before Random, Marquee's first recipe.
+        page = harness.change_clock_setting("pause.clock.marquee.previous", "Off", &page);
         assert_eq!(
             control_value(&page, "pause.clock.crow.next"),
             Some("Varied")
@@ -1439,33 +1454,28 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
         harness.activate_guarded("pause.return-to-launcher", &menu);
         let launcher = harness.wait_clock_screen(UiScreen::LauncherMain, menu.revision);
+        // The launcher's pages show what was saved.
         let page = harness.activate_guarded("launcher.settings", &launcher);
-        assert_eq!(
-            control_value(&page, "launcher.settings.clock.time-format.next"),
-            Some("12-hour")
-        );
-        assert_eq!(
-            control_value(&page, "launcher.settings.clock.event-profile.next"),
-            Some("Off")
-        );
-        assert_eq!(
-            control_value(&page, "launcher.settings.clock.show-date.next"),
-            Some("On")
-        );
-        assert_eq!(
-            control_value(&page, "launcher.settings.clock.grass.next"),
-            Some("Off")
-        );
-        assert_eq!(
-            control_value(&page, "launcher.settings.clock.lamps.next"),
-            Some("Steady")
-        );
-        assert_eq!(
-            control_value(&page, "launcher.settings.clock.theme.next"),
-            Some("Christmas")
-        );
-        harness.activate_guarded("launcher.settings.start", &page);
-        harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let look = harness.activate_guarded("launcher.settings.clock.look", &page);
+        for (id, value) in [
+            ("launcher.settings.clock.time-format.next", "12-hour"),
+            ("launcher.settings.clock.show-date", "On"),
+            ("launcher.settings.clock.lamps.next", "Steady"),
+            ("launcher.settings.clock.theme.next", "Christmas"),
+        ] {
+            assert_eq!(control_value(&look, id), Some(value), "{id}");
+        }
+        let page = harness.activate_guarded("launcher.settings.back", &look);
+        let events = harness.activate_guarded("launcher.settings.clock.events", &page);
+        for (id, value) in [
+            ("launcher.settings.clock.event-profile.next", "Off"),
+            ("launcher.settings.clock.grass", "Off"),
+            ("launcher.settings.clock.marquee.next", "Off"),
+        ] {
+            assert_eq!(control_value(&events, id), Some(value), "{id}");
+        }
+        harness.activate_guarded("launcher.settings.start", &events);
+        harness.wait_clock_screen(UiScreen::Gameplay, events.revision);
         let relaunched = harness.clock_state();
         assert_ne!(relaunched.scenario_revision, restarted.scenario_revision);
         assert_eq!(relaunched.settings, configured.settings);
@@ -1520,6 +1530,28 @@ impl FunctionalHarness {
         applied
     }
 
+    /// Presses a control in the launcher's Clock settings from whichever of
+    /// their pages shows, first opening the page that lists it.
+    fn activate_launcher_clock(&mut self, id: &str, state: &UiState) -> UiState {
+        let lists = |state: &UiState| state.controls.iter().any(|control| control.id == id);
+        let mut state = state.clone();
+        for page in [
+            "launcher.settings.clock.look",
+            "launcher.settings.clock.events",
+        ] {
+            if lists(&state) {
+                break;
+            }
+            if state.screen != UiScreen::LauncherSettings {
+                state = self.activate_guarded("launcher.settings.back", &state);
+            }
+            if !lists(&state) {
+                state = self.activate_guarded(page, &state);
+            }
+        }
+        self.activate_guarded(id, &state)
+    }
+
     /// Backs out of Clock Controls, from whichever page shows, to the pause
     /// menu.
     fn leave_clock_controls(&mut self, state: &UiState) -> UiState {
@@ -1542,6 +1574,7 @@ fn falling_digits_recover_and_survive_pause_restart_and_relaunch() {
         let state = harness.wait_until_ready();
         let state = harness.activate_until_scenario("clock", state);
         let state = harness.activate_guarded("launcher.settings", &state);
+        let state = harness.activate_guarded("launcher.settings.clock.events", &state);
         assert_eq!(
             control_value(&state, "launcher.settings.clock.event-profile.next"),
             Some("Calm")
@@ -1552,7 +1585,8 @@ fn falling_digits_recover_and_survive_pause_restart_and_relaunch() {
             control_value(&state, "launcher.settings.clock.event-profile.next"),
             Some("Off")
         );
-        let state = harness.activate_guarded("launcher.settings.clock.time-format.next", &state);
+        let state =
+            harness.activate_launcher_clock("launcher.settings.clock.time-format.next", &state);
         harness.capture_screenshot("clock-settings.png");
         harness.activate_guarded("launcher.settings.start", &state);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, state.revision);
@@ -1677,24 +1711,26 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
         let state = harness.wait_until_ready();
         let state = harness.activate_until_scenario("clock", state);
         let state = harness.activate_guarded("launcher.settings", &state);
-        let state = harness.activate_guarded("launcher.settings.clock.event-profile.next", &state);
+        let state =
+            harness.activate_launcher_clock("launcher.settings.clock.event-profile.next", &state);
         // Keep the periodic schedule test independent of when a real minute
         // rolls over. Time-change triggers are driven by injected core readings.
-        let state = harness.activate_guarded("launcher.settings.clock.digit-slide.next", &state);
+        let state = harness.activate_launcher_clock("launcher.settings.clock.digit-slide", &state);
         // This real-time UI smoke checks timed-event cadence. Resident-actor
         // scheduling/composition is covered at exact ticks in headless tests.
-        let state = harness.activate_guarded("launcher.settings.clock.duck.next", &state);
+        let state = harness.activate_launcher_clock("launcher.settings.clock.duck", &state);
         // Resident admissions consume a global ID but never occupy the active
         // timed slot. Keep exact-ID waits scoped to the timed catalog.
-        let state = harness.activate_guarded("launcher.settings.clock.crow.previous", &state);
+        let state =
+            harness.activate_launcher_clock("launcher.settings.clock.crow.previous", &state);
         assert_eq!(
             control_value(&state, "launcher.settings.clock.crow.next"),
             Some("Off")
         );
         // The spider is a resident visit too, in the run's arena.
-        let state = harness.activate_guarded("launcher.settings.clock.spider.next", &state);
+        let state = harness.activate_launcher_clock("launcher.settings.clock.spider", &state);
         assert_eq!(
-            control_value(&state, "launcher.settings.clock.spider.next"),
+            control_value(&state, "launcher.settings.clock.spider"),
             Some("Off")
         );
         assert_eq!(
@@ -1804,41 +1840,39 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
         let state = harness.wait_until_ready();
         let state = harness.activate_until_scenario("clock", state);
         let mut state = harness.activate_guarded("launcher.settings", &state);
-        state = harness.activate_guarded("launcher.settings.clock.event-profile.next", &state);
+        state =
+            harness.activate_launcher_clock("launcher.settings.clock.event-profile.next", &state);
         for id in [
-            "launcher.settings.clock.falling.next",
-            "launcher.settings.clock.color-cycle.next",
-            "launcher.settings.clock.meltdown.next",
-            "launcher.settings.clock.duck.next",
-            "launcher.settings.clock.explosion.next",
-            "launcher.settings.clock.aquarium.next",
-            "launcher.settings.clock.cell-swap.next",
-            "launcher.settings.clock.grass.next",
-            "launcher.settings.clock.marquee.next",
-            "launcher.settings.clock.digit-slide.next",
-            "launcher.settings.clock.slot-machine.next",
-            "launcher.settings.clock.spider.next",
-            "launcher.settings.clock.coins.next",
-            "launcher.settings.clock.tanks.next",
+            "launcher.settings.clock.falling",
+            "launcher.settings.clock.color-cycle",
+            "launcher.settings.clock.meltdown",
+            "launcher.settings.clock.duck",
+            "launcher.settings.clock.explosion",
+            "launcher.settings.clock.aquarium",
+            "launcher.settings.clock.cell-swap",
+            "launcher.settings.clock.grass",
+            "launcher.settings.clock.digit-slide",
+            "launcher.settings.clock.slot-machine",
+            "launcher.settings.clock.spider",
+            "launcher.settings.clock.coins",
+            "launcher.settings.clock.tanks",
         ] {
             assert_eq!(control_value(&state, id), Some("On"));
             state = harness.activate_guarded(id, &state);
             assert_eq!(control_value(&state, id), Some("Off"));
         }
-        assert_eq!(
-            control_value(&state, "launcher.settings.clock.crow.next"),
-            Some("Varied")
-        );
-        state = harness.activate_guarded("launcher.settings.clock.crow.previous", &state);
-        assert_eq!(
-            control_value(&state, "launcher.settings.clock.crow.next"),
-            Some("Off")
-        );
-        state = harness.activate_guarded("launcher.settings.clock.rain.previous", &state);
-        assert_eq!(
-            control_value(&state, "launcher.settings.clock.rain.next"),
-            Some("Off")
-        );
+        // Crow, Marquee and Rain are Off a step back from their first choice.
+        for (id, first) in [
+            ("crow", "Varied"),
+            ("marquee", "Random"),
+            ("rain", "Varied"),
+        ] {
+            let next = format!("launcher.settings.clock.{id}.next");
+            assert_eq!(control_value(&state, &next), Some(first), "{id}");
+            state =
+                harness.activate_guarded(&format!("launcher.settings.clock.{id}.previous"), &state);
+            assert_eq!(control_value(&state, &next), Some("Off"), "{id}");
+        }
         harness.capture_screenshot("clock-event-switches.png");
         harness.activate_guarded("launcher.settings.start", &state);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, state.revision);
@@ -1905,15 +1939,16 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             TRANSITION_TIMEOUT,
         );
         let settings = harness.activate_guarded("launcher.settings", &launcher);
+        let settings = harness.activate_guarded("launcher.settings.clock.events", &settings);
         for id in [
-            "launcher.settings.clock.falling.next",
-            "launcher.settings.clock.color-cycle.next",
-            "launcher.settings.clock.meltdown.next",
-            "launcher.settings.clock.duck.next",
+            "launcher.settings.clock.falling",
+            "launcher.settings.clock.color-cycle",
+            "launcher.settings.clock.meltdown",
+            "launcher.settings.clock.duck",
             "launcher.settings.clock.crow.next",
-            "launcher.settings.clock.explosion.next",
+            "launcher.settings.clock.explosion",
             "launcher.settings.clock.marquee.next",
-            "launcher.settings.clock.grass.next",
+            "launcher.settings.clock.grass",
         ] {
             assert_eq!(control_value(&settings, id), Some("Off"));
         }
@@ -2131,8 +2166,8 @@ fn meltdown_pools_drains_previews_and_cleans_up_through_the_real_client() {
         let state = harness.wait_until_ready();
         let state = harness.activate_until_scenario("clock", state);
         let state = harness.activate_guarded("launcher.settings", &state);
-        let state =
-            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
+        let state = harness
+            .activate_launcher_clock("launcher.settings.clock.event-profile.previous", &state);
         assert_eq!(
             control_value(&state, "launcher.settings.clock.event-profile.next"),
             Some("Off")
@@ -2237,11 +2272,11 @@ fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
         let state = harness.wait_until_ready();
         let state = harness.activate_until_scenario("clock", state);
         let state = harness.activate_guarded("launcher.settings", &state);
-        let state =
-            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
-        let state = harness.activate_guarded("launcher.settings.clock.duck.next", &state);
+        let state = harness
+            .activate_launcher_clock("launcher.settings.clock.event-profile.previous", &state);
+        let state = harness.activate_launcher_clock("launcher.settings.clock.duck", &state);
         assert_eq!(
-            control_value(&state, "launcher.settings.clock.duck.next"),
+            control_value(&state, "launcher.settings.clock.duck"),
             Some("Off")
         );
         harness.capture_screenshot("clock-duck-launcher.png");
@@ -2413,8 +2448,8 @@ fn arena_residents_share_a_visit_refuse_what_has_no_room_and_end_with_the_run() 
         let state = harness.wait_until_ready();
         let state = harness.activate_until_scenario("clock", state);
         let state = harness.activate_guarded("launcher.settings", &state);
-        let state =
-            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
+        let state = harness
+            .activate_launcher_clock("launcher.settings.clock.event-profile.previous", &state);
         assert_eq!(
             control_value(&state, "launcher.settings.clock.event-profile.next"),
             Some("Off")
@@ -2550,7 +2585,7 @@ fn ceiling_sequence(name: &'static str, renderer: &'static str) {
             control_value(&page, "launcher.settings.renderer.next"),
             Some(renderer)
         );
-        page = h.activate_guarded("launcher.settings.clock.event-profile.previous", &page);
+        page = h.activate_launcher_clock("launcher.settings.clock.event-profile.previous", &page);
         h.activate_guarded("launcher.settings.start", &page);
         h.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let initial = h.clock_state();
@@ -2776,7 +2811,7 @@ fn ceiling_moving_blocker(name: &'static str, renderer: &'static str) {
             control_value(&page, "launcher.settings.renderer.next"),
             Some(renderer)
         );
-        page = h.activate_guarded("launcher.settings.clock.event-profile.previous", &page);
+        page = h.activate_launcher_clock("launcher.settings.clock.event-profile.previous", &page);
         h.activate_guarded("launcher.settings.start", &page);
         h.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let initial = h.clock_state();

@@ -292,13 +292,12 @@ where the beam falls steeply onto the minutes.
 Controls, is Lively by default. Steady keeps both lamps at rest whatever goes
 on, and an outage under way skips to its warm-up. Lively lamps act under every
 event profile, Off included, where they follow a player's duck. The setting is
-saved with the others. In Scenario Settings it sits between Date and Theme; in
-Clock Controls it is on the Look page, between Theme and Fonts, and Left and
-Right switch it, as they change every setting there.
+saved with the others. In both it is on the Look page, between Theme and
+Fonts, and Left and Right switch it, as they change every setting there.
 
 | Clock Controls | Scenario Settings | Portrait |
 | --- | --- | --- |
-| ![Lamps Lively, selected, between Theme and Fonts on the Look page of Clock Controls, with what it does under the rows](screenshots/clock/lamps-800x480-live-controls.png) | ![Lamps Lively, selected, between Date and Fonts in the launcher's Clock settings](screenshots/clock/lamps-800x480-launcher-controls.png) | ![The Look page in the 480×800 view](screenshots/clock/lamps-480x800-live-controls.png) |
+| ![Lamps Lively, selected, between Theme and Fonts on the Look page of Clock Controls, with what it does under the rows](screenshots/clock/lamps-800x480-live-controls.png) | ![Lamps Lively, selected, between Theme and Fonts on the Look page of the launcher's Clock settings](screenshots/clock/lamps-800x480-launcher-controls.png) | ![The Look page in the 480×800 view](screenshots/clock/lamps-480x800-live-controls.png) |
 
 **Isolation.** The lamps draw from a seeded stream of their own, never the
 event schedule's, and only read the scene, so they never change it: the same
@@ -739,12 +738,12 @@ rotation off, Demo events and the date visible.
 
 ## Optional weekday and date
 
-Enable **Clock → Scenario Settings → Show Date**, or **Pause → Clock Controls →
+Enable **Clock → Scenario Settings → Look → Date**, or **Pause → Clock Controls →
 Look → Date**, to display a quiet line such as `FRIDAY · SEPTEMBER 25` in the upper band.
 It defaults to **Off**, including when loading older settings. The saved
 `clock.show_date` boolean is independent of 12/24-hour format and event cadence.
 Keyboard, controller, touch and guarded CLI UI activation use the same controls:
-`launcher.settings.clock.show-date.next` and `pause.clock.show-date`.
+`launcher.settings.clock.show-date` and `pause.clock.show-date`.
 
 The first pass uses English weekday/month names and omits the year from the
 visible line; it is not a calendar screen or a new scheduled event. The label
@@ -998,18 +997,15 @@ Normal and Christmas hold all year, and a chosen Christmas dresses the `--:--`
 face. Halloween's look (#456) and its October nights wait until next year, and
 until then no Halloween choice is offered.
 
-In Scenario Settings, Theme sits between Lamps and Fonts in a row of five
-buttons, where the time format became a **Time** button so that its value still
-shows in the portrait view. In Clock Controls, Theme is on the Look page,
+In both Scenario Settings and Clock Controls, Theme is on the Look page,
 between Date and Lamps. Left and Right, or a tap on its ‹ or ›, step it, and A
-or Enter moves it on. While Theme is selected, the page says what Auto does,
-"Auto: Christmas on December nights, 6 pm to 6 am.", in Scenario Settings in
-place of the subtitle and in Clock Controls on the line under the rows, where
-each row says what it does.
+or Enter moves it on. While Theme is selected, the line under the rows, where
+each row says what it does, says what Auto does: "Auto: Christmas on December
+nights, 6 pm to 6 am."
 
 | Clock Controls | Scenario Settings |
 | --- | --- |
-| ![Theme Christmas, selected, on the paused Clock's Look page, with "Auto: Christmas on December nights, 6 pm to 6 am." under the rows](screenshots/clock/theme-800x480-live-controls.png) | ![Theme Christmas, selected, between Lamps and Fonts in the launcher's Clock settings, with the same line in place of the subtitle](screenshots/clock/theme-800x480-launcher-controls.png) |
+| ![Theme Christmas, selected, on the paused Clock's Look page, with "Auto: Christmas on December nights, 6 pm to 6 am." under the rows](screenshots/clock/theme-800x480-live-controls.png) | ![Theme Christmas, selected, on the Look page of the launcher's Clock settings, with the same line under the rows](screenshots/clock/theme-800x480-launcher-controls.png) |
 
 Both at [1024×768](screenshots/clock/theme-1024x768-live-controls.png)
 ([settings](screenshots/clock/theme-1024x768-launcher-controls.png)) and in the
@@ -1115,16 +1111,16 @@ cyan in each Normal picture and in no Christmas one, and draws the fade at its
 middle. Set `SPACEWARS_CLOCK_ARTIFACTS` to save their pictures; the ones above
 come from the last two, and the controls' from
 `ui_render_tests::the_theme_control_and_what_auto_does_show_on_both_settings_pages`,
-which draws both settings pages with Theme selected at each size. It finds the
-line about Auto only while Theme is selected, and as wide at every size, so no
-size cuts it short.
+which draws the Look page of both menus with Theme selected at each size. It
+finds the line about Auto only while Theme is selected, and as wide at every
+size, so no size cuts it short.
 
 The setting's tests are
 `settings::tests::theme_is_auto_in_old_settings_and_round_trips_every_choice`,
 `clock_settings_table::tests::every_step_moves_one_value_and_wraps_at_either_end`,
 `clock_settings_table::tests::stepping_a_setting_changes_only_its_own_fields`,
-the keyboard and touch tests of the launcher's page, and a functional test
-through the public controls.
+`clock_controls::tests::launcher_rows_step_their_settings_and_keep_them_on_the_pages`,
+and a functional test through the public controls.
 `clock::live_clock_controls_preserve_events_preview_and_persist_across_restart_and_relaunch`
 chooses Christmas on the paused Look page while saving fails. It finds
 the face heading for Christmas with its fade held at the start, and the failure
@@ -1178,8 +1174,8 @@ the Off profile still disables every automatic event.
 ### Tanks
 
 Tanks uses the shared Scorched duel in Clock's existing physics world. Enable
-**Tanks** in scenario settings or Clock Controls; press its **Play** there,
-or run `spacewars-cli clock trigger tanks`. It participates in Calm and Demo's
+**Tanks** in scenario settings or Clock Controls; press its **Play** in Clock
+Controls, or run `spacewars-cli clock trigger tanks`. It participates in Calm and Demo's
 ordinary periodic selection. Off permits manual requests only. Completion and
 cancellation start its 120-second reuse delay and the ordinary two-second event
 cooldown; deliberate previews may bypass reuse delays.
@@ -1542,16 +1538,12 @@ below it:
 
 ![The pile under the face in the 480×800 view](screenshots/clock/coins-480x800-piled.png)
 
-The switch sits on the pause Events page under Digits, between Cell Swap and
-Color Cycle, with its Play, and in the launcher's Events row, six columns since
-Tanks. On the launcher, Left and Right walk the row's switches, as they do on
-every switch, and adjust the selectors. The pause page is a list of rows, which
-can't overlap, so `tools/audit-clock-control-layout.py` measures only the
-launcher's grid and holds it to having no two controls overlap:
+The switch sits on the Events page of both menus under Digits, between Cell
+Swap and Color Cycle, with its Play in Clock Controls:
 
 | Clock Controls | Scenario Settings | Portrait |
 | --- | --- | --- |
-| ![Coins On, selected, between Cell Swap and Color Cycle on the pause Events page, its Play lit](screenshots/clock/coins-800x480-live-controls.png) | ![Coins On in the launcher's Events row](screenshots/clock/coins-800x480-launcher-controls.png) | ![The Events page in the 480×800 view](screenshots/clock/coins-480x800-live-controls.png) |
+| ![Coins On, selected, between Cell Swap and Color Cycle on the pause Events page, its Play lit](screenshots/clock/coins-800x480-live-controls.png) | ![Coins On, selected, between Cell Swap and Color Cycle on the Events page of the launcher's Clock settings](screenshots/clock/coins-800x480-launcher-controls.png) | ![The Events page in the 480×800 view](screenshots/clock/coins-480x800-live-controls.png) |
 
 `coins_tests` cover the cap and the batch's own identities, seeded replay at
 six aspect ratios in both formats, the settle measurement above, the return
@@ -3347,16 +3339,22 @@ caption are gone; the optional performance overlay remains enabled here.
 
 ![Clock face on Picade with no permanent controls button](screenshots/clock/picade-clean-controls.png)
 
-### Clock Controls pages
+### Clock settings pages
 
-Clock Controls open on a short top page: **Look** and **Events**, each with a
-summary of what it holds, then **Back**. **Look** holds Time, Date, Theme and
-Lamps, then **Fonts**, which opens the font picker. **Events** holds How often,
-then the events under **Digits**, **Visitors** and **Room**. Each event's row
-has its switch, or a choice for Crow and Rain, and a **Play** button. Marquee's
-Recipe has a row of its own after it. The line under the rows says what the
-focused row does. The rows come from the client's Clock settings table, so a
-setting added there appears on its page.
+Clock's settings show as the same pages in two menus: **Clock Controls**, over
+the paused Clock, and the launcher's **Scenario Settings** for Clock. Each
+opens on a short top page: **Look** and **Events**, each with a summary of what
+it holds, then **Back**. Scenario Settings add **Renderer** and **Raster
+Scale** after Events, as every scenario's settings have them, and **Start
+Game** beside Back. **Look** holds Time, Date, Theme and Lamps, then **Fonts**,
+which opens the font picker. **Events** holds How often, then the events under
+**Digits**, **Visitors** and **Room**. Each event's row has its switch, or for
+Crow, Marquee and Rain a choice of Off or one of their values, and in Clock
+Controls a **Play** button. The line under the rows says what the focused row
+does. The rows come from the client's Clock settings table, so a setting added
+there appears on its page in both menus.
+
+Clock Controls:
 
 | Page | 800×480 | 1024×768 | 480×800 |
 | --- | --- | --- | --- |
@@ -3364,27 +3362,47 @@ setting added there appears on its page.
 | Look | ![The Look page, Theme Christmas selected and what Auto does under the rows, at 800 by 480](screenshots/clock/pages-800x480-look.png) | ![The Look page, Theme Christmas selected and what Auto does under the rows, at 1024 by 768](screenshots/clock/pages-1024x768-look.png) | ![The Look page, Theme Christmas selected and what Auto does under the rows, at 480 by 800](screenshots/clock/pages-480x800-look.png) |
 | Events | ![The Events page from How often, Cell Swap selected with its Play lit and Coins Off, at 800 by 480](screenshots/clock/pages-800x480-events.png) | ![The Events page from How often, Cell Swap selected with its Play lit and Coins Off, at 1024 by 768](screenshots/clock/pages-1024x768-events.png) | ![The Events page from How often, Cell Swap selected with its Play lit and Coins Off, at 480 by 800](screenshots/clock/pages-480x800-events.png) |
 
+Scenario Settings:
+
+| Page | 800×480 | 1024×768 | 480×800 |
+| --- | --- | --- | --- |
+| Top | ![The launcher's top page, Look and Events with their summaries, then Renderer, selected, and Raster Scale, at 800 by 480](screenshots/clock/pages-800x480-launcher-top.png) | ![The launcher's top page, Look and Events with their summaries, then Renderer, selected, and Raster Scale, at 1024 by 768](screenshots/clock/pages-1024x768-launcher-top.png) | ![The launcher's top page, Look and Events with their summaries, then Renderer, selected, and Raster Scale, at 480 by 800](screenshots/clock/pages-480x800-launcher-top.png) |
+| Look | ![The launcher's Look page, Theme Christmas selected and what Auto does under the rows, at 800 by 480](screenshots/clock/pages-800x480-launcher-look.png) | ![The launcher's Look page, Theme Christmas selected and what Auto does under the rows, at 1024 by 768](screenshots/clock/pages-1024x768-launcher-look.png) | ![The launcher's Look page, Theme Christmas selected and what Auto does under the rows, at 480 by 800](screenshots/clock/pages-480x800-launcher-look.png) |
+| Events | ![The launcher's Events page from How often, Cell Swap selected and Coins Off, with no Play, at 800 by 480](screenshots/clock/pages-800x480-launcher-events.png) | ![The launcher's Events page from How often, Cell Swap selected and Coins Off, with no Play, at 1024 by 768](screenshots/clock/pages-1024x768-launcher-events.png) | ![The launcher's Events page from How often, Cell Swap selected and Coins Off, with no Play, at 480 by 800](screenshots/clock/pages-480x800-launcher-events.png) |
+
 Up and Down move between rows, skip the headings, and wrap around through Back.
 Left and Right change the focused row's value: a switch flips and a choice
-steps. Right also opens a page's row. A or Enter plays an event's row, whose
-**Play** is lit while the row is focused; on a page's row it opens the page, on
-any other setting it steps forward, and on Back it goes back. A tap on a row's
-‹, › or switch changes it, a tap on Play plays it, and a tap on a page's row
-opens the page. B/Esc goes up one page, and from the top page closes Clock
-Controls. C/F1 closes them from any page. Start resumes. Clock Controls reopen
-where they were left, even after Restart; each launch of the Clock starts them
-on the top page.
+steps. Right also opens a page's row. In Clock Controls, A or Enter plays an
+event's row, whose **Play** is lit while the row is focused. On a page's row A
+or Enter opens the page, on any other setting it steps forward, and on Back it
+goes back. A tap on a row's ‹, › or switch changes it, a tap on Play plays it,
+and a tap on a page's row opens the page. B/Esc goes up one page, and from the
+top page leaves the menu. C/F1 closes Clock Controls from any page; from
+Scenario Settings it shows the launcher's Controls. Start resumes the Clock,
+or starts it from Scenario Settings. Clock Controls reopen where they were left,
+even after Restart; each launch of the Clock starts them on the top page.
+Scenario Settings start on their top page each time the launcher shows or its
+scenario changes.
 Holding Left or Right never repeats on these pages.
 
 The control API names the pages' screens `pause.clock` (the top page),
-`pause.clock-events` and `pause.clock-look`; the font picker stays
-`pause.clock-fonts`. `pause.clock.events` and `pause.clock.look` open the
-pages. A switch is `pause.clock.<setting>`, a choice is
-`pause.clock.<setting>.previous` and `.next`, an event's Play is
-`pause.clock.<event>.play`, and `pause.clock.back` goes back.
+`pause.clock-events` and `pause.clock-look` in Clock Controls, and
+`launcher.settings` (the top page), `launcher.clock-events` and
+`launcher.clock-look` in Scenario Settings. The font pickers stay
+`pause.clock-fonts` and `launcher.clock-fonts`. `pause.clock.events` and
+`pause.clock.look` open the pages, as `launcher.settings.clock.events` and
+`launcher.settings.clock.look` do. A switch is `pause.clock.<setting>` or
+`launcher.settings.clock.<setting>`, a choice adds `.previous` and `.next`, an
+event's Play is `pause.clock.<event>.play`, and `pause.clock.back` or
+`launcher.settings.back` goes back. Renderer, Raster Scale and Start Game keep
+the names they have in every scenario's settings:
+`launcher.settings.renderer.previous` and `.next`,
+`launcher.settings.raster-scale.previous` and `.next`, and
+`launcher.settings.start`.
 
-Changes apply at the next host tick, even while paused, and are saved for
-restart/relaunch. A save failure is shown on the page; settings then remain
+Scenario Settings keep their changes on the pages until the Clock starts, which
+saves them. Changes in Clock Controls apply at the next host tick, even while
+paused, and are saved for restart/relaunch. A save failure is shown on the page; settings then remain
 active for the current session. Setting changes do not interrupt the current
 animation or reset its physics, event ID, or cooldown. A format change during a
 fall takes effect as the digits reform.
@@ -3412,6 +3430,15 @@ spacewars-cli ui wait --screen gameplay --scenario clock --timeout 3s
 Clock Controls reopen where they were left, so a second pass in the same run
 finds `pause.clock-events`; `pause.clock.back` returns to the top page.
 
+Before a run, the launcher's pages take the same steps:
+
+```sh
+spacewars-cli ui activate launcher.settings --expect-screen launcher.main
+spacewars-cli ui activate launcher.settings.clock.events --expect-screen launcher.settings
+spacewars-cli ui activate launcher.settings.clock.rain.next --expect-screen launcher.clock-events
+spacewars-cli ui activate launcher.settings.start --expect-screen launcher.clock-events
+```
+
 Use the current UI revision as `--expect-revision` for guarded scripts. Setting
 changes acknowledge a queued operation; controls are temporarily disabled until
 applied. Wait for a newer UI revision with enabled controls before another
@@ -3438,20 +3465,17 @@ in `scenarios/clock/src/events/`; each owns its phase and temporary resources.
 Animation randomness uses a separate per-event seed, never the schedule's RNG.
 
 The catalog declares each event's trigger (`periodic` or `time-change`), affected area and timing. Add a kind, its
-settings/launcher control, catalog entry, and an enum implementation when adding
-an event; keep shared lifecycle tests and add event-specific tests. Its setting
-also goes in the client's Clock settings table,
-`crates/engine-client/src/clock_settings_table.rs`, under the kind's name, which
-is also its control's name on both settings pages. The table says once what the
-setting's values are (Off and On, or Off and a choice, as Rain and Crow have)
-and how it changes `ClockSettings`, and both pages step it through the table.
-The pause pages build their rows from the table, in `clock_menu.rs`, so the
-setting appears on its page, in its section, with its controls, focus and
-moves, and an event's row gets its Play, with nothing else to change. The
-launcher's page still places the control by hand: in its grid in
-`ui/main.slint`, its focus order in `ui_inventory.rs` and its activation target
-in `ui_activation.rs`. Tests check that both pages offer every setting in the
-table and that the launcher's activation agrees with its focus order. Finishing or
+setting, catalog entry, and an enum implementation when adding an event; keep
+shared lifecycle tests and add event-specific tests. The setting goes in the
+client's Clock settings table, `crates/engine-client/src/clock_settings_table.rs`,
+under the kind's name, which is also its control's name in both settings menus.
+The table says once what the setting's values are (Off and On, or Off and a
+choice, as Rain, Crow and Marquee have) and how it changes `ClockSettings`.
+Both menus build their pages' rows from the table, in `clock_menu.rs`, so the
+setting appears on its page in each, in its section, with its controls, focus
+and moves, and an event's row gets its Play in Clock Controls, with nothing
+else to change. A test checks that each menu offers every setting in the table
+once. Finishing or
 resizing drops the active event and restores the latest face and base palette;
 residents of the run's physics arena stay through a resize, as below.
 Restart/relaunch constructs a fresh scenario. There is no plugin framework and
@@ -3920,9 +3944,12 @@ ffmpeg -framerate 30 -i frame-%04d.png -vf "split[a][b];[a]palettegen=max_colors
 
 ### Composed Marquee effects
 
-Choose **Recipe** in the launcher or on the live **Clock Controls → Events**
-page, then press Marquee's **Play**. The default is **Random**.
-Explicit previews work even with the Marquee switch or profile Off.
+Choose **Marquee**'s recipe on the **Events** page of Clock's Scenario
+Settings or of the live **Clock Controls**. In Clock Controls, its **Play**
+shows the recipe now. Marquee is Off or one of the recipes below, and the
+default is **Random**.
+Play works even with Marquee or the profile Off: Off keeps the recipe it was
+stepped from, Random or Text spin, and Play shows that one.
 
 | Recipe | Content | Motion | Lighting |
 | --- | --- | --- | --- |

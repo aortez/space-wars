@@ -20,6 +20,8 @@ pub(crate) struct ScreenVisibility {
     pub(crate) ingame_menu: bool,
     pub(crate) ingame_controls: bool,
     pub(crate) ingame_clock: bool,
+    /// The Clock's page in the menu showing it, or the top page when neither
+    /// does.
     pub(crate) clock_page: crate::clock_menu::Page,
     pub(crate) clock_fonts: bool,
     pub(crate) game_over: bool,
@@ -56,7 +58,9 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
         } else if visibility.launcher_controls {
             UiScreen::LauncherControls
         } else if visibility.launcher_settings {
-            UiScreen::LauncherSettings
+            visibility
+                .clock_page
+                .screen(crate::clock_menu::Menu::Launcher)
         } else {
             UiScreen::LauncherMain
         }
@@ -75,7 +79,7 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
     } else if visibility.ingame_menu && visibility.sound {
         UiScreen::PauseSound
     } else if visibility.ingame_menu && visibility.ingame_clock {
-        visibility.clock_page.screen()
+        visibility.clock_page.screen(crate::clock_menu::Menu::Pause)
     } else if visibility.ingame_controls {
         UiScreen::PauseControls
     } else if visibility.ingame_menu {
@@ -125,6 +129,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) launcher_settings_focus_index: i32,
     pub(crate) launcher_controls_focus_index: i32,
     pub(crate) ingame_menu_focus_index: i32,
+    /// The controls on the Clock's page showing, in either menu.
     pub(crate) clock_controls: Vec<UiControl>,
     pub(crate) clock_selected: Option<String>,
     pub(crate) clock_controls_pending: bool,
@@ -159,28 +164,6 @@ pub(crate) struct UiInventoryContext {
     pub(crate) pizza_event_available: bool,
     pub(crate) pizza_event_can_trigger: bool,
     pub(crate) pizza_event_status: String,
-    pub(crate) clock_time_format: String,
-    pub(crate) clock_show_date: bool,
-    pub(crate) clock_event_profile: String,
-    pub(crate) clock_falling_enabled: bool,
-    pub(crate) clock_color_cycle_enabled: bool,
-    pub(crate) clock_meltdown_enabled: bool,
-    pub(crate) clock_duck_enabled: bool,
-    pub(crate) clock_crow: String,
-    pub(crate) clock_lamps: String,
-    pub(crate) clock_theme: String,
-    pub(crate) clock_explosion_enabled: bool,
-    pub(crate) clock_aquarium_enabled: bool,
-    pub(crate) clock_marquee_enabled: bool,
-    pub(crate) clock_digit_slide_enabled: bool,
-    pub(crate) clock_cell_swap_enabled: bool,
-    pub(crate) clock_grass_enabled: bool,
-    pub(crate) clock_slot_machine_enabled: bool,
-    pub(crate) clock_spider_enabled: bool,
-    pub(crate) clock_coins_enabled: bool,
-    pub(crate) clock_tanks_enabled: bool,
-    pub(crate) clock_rain: String,
-    pub(crate) clock_marquee_preset: String,
     pub(crate) nes_cartridge_name: String,
 }
 
@@ -326,6 +309,12 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
             actions: UiAction::ALL.to_vec(),
             error: context.settings_save_error.clone(),
         },
+        UiScreen::LauncherSettings if context.selected_scenario == "clock" => {
+            launcher_clock_inventory(context)
+        }
+        UiScreen::LauncherClockLook | UiScreen::LauncherClockEvents => {
+            launcher_clock_inventory(context)
+        }
         UiScreen::LauncherSettings => launcher_settings_inventory(context),
         UiScreen::LauncherControls => launcher_controls_inventory(context),
         UiScreen::LauncherTouchTest => UiInventory {
@@ -785,108 +774,6 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.back",
             ]
         }
-        "clock" => {
-            push_choice(
-                &mut controls,
-                "launcher.settings.renderer",
-                &context.renderer,
-            );
-            push_choice(
-                &mut controls,
-                "launcher.settings.raster-scale",
-                &format!("{}×", context.raster_scale),
-            );
-            push_choice(
-                &mut controls,
-                "launcher.settings.clock.time-format",
-                &context.clock_time_format,
-            );
-            push_choice(
-                &mut controls,
-                "launcher.settings.clock.event-profile",
-                &context.clock_event_profile,
-            );
-            for (id, enabled) in [
-                ("launcher.settings.clock.show-date", context.clock_show_date),
-                (
-                    "launcher.settings.clock.falling",
-                    context.clock_falling_enabled,
-                ),
-                (
-                    "launcher.settings.clock.color-cycle",
-                    context.clock_color_cycle_enabled,
-                ),
-                (
-                    "launcher.settings.clock.meltdown",
-                    context.clock_meltdown_enabled,
-                ),
-                ("launcher.settings.clock.duck", context.clock_duck_enabled),
-                (
-                    "launcher.settings.clock.aquarium",
-                    context.clock_aquarium_enabled,
-                ),
-                (
-                    "launcher.settings.clock.explosion",
-                    context.clock_explosion_enabled,
-                ),
-                (
-                    "launcher.settings.clock.marquee",
-                    context.clock_marquee_enabled,
-                ),
-                ("launcher.settings.clock.grass", context.clock_grass_enabled),
-                (
-                    "launcher.settings.clock.cell-swap",
-                    context.clock_cell_swap_enabled,
-                ),
-                (
-                    "launcher.settings.clock.digit-slide",
-                    context.clock_digit_slide_enabled,
-                ),
-                (
-                    "launcher.settings.clock.slot-machine",
-                    context.clock_slot_machine_enabled,
-                ),
-                (
-                    "launcher.settings.clock.spider",
-                    context.clock_spider_enabled,
-                ),
-                ("launcher.settings.clock.coins", context.clock_coins_enabled),
-                ("launcher.settings.clock.tanks", context.clock_tanks_enabled),
-            ] {
-                push_choice(&mut controls, id, if enabled { "On" } else { "Off" });
-            }
-            push_choice(
-                &mut controls,
-                "launcher.settings.clock.marquee-preset",
-                &context.clock_marquee_preset,
-            );
-            push_choice(
-                &mut controls,
-                "launcher.settings.clock.rain",
-                &context.clock_rain,
-            );
-            push_choice(
-                &mut controls,
-                "launcher.settings.clock.crow",
-                &context.clock_crow,
-            );
-            push_choice(
-                &mut controls,
-                "launcher.settings.clock.lamps",
-                &context.clock_lamps,
-            );
-            push_choice(
-                &mut controls,
-                "launcher.settings.clock.theme",
-                &context.clock_theme,
-            );
-            controls.push(UiControl::new(
-                "launcher.settings.clock.fonts",
-                "Fonts",
-                true,
-            ));
-            &LAUNCHER_CLOCK_FOCUS_ORDER
-        }
         "surface-expedition"
         | "spacewars-terrain"
         | "spacewars-surface-blocks"
@@ -1115,6 +1002,23 @@ fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
     }
 }
 
+/// The Clock's Scenario Settings page showing: its rows' controls and Back,
+/// with the focused one selected, and Start Game.
+fn launcher_clock_inventory(context: &UiInventoryContext) -> UiInventory {
+    let mut controls = context.clock_controls.clone();
+    controls.push(UiControl::new(
+        "launcher.settings.start",
+        "Start Game",
+        context.launch_available,
+    ));
+    UiInventory {
+        selected_control: context.clock_selected.clone(),
+        controls,
+        actions: UiAction::ALL.to_vec(),
+        error: context.launcher_error.clone(),
+    }
+}
+
 /// The Clock Controls page showing: its rows' controls, with the focused row
 /// selected. None of them take a press while the host applies a change.
 fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
@@ -1136,37 +1040,6 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
             .or_else(|| context.scenario_error.clone()),
     }
 }
-
-/// The launcher's Clock settings by focus index, Back last. The launcher
-/// changes the setting the control at its focused index names.
-pub(crate) const LAUNCHER_CLOCK_FOCUS_ORDER: [&str; 26] = [
-    "launcher.settings.renderer",
-    "launcher.settings.raster-scale",
-    "launcher.settings.clock.time-format",
-    "launcher.settings.clock.digit-slide",
-    "launcher.settings.clock.event-profile",
-    "launcher.settings.clock.falling",
-    "launcher.settings.clock.color-cycle",
-    "launcher.settings.clock.meltdown",
-    "launcher.settings.clock.duck",
-    "launcher.settings.clock.marquee",
-    "launcher.settings.clock.marquee-preset",
-    "launcher.settings.clock.rain",
-    "launcher.settings.clock.show-date",
-    "launcher.settings.clock.crow",
-    "launcher.settings.clock.explosion",
-    "launcher.settings.clock.fonts",
-    "launcher.settings.clock.aquarium",
-    "launcher.settings.clock.cell-swap",
-    "launcher.settings.clock.grass",
-    "launcher.settings.clock.slot-machine",
-    "launcher.settings.clock.spider",
-    "launcher.settings.clock.coins",
-    "launcher.settings.clock.tanks",
-    "launcher.settings.clock.lamps",
-    "launcher.settings.clock.theme",
-    "launcher.settings.back",
-];
 
 fn selected_from_index(ids: &[&str], index: i32) -> Option<String> {
     usize::try_from(index)
@@ -1201,28 +1074,6 @@ mod tests {
             pizza_event_available: false,
             pizza_event_can_trigger: false,
             pizza_event_status: String::new(),
-            clock_time_format: "24-hour".into(),
-            clock_show_date: false,
-            clock_event_profile: "Calm".into(),
-            clock_falling_enabled: true,
-            clock_color_cycle_enabled: true,
-            clock_meltdown_enabled: true,
-            clock_duck_enabled: true,
-            clock_crow: "Varied".into(),
-            clock_lamps: "Lively".into(),
-            clock_theme: "Auto".into(),
-            clock_explosion_enabled: true,
-            clock_aquarium_enabled: true,
-            clock_marquee_enabled: true,
-            clock_digit_slide_enabled: true,
-            clock_cell_swap_enabled: true,
-            clock_grass_enabled: true,
-            clock_slot_machine_enabled: true,
-            clock_spider_enabled: true,
-            clock_coins_enabled: true,
-            clock_tanks_enabled: true,
-            clock_rain: "Varied".into(),
-            clock_marquee_preset: engine_common::ClockMarqueePreset::default().label().into(),
             nes_cartridge_name: "Demo Cartridge".into(),
             ..Default::default()
         }
@@ -1236,9 +1087,12 @@ mod tests {
             .collect()
     }
 
+    /// The Clock's renderer rows come from its pages, which
+    /// `ipc::tests::every_clock_control_is_listed_on_its_page_and_activates_as_its_input_does`
+    /// covers.
     #[test]
     fn raster_only_inventory_disables_renderer_but_not_scale_or_launch() {
-        for scenario in ["clock", "pizza", "spacewars-classic", "rover-lab"] {
+        for scenario in ["pizza", "spacewars-classic", "rover-lab"] {
             let mut context = context(scenario);
             context.raster_only = true;
             let inventory = inventory_for_screen(UiScreen::LauncherSettings, &context);
@@ -1490,7 +1344,6 @@ mod tests {
                 "launcher.settings.spacewars.player-2",
             ),
             ("pizza", 14, "launcher.settings.pizza.live-ball-limit"),
-            ("clock", 51, "launcher.settings.clock.duck"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             (
                 "spacewars-surface-blocks",
@@ -1527,7 +1380,6 @@ mod tests {
                 "spacewars" => 3,
                 "spacewars-classic" => 6,
                 "pizza" => 5,
-                "clock" => 8,
                 "rover-lab" => 1,
                 "falling" => 0,
                 "nes" => 0,
@@ -1551,7 +1403,6 @@ mod tests {
     #[test]
     fn launcher_settings_focus_order_names_every_index_and_ends_on_back() {
         for scenario in [
-            "clock",
             "nes",
             "pizza",
             "spacewars",
@@ -1761,31 +1612,61 @@ mod tests {
         }
     }
 
+    /// Each menu's Clock pages list the page's controls, with Back among
+    /// them, and report the page's screen. Clock Controls take no press while
+    /// the host applies a change, and Scenario Settings add Start Game.
     #[test]
-    fn clock_controls_report_their_page_selection_and_pending_availability() {
-        let mut context = context("clock");
-        context.clock_controls = vec![
+    fn clock_pages_report_their_controls_selection_and_screen_in_both_menus() {
+        use crate::clock_menu::{Menu, Page};
+        let mut pause = context("clock");
+        pause.clock_controls = vec![
             UiControl::new("pause.clock.falling", "Falling", true).with_value("On"),
             UiControl::new("pause.clock.falling.play", "Play", true),
             UiControl::new("pause.clock.back", "Back", true),
         ];
-        context.clock_selected = Some("pause.clock.falling".into());
-        let inventory = inventory_for_screen(UiScreen::PauseClockEvents, &context);
+        pause.clock_selected = Some("pause.clock.falling".into());
+        let inventory = inventory_for_screen(UiScreen::PauseClockEvents, &pause);
         assert_eq!(
             inventory.selected_control.as_deref(),
             Some("pause.clock.falling")
         );
-        assert_eq!(inventory.controls, context.clock_controls);
+        assert_eq!(inventory.controls, pause.clock_controls);
         assert_eq!(inventory.actions, UiAction::ALL.to_vec());
-        context.clock_controls_pending = true;
-        let pending = inventory_for_screen(UiScreen::PauseClockEvents, &context);
+        pause.clock_controls_pending = true;
+        let pending = inventory_for_screen(UiScreen::PauseClockEvents, &pause);
         assert!(pending.controls.iter().all(|control| !control.enabled));
         assert!(pending.actions.is_empty());
-        for page in [
-            crate::clock_menu::Page::Top,
-            crate::clock_menu::Page::Look,
-            crate::clock_menu::Page::Events,
+
+        let mut launcher = context("clock");
+        launcher.clock_controls = vec![
+            UiControl::new("launcher.settings.clock.falling", "Falling", true).with_value("On"),
+            UiControl::new("launcher.settings.back", "Back", true),
+        ];
+        launcher.clock_selected = Some("launcher.settings.back".into());
+        for screen in [
+            UiScreen::LauncherSettings,
+            UiScreen::LauncherClockLook,
+            UiScreen::LauncherClockEvents,
         ] {
+            let inventory = inventory_for_screen(screen, &launcher);
+            assert_eq!(
+                inventory.selected_control.as_deref(),
+                Some("launcher.settings.back"),
+                "{screen}"
+            );
+            assert_eq!(
+                control_ids(&inventory),
+                [
+                    "launcher.settings.clock.falling",
+                    "launcher.settings.back",
+                    "launcher.settings.start"
+                ],
+                "{screen}"
+            );
+            assert_eq!(inventory.actions, UiAction::ALL.to_vec(), "{screen}");
+        }
+
+        for page in [Page::Top, Page::Look, Page::Events] {
             assert_eq!(
                 classify_screen(ScreenVisibility {
                     ingame_menu: true,
@@ -1793,7 +1674,16 @@ mod tests {
                     clock_page: page,
                     ..Default::default()
                 }),
-                page.screen()
+                page.screen(Menu::Pause)
+            );
+            assert_eq!(
+                classify_screen(ScreenVisibility {
+                    launcher: true,
+                    launcher_settings: true,
+                    clock_page: page,
+                    ..Default::default()
+                }),
+                page.screen(Menu::Launcher)
             );
         }
     }

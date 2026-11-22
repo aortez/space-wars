@@ -688,7 +688,12 @@ fn clock_explosion_captures_warning_burst_reformation_and_controls_on_device_lay
                     &ui,
                     engine_common::ClockSettings::default(),
                 );
-                crate::clock_menu::show(&ui, crate::clock_menu::Page::Events, Some("explosion"));
+                crate::clock_menu::show(
+                    &ui,
+                    crate::clock_menu::Menu::Pause,
+                    crate::clock_menu::Page::Events,
+                    Some("explosion"),
+                );
                 // The list scrolls to the row in a change handler, which runs
                 // with the timers.
                 slint::platform::update_timers_and_animations();
@@ -1149,12 +1154,12 @@ fn clock_events_and_a_change_of_theme_wear_the_theme_in_real_pixels() {
     save(&fade, "fade");
 }
 
-/// The Clock's settings pages at each device size, over the paused Clock.
-/// With `SPACEWARS_CLOCK_ARTIFACTS` set, each page is saved as
-/// `pages-<W>x<H>-<page>.png`.
+/// The Clock's settings pages at each device size, over the paused Clock and
+/// in the launcher. With `SPACEWARS_CLOCK_ARTIFACTS` set, each page is saved
+/// as `pages-<W>x<H>-<page>.png`, or `pages-<W>x<H>-launcher-<page>.png`.
 #[test]
 fn clock_settings_pages_render_at_each_size() {
-    use crate::clock_menu::Page;
+    use crate::clock_menu::{Menu, Page};
     use crate::render::{FrameLayout, Viewport};
     use engine_common::{
         ClockCrowWaterTolerance, ClockEventProfile, ClockEvents, ClockMarqueePreset,
@@ -1206,26 +1211,42 @@ fn clock_settings_pages_render_at_each_size() {
         let overlay =
             crate::render::raster_text_overlay(&frames, viewport, FrameLayout::EqualHorizontal);
         let face = crate::thruster_visual_tests::raster(&frames[0], viewport);
-        // Focus on Events, on Theme, on Cell Swap under its heading, on
-        // Crow under its own, and on Rain at the end of the Events page.
-        for (page, focus, name) in [
-            (Page::Top, 1, "top"),
-            (Page::Look, 2, "look"),
-            (Page::Events, 2, "events"),
-            (Page::Events, 13, "events-visitors"),
-            (Page::Events, 20, "events-room"),
-        ] {
+        // Focus on Events, or the launcher's Renderer, on Theme, on Cell Swap
+        // under its heading, on Crow under its own, and on Rain at the end of
+        // the Events page.
+        for (menu, page, focus, name) in
+            [Menu::Pause, Menu::Launcher].into_iter().flat_map(|menu| {
+                [
+                    (Page::Top, if menu == Menu::Pause { 1 } else { 2 }, "top"),
+                    (Page::Look, 2, "look"),
+                    (Page::Events, 2, "events"),
+                    (Page::Events, 12, "events-visitors"),
+                    (Page::Events, 19, "events-room"),
+                ]
+                .map(|(page, focus, name)| (menu, page, focus, name))
+            })
+        {
             reset_panels(&ui);
             ui.set_launcher_scenario("clock".into());
             crate::apply_scenario_metadata(&ui, "clock");
             crate::clock_controls::publish_settings(&ui, settings);
-            ui.set_raster_visible(true);
-            ui.set_raster_frame(Image::from_rgb8(face.clone()));
-            ui.set_primitives(Rc::new(slint::VecModel::from(overlay.clone())).into());
             ui.set_clock_menu_page(page.name().into());
-            ui.set_ingame_menu_visible(true);
-            ui.set_ingame_clock_visible(true);
-            ui.set_ingame_clock_focus_index(focus);
+            let name = match menu {
+                Menu::Pause => {
+                    ui.set_raster_visible(true);
+                    ui.set_raster_frame(Image::from_rgb8(face.clone()));
+                    ui.set_primitives(Rc::new(slint::VecModel::from(overlay.clone())).into());
+                    ui.set_ingame_menu_visible(true);
+                    ui.set_ingame_clock_visible(true);
+                    name.to_owned()
+                }
+                Menu::Launcher => {
+                    ui.set_launcher_visible(true);
+                    ui.set_launcher_settings_visible(true);
+                    format!("launcher-{name}")
+                }
+            };
+            menu.set_focus(&ui, focus);
             // The list scrolls to the focused row in a change handler, which
             // runs with the timers.
             slint::platform::update_timers_and_animations();
@@ -1258,6 +1279,7 @@ fn clock_settings_pages_render_at_each_size() {
 
 #[test]
 fn the_theme_control_and_what_auto_does_show_on_both_settings_pages() {
+    use crate::clock_menu::Menu;
     use crate::render::{FrameLayout, Viewport};
     use engine_common::{
         ClockEventProfile, ClockLampMode, ClockSettings, ClockThemeChoice, Scenario,
@@ -1269,13 +1291,12 @@ fn the_theme_control_and_what_auto_does_show_on_both_settings_pages() {
     let ui = MainWindow::new().unwrap();
     ui.show().unwrap();
     let windows = windows.borrow();
-    // Christmas, the longest choice, beside Demo, the profile's longest value.
+    // Christmas, the longest choice.
     let settings = ClockSettings {
         theme: ClockThemeChoice::Christmas,
-        event_profile: ClockEventProfile::Demo,
         ..ClockSettings::default()
     };
-    // How wide the line about Auto is on each page, at each size.
+    // How wide the line about Auto is in each menu, at each size.
     let mut widths = [Vec::new(), Vec::new()];
     for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
         windows[0].set_size(PhysicalSize::new(width, height));
@@ -1305,24 +1326,26 @@ fn the_theme_control_and_what_auto_does_show_on_both_settings_pages() {
         let overlay =
             crate::render::raster_text_overlay(&frames, viewport, FrameLayout::EqualHorizontal);
         let face = crate::thruster_visual_tests::raster(&frames[0], viewport);
-        let shoot = |live: bool, focus: i32| {
+        let shoot = |menu: Menu, focus: i32| {
             reset_panels(&ui);
             ui.set_launcher_scenario("clock".into());
             crate::apply_scenario_metadata(&ui, "clock");
             crate::clock_controls::publish_settings(&ui, settings);
-            ui.set_raster_visible(true);
-            ui.set_raster_frame(Image::from_rgb8(face.clone()));
-            ui.set_primitives(Rc::new(slint::VecModel::from(overlay.clone())).into());
-            if live {
-                ui.set_ingame_menu_visible(true);
-                ui.set_ingame_clock_visible(true);
-                ui.set_clock_menu_page("look".into());
-                ui.set_ingame_clock_focus_index(focus);
-            } else {
-                ui.set_launcher_visible(true);
-                ui.set_launcher_settings_visible(true);
-                ui.set_launcher_settings_focus_index(focus);
+            match menu {
+                Menu::Pause => {
+                    ui.set_raster_visible(true);
+                    ui.set_raster_frame(Image::from_rgb8(face.clone()));
+                    ui.set_primitives(Rc::new(slint::VecModel::from(overlay.clone())).into());
+                    ui.set_ingame_menu_visible(true);
+                    ui.set_ingame_clock_visible(true);
+                }
+                Menu::Launcher => {
+                    ui.set_launcher_visible(true);
+                    ui.set_launcher_settings_visible(true);
+                }
             }
+            ui.set_clock_menu_page("look".into());
+            menu.set_focus(&ui, focus);
             let mut shot = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
             windows[0].request_redraw();
             windows[0].draw_if_needed(|renderer| {
@@ -1354,52 +1377,37 @@ fn the_theme_control_and_what_auto_does_show_on_both_settings_pages() {
             inked.last().unwrap() - inked.first().unwrap()
         };
         // The Look page's help line says what Auto does while Theme is
-        // selected, and what Lamps do while they are. The panel fits Look's
-        // five rows, 412 px, and the line's box starts 108 px above its foot.
-        let live = shoot(true, 2);
-        assert_eq!(ui.get_launcher_clock_theme(), "Christmas");
-        let status = (height - 412) / 2 + 412 - 108 + 8;
-        assert_ne!(
-            band(&live, status, 20),
-            band(&shoot(true, 3), status, 20),
-            "{width}x{height}"
-        );
-        // The panel is 600 px wide, or 32 px narrower than the view, and the
-        // line's box leaves 24 px each side.
-        let panel_width = if width < 632 { width - 32 } else { 600 };
-        widths[0].push(ink(
-            &live,
-            status,
-            20,
-            (width - panel_width) / 2 + 24,
-            (width + panel_width) / 2 - 24,
-        ));
-        // The launcher's subtitle says it in place of the scenario's name, in
-        // a panel 440 px tall.
-        let launcher = shoot(false, 24);
-        let subtitle = (height - 440) / 2 + 52;
-        assert_ne!(
-            band(&launcher, subtitle, 24),
-            band(&shoot(false, 23), subtitle, 24),
-            "{width}x{height}"
-        );
-        // The page is at most 760 px wide, and 32 px narrower than the view.
-        // The settings' first row starts 20 px below the subtitle's top.
-        let page_width = (width - 32).min(760);
-        widths[1].push(ink(
-            &launcher,
-            subtitle,
-            20,
-            (width - page_width) / 2 + 24,
-            (width + page_width) / 2 - 24,
-        ));
-        if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {
-            let directory = std::path::PathBuf::from(directory);
-            std::fs::create_dir_all(&directory).unwrap();
-            for (page, shot) in [("live", &live), ("launcher", &launcher)] {
+        // selected, and what Lamps do while they are. Each menu's panel fits
+        // Look's five rows: 412 px in Clock Controls, where the line's box
+        // starts 108 px above the panel's foot, and 420 px in Scenario
+        // Settings, where it starts 106 px above it. The panels are 600 and
+        // 760 px wide, or 32 px narrower than the view, and the box leaves
+        // 24 px each side.
+        for (index, menu, panel_height, above_foot, widest, page) in [
+            (0, Menu::Pause, 412, 108, 600, "live"),
+            (1, Menu::Launcher, 420, 106, 760, "launcher"),
+        ] {
+            let theme = shoot(menu, 2);
+            let status = (height - panel_height) / 2 + panel_height - above_foot + 8;
+            assert_ne!(
+                band(&theme, status, 20),
+                band(&shoot(menu, 3), status, 20),
+                "{menu:?} at {width}x{height}"
+            );
+            let panel_width = (width - 32).min(widest);
+            widths[index].push(ink(
+                &theme,
+                status,
+                20,
+                (width - panel_width) / 2 + 24,
+                (width + panel_width) / 2 - 24,
+            ));
+            if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {
+                let directory = std::path::PathBuf::from(directory);
+                std::fs::create_dir_all(&directory).unwrap();
                 crate::thruster_visual_tests::write_png(
                     &directory.join(format!("theme-{width}x{height}-{page}-controls.png")),
-                    shot,
+                    &theme,
                 );
             }
         }
@@ -1524,7 +1532,13 @@ fn clock_fonts_picker_and_faces_render_and_select_across_device_layouts() {
         reset_panels(&ui);
         ui.set_launcher_visible(true);
         ui.set_launcher_settings_visible(true);
-        crate::clock_fonts::publish(&ui, ClockFontSettings::default());
+        crate::clock_controls::publish_settings(&ui, engine_common::ClockSettings::default());
+        crate::clock_menu::show(
+            &ui,
+            crate::clock_menu::Menu::Launcher,
+            crate::clock_menu::Page::Look,
+            None,
+        );
         assert!(crate::ui_activation::activate(
             &ui,
             "launcher.settings.clock.fonts"
@@ -1550,6 +1564,11 @@ fn clock_fonts_picker_and_faces_render_and_select_across_device_layouts() {
         );
         assert!(crate::ui_activation::activate(&ui, "clock.fonts.rotate"));
         assert!(crate::clock_fonts::settings(&ui).unwrap().rotate);
+        // The launcher's pages keep the choices until Start saves them.
+        assert_eq!(
+            crate::clock_menu::settings(&ui).map(|settings| settings.fonts),
+            crate::clock_fonts::settings(&ui).ok()
+        );
         let mut pixels = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
         windows.borrow()[0].request_redraw();
         windows.borrow()[0].draw_if_needed(|renderer| {
@@ -1652,14 +1671,18 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
     for (index, pixel) in frame.make_mut_slice().iter_mut().enumerate() {
         *pixel = Rgb8Pixel::new((index % 32 * 7) as u8, (index / 32 * 9) as u8, 40);
     }
+    let clock = engine_common::ClockSettings {
+        time_format: engine_common::ClockTimeFormat::TwelveHour,
+        event_profile: engine_common::ClockEventProfile::Off,
+        ..Default::default()
+    };
     for ui in &uis {
         ui.set_raster_visible(true);
         ui.set_raster_frame(Image::from_rgb8(frame.clone()));
-        ui.set_launcher_clock_time_format("12-hour".into());
-        ui.set_launcher_clock_event_profile("Off".into());
-        ui.set_launcher_settings_focus_index(10);
-        // Back on the Clock's top page, Theme on Look and Cell Swap on Events.
-        crate::clock_menu::publish(ui, &engine_common::ClockSettings::default());
+        crate::clock_menu::publish(ui, &clock);
+        // On the Clock's top page, Back in Clock Controls and Renderer in the
+        // launcher. Theme on Look, and Cell Swap on Events.
+        ui.set_launcher_settings_focus_index(2);
         ui.set_ingame_clock_focus_index(2);
         ui.set_scenario_controls_help("Move with the joystick. A selects. B goes back.".into());
         ui.set_sound_volume_percent(5);
@@ -1801,6 +1824,13 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
             ui.set_launcher_visible(true);
         }),
         ("launcher-settings", |ui| {
+            ui.set_clock_menu_page("top".into());
+            ui.set_launcher_visible(true);
+            ui.set_launcher_settings_visible(true);
+        }),
+        // The launcher's longest Clock page, which scrolls.
+        ("launcher-clock-events", |ui| {
+            ui.set_clock_menu_page("events".into());
             ui.set_launcher_visible(true);
             ui.set_launcher_settings_visible(true);
         }),
@@ -1932,9 +1962,8 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
                 "{name} at {width}×{height}: partial repaint left different pixels"
             );
             for ui in &uis {
-                assert_eq!(ui.get_launcher_clock_time_format(), "12-hour");
-                assert_eq!(ui.get_launcher_clock_event_profile(), "Off");
-                assert_eq!(ui.get_launcher_settings_focus_index(), 10);
+                assert_eq!(crate::clock_menu::settings(ui), Some(clock));
+                assert_eq!(ui.get_launcher_settings_focus_index(), 2);
                 assert_eq!(ui.get_ingame_clock_focus_index(), 2);
                 assert_eq!(ui.get_sound_volume_percent(), 5);
             }

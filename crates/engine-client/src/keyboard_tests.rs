@@ -541,7 +541,12 @@ fn a_held_controller_direction_changes_a_clock_setting_once_but_still_moves_thro
     window.set_ingame_menu_visible(true);
     window.set_ingame_clock_visible(true);
     clock_menu::publish(&window, &engine_common::ClockSettings::default());
-    clock_menu::show(&window, clock_menu::Page::Events, None);
+    clock_menu::show(
+        &window,
+        clock_menu::Menu::Pause,
+        clock_menu::Page::Events,
+        None,
+    );
     let adjusted = Rc::new(RefCell::new(Vec::new()));
     let log = Rc::clone(&adjusted);
     window.on_clock_menu_adjust(move |index, delta| log.borrow_mut().push((index, delta)));
@@ -1019,7 +1024,7 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     key(&window, Key::F1);
     assert!(input.borrow_mut().take_controls_requested());
 
-    use crate::clock_menu::{self, Page};
+    use crate::clock_menu::{self, Menu, Page};
     let page = || clock_menu::page(&window);
     let focus = || window.get_ingame_clock_focus_index();
     clock_menu::publish(&window, &engine_common::ClockSettings::default());
@@ -1044,7 +1049,8 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     key(&window, Key::DownArrow);
     key(&window, Key::RightArrow);
     assert_eq!((page(), focus()), (Page::Events, 0));
-    // Right steps How often on, once however long it is held.
+    // Right steps How often on, once however long it is held. A steps it on
+    // too, since it has no Play.
     key(&window, Key::RightArrow);
     assert_eq!(adjusted.get(), Some((0, 1)));
     adjusted.set(None);
@@ -1054,6 +1060,8 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
             text: Key::RightArrow.into(),
         });
     assert_eq!(adjusted.get(), None);
+    key(&window, Key::Return);
+    assert_eq!((adjusted.get(), played.get()), (Some((0, 1)), None));
     // Down passes over the Digits heading to Cell Swap. Left and Right flip
     // its switch, and A plays it.
     key(&window, Key::DownArrow);
@@ -1062,22 +1070,21 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(adjusted.get(), Some((2, -1)));
     key(&window, Key::Return);
     assert_eq!(played.get(), Some(2));
-    // A steps on the recipe, which has no Play.
-    played.set(None);
-    for _ in 0..7 {
+    // A plays Marquee too, though it is a choice.
+    for _ in 0..6 {
         key(&window, Key::DownArrow);
     }
-    assert_eq!(focus(), 9);
+    assert_eq!(focus(), 8);
     key(&window, Key::Return);
-    assert_eq!((adjusted.get(), played.get()), (Some((9, 1)), None));
+    assert_eq!((adjusted.get(), played.get()), (Some((2, -1)), Some(8)));
     // Up passes over the Visitors heading, and after Rain come Back and How
     // often.
-    window.set_ingame_clock_focus_index(13);
+    window.set_ingame_clock_focus_index(12);
     key(&window, Key::UpArrow);
-    assert_eq!(focus(), 11);
-    window.set_ingame_clock_focus_index(20);
+    assert_eq!(focus(), 10);
+    window.set_ingame_clock_focus_index(19);
     key(&window, Key::DownArrow);
-    assert_eq!(focus(), 21);
+    assert_eq!(focus(), 20);
     key(&window, Key::DownArrow);
     assert_eq!(focus(), 0);
     // Back returns to the top page on Events. A on Look opens it, and A on
@@ -1133,7 +1140,7 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(backs.get(), 1);
     // On Events, scrolled to the top: How often's ‹ and ›, Cell Swap's switch
     // and Play, a tap on the row itself, and Back.
-    clock_menu::show(&window, Page::Events, None);
+    clock_menu::show(&window, Menu::Pause, Page::Events, None);
     click(&window, 337.0, 96.0);
     assert_eq!(adjusted.get(), Some((0, -1)));
     click(&window, 640.0, 96.0);
@@ -1147,122 +1154,56 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(activated.get(), Some(2));
     click(&window, 400.0, 426.0);
     assert_eq!(backs.get(), 2);
-    // The extra launcher row must not overlap Back/Start at 800×480.
+    // Scenario Settings show the same pages, without Play. Their top page
+    // adds Renderer and Raster Scale, which step as any choice does.
     window.set_ingame_menu_visible(false);
+    window.set_ingame_clock_visible(false);
     window.set_launcher_visible(true);
     window.set_launcher_settings_visible(true);
-    assert!(window.get_launcher_clock_digit_slide_enabled());
-    // Time, Date, Lamps, Theme and Fonts share a row of five buttons.
-    click(&window, 112.0, 168.0);
-    assert_eq!(window.get_launcher_clock_time_format(), "12-hour");
-    assert_eq!(window.get_launcher_settings_focus_index(), 2);
-    click(&window, 256.0, 168.0);
-    assert!(window.get_launcher_clock_show_date());
-    assert_eq!(window.get_launcher_settings_focus_index(), 12);
-    click(&window, 400.0, 168.0);
-    assert_eq!(window.get_launcher_clock_lamps(), "Steady");
-    assert_eq!(window.get_launcher_settings_focus_index(), 23);
-    for expected in ["Normal", "Christmas", "Auto"] {
-        click(&window, 544.0, 168.0);
-        assert_eq!(window.get_launcher_clock_theme(), expected);
-        assert_eq!(window.get_launcher_settings_focus_index(), 24);
-    }
-    fonts_opened.set(false);
-    click(&window, 688.0, 168.0);
-    assert!(fonts_opened.get());
-    // The six event choices keep their existing control identities.
-    assert!(window.get_launcher_clock_tanks_enabled());
-    click(&window, 660.0, 220.0);
-    assert!(!window.get_launcher_clock_tanks_enabled());
-    assert_eq!(window.get_launcher_settings_focus_index(), 22);
-    assert!(window.get_launcher_clock_coins_enabled());
-    click(&window, 556.0, 220.0);
-    assert!(!window.get_launcher_clock_coins_enabled());
-    assert_eq!(window.get_launcher_settings_focus_index(), 21);
-    assert!(window.get_launcher_clock_spider_enabled());
-    click(&window, 452.0, 220.0);
-    assert!(!window.get_launcher_clock_spider_enabled());
-    assert_eq!(window.get_launcher_settings_focus_index(), 20);
-    click(&window, 348.0, 220.0);
-    assert!(!window.get_launcher_clock_digit_slide_enabled());
-    assert_eq!(window.get_launcher_settings_focus_index(), 3);
-    key(&window, Key::DownArrow);
-    assert_eq!(window.get_launcher_settings_focus_index(), 4);
-    // This row now has the same five columns as the one below it, so its
-    // coordinates match, and its last column is Slot Machine.
-    assert!(window.get_launcher_clock_cell_swap_enabled());
-    click(&window, 400.0, 272.0);
-    assert!(!window.get_launcher_clock_cell_swap_enabled());
-    assert_eq!(window.get_launcher_settings_focus_index(), 17);
-    assert!(window.get_launcher_clock_grass_enabled());
-    click(&window, 525.0, 272.0);
-    assert!(!window.get_launcher_clock_grass_enabled());
-    assert_eq!(window.get_launcher_settings_focus_index(), 18);
-    assert!(window.get_launcher_clock_slot_machine_enabled());
-    click(&window, 649.0, 272.0);
-    assert!(!window.get_launcher_clock_slot_machine_enabled());
-    assert_eq!(window.get_launcher_settings_focus_index(), 19);
-    assert!(window.get_launcher_clock_meltdown_enabled());
-    click(&window, 175.0, 324.0);
-    assert!(!window.get_launcher_clock_meltdown_enabled());
-    assert!(window.get_launcher_settings_visible());
-    assert_eq!(window.get_launcher_settings_focus_index(), 7);
-    assert!(window.get_launcher_clock_duck_enabled());
-    click(&window, 318.0, 324.0);
-    assert!(!window.get_launcher_clock_duck_enabled());
-    assert_eq!(window.get_launcher_settings_focus_index(), 8);
-    assert!(window.get_launcher_clock_crow_enabled());
-    for expected in ["Shy", "Hardy"] {
-        click(&window, 400.0, 324.0);
-        assert!(window.get_launcher_clock_crow_enabled());
-        assert_eq!(
-            window.get_launcher_clock_crow_water_tolerance().as_str(),
-            expected
-        );
-    }
-    click(&window, 400.0, 324.0);
-    assert!(!window.get_launcher_clock_crow_enabled());
-    assert_eq!(window.get_launcher_settings_focus_index(), 13);
-    assert!(window.get_launcher_clock_explosion_enabled());
-    click(&window, 525.0, 324.0);
-    assert!(!window.get_launcher_clock_explosion_enabled());
-    assert_eq!(window.get_launcher_settings_focus_index(), 14);
-    assert!(window.get_launcher_clock_aquarium_enabled());
-    click(&window, 649.0, 324.0);
-    assert!(!window.get_launcher_clock_aquarium_enabled());
-    assert_eq!(window.get_launcher_settings_focus_index(), 16);
-    click(&window, 372.0, 376.0);
-    assert!(!window.get_launcher_clock_marquee_enabled());
-    assert_eq!(window.get_launcher_settings_focus_index(), 9);
-    click(&window, 728.0, 376.0);
-    assert_eq!(window.get_launcher_clock_marquee_preset(), "Clock chase");
-    assert_eq!(window.get_launcher_settings_focus_index(), 10);
-    // Up from the top reaches Back and then Theme. Left and Right switch the
-    // theme, Return moves it on, and Return on Back closes the page.
-    window.set_launcher_settings_focus_index(0);
+    clock_menu::reset(&window, Menu::Launcher);
+    let focus = || window.get_launcher_settings_focus_index();
     key(&window, Key::UpArrow);
-    assert_eq!(window.get_launcher_settings_focus_index(), 25);
+    assert_eq!((page(), focus()), (Page::Top, 4));
     key(&window, Key::UpArrow);
-    assert_eq!(window.get_launcher_settings_focus_index(), 24);
-    assert_eq!(window.get_launcher_clock_theme(), "Auto");
-    key(&window, Key::RightArrow);
-    assert_eq!(window.get_launcher_clock_theme(), "Normal");
     key(&window, Key::LeftArrow);
-    key(&window, Key::LeftArrow);
-    assert_eq!(window.get_launcher_clock_theme(), "Christmas");
+    assert_eq!(adjusted.get(), Some((3, -1)));
+    key(&window, Key::UpArrow);
     key(&window, Key::Return);
-    assert_eq!(window.get_launcher_clock_theme(), "Auto");
-    assert_eq!(window.get_launcher_settings_focus_index(), 24);
+    assert_eq!(adjusted.get(), Some((2, 1)));
+    // A on an event flips its switch.
+    window.set_launcher_settings_focus_index(1);
+    key(&window, Key::Return);
+    assert_eq!((page(), focus()), (Page::Events, 0));
     key(&window, Key::DownArrow);
-    assert_eq!(window.get_launcher_settings_focus_index(), 25);
-    key(&window, Key::RightArrow);
-    assert_eq!(window.get_launcher_clock_theme(), "Auto");
-    assert!(window.get_launcher_settings_visible());
+    adjusted.set(None);
+    played.set(None);
     key(&window, Key::Return);
+    assert_eq!((adjusted.get(), played.get()), (Some((2, 1)), None));
+    // Back goes up a page, then out of Scenario Settings, which next open on
+    // the top page's first row. F1 turns them to the launcher's Controls.
+    key(&window, Key::Escape);
+    assert_eq!((page(), focus()), (Page::Top, 1));
+    key(&window, Key::Escape);
     assert!(!window.get_launcher_settings_visible());
+    assert_eq!((page(), focus()), (Page::Top, 0));
     window.set_launcher_settings_visible(true);
-    click(&window, 100.0, 428.0);
+    key(&window, Key::F1);
     assert!(!window.get_launcher_settings_visible());
+    assert!(window.get_launcher_controls_visible());
+    // At 800×480 the top page's rows, their ‹ and ›, Back and Start Game
+    // take taps.
+    window.set_launcher_controls_visible(false);
+    window.set_launcher_settings_visible(true);
+    click(&window, 200.0, 196.0);
+    assert_eq!(activated.get(), Some(1));
+    click(&window, 257.0, 244.0);
+    assert_eq!(adjusted.get(), Some((2, -1)));
+    click(&window, 720.0, 292.0);
+    assert_eq!(adjusted.get(), Some((3, 1)));
+    click(&window, 666.0, 388.0);
+    assert_eq!(starts.get(), 2);
+    click(&window, 119.0, 388.0);
+    assert_eq!(backs.get(), 3);
 }
 
 fn click(window: &MainWindow, x: f32, y: f32) {
@@ -1643,7 +1584,12 @@ fn calendar_date_live_control_reaches_host_and_persists_without_restarting() {
     window.invoke_ingame_clock_open();
     pump_until(|| controls.borrow().clock_state().is_some_and(|s| s.paused));
     let before = controls.borrow().clock_state().unwrap();
-    crate::clock_menu::show(&window, crate::clock_menu::Page::Look, Some("show-date"));
+    crate::clock_menu::show(
+        &window,
+        crate::clock_menu::Menu::Pause,
+        crate::clock_menu::Page::Look,
+        Some("show-date"),
+    );
     for show_date in [true, false, true] {
         window.invoke_clock_menu_adjust(window.get_ingame_clock_focus_index(), 1);
         pump_until(|| {
@@ -1652,7 +1598,10 @@ fn calendar_date_live_control_reaches_host_and_persists_without_restarting() {
                 .clock_state()
                 .is_some_and(|s| s.settings.show_date == show_date && !s.settings_pending)
         });
-        assert_eq!(window.get_launcher_clock_show_date(), show_date);
+        assert_eq!(
+            crate::clock_menu::settings(&window).map(|settings| settings.show_date),
+            Some(show_date)
+        );
         assert_eq!(settings.read().unwrap().clock.show_date, show_date);
         let after = controls.borrow().clock_state().unwrap();
         assert_eq!(after.scenario_revision, before.scenario_revision);

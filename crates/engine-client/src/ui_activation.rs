@@ -63,15 +63,16 @@ pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
         window.invoke_controllers_command(control_id.into());
         return true;
     }
-    // Clock Controls name their controls from the page's rows: focus the row,
-    // then press there as a key would.
-    if window.get_ingame_clock_visible()
-        && !window.get_clock_fonts_visible()
-        && let Some((_, index, action)) = crate::clock_menu::targets(window)
+    // The Clock's pages, in Clock Controls and in its Scenario Settings, name
+    // their controls from the page's rows: focus the row, then press there as
+    // a key would.
+    if !window.get_clock_fonts_visible()
+        && let Some(menu) = crate::clock_menu::Menu::showing(window)
+        && let Some((_, index, action)) = crate::clock_menu::targets(window, menu)
             .into_iter()
             .find(|(control, _, _)| control.id == control_id)
     {
-        window.set_ingame_clock_focus_index(index);
+        menu.set_focus(window, index);
         handle_ui_action(window, action);
         return true;
     }
@@ -228,7 +229,6 @@ fn activation_target(
         "pause.new-match" => pause_main(4),
         "pause.benchmark" => pause_main(2),
         "pause.controls" => pause_main(2 + i32::from(benchmark_available)),
-        "launcher.settings.clock.fonts" => launcher_settings(Some(15), UiAction::Confirm),
         "pause.clock" => pause_main(4),
         "pause.return-to-launcher" => pause_main(3 + i32::from(benchmark_available)),
         "pause.controls.back" => ActivationTarget {
@@ -264,48 +264,27 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         | "launcher.settings.travel.asteroid-interval"
         | "launcher.settings.combat.break-interval"
         | "launcher.settings.expedition.players"
-        | "launcher.settings.pizza.desired-balls"
-        | "launcher.settings.clock.time-format" => 2,
+        | "launcher.settings.pizza.desired-balls" => 2,
         "launcher.settings.spacewars.planets"
         | "launcher.settings.match.player-2"
         | "launcher.settings.travel.asteroid-strength"
         | "launcher.settings.combat.break-duration"
-        | "launcher.settings.pizza.spawn-rate"
-        | "launcher.settings.clock.digit-slide" => 3,
+        | "launcher.settings.pizza.spawn-rate" => 3,
         "launcher.settings.pizza.automatic-events"
         | "launcher.settings.travel.loose-dirt"
         | "launcher.settings.spacewars.asteroids"
         | "launcher.settings.match.break-interval"
-        | "launcher.settings.combat.mission"
-        | "launcher.settings.clock.event-profile" => 4,
+        | "launcher.settings.combat.mission" => 4,
         "launcher.settings.pizza.live-ball-limit"
         | "launcher.settings.spacewars.player-health"
         | "launcher.settings.match.break-duration"
-        | "launcher.settings.combat.asteroid-interval"
-        | "launcher.settings.clock.falling" => 5,
+        | "launcher.settings.combat.asteroid-interval" => 5,
         "launcher.settings.spacewars.player-2"
         | "launcher.settings.combat.asteroid-strength"
-        | "launcher.settings.match.asteroid-interval"
-        | "launcher.settings.clock.color-cycle" => 6,
-        "launcher.settings.combat.loose-dirt"
-        | "launcher.settings.match.asteroid-strength"
-        | "launcher.settings.clock.meltdown" => 7,
-        "launcher.settings.clock.duck" | "launcher.settings.match.length" => 8,
-        "launcher.settings.match.loose-dirt" | "launcher.settings.clock.marquee" => 9,
-        "launcher.settings.clock.marquee-preset" => 10,
-        "launcher.settings.clock.rain" => 11,
-        "launcher.settings.clock.show-date" => 12,
-        "launcher.settings.clock.crow" => 13,
-        "launcher.settings.clock.explosion" => 14,
-        "launcher.settings.clock.aquarium" => 16,
-        "launcher.settings.clock.cell-swap" => 17,
-        "launcher.settings.clock.grass" => 18,
-        "launcher.settings.clock.slot-machine" => 19,
-        "launcher.settings.clock.spider" => 20,
-        "launcher.settings.clock.coins" => 21,
-        "launcher.settings.clock.tanks" => 22,
-        "launcher.settings.clock.lamps" => 23,
-        "launcher.settings.clock.theme" => 24,
+        | "launcher.settings.match.asteroid-interval" => 6,
+        "launcher.settings.combat.loose-dirt" | "launcher.settings.match.asteroid-strength" => 7,
+        "launcher.settings.match.length" => 8,
+        "launcher.settings.match.loose-dirt" => 9,
         _ => return None,
     };
     Some(launcher_settings(Some(focus_index), action))
@@ -375,31 +354,6 @@ mod tests {
             activation_target("pause.return-to-launcher", false, false),
             Some(pause_main(3))
         );
-    }
-
-    /// Activating a control on the launcher's Clock settings focuses the
-    /// index where the inventory names it; Back takes no index. The page
-    /// changes the setting named at the focused index, so a control's name and
-    /// the setting it changes can't drift apart.
-    #[test]
-    fn launcher_clock_targets_focus_where_the_inventory_names_them() {
-        let target = |control: &str| {
-            activation_target(control, false, false)
-                .or_else(|| activation_target(&format!("{control}.next"), false, false))
-                .unwrap_or_else(|| panic!("{control} has no activation target"))
-                .focus
-        };
-        for (index, control) in crate::ui_inventory::LAUNCHER_CLOCK_FOCUS_ORDER
-            .iter()
-            .enumerate()
-            .filter(|(_, control)| **control != "launcher.settings.back")
-        {
-            assert_eq!(
-                target(control),
-                ActivationFocus::LauncherSettings(Some(index as i32)),
-                "{control}"
-            );
-        }
     }
 
     #[test]

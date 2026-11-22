@@ -85,7 +85,7 @@ Serif shuffle at 480×800, through the vector adapter:
 
 Launcher and live settings at 800×480:
 
-![Launcher Cell Swap switch](screenshots/clock/cell-swap-800x480-launcher-controls.png)
+![Cell Swap's switch on the Events page of the launcher's Clock settings](screenshots/clock/cell-swap-800x480-launcher-controls.png)
 ![Live Cell Swap switch and Play on the Events page](screenshots/clock/cell-swap-800x480-live-controls.png)
 
 The live switch and Play also fit the portrait layout:

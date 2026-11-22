@@ -496,10 +496,19 @@ mod tests {
             let settings_writer =
                 crate::settings_writer::SettingsWriter::new(directory.path().join("settings.toml"))
                     .unwrap();
+            let controls = host::new_scenario_controls();
+            // The Clock's settings pages change their rows through these, as
+            // in the app.
+            crate::clock_controls::install(
+                &window,
+                Rc::clone(&controls),
+                Arc::clone(&settings),
+                settings_writer.clone(),
+            );
             let mut launcher = Launcher::new(
                 &window,
                 Rc::new(RefCell::new(None)),
-                host::new_scenario_controls(),
+                controls,
                 input,
                 settings,
                 catalog,
@@ -561,7 +570,18 @@ mod tests {
         harness.show_menu();
         assert_eq!(window.get_launcher_renderer(), "raster");
         window.set_launcher_settings_visible(true);
-        window.set_launcher_settings_focus_index(0);
+        // The Clock lists Renderer on its top page.
+        let launcher = crate::clock_menu::Menu::Launcher;
+        crate::clock_menu::show(
+            window,
+            launcher,
+            crate::clock_menu::Page::Top,
+            Some("renderer"),
+        );
+        assert_eq!(
+            crate::clock_menu::selected(window, launcher),
+            "launcher.settings.renderer"
+        );
         for action in [UiAction::Left, UiAction::Right, UiAction::Confirm] {
             window.invoke_ui_action(action.code());
             assert_eq!(window.get_launcher_renderer(), "raster");
@@ -589,6 +609,40 @@ mod tests {
         window.invoke_launcher_start_game();
         harness.wait_for(|| !window.get_launcher_busy());
         assert_clock_is_raster(window);
+    }
+
+    #[test]
+    fn clock_settings_start_on_their_top_page_after_a_change_of_scenario_or_a_run() {
+        use crate::clock_menu::{self, Page};
+        let harness = Harness::new(Arc::new(|_| Ok(())));
+        let window = &harness.window;
+        harness.launcher.settings.write().unwrap().launch.scenario = "clock".into();
+        harness.show_menu();
+        let menu = clock_menu::Menu::Launcher;
+        let at = || (clock_menu::page(window), menu.focus(window));
+        // F1 leaves Scenario Settings for the launcher's Controls and keeps
+        // the page, here Events with Duck focused.
+        let leave_on_duck = || {
+            window.set_launcher_settings_visible(true);
+            clock_menu::show(window, menu, Page::Events, Some("duck"));
+            window.invoke_ui_action(UiAction::Controls.code());
+            assert!(window.get_launcher_controls_visible());
+            assert!(!window.get_launcher_settings_visible());
+            assert_eq!(at(), (Page::Events, 13));
+            window.set_launcher_controls_visible(false);
+        };
+
+        leave_on_duck();
+        crate::cycle_launcher_scenario(window, 1);
+        assert_ne!(window.get_launcher_scenario(), "clock");
+        crate::cycle_launcher_scenario(window, -1);
+        assert_eq!(window.get_launcher_scenario(), "clock");
+        assert_eq!(at(), (Page::Top, 0));
+
+        // The launcher showing again, as it does after a run.
+        leave_on_duck();
+        harness.show_menu();
+        assert_eq!(at(), (Page::Top, 0));
     }
 
     fn assert_clock_is_raster(window: &MainWindow) {

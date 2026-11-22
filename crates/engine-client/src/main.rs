@@ -883,42 +883,11 @@ fn show_launcher(
     window.set_launcher_pizza_spawn_rate_text(SharedString::from(format_float_setting(
         pizza.ball_spawn_rate,
     )));
-    window.set_launcher_clock_time_format(SharedString::from(clock_time_format_label(
-        settings.clock.time_format,
-    )));
-    clock_fonts::publish(window, settings.clock.fonts);
-    window.set_launcher_clock_show_date(settings.clock.show_date);
-    window.set_launcher_clock_event_profile(SharedString::from(clock_event_profile_label(
-        settings.clock.event_profile,
-    )));
-    window.set_launcher_clock_falling_enabled(settings.clock.events.falling);
-    window.set_launcher_clock_color_cycle_enabled(settings.clock.events.color_cycle);
-    window.set_launcher_clock_meltdown_enabled(settings.clock.events.meltdown);
-    window.set_launcher_clock_duck_enabled(settings.clock.events.duck);
-    window.set_launcher_clock_crow_enabled(settings.clock.events.crow);
-    window.set_launcher_clock_crow_water_tolerance(
-        settings.clock.crow_water_tolerance.label().into(),
-    );
-    window.set_launcher_clock_lamps(settings.clock.lamps.label().into());
-    window.set_launcher_clock_theme(settings.clock.theme.label().into());
-    window.set_launcher_clock_explosion_enabled(settings.clock.events.explosion);
-    window.set_launcher_clock_aquarium_enabled(settings.clock.events.aquarium);
-    window.set_launcher_clock_marquee_enabled(settings.clock.events.marquee);
-    window.set_launcher_clock_digit_slide_enabled(settings.clock.events.digit_slide);
-    window.set_launcher_clock_cell_swap_enabled(settings.clock.events.cell_swap);
-    window.set_launcher_clock_slot_machine_enabled(settings.clock.events.slot_machine);
-    window.set_launcher_clock_spider_enabled(settings.clock.events.spider);
-    window.set_launcher_clock_coins_enabled(settings.clock.events.coins);
-    window.set_launcher_clock_tanks_enabled(settings.clock.events.tanks);
-    window.set_launcher_clock_grass_enabled(settings.clock.events.grass);
-    window.set_launcher_clock_rain_enabled(settings.clock.events.rain);
-    window.set_launcher_clock_rain_amount(settings.clock.rain_amount.label().into());
-    window.set_launcher_clock_marquee_preset(settings.clock.marquee_preset.label().into());
-    window.set_launcher_clock_marquee_message(settings.clock.marquee_message.as_str().into());
+    clock_controls::publish_settings(window, settings.clock);
     refresh_nes_rom_library(window, &settings, rom_catalog);
     window.set_launcher_error_text(SharedString::from(""));
     window.set_launcher_focus_index(0);
-    window.set_launcher_settings_focus_index(0);
+    clock_menu::reset(window, clock_menu::Menu::Launcher);
     window.set_launcher_settings_visible(false);
     window.set_launcher_controls_visible(false);
     window.set_touch_test_visible(false);
@@ -1455,6 +1424,10 @@ fn handle_launcher_ui_action(window: &MainWindow, action: UiAction) {
         return;
     }
 
+    if window.get_launcher_settings_visible() && window.get_launcher_scenario() == "clock" {
+        clock_controls::handle_action(window, clock_menu::Menu::Launcher, action);
+        return;
+    }
     if window.get_launcher_settings_visible() {
         let item_count = launcher_settings_item_count(window);
         match action {
@@ -1568,7 +1541,7 @@ fn handle_game_over_ui_action(window: &MainWindow, action: UiAction) {
 
 fn handle_ingame_menu_ui_action(window: &MainWindow, action: UiAction) {
     if window.get_ingame_clock_visible() {
-        clock_controls::handle_action(window, action);
+        clock_controls::handle_action(window, clock_menu::Menu::Pause, action);
         return;
     }
     if window.get_ingame_controls_visible() {
@@ -1658,7 +1631,9 @@ fn cycle_launcher_scenario(window: &MainWindow, delta: i32) {
     };
     window.set_launcher_scenario(scenario.clone());
     window.invoke_launcher_scenario_selected(scenario);
-    window.set_launcher_settings_focus_index(0);
+    // The new scenario's settings open on their first row, and the Clock's on
+    // its top page.
+    clock_menu::reset(window, clock_menu::Menu::Launcher);
 }
 
 fn launcher_settings_item_count(window: &MainWindow) -> i32 {
@@ -1677,7 +1652,6 @@ pub(crate) fn launcher_settings_item_count_for(scenario: &str) -> i32 {
         | "spacewars-terrain-travel-duel"
         | "spacewars-terrain-arena"
         | "spacewars-terrain-arena-duel" => 6,
-        "clock" => 26,
         "falling" => 1,
         "nes" => 2,
         "surface-expedition"
@@ -1701,29 +1675,11 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
         return;
     }
     if focus == 0 {
-        if window.get_raster_only() {
-            return;
-        }
-        let previous = window.get_launcher_renderer();
-        let next = cycle_label(previous.as_str(), &["vector", "raster"], delta);
-        window.set_launcher_renderer(SharedString::from(next));
-        if previous != next {
-            tracing::info!(
-                source = "scenario_settings",
-                old_renderer = previous.as_str(),
-                new_renderer = next,
-                "renderer selection changed."
-            );
-        }
+        cycle_renderer(window, delta);
         return;
     }
     if focus == 1 {
-        let next = cycle_label(
-            window.get_launcher_raster_scale_text().as_str(),
-            &["1.0", "1.5", "2.0", "3.0"],
-            delta,
-        );
-        window.set_launcher_raster_scale_text(SharedString::from(next));
+        cycle_raster_scale(window, delta);
         return;
     }
 
@@ -1814,9 +1770,36 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
         "spacewars" => adjust_material_match_launcher_setting(window, focus, delta),
         "spacewars-classic" => adjust_spacewars_launcher_setting(window, focus, delta),
         "pizza" => adjust_pizza_launcher_setting(window, focus, delta),
-        "clock" => adjust_clock_launcher_setting(window, focus, delta),
         _ => {}
     }
+}
+
+/// Steps the launcher's renderer, unless the display can draw only raster.
+pub(crate) fn cycle_renderer(window: &MainWindow, delta: i32) {
+    if window.get_raster_only() {
+        return;
+    }
+    let previous = window.get_launcher_renderer();
+    let next = cycle_label(previous.as_str(), &["vector", "raster"], delta);
+    window.set_launcher_renderer(SharedString::from(next));
+    if previous != next {
+        tracing::info!(
+            source = "scenario_settings",
+            old_renderer = previous.as_str(),
+            new_renderer = next,
+            "renderer selection changed."
+        );
+    }
+}
+
+/// Steps the scale the launcher's raster renderer draws at.
+pub(crate) fn cycle_raster_scale(window: &MainWindow, delta: i32) {
+    let next = cycle_label(
+        window.get_launcher_raster_scale_text().as_str(),
+        &["1.0", "1.5", "2.0", "3.0"],
+        delta,
+    );
+    window.set_launcher_raster_scale_text(SharedString::from(next));
 }
 
 fn adjust_material_match_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
@@ -1991,32 +1974,6 @@ fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
                 .set_launcher_pizza_spawn_rate_text(SharedString::from(format_float_setting(next)));
         }
         _ => {}
-    }
-}
-
-/// Moves the launcher's Clock setting at `focus` by `delta`, or opens the
-/// fonts page from its control.
-fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
-    let Some(id) = usize::try_from(focus)
-        .ok()
-        .and_then(|focus| ui_inventory::LAUNCHER_CLOCK_FOCUS_ORDER.get(focus))
-        .and_then(|control| control.strip_prefix("launcher.settings.clock."))
-    else {
-        return;
-    };
-    if id == "fonts" {
-        window.invoke_clock_fonts_open();
-        return;
-    }
-    let Some(setting) = clock_settings_table::find(id) else {
-        return;
-    };
-    match clock_setup_from_window(window) {
-        Ok(settings) => clock_controls::publish_settings(
-            window,
-            clock_settings_table::stepped(setting, settings, delta),
-        ),
-        Err(error) => tracing::warn!(%error, "The launcher's Clock settings could not be read."),
     }
 }
 
@@ -2401,8 +2358,9 @@ fn launcher_selections_from_window(
             current_settings.spacewars.clone(),
             pizza_setup_from_window(window)?,
         ),
+        // The Clock's pages hold its settings, the saved ones until changed.
         "clock" => (
-            clock_setup_from_window(window)?,
+            clock_menu::settings(window).unwrap_or(current_settings.clock),
             current_settings.spacewars.clone(),
             current_settings.pizza.clone(),
         ),
@@ -2553,64 +2511,6 @@ fn pizza_setup_from_window(window: &MainWindow) -> Result<PizzaSettings, String>
     )
 }
 
-fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String> {
-    Ok(ClockSettings {
-        fonts: clock_fonts::settings(window)?,
-        show_date: window.get_launcher_clock_show_date(),
-        time_format: clock_time_format_from_label(
-            window.get_launcher_clock_time_format().as_str(),
-        )?,
-        event_profile: clock_event_profile_from_label(
-            window.get_launcher_clock_event_profile().as_str(),
-        )?,
-        events: engine_common::ClockEvents {
-            falling: window.get_launcher_clock_falling_enabled(),
-            color_cycle: window.get_launcher_clock_color_cycle_enabled(),
-            meltdown: window.get_launcher_clock_meltdown_enabled(),
-            duck: window.get_launcher_clock_duck_enabled(),
-            crow: window.get_launcher_clock_crow_enabled(),
-            explosion: window.get_launcher_clock_explosion_enabled(),
-            aquarium: window.get_launcher_clock_aquarium_enabled(),
-            cell_swap: window.get_launcher_clock_cell_swap_enabled(),
-            grass: window.get_launcher_clock_grass_enabled(),
-            marquee: window.get_launcher_clock_marquee_enabled(),
-            digit_slide: window.get_launcher_clock_digit_slide_enabled(),
-            rain: window.get_launcher_clock_rain_enabled(),
-            slot_machine: window.get_launcher_clock_slot_machine_enabled(),
-            spider: window.get_launcher_clock_spider_enabled(),
-            coins: window.get_launcher_clock_coins_enabled(),
-            tanks: window.get_launcher_clock_tanks_enabled(),
-        },
-        marquee_preset: engine_common::ClockMarqueePreset::ALL
-            .into_iter()
-            .find(|preset| preset.label() == window.get_launcher_clock_marquee_preset().as_str())
-            .ok_or("Unknown Clock marquee recipe")?,
-        crow_water_tolerance: engine_common::ClockCrowWaterTolerance::ALL
-            .into_iter()
-            .find(|choice| {
-                choice.label() == window.get_launcher_clock_crow_water_tolerance().as_str()
-            })
-            .ok_or("Unknown Clock crow water tolerance")?,
-        rain_amount: engine_common::ClockRainAmount::ALL
-            .into_iter()
-            .find(|amount| amount.label() == window.get_launcher_clock_rain_amount().as_str())
-            .ok_or("Unknown Clock rain amount")?,
-        lamps: engine_common::ClockLampMode::ALL
-            .into_iter()
-            .find(|mode| mode.label() == window.get_launcher_clock_lamps().as_str())
-            .ok_or("Unknown Clock lamp mode")?,
-        theme: engine_common::ClockThemeChoice::ALL
-            .into_iter()
-            .find(|choice| choice.label() == window.get_launcher_clock_theme().as_str())
-            .ok_or("Unknown Clock theme")?,
-        marquee_message: window
-            .get_launcher_clock_marquee_message()
-            .as_str()
-            .parse()
-            .map_err(|error: engine_common::ClockMessageError| error.to_string())?,
-    })
-}
-
 fn launch_options_from_values(
     scenario: &str,
     seed: &str,
@@ -2723,27 +2623,10 @@ fn clock_event_profile_label(profile: ClockEventProfile) -> &'static str {
     }
 }
 
-fn clock_event_profile_from_label(label: &str) -> Result<ClockEventProfile, String> {
-    match label.trim() {
-        "Off" => Ok(ClockEventProfile::Off),
-        "Calm" => Ok(ClockEventProfile::Calm),
-        "Demo" => Ok(ClockEventProfile::Demo),
-        _ => Err(format!("Unknown clock event profile: {label}")),
-    }
-}
-
 fn clock_time_format_label(format: ClockTimeFormat) -> &'static str {
     match format {
         ClockTimeFormat::TwelveHour => "12-hour",
         ClockTimeFormat::TwentyFourHour => "24-hour",
-    }
-}
-
-fn clock_time_format_from_label(label: &str) -> Result<ClockTimeFormat, String> {
-    match label.trim() {
-        "12-hour" => Ok(ClockTimeFormat::TwelveHour),
-        "24-hour" => Ok(ClockTimeFormat::TwentyFourHour),
-        other => Err(format!("Unknown clock time format {other:?}.")),
     }
 }
 
@@ -4221,50 +4104,6 @@ mod tests {
         assert!(!should_launch_directly(&args));
     }
 
-    /// Each Clock control on the launcher steps its setting as the settings
-    /// table does, through the labels the launcher shows and parses back.
-    #[test]
-    fn launcher_clock_controls_step_their_settings_as_the_table_does() {
-        use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
-        use slint::platform::{Platform, PlatformError, WindowAdapter};
-
-        struct TestPlatform;
-
-        impl Platform for TestPlatform {
-            fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
-                Ok(MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer)
-                    as Rc<dyn WindowAdapter>)
-            }
-        }
-
-        slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
-        let window = MainWindow::new().unwrap();
-        window.set_launcher_scenario("clock".into());
-        let mut covered = 0;
-        for (focus, control) in ui_inventory::LAUNCHER_CLOCK_FOCUS_ORDER.iter().enumerate() {
-            let Some(setting) = control
-                .strip_prefix("launcher.settings.clock.")
-                .and_then(clock_settings_table::find)
-            else {
-                continue;
-            };
-            for start in clock_settings_table::starting_points() {
-                for delta in [1, -1] {
-                    clock_controls::publish_settings(&window, start);
-                    window.set_launcher_settings_focus_index(focus as i32);
-                    adjust_launcher_setting(&window, delta);
-                    assert_eq!(
-                        clock_setup_from_window(&window),
-                        Ok(clock_settings_table::stepped(setting, start, delta)),
-                        "{control} by {delta}"
-                    );
-                }
-            }
-            covered += 1;
-        }
-        assert_eq!(covered, clock_settings_table::SETTINGS.len());
-    }
-
     #[test]
     fn successful_launch_hides_touch_test_and_menu_overlays() {
         use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
@@ -4647,17 +4486,6 @@ mod tests {
         assert!(pizza_setup_from_values("24", "0.1", true, "many").is_err());
         assert!(pizza_setup_from_values("many", "0.42", true, "500").is_err());
         assert!(pizza_setup_from_values("24", "often", true, "500").is_err());
-    }
-
-    #[test]
-    fn clock_format_labels_parse_and_round_trip() {
-        for format in [ClockTimeFormat::TwelveHour, ClockTimeFormat::TwentyFourHour] {
-            assert_eq!(
-                clock_time_format_from_label(clock_time_format_label(format)).unwrap(),
-                format
-            );
-        }
-        assert!(clock_time_format_from_label("many-hours").is_err());
     }
 
     #[test]
