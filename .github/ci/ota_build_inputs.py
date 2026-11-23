@@ -204,8 +204,11 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--cache', type=Path, required=True)
     parser.add_argument('--direct-kas', action='store_true', help='Use the pinned kas container toolchain directly')
+    parser.add_argument('--source-checkout', type=Path,
+                        help='Build this checkout rather than the one holding this file')
     args = parser.parse_args()
-    build(Path(__file__).resolve().parents[2], args.source, args.build_directory, args.output, args.cache, args.direct_kas)
+    build(args.source_checkout or Path(__file__).resolve().parents[2], args.source, args.build_directory,
+          args.output, args.cache, args.direct_kas)
 
 
 if __name__ == '__main__':

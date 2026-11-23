@@ -13,7 +13,9 @@ Rapier settings.
 ## Registration and ownership
 
 Enable contact capture, then call `PhysicsWorld::enable_material_response()`.
-For each logical region, register an existing incarnation token with
+A world whose capture admits
+[speculative arrivals](material-contact-records.md#speculative-arrivals) cannot
+enable it. For each logical region, register an existing incarnation token with
 `register_loading_material(token, region, section)`. The input `Region` carries
 the material parameters, represented volume and precise remaining capacity;
 `Section` provides material thickness and deformation depth. Collider bindings

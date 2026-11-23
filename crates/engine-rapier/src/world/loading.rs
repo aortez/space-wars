@@ -34,8 +34,9 @@ pub struct EpisodeId(u64);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EpisodeTransition {
-    /// A new touching episode with positive relative approach. This is a
-    /// candidate impact, not permission to spend a separate budget per point.
+    /// A new episode, touching or arriving, with positive relative approach.
+    /// This is a candidate impact, not permission to spend a separate budget
+    /// per point.
     Impact,
     Support,
     End,
@@ -178,6 +179,9 @@ pub enum LoadingError {
     InvalidMaterial,
     /// A contact episode involves the region, so it cannot be split or moved.
     RegionInContact,
+    /// The material response and speculative arrivals exclude each other: the
+    /// response admits only touching contacts.
+    Incompatible,
 }
 
 impl std::fmt::Display for LoadingError {
@@ -213,6 +217,10 @@ pub(super) struct LoadingState {
     regions: BTreeMap<RegionId, RegionEntry>,
     bindings: BTreeMap<ColliderId, ContactSource>,
     episodes: BTreeMap<[ContactSource; 2], Episode>,
+    // A tagged section after the versioned payloads carries this, so the v2
+    // capture payload is unchanged.
+    #[serde(skip)]
+    pub(in crate::world) speculative_arrivals: bool,
     #[serde(skip)]
     batches: Vec<ContactBatch>,
     #[serde(skip)]
@@ -248,6 +256,7 @@ impl LoadingState {
             regions: BTreeMap::new(),
             bindings: BTreeMap::new(),
             episodes: BTreeMap::new(),
+            speculative_arrivals: false,
             batches: Vec::new(),
             diagnostics: CaptureDiagnostics::default(),
             records: 0,
@@ -358,6 +367,7 @@ impl LoadingState {
 
     pub(super) fn valid_for(&self, world: &PhysicsWorld) -> bool {
         self.config.valid()
+            && !(self.speculative_arrivals && self.response.is_some())
             && self.dynamic_compression.as_ref().is_none_or(|c| {
                 self.gravity.is_none()
                     && self.compression.is_none()
@@ -535,10 +545,16 @@ impl LoadingState {
                 .then(a.point.y.total_cmp(&b.point.y))
                 .then(a.separation.total_cmp(&b.separation))
         });
-        let mut touching = BTreeMap::<_, f32>::new();
+        // The pairs that start or continue an episode, with their fastest
+        // approach: touching pairs and, with speculative arrivals, pairs whose
+        // approach closes the gap within the substep, which Rapier's solver
+        // acts on.
+        let mut acting = BTreeMap::<_, f32>::new();
         for record in &contacts {
-            if record.separation <= self.config.touch_tolerance {
-                touching
+            let arrives =
+                self.speculative_arrivals && record.closing_speed * context.dt > record.separation;
+            if record.separation <= self.config.touch_tolerance || arrives {
+                acting
                     .entry(record.sources)
                     .and_modify(|speed| *speed = speed.max(record.closing_speed))
                     .or_insert(record.closing_speed);
@@ -547,7 +563,7 @@ impl LoadingState {
         let mut episodes = self.episodes.clone();
         let mut events = Vec::new();
         episodes.retain(|sources, episode| {
-            if touching.contains_key(sources) {
+            if acting.contains_key(sources) {
                 episode.absent_seconds = 0.0;
                 return true;
             }
@@ -564,7 +580,7 @@ impl LoadingState {
             false
         });
         let mut next_episode = self.next_episode;
-        for (sources, speed) in touching {
+        for (sources, speed) in acting {
             if episodes.contains_key(&sources) {
                 continue;
             }
@@ -721,6 +737,32 @@ impl PhysicsWorld {
         }
         self.loading = Some(LoadingState::new(config));
         Ok(())
+    }
+
+    /// Let a speculative contact whose approach closes its gap within the
+    /// substep start or continue an episode, as a touching contact does.
+    /// Rapier's solver stops most impacts on such a contact before the bodies
+    /// touch, so without this an impact's episode starts on whatever approach
+    /// the solver left, if it starts at all. Physics is unchanged. The
+    /// material response admits only touching contacts, so a world uses one
+    /// or the other. Snapshots and clones keep the setting.
+    pub fn enable_speculative_arrivals(&mut self) -> Result<(), LoadingError> {
+        let state = self.loading.as_mut().ok_or(LoadingError::Disabled)?;
+        if state.speculative_arrivals {
+            return Err(LoadingError::AlreadyEnabled);
+        }
+        if state.response.is_some() {
+            return Err(LoadingError::Incompatible);
+        }
+        state.speculative_arrivals = true;
+        Ok(())
+    }
+
+    /// Whether this world's capture admits speculative arrivals.
+    pub fn admits_speculative_arrivals(&self) -> bool {
+        self.loading
+            .as_ref()
+            .is_some_and(|s| s.speculative_arrivals)
     }
 
     pub fn create_loading_region(

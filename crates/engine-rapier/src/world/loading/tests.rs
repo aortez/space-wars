@@ -662,3 +662,297 @@ fn malformed_loading_snapshot_is_rejected_and_output_records_are_transient() {
     assert!(PhysicsWorld::from_snapshot_bytes(&world.snapshot_bytes().unwrap()).is_err());
     assert!(PhysicsWorld::from_snapshot_bytes(&before[..before.len() - 1]).is_err());
 }
+
+/// Two slabs `gap` apart, each made of `parts` colliders, with body 1 closing
+/// at `speed`. The capture admits speculative arrivals if `arrivals`.
+fn gapped(parts: u16, gap: f32, speed: f32, arrivals: bool) -> PhysicsWorld {
+    let (mut world, _) = slabs(parts, speed, 0.0, false, CaptureConfig::default());
+    world.set_pose(body(1), -Vec2::X * gap, 0.0, true);
+    if arrivals {
+        world.enable_speculative_arrivals().unwrap();
+    }
+    world
+}
+
+fn starts(world: &PhysicsWorld) -> Vec<EpisodeEvent> {
+    transitions(world)
+        .into_iter()
+        .filter(|e| e.transition != EpisodeTransition::End)
+        .collect()
+}
+
+/// Binds collider 0 of bodies 1 and 2 to their own regions.
+fn bind_pair(world: &mut PhysicsWorld) {
+    for n in [1, 2] {
+        let token = world.create_loading_region(region(n), body(n)).unwrap();
+        world
+            .bind_loading_collider(
+                collider(n, 0),
+                ContactSource {
+                    region: token,
+                    patch: 0,
+                },
+            )
+            .unwrap();
+    }
+}
+
+#[test]
+fn speculative_arrivals_start_an_impact_on_the_incoming_approach() {
+    for parts in [1, 2, 4] {
+        // The solve stops body 1 on the speculative contact, so under the
+        // touching rule the episode starts a step later, on what approach is
+        // left.
+        let mut touching = gapped(parts, 0.001, 3.0, false);
+        let mut arriving = gapped(parts, 0.001, 3.0, true);
+        let mut late = Vec::new();
+        let mut early = Vec::new();
+        for _ in 0..30 {
+            touching.step(DT);
+            arriving.step(DT);
+            // Capture is read-only under either rule.
+            assert_eq!(touching.motion(body(1)), arriving.motion(body(1)));
+            late.extend(starts(&touching));
+            early.extend(transitions(&arriving));
+        }
+        assert_eq!(early.len(), 1, "{parts} parts: {early:?}");
+        assert_eq!(early[0].transition, EpisodeTransition::Impact);
+        assert_eq!(early[0].closing_speed, 3.0);
+        assert_eq!(late.len(), 1, "{parts} parts: {late:?}");
+        assert!(late[0].closing_speed < 0.3, "{late:?}");
+    }
+}
+
+#[test]
+fn a_speculative_contact_starts_nothing_until_its_solve_closes_it() {
+    // At 0.05 a step closes 0.0004 of the 0.001 gap, and at -3 the slabs part.
+    for speed in [0.05, -3.0] {
+        let mut world = gapped(1, 0.001, speed, true);
+        world.step(DT);
+        let batch = &world.loading_batches()[0];
+        assert!(!batch.contacts.is_empty());
+        assert!(batch.contacts.iter().all(|r| r.separation > 0.0));
+        assert!(batch.events.is_empty(), "{speed}: {:?}", batch.events);
+        let mut later = Vec::new();
+        for _ in 0..10 {
+            world.step(DT);
+            later.extend(starts(&world));
+        }
+        if speed > 0.0 {
+            assert_eq!(later.len(), 1, "{later:?}");
+            assert_eq!(later[0].transition, EpisodeTransition::Impact);
+            assert_eq!(later[0].closing_speed, speed);
+        } else {
+            assert!(later.is_empty(), "{later:?}");
+        }
+    }
+}
+
+/// A ball closing at 400 on a fixed wall from `gap` away.
+fn wall_arrival(ccd: bool, substeps: usize, gap: f32) -> PhysicsWorld {
+    let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+        gravity: Vec2::ZERO,
+        max_ccd_substeps: substeps,
+        collect_events: false,
+        ..Default::default()
+    });
+    world
+        .enable_loading_capture(CaptureConfig::default())
+        .unwrap();
+    world.enable_speculative_arrivals().unwrap();
+    let mut ball = ColliderSpec::ball(collider(1, 0), 0.5);
+    ball.friction = 0.0;
+    assert!(world.insert_body(
+        body(1),
+        BodySpec {
+            position: -Vec2::X * (0.5 + gap),
+            linear_velocity: Vec2::X * 400.0,
+            ccd_enabled: ccd,
+            ..Default::default()
+        },
+        &[ball]
+    ));
+    let mut wall = ColliderSpec::cuboid(collider(2, 0), 50.0, 50.0);
+    wall.friction = 0.0;
+    assert!(world.insert_body(
+        body(2),
+        BodySpec {
+            kind: BodyKind::Fixed,
+            position: Vec2::X * 50.0,
+            ..Default::default()
+        },
+        &[wall]
+    ));
+    bind_pair(&mut world);
+    world
+}
+
+#[test]
+fn speculative_arrivals_catch_each_wall_impact_once_at_its_incoming_speed() {
+    for hz in [30.0, 60.0, 120.0, 240.0] {
+        for ccd in [false, true] {
+            for substeps in [1, 4] {
+                for gap in [0.001, 0.01, 0.1, 1.0] {
+                    let case = format!("{hz} Hz, CCD {ccd}, {substeps} substeps, gap {gap}");
+                    let mut world = wall_arrival(ccd, substeps, gap);
+                    let mut impacts = Vec::new();
+                    for _ in 0..(hz / 4.0) as usize {
+                        world.step(1.0 / hz);
+                        impacts.extend(starts(&world));
+                    }
+                    assert_eq!(impacts.len(), 1, "{case}: {impacts:?}");
+                    assert_eq!(impacts[0].transition, EpisodeTransition::Impact, "{case}");
+                    assert!(
+                        (impacts[0].closing_speed - 400.0).abs() < 1.0e-3,
+                        "{case}: {impacts:?}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// A ball of `restitution` dropped from `height` onto fixed ground under a
+/// gravity of 10, with the capture admitting speculative arrivals.
+fn drop(height: f32, restitution: f32, can_sleep: bool) -> PhysicsWorld {
+    let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+        gravity: -Vec2::Y * 10.0,
+        collect_events: false,
+        ..Default::default()
+    });
+    world
+        .enable_loading_capture(CaptureConfig::default())
+        .unwrap();
+    world.enable_speculative_arrivals().unwrap();
+    let mut ball = ColliderSpec::ball(collider(1, 0), 0.5);
+    ball.friction = 0.0;
+    ball.restitution = restitution;
+    assert!(world.insert_body(
+        body(1),
+        BodySpec {
+            position: Vec2::Y * (0.5 + height),
+            can_sleep,
+            ..Default::default()
+        },
+        &[ball]
+    ));
+    let mut ground = ColliderSpec::cuboid(collider(2, 0), 10.0, 0.5);
+    ground.friction = 0.0;
+    ground.restitution = restitution;
+    assert!(world.insert_body(
+        body(2),
+        BodySpec {
+            kind: BodyKind::Fixed,
+            position: -Vec2::Y * 0.5,
+            ..Default::default()
+        },
+        &[ground]
+    ));
+    bind_pair(&mut world);
+    world
+}
+
+#[test]
+fn with_speculative_arrivals_each_bounce_starts_one_impact() {
+    let mut world = drop(2.0, 0.5, false);
+    let mut impacts = Vec::new();
+    let mut ends = 0;
+    for _ in 0..360 {
+        world.step(DT);
+        for event in transitions(&world) {
+            match event.transition {
+                EpisodeTransition::Impact => impacts.push(event.closing_speed),
+                EpisodeTransition::End => ends += 1,
+                EpisodeTransition::Support => {}
+            }
+        }
+    }
+    // The first approach is the fall's, short of the step's own gravity.
+    let fall = (2.0_f32 * 10.0 * 2.0).sqrt();
+    assert!((impacts[0] - fall).abs() < 2.0 * 10.0 * DT, "{impacts:?}");
+    // Each bounce ends its episode before the next one starts slower.
+    assert!(impacts.len() >= 3, "{impacts:?}");
+    assert!(impacts.windows(2).all(|w| w[1] < w[0]), "{impacts:?}");
+    assert!(ends + 1 >= impacts.len(), "{ends} ends, {impacts:?}");
+}
+
+#[test]
+fn with_speculative_arrivals_a_resting_body_keeps_one_episode() {
+    // Set down just clear of the ground, the ball falls the gap and rests,
+    // awake or asleep, without ending or restarting its episode.
+    for can_sleep in [false, true] {
+        let mut world = drop(0.0005, 0.0, can_sleep);
+        let mut events = Vec::new();
+        for _ in 0..600 {
+            world.step(DT);
+            events.extend(transitions(&world));
+        }
+        assert_eq!(events.len(), 1, "can sleep {can_sleep}: {events:?}");
+        assert_ne!(events[0].transition, EpisodeTransition::End);
+        if can_sleep {
+            let handle = world.body_handle(body(1)).unwrap();
+            assert!(world.raw.bodies[handle].is_sleeping());
+        }
+    }
+}
+
+#[test]
+fn speculative_arrivals_survive_snapshots_and_exclude_the_material_response() {
+    let mut world = gapped(1, 0.001, 3.0, false);
+    let plain = world.snapshot_bytes().unwrap();
+    world.enable_speculative_arrivals().unwrap();
+    assert!(world.admits_speculative_arrivals());
+    assert_eq!(
+        world.enable_speculative_arrivals(),
+        Err(LoadingError::AlreadyEnabled)
+    );
+    assert_eq!(
+        world.enable_material_response(),
+        Err(LoadingError::Incompatible)
+    );
+    // The capture payload is unchanged, and the tag follows it.
+    let bytes = world.snapshot_bytes().unwrap();
+    assert_eq!(
+        u32::from_le_bytes(bytes[..4].try_into().unwrap()),
+        LOADING_SNAPSHOT_VERSION
+    );
+    assert_eq!(bytes[..plain.len()], plain[..]);
+    assert_eq!(
+        bytes[plain.len()..],
+        SPECULATIVE_ARRIVALS_SNAPSHOT_TAG.to_le_bytes()
+    );
+    let mut replay = PhysicsWorld::from_snapshot_bytes(&bytes).unwrap();
+    let mut clone = world.clone();
+    assert!(replay.admits_speculative_arrivals());
+    assert!(clone.admits_speculative_arrivals());
+    for _ in 0..10 {
+        for w in [&mut world, &mut replay, &mut clone] {
+            w.step(DT);
+        }
+        assert_eq!(world.loading_batches(), replay.loading_batches());
+        assert_eq!(world.loading_batches(), clone.loading_batches());
+        assert_eq!(
+            world.snapshot_bytes().unwrap(),
+            replay.snapshot_bytes().unwrap()
+        );
+    }
+    // A world with the response, or without a capture, cannot take the tag.
+    let mut responding = gapped(1, 0.001, 3.0, false);
+    responding.enable_material_response().unwrap();
+    assert_eq!(
+        responding.enable_speculative_arrivals(),
+        Err(LoadingError::Incompatible)
+    );
+    let mut bare = PhysicsWorld::new(PhysicsWorldConfig::default());
+    assert_eq!(
+        bare.enable_speculative_arrivals(),
+        Err(LoadingError::Disabled)
+    );
+    assert!(!bare.admits_speculative_arrivals());
+    for refused in [&responding, &bare] {
+        let mut forged = refused.snapshot_bytes().unwrap();
+        assert!(PhysicsWorld::from_snapshot_bytes(&forged).is_ok());
+        forged.extend(SPECULATIVE_ARRIVALS_SNAPSHOT_TAG.to_le_bytes());
+        assert!(PhysicsWorld::from_snapshot_bytes(&forged).is_err());
+    }
+}

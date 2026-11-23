@@ -81,20 +81,21 @@ do not account for external work or constraint/support reactions.
 One cached episode represents one ordered pair of host-declared surface
 sources. Only a touching observation can start it: separation must be at most
 `touch_tolerance` (default 0.00001 wu). Purely speculative samples remain visible
-but cannot create an episode on their own.
+but cannot create an episode on their own. A world can let
+[speculative arrivals](#speculative-arrivals) start one too.
 
 A new episode emits one transition across all its points and collider parts:
 
-- `Impact` when the maximum touching-point approach exceeds
+- `Impact` when the fastest approach among the points that start it exceeds
   `min_approach_speed` (default 0.0001 wu/s). This is a candidate impact.
 - `Support` otherwise, including resting contact.
 
 Continuing contact keeps the episode ID and emits no additional start. A
-complete observation without touching samples accumulates absence time. At
-`separation_grace_seconds` (default 1/60 s), the episode ends once and can be
-rearmed by a subsequent contact. This time-based grace suppresses short contact
-gaps without tying the rule to render frames. Pause, invalid time and rejected
-batches do not advance the absence timer.
+complete observation with no point that could start an episode accumulates
+absence time. At `separation_grace_seconds` (default 1/60 s), the episode ends
+once and can be rearmed by a subsequent contact. This time-based grace
+suppresses short contact gaps without tying the rule to render frames. Pause,
+invalid time and rejected batches do not advance the absence timer.
 
 The policy has explicit limits: a real departure and return inside the grace
 period can be coalesced; distinct independent surfaces sharing one source ID
@@ -107,6 +108,47 @@ become new material identities.
 An `Impact` transition is not a proof of available energy. Generalized motion
 sharing, driven contacts and constraint effects still need an accounting law
 before any transition can cause material damage.
+
+## Speculative arrivals
+
+Rapier's solver acts on a speculative contact when the approach would close its
+gap within the substep, and it stops the bodies before they touch. That happens
+whenever a body's last substep before an impact starts within Rapier's
+prediction distance of the surface, 0.002 length units by default, as every
+slow approach does. In the native response's
+[arrival evidence](material-native-response.md#arrival-evidence-and-next-boundary),
+the solver spends over 99% of an impact's energy on a speculative contact. Under
+the touching rule, that impact's episode starts a step later, on whatever
+approach is left, if it starts at all.
+
+`PhysicsWorld::enable_speculative_arrivals` changes the rule for one world. A
+speculative point whose closing speed times the substep's duration exceeds its
+separation counts as a touching one: it starts or continues an episode, and the
+episode's `Impact` then carries the approach the bodies brought into the
+substep.
+
+Capture stays read-only: the rule changes which records start episodes, not the
+physics. The material response admits only touching contacts, so a world
+enables one or the other, and each refuses the other with
+`LoadingError::Incompatible`. The response's own refusal,
+`ResponseRejection::SpeculativeArrival`, is broader than this rule: it covers
+any approaching speculative point, whether or not its gap closes within the
+substep.
+
+The rule has two known limits:
+
+- A substep's records come before its gravity and other forces are integrated,
+  and before its solver aims for a bounce. When only the substep's gravity
+  carries a slow body across a gap, the rule misses the arrival, and the solver
+  stops the body there. Restitution does the same: on a bouncy contact the
+  solver acts on a slightly slower approach than the rule's, to start the
+  rebound. The next record then shows whatever approach the solver left, often
+  none, so the episode can start as a `Support` and the impact is lost. Such
+  approaches are slow: their gap is within the prediction distance, so at 60 Hz
+  they are under about 0.12 length units a second, plus a substep of gravity.
+- A body that the solver stops just clear of its support, without touching it,
+  accrues absence as a separated one does. If it stays clear past the
+  separation grace, its next arrival starts a new episode.
 
 ## Bounds and admission
 
@@ -141,6 +183,11 @@ Worlds without capture retain the version 1 encoding. Existing version 1
 snapshots remain readable. Unknown versions, truncated loading state and
 trailing bytes are rejected. Old builds do not understand version 2 snapshots.
 
+A world with speculative arrivals writes a tag after its versioned payloads,
+before any other tagged section, and keeps its version. Older builds refuse that
+tag as trailing data. A snapshot whose tag comes with the material response, or
+without a capture, is rejected.
+
 Same-build serialized continuation is tested, including a mid-contact snapshot,
 separation, and a later new impact. This is not a cross-machine lockstep claim.
 
@@ -157,6 +204,16 @@ The loading tests exercise actual canonical worlds with:
 - Atomic rejection at visit/contact/episode/output limits, preservation of prior
   CCD batches, real CCD substeps, and moving-surface hook composition.
 - Matching motion with capture enabled and disabled.
+- Speculative arrivals:
+  - Impacts start on the incoming approach for one, two and four collider
+    partitions, where the touching rule starts them on the approach left.
+  - A speculative contact starts nothing until its solve closes it.
+  - A ball closing on a wall at 400 from 0.001 to 1 away starts exactly one
+    impact, at 400. This holds with and without CCD, at 30 to 240 Hz and with
+    one or four CCD substeps.
+  - Each bounce starts one impact, and a ball resting awake or asleep keeps one
+    episode.
+  - Snapshots and clones keep the rule, and the material response is excluded.
 
 Run `RUST_MIN_STACK=16777216 cargo test -p engine-rapier --lib world::loading`.
 
