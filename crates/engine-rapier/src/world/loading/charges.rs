@@ -1,8 +1,9 @@
-//! Contact charges: each new impact a capture saw, priced after the step
-//! against the surfaces the host keeps. Pricing reads the step's pre-solve
-//! records and leaves the physics alone, so Rapier's restitution still sets
-//! the bounce. The host keeps the regions and charges them, as it does for
-//! weapons. See `docs/design/material-contact-charges.md`.
+//! Contact charges: each new impact a capture saw, and each support's load,
+//! priced after the step against the surfaces the host keeps. Impacts are
+//! priced from the step's pre-solve records and supports from the solver's
+//! impulses, and neither changes the physics, so Rapier's restitution still
+//! sets the bounce. The host keeps the regions and charges them, as it does
+//! for weapons. See `docs/design/material-contact-charges.md`.
 
 use super::*;
 use engine_material::shared_impact::{self, BudgetError};
@@ -48,8 +49,8 @@ pub enum Depth {
 pub trait ContactSurfaces {
     /// The surface the host keeps behind `source`, if it keeps one.
     fn surface(&self, source: ContactSource) -> Option<ContactSurface>;
-    /// Charges the region behind `source` with the work an impact consumed
-    /// from it.
+    /// Charges the region behind `source` with the work an impact or a
+    /// support consumed from it.
     fn absorb(&mut self, source: ContactSource, work: f32);
     /// Whether the host's policy shields `source` for now, as it might shield
     /// a ship just after it spawns. A shielded side is priced as any other,
@@ -59,7 +60,7 @@ pub trait ContactSurfaces {
     }
 }
 
-/// Why an impact was not priced.
+/// Why an impact or a support was not priced.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Unpriced {
     /// A side's region was retired after the step.
@@ -68,8 +69,9 @@ pub enum Unpriced {
     Undeclared,
     /// The new impacts that shared its bodies in its substep could not share
     /// one budget, such as when they have more points than a budget takes.
+    /// Supports have no budget.
     Budget(BudgetError),
-    /// The material law refused the impact, such as at a single point between
+    /// The material law refused the load, such as at a single point between
     /// two flat surfaces.
     Material(MaterialError),
 }
@@ -96,6 +98,36 @@ pub enum ContactCharge {
         /// The impact's share of its substep's energy, if its budget was
         /// solved.
         energy: Option<f32>,
+        reason: Unpriced,
+    },
+}
+
+/// What pricing one support's load did. Each steady support that carried
+/// load in the step is reported once.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SupportCharge {
+    /// A support priced against both surfaces. Each outcome is one side's, in
+    /// its slot 0, and they follow `sources`. Each side the host doesn't
+    /// protect has absorbed its consumed work.
+    Charged {
+        episode: EpisodeId,
+        sources: [ContactSource; 2],
+        /// The normal force the support carried over the step,
+        /// `mu wu / s^2`.
+        force: f32,
+        /// How wide what its loaded pieces cover is, `wu`.
+        width: f32,
+        /// How long the load acted, seconds: the whole step.
+        duration: f32,
+        outcomes: [Outcome; 2],
+        protected: [bool; 2],
+    },
+    /// A support that was not priced, because the host keeps no surface
+    /// behind a side or the law refused the load.
+    Unpriced {
+        episode: EpisodeId,
+        sources: [ContactSource; 2],
+        force: f32,
         reason: Unpriced,
     },
 }
@@ -465,17 +497,7 @@ fn charge(
         Ok(outcome) => outcome,
         Err(error) => return unpriced(Some(share.energy), Unpriced::Material(error)),
     };
-    let protected = event.sources.map(|s| surfaces.protected(s));
-    let sides = event
-        .sources
-        .into_iter()
-        .zip(outcome.consumed)
-        .zip(protected);
-    for ((source, work), shielded) in sides {
-        if !shielded && work > 0.0 {
-            surfaces.absorb(source, work);
-        }
-    }
+    let protected = absorb(surfaces, event.sources, outcome.consumed);
     ContactCharge::Charged {
         episode: event.id,
         sources: event.sources,
@@ -483,6 +505,22 @@ fn charge(
         outcome,
         protected,
     }
+}
+
+/// Has the host absorb the work each side consumed, except on the sides its
+/// policy shields, and returns which those are.
+fn absorb(
+    surfaces: &mut impl ContactSurfaces,
+    sources: [ContactSource; 2],
+    consumed: [f32; 2],
+) -> [bool; 2] {
+    let protected = sources.map(|s| surfaces.protected(s));
+    for ((source, work), shielded) in sources.into_iter().zip(consumed).zip(protected) {
+        if !shielded && work > 0.0 {
+            surfaces.absorb(source, work);
+        }
+    }
+    protected
 }
 
 /// How wide what a group's points cover is, between two surfaces. Each
@@ -556,6 +594,8 @@ fn price(a: ContactSurface, b: ContactSurface, share: &Share) -> Result<Outcome,
     };
     impact(&a.region, &b.region, contact, load)
 }
+
+mod supports;
 
 #[cfg(test)]
 mod tests;

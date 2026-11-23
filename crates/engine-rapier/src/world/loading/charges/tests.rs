@@ -3,6 +3,8 @@ use engine_material::{
     ContactBody, HULL, Material, ROCK, SOFT_TISSUE, effective_mass, shared_impact,
 };
 
+mod supports;
+
 const DT: f32 = 1.0 / 120.0;
 const SECTION: Section = Section::new(1.0, 0.5);
 
