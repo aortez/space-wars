@@ -5,6 +5,7 @@
 use super::*;
 use rapier2d::prelude::{ContactModificationContext, PhysicsHooks, SolverContactBatchContext};
 
+pub mod charges;
 pub mod response;
 
 /// A logical material region, independent of collider partitioning.
@@ -182,6 +183,9 @@ pub enum LoadingError {
     /// The material response and speculative arrivals exclude each other: the
     /// response admits only touching contacts.
     Incompatible,
+    /// Contact charges need a capture that admits speculative arrivals, so each
+    /// impact is priced on the approach the bodies brought into it.
+    ArrivalsDisabled,
 }
 
 impl std::fmt::Display for LoadingError {
@@ -223,6 +227,9 @@ pub(super) struct LoadingState {
     pub(in crate::world) speculative_arrivals: bool,
     #[serde(skip)]
     batches: Vec<ContactBatch>,
+    // Whether the host has priced this step's impacts.
+    #[serde(skip)]
+    charged: bool,
     #[serde(skip)]
     diagnostics: CaptureDiagnostics,
     #[serde(skip)]
@@ -258,6 +265,7 @@ impl LoadingState {
             episodes: BTreeMap::new(),
             speculative_arrivals: false,
             batches: Vec::new(),
+            charged: false,
             diagnostics: CaptureDiagnostics::default(),
             records: 0,
             response: None,
@@ -271,6 +279,7 @@ impl LoadingState {
 
     pub(super) fn begin_step(&mut self) {
         self.batches.clear();
+        self.charged = false;
         self.diagnostics = CaptureDiagnostics::default();
         self.records = 0;
         if let Some(response) = &mut self.response {
@@ -315,6 +324,14 @@ impl LoadingState {
         for token in tokens {
             self.retire(token);
         }
+    }
+
+    /// Whether `record` starts or continues an episode in a substep of `dt`:
+    /// it touches or, with speculative arrivals, its approach closes its gap
+    /// within the substep, which Rapier's solver acts on.
+    fn acting(&self, record: &ContactRecord, dt: f32) -> bool {
+        record.separation <= self.config.touch_tolerance
+            || (self.speculative_arrivals && record.closing_speed * dt > record.separation)
     }
 
     fn live(&self, token: RegionToken) -> bool {
@@ -546,14 +563,10 @@ impl LoadingState {
                 .then(a.separation.total_cmp(&b.separation))
         });
         // The pairs that start or continue an episode, with their fastest
-        // approach: touching pairs and, with speculative arrivals, pairs whose
-        // approach closes the gap within the substep, which Rapier's solver
-        // acts on.
+        // approach.
         let mut acting = BTreeMap::<_, f32>::new();
         for record in &contacts {
-            let arrives =
-                self.speculative_arrivals && record.closing_speed * context.dt > record.separation;
-            if record.separation <= self.config.touch_tolerance || arrives {
+            if self.acting(record, context.dt) {
                 acting
                     .entry(record.sources)
                     .and_modify(|speed| *speed = speed.max(record.closing_speed))
