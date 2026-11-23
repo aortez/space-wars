@@ -41,25 +41,37 @@ const BUDGET: Budget = Budget::for_terrain(
     false,
     scenario_scorched_earth::host::MAX_TERRAIN_WIDTH,
 );
+/// The duel's budget, and the face's fixed body of boxes.
 pub const POPULATION: Population = Population {
-    bodies: BUDGET.bodies,
-    colliders: BUDGET.colliders,
+    bodies: BUDGET.bodies + 1,
+    colliders: BUDGET.colliders + digits::MAX_CELLS,
     joints: BUDGET.joints,
 };
 
-pub fn config(shape: GrainShape) -> ScorchedConfig {
+pub fn config(shape: GrainShape, cpu_policy: [CpuPolicy; 2]) -> ScorchedConfig {
     ScorchedConfig {
         shape,
         max_grains: MAX_GRAINS,
         demo: true,
         cpu_driving: true,
-        cpu_policy: [CpuPolicy::Reactive; 2],
+        cpu_policy,
         slumping: true,
         cohesion: BankStrength::Weak,
         ..Default::default()
     }
 }
 
+/// The CPUs a fight's seed sends in: two that plot each shot, or one that
+/// plots against one that learns from its shots, on either side.
+pub fn policies(seed: u64) -> [CpuPolicy; 2] {
+    match seed % 3 {
+        0 => [CpuPolicy::Plotted; 2],
+        1 => [CpuPolicy::Plotted, CpuPolicy::Reactive],
+        _ => [CpuPolicy::Reactive, CpuPolicy::Plotted],
+    }
+}
+
+mod digits;
 mod entry;
 pub use entry::placement;
 
@@ -108,7 +120,11 @@ pub struct TanksEvent {
     pub converted: Vec<TerrainGrain>,
     pub result: Option<ResultKind>,
     combat_ticks: u64,
+    /// Shells the face has stopped.
+    face_hits: u32,
     layout: Layout,
+    digits: digits::Solids,
+    policies: [CpuPolicy; 2],
     ground: BodyId,
     spawn: [(BodyId, BodyMotion); 2],
     departure: Vec<(BodyId, BodyMotion)>,
@@ -139,7 +155,8 @@ impl TanksEvent {
             GrainShape::Hexagon
         };
         let world = arena.claim_resident(OWNER, layout);
-        let mut duel = match HostedDuel::attach(world, config(shape), seed, place) {
+        let policies = policies(seed);
+        let mut duel = match HostedDuel::attach(world, config(shape, policies), seed, place) {
             Ok(duel) => duel,
             Err(_) => {
                 arena.release(OWNER);
@@ -168,6 +185,8 @@ impl TanksEvent {
                 false,
             );
         }
+        let mut digits = digits::Solids::default();
+        digits.synchronize(world, layout, display);
         Ok(Self {
             seed,
             tick: 0,
@@ -177,7 +196,10 @@ impl TanksEvent {
             converted: Vec::new(),
             result: None,
             combat_ticks: 0,
+            face_hits: 0,
             layout,
+            digits,
+            policies,
             ground,
             spawn,
             departure: Vec::new(),
@@ -203,9 +225,17 @@ impl TanksEvent {
         self.spawn[slot].1.position
     }
 
+    /// Keeps the event to the reading: the face's boxes throughout, and the
+    /// entry lanes while the tanks arrive.
+    pub fn synchronize(&mut self, arena: &mut ClockArena, display: crate::digits::DisplaySnapshot) {
+        let world = arena.held_mut(OWNER).expect("Tanks holds the arena");
+        self.digits.synchronize(world, self.layout, display);
+        self.synchronize_entry(arena, display);
+    }
+
     /// A minute/font change can close a previously clear lane. Restart that
     /// transport once from the top; repeated changes still have a bounded exit.
-    pub fn synchronize_entry(
+    fn synchronize_entry(
         &mut self,
         arena: &mut ClockArena,
         display: crate::digits::DisplaySnapshot,
@@ -247,7 +277,7 @@ impl TanksEvent {
         arena: &mut ClockArena,
         display: crate::digits::DisplaySnapshot,
     ) -> bool {
-        self.synchronize_entry(arena, display);
+        self.synchronize(arena, display);
         let world = arena.held_mut(OWNER).expect("Tanks holds the arena");
         let scale = self.duel.placement().scale;
         match self.phase {
@@ -305,6 +335,12 @@ impl TanksEvent {
             self.duel
                 .finish_step(world)
                 .expect("one completion per Clock tick");
+            self.face_hits += self
+                .duel
+                .impacts()
+                .iter()
+                .filter(|impact| impact.collider.entity == digits::BODY)
+                .count() as u32;
         }
         self.tick += 1;
         self.phase_tick += 1;
@@ -526,6 +562,8 @@ impl TanksEvent {
                 * (0.5 * self.duel.placement().scale).powi(2))
             .round() as u32,
             entry_failure: self.entry_failure.map(str::to_owned),
+            cpu: self.policies.map(|policy| policy.label().to_owned()),
+            face_hits: self.face_hits,
         }
     }
 }

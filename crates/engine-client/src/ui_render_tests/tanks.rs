@@ -178,3 +178,127 @@ fn tanks_render_both_adapters_and_controls_without_covering_the_reading() {
         }
     }
 }
+
+/// A Tanks fight at `seed` on the Picade's 4:3 screen, where the tanks stand
+/// far enough apart for shells to reach the face.
+fn face_fight(viewport: Viewport, seed: u64) -> scenario_clock::ClockState {
+    let mut state = ClockScenario::init(
+        ClockConfig {
+            lamps: engine_common::ClockLampMode::Steady,
+            aspect_ratio: viewport.aspect_ratio(),
+            event_profile: ClockEventProfile::Off,
+            ..Default::default()
+        },
+        seed,
+    );
+    ClockScenario::step(
+        &mut state,
+        &[
+            ClockAction::set_reading(ClockReading::new(12, 39, 50).unwrap()),
+            ClockAction::preview_event(ClockEventKind::Tanks),
+        ],
+        Duration::ZERO,
+    );
+    state
+}
+
+fn step(state: &mut scenario_clock::ClockState) {
+    ClockScenario::step(state, &[], Duration::from_nanos(16_666_667));
+}
+
+/// The ticks of a fight until its result, with what `read` reads from each.
+fn record<T>(
+    mut state: scenario_clock::ClockState,
+    read: impl Fn(&engine_common::ClockTanksState) -> T,
+) -> Vec<T> {
+    let mut readings = Vec::new();
+    while let Some(tanks) = state.tanks_state().filter(|tanks| tanks.result.is_none()) {
+        readings.push(read(&tanks));
+        step(&mut state);
+    }
+    readings
+}
+
+#[test]
+fn tanks_shells_burst_on_the_face_in_front_of_it() {
+    let windows = Rc::new(RefCell::new(Vec::new()));
+    slint::platform::set_platform(Box::new(CapturePlatform(windows.clone()))).unwrap();
+    let ui = MainWindow::new().unwrap();
+    ui.show().unwrap();
+    let output = std::env::var_os("SPACEWARS_TANKS_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(path) = &output {
+        std::fs::create_dir_all(path).unwrap();
+    }
+    let (width, height) = (1024, 768);
+    let viewport = Viewport::new(width as f32, height as f32);
+    let window = windows.borrow()[0].clone();
+    window.set_size(PhysicalSize::new(width, height));
+    // The frame at tick `to` of the fight at `seed`, with every shell drawn
+    // since tick `from` left on it as a trail.
+    let picture = |name: &str, seed: u64, from: usize, to: usize| {
+        let mut state = face_fight(viewport, seed);
+        for _ in 0..from {
+            step(&mut state);
+        }
+        let shell = Rgb8Pixel::new(255, 232, 158);
+        let mut trail = vec![false; (width * height) as usize];
+        let mut pixels = None;
+        for tick in from..=to {
+            let drawn = draw(
+                &ui,
+                &window,
+                &ClockScenario::render_frame(&state),
+                viewport,
+                false,
+            );
+            for (on, pixel) in trail.iter_mut().zip(drawn.as_slice()) {
+                *on |= *pixel == shell;
+            }
+            pixels = Some(drawn);
+            if tick < to {
+                step(&mut state);
+            }
+        }
+        let mut pixels = pixels.unwrap();
+        for (pixel, on) in pixels.make_mut_slice().iter_mut().zip(trail) {
+            if on {
+                *pixel = shell;
+            }
+        }
+        if let Some(path) = &output {
+            write_png(
+                &path.join(format!("tanks-{width}x{height}-{name}.png")),
+                &pixels,
+            );
+        }
+        state
+    };
+
+    // The 2.5 s up to the face's first stop, in a fight between a learning
+    // tank on the left and a plotting one on the right.
+    let state = face_fight(viewport, 2);
+    assert_eq!(
+        state.tanks_state().unwrap().cpu,
+        ["Learning + move", "Plotting + move"]
+    );
+    let hits = record(state, |tanks| tanks.face_hits);
+    let hit = hits
+        .iter()
+        .position(|&stopped| stopped > 0)
+        .expect("the face stopped a shell");
+    let state = picture("face-burst", 2, hit.saturating_sub(150), hit + 8);
+    assert_eq!(state.tanks_state().unwrap().face_hits, 1);
+
+    // Two plotting tanks' first shots, until both land, clear of the face.
+    let state = face_fight(viewport, 3);
+    assert_eq!(state.tanks_state().unwrap().cpu, ["Plotting + move"; 2]);
+    let shots = record(state, |tanks| (tanks.shots, tanks.shells));
+    let first = shots.iter().position(|&(shots, _)| shots > 0).unwrap();
+    let landed = first
+        + shots[first..]
+            .iter()
+            .position(|&(shots, shells)| shots >= 2 && shells == 0)
+            .unwrap();
+    let state = picture("plotted-pass", 3, first, landed + 8);
+    assert_eq!(state.tanks_state().unwrap().face_hits, 0);
+}

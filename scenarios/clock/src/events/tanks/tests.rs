@@ -39,6 +39,33 @@ fn event(state: &mut ClockState) -> &mut TanksEvent {
     }
 }
 
+fn tanks(state: &ClockState) -> &TanksEvent {
+    match state.active_event.as_ref().unwrap() {
+        ActiveEvent::Tanks(event) => event,
+        _ => panic!("Tanks"),
+    }
+}
+
+/// The middles of the polygons `frame` draws on `layer`.
+fn middles(frame: &engine_common::RenderFrame, layer: i32) -> Vec<Vec2> {
+    frame
+        .layers
+        .iter()
+        .filter(|drawn| drawn.z == layer)
+        .flat_map(|drawn| &drawn.primitives)
+        .filter_map(|primitive| match primitive {
+            engine_common::RenderPrimitive::Polygon(polygon) => Some(
+                polygon
+                    .points
+                    .iter()
+                    .fold(Vec2::ZERO, |sum, p| sum + Vec2::new(p.x, p.y))
+                    / polygon.points.len() as f32,
+            ),
+            _ => None,
+        })
+        .collect()
+}
+
 #[test]
 fn terrain_fills_the_width_and_transport_uses_current_glyph_gaps() {
     use engine_common::ClockFont;
@@ -215,6 +242,93 @@ fn entry_combat_and_departure_share_the_arena_and_keep_the_current_reading() {
         assert!(state.arena.idle());
         assert_eq!(state.reading.unwrap().hour, 0);
     }
+}
+
+#[test]
+fn fights_pair_plotting_with_plotting_or_with_learning_on_either_side() {
+    let mut pairs = Vec::new();
+    for seed in 0..6 {
+        let pair = policies(seed);
+        assert!(pair.contains(&CpuPolicy::Plotted), "{seed}: {pair:?}");
+        if !pairs.contains(&pair) {
+            pairs.push(pair);
+        }
+    }
+    assert_eq!(pairs.len(), 3, "{pairs:?}");
+}
+
+#[test]
+fn the_face_stops_shells_in_front_of_it_and_plotted_shots_clear_it() {
+    // At 4:3 the tanks fight far enough apart for shells to reach the face.
+    // In this fight the left tank learns and the right one plots.
+    let mut state = ready(4.0 / 3.0, 2, ClockTimeFormat::TwentyFourHour);
+    start_fighting(&mut state);
+    assert_eq!(
+        state.tanks_state().unwrap().cpu,
+        ["Learning + move", "Plotting + move"]
+    );
+    let layout = tanks(&state).layout;
+    let scale = tanks(&state).duel.placement().scale;
+    let mut face_hits = [0; 2];
+    while state.tanks_state().unwrap().result.is_none() {
+        assert!(tanks(&state).tick < MAX_TICKS);
+        let before = ClockScenario::render_frame(&state);
+        let shells: Vec<_> = tanks(&state).duel.shells().collect();
+        tick(&mut state);
+        let event = tanks(&state);
+        let bodies = event
+            .duel
+            .tanks(state.arena.world().unwrap())
+            .map(|tank| tank.body.entity);
+        for impact in event.duel.impacts() {
+            if impact.collider.entity != digits::BODY {
+                continue;
+            }
+            let owner = bodies
+                .iter()
+                .position(|body| *body == impact.source.owner)
+                .unwrap();
+            face_hits[owner] += 1;
+            // The shell burst on the cell its ray met.
+            let cell = event.digits.cells()[usize::from(impact.collider.part)];
+            let offset = impact.point - cell.center;
+            assert!(
+                offset.x.abs().max(offset.y.abs()) <= cell.half + 1e-3,
+                "{offset:?} {cell:?}"
+            );
+            if face_hits[0] + face_hits[1] > 1 {
+                continue;
+            }
+            // Before it did, it flew in front of the face, where combat
+            // drawing used to stop, and its burst is drawn there too.
+            let shell = shells
+                .iter()
+                .find(|shell| shell.source == impact.source)
+                .unwrap();
+            assert!(shell.position.y > layout.face_origin.y - 4.0, "{shell:?}");
+            assert!(
+                middles(&before, crate::render::SHOT_LAYER)
+                    .iter()
+                    .any(|middle| middle.distance_to(shell.position) < 1e-3),
+                "{shell:?}"
+            );
+            assert!(
+                middles(
+                    &ClockScenario::render_frame(&state),
+                    crate::render::SHOT_LAYER
+                )
+                .iter()
+                .any(|middle| middle.distance_to(impact.point) < scale),
+                "{impact:?}"
+            );
+        }
+    }
+    assert!(
+        face_hits[0] > 0,
+        "the learning tank's shells reach the face"
+    );
+    assert_eq!(face_hits[1], 0, "the plotting tank's shots clear it");
+    assert_eq!(state.tanks_state().unwrap().face_hits, face_hits[0]);
 }
 
 fn start_fighting(state: &mut ClockState) {

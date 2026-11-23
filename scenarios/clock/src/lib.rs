@@ -2426,7 +2426,7 @@ impl ClockState {
             event.synchronize(self.display, &mut self.segments);
         }
         if let Some(ActiveEvent::Tanks(event)) = &mut self.active_event {
-            event.synchronize_entry(&mut self.arena, self.display);
+            event.synchronize(&mut self.arena, self.display);
         }
         if !self
             .active_event

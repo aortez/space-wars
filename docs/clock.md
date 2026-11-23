@@ -503,7 +503,7 @@ load, and without it the grains at the bottom read as knocked tick after
 tick.
 
 A look visits at most 512 bodies across the worlds; the arena holds at most
-255, or 335 under Tanks. On the development workstation (`--profile ci`), the
+255, or 336 under Tanks. On the development workstation (`--profile ci`), the
 ignored test `what_a_look_costs` timed a look at 512 moving bodies, all in
 view, at about 52 µs. In events the 99th percentile was about 10 µs for
 Tanks, with up to 92 bodies, 8 µs for Exploding digits and for Coins, and
@@ -1174,7 +1174,7 @@ the Off profile still disables every automatic event.
 | `explosion` | Individual digit/AM-PM blocks scatter and bounce | 0.6 s warning + 3.5 s burst + 1.5 s reform | 45 s |
 | `spider` | One visitor on a silk line, climbing and swinging on the digits in the run's arena | At most 30 s including departure, with up to 10 s more to finish leaving | 30 s after departure |
 | `coins` | Lit cells turn into coins that drop, roll and pile; a magpie carries three or four off, and the rest fly home | 0.6 s minting + 4 s cascade + 23 s gathering + 1.5 s reform | 45 s |
-| `tanks` | Two CPU tanks duel on destructible hills below the reading | At most 84 s, including entry, one transport retry and departure | 120 s |
+| `tanks` | Two CPU tanks duel on destructible hills below the reading, whose lit cells stop their shells | At most 84 s, including entry, one transport retry and departure | 120 s |
 
 ### Tanks
 
@@ -1198,12 +1198,23 @@ reservation is separate from the existing visitor combinations; inspection
 reports the capacity for the current composition. Residents keep their bodies
 and world, and cleanup removes only identities in the Tanks namespace.
 
+Each fight's seed sends in two of Scorched Earth's CPUs: Plotting + move
+against itself, or against Learning + move on either side
+([Plotted aim](scorched-earth.md#plotted-aim)). The face stops shells. One
+fixed body holds a box for every lit digit cell, both colon cells, even while
+the colon blinks off, and each AM/PM pixel, and the body is rebuilt when the
+reading changes. A shell is a ray each tick, so it bursts on the first box it
+meets, and a plotting tank's trial shells find the arcs that pass the face.
+The boxes push nothing, so dirt and tanks pass through the face as before.
+Shells and their bursts are drawn in front of the face, up to the canopy, and a
+shell flies on until it leaves the frame.
+
 | Phase | Maximum time | Behavior |
 | --- | --- | --- |
 | `raising` | 2 s | Physical hills rise from beneath the floor. |
 | `beam-down` | 2 s, plus at most one 2 s retry | Tanks descend from above the frame, through clear digit gaps, to supported hill positions. A reading/font change that closes a lane replans and restarts transport; a second closure withdraws. |
 | `settling` | 2 s | Both hulls must actually be upright and supported before driving or firing. Failure withdraws the hills. |
-| `fighting` | 60 s | Shared CPU driving, swept shells, craters, loose dirt and weak-bank collapse. |
+| `fighting` | 60 s | Shared CPU driving, swept shells that burst on the lit face, craters, loose dirt and weak-bank collapse. |
 | `finishing-shots` | 10 s | No new driving or fire; existing shells finish before deciding the result. |
 | `crumbling` | 1 s | Each in-view loser becomes physical dirt at its actual pose. |
 | `beam-up` | 2 s | Surviving winners depart. |
@@ -1222,12 +1233,46 @@ already off-screen loser retires without bringing its pile back into view.
 Once the last shell resolves, the result is latched. Rapier continues to move
 the aftermath, while duel AI, damage and terrain topology stop changing. Pausing
 freezes all phases. Reading updates continue throughout, and both render adapters
-clip combat geometry below the face. Entry hulls and beams use the full-height
-clear lanes. Layout changes cancel through the normal owned cleanup path.
+clip the battlefield below the face; shells and their bursts are drawn in front
+of it. Entry hulls and beams use the full-height clear lanes. Layout changes
+cancel through the normal owned cleanup path.
+
+How often the face matters depends on the screen. A local survey ran 60 fights
+at each of 4:3, 5:3 and 16:9, at readings that vary with the seed:
+
+- At 4:3, the Picade's shape, the tanks fight about 60 units apart and their
+  arcs rise into the face. Learning + move's shells burst on it on 89 of 171
+  shots; none of Plotting + move's 346 shots did, and every one hit. The first
+  kill comes at a median of 19 s. Two Learning + move tanks took 47 s before
+  the face stopped shells, and take 57 s against it.
+- At 5:3, HyperPixel's shape, and at 16:9 the tanks close to 22–26 units, their
+  arcs stay below the face, and no shell reached it. The first kill comes at a
+  median of 17 s, against 23 s for two Learning + move tanks. Thirty fights
+  each in portrait (0.6) and at 4:1 left the face untouched too.
+- Plotting + move won 104 of its 120 fights against Learning + move, and the
+  other 16 left no survivors. Two plotting tanks left none in 25 of 60 fights.
+- On the development workstation (`--profile ci`), the 99th-percentile Clock
+  tick during a fight, as a median over each shape's fights, fell from
+  2.3–2.9 ms to 1.4–1.7 ms: fights end sooner and leave less dirt. The slowest
+  tick stayed at 6–7 ms. It has not been timed on a Pi.
+
+The run data stays local.
+
+| Learning + move bursts a shell on the 2 | Plotting + move shoots under the face |
+| --- | --- |
+| ![A plotted shot passing under the face, and a learning tank's shell bursting on the 2](screenshots/clock/tanks-1024x768-face-burst.png) | ![Two plotting tanks' first shots passing under the face](screenshots/clock/tanks-1024x768-plotted-pass.png) |
+
+Each picture keeps the shells of the frames before it as a trail. On the left,
+the plotting tank's 37° shot passes under the face and hits the learning tank,
+whose 50° reply bursts on the bottom of the 2. On the right, two plotting
+tanks' first shots pass under the face. `SPACEWARS_TANKS_ARTIFACTS=<dir> cargo
+test --locked --profile ci -p engine-client tanks_shells_burst_on_the_face`
+regenerates them.
 
 `clock state` includes phase, support, world positions, hull and terrain IDs,
-health, shell/shot counts, conversion accounting and any settling failure in
-`tanks`. Values with a `_milli` suffix use thousandths of their inspection
+health, the two CPUs (`cpu`), shell/shot counts, the shells the face stopped
+(`face_hits`), conversion accounting and any settling failure in `tanks`.
+Values with a `_milli` suffix use thousandths of their inspection
 unit (positions, area and mass use host units). The common damage-material migration
 and damage to resident plants remain follow-up work: this integration uses Scorched's current tank HP rule and does
 not yet route the exposed impact notifications into plant tissue. Contact-driven

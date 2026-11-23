@@ -135,8 +135,9 @@ impl Owner {
                     + count(&ids::canonical::FLAPS);
                 Population::new(bodies, bodies)
             }
-            // A fixed compound of its solid digit cells and two liner panels.
+            // The duel's own budget, and a fixed compound of the face's cells.
             Self::Event(ClockEventKind::Tanks) => crate::events::tanks::POPULATION,
+            // A fixed compound of its solid digit cells and two liner panels.
             Self::Event(ClockEventKind::Aquarium) => Population::new(
                 count(&ids::canonical::AQUARIUM_DIGITS) + count(&ids::canonical::AQUARIUM_LINER),
                 MAX_DIGIT_SOLIDS + count(&ids::canonical::AQUARIUM_LINER),
@@ -199,7 +200,7 @@ impl Owner {
             Self::Event(ClockEventKind::Aquarium) => &[AQUARIUM_LINER, AQUARIUM_DIGITS],
             Self::Event(ClockEventKind::Explosion) => &[EXPLOSION_CELLS],
             Self::Event(ClockEventKind::Coins) => &[COIN_CELLS, MAGPIE],
-            Self::Event(ClockEventKind::Tanks) => &[TANKS],
+            Self::Event(ClockEventKind::Tanks) => &[TANKS, TANKS_DIGITS],
             Self::Event(ClockEventKind::Falling) => &[FALLING_SEGMENTS, FALLING_LETTERS],
             Self::Event(ClockEventKind::Meltdown) => &[MELTDOWN_CELLS],
             Self::Event(_) => &[],
@@ -1329,6 +1330,8 @@ pub(crate) mod ids {
         pub(crate) const AQUARIUM_LINER: Range<u64> = 6001..6003;
         /// Aquarium's solid digit compound.
         pub(crate) const AQUARIUM_DIGITS: Range<u64> = 6100..6101;
+        /// Tanks' digit compound, which shells burst on.
+        pub(crate) const TANKS_DIGITS: Range<u64> = 6200..6201;
         /// The arena fixture's balls, `MAX_FIXTURE_BALLS` for each of its
         /// owners.
         pub(crate) const FIXTURE_BALLS: Range<u64> =
@@ -1429,6 +1432,7 @@ pub(crate) mod ids {
             ("TANKS", TANKS),
             ("AQUARIUM_LINER", AQUARIUM_LINER),
             ("AQUARIUM_DIGITS", AQUARIUM_DIGITS),
+            ("TANKS_DIGITS", TANKS_DIGITS),
             ("FIXTURE_BALLS", FIXTURE_BALLS),
             ("SPIDER", SPIDER),
             ("SPIDER_FRAME", SPIDER_FRAME),

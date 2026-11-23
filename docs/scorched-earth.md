@@ -422,8 +422,8 @@ It moves after enemy hits as Learning + move does, except that it counts as
 confident while its last plot found an arc that reaches. With a plotted hit it
 stays and fires back; without one it may move. Besides the shared labels, the
 label above the tank shows `plotting`, `plotted hit`, `plotted near miss`, `no
-plotted shot` or `waiting to plot`. Clock's Tanks event still uses Learning +
-move.
+plotted shot` or `waiting to plot`. Clock's Tanks event sends it in against
+itself or against Learning + move ([Tanks](clock.md#tanks)).
 
 The aiming lab's `wall` case shuts the fixed tanks in a dirt room, divided
 halfway by a wall with one window, so the window is the only way through.
