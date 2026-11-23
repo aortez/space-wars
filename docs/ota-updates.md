@@ -116,38 +116,46 @@ commit it names, which must be on `main` with a passing push run. It moves the
 build checkout to that commit, builds it with
 [`ota_build_inputs.py`](../.github/ci/ota_build_inputs.py), packages the
 output with the pinned `image_candidate` and compares the image with the
-newest published generation, or the one `--baseline` names. The comparison
-([`ota_prepare.py`](../.github/ci/ota_prepare.py)) covers every changed path
-under `yocto/`, the fields that decide which units may install the image, and
-every entry of both root filesystems: its type, mode, owner, content and link
-target. Only the content of the app's own files may change, and of the three
-NSS self-check files that every image build signs again. A different boot set,
-or kernel modules for another kernel, stops the preparation, since boot set
-changes take the supervised path (#268). Any other difference stops it after writing `differences.json` and
-printing that file's digest; after reviewing the file, run again with
-`--accept DIGEST`, which reuses the build. Every image must also pass the
-content checks: the packaged image record, the packaged units and scripts
-against their sources, the device service's block device rules, an fstab
-that mounts nothing by device name, no owner helpers, and the two executables
-against the image record. The prepared candidate is the workspace directory
-named by the source's first eight digits, ready for `nightly`. `candidate`
-reads the journal and the published bundle without the publisher lock, so a
-renewal can run during its build, and it never signs, publishes or contacts a
-device.
+newest published generation. The build reads the checkout's working tree, so
+the checkout may hold nothing but the commit and what builds leave there. The
+comparison ([`ota_prepare.py`](../.github/ci/ota_prepare.py)) covers every
+changed path under `yocto/`, the data range and protocols a unit needs to
+install the image, and every entry of both root filesystems: its type, mode,
+owner, flags, extended attributes, content and link target. Only the content
+of the app's own files may change, and of the three NSS self-check files that
+every image build signs again. A different boot set, machine, architecture or
+layout, or kernel modules for another kernel, stops the preparation, since
+such changes take the supervised path (#268). Any other difference stops it
+after writing `differences.json` and printing that file's digest and the
+command that accepts it, which names the same source and reuses the build.
+Every image must also pass the content checks: the packaged image record, the
+packaged units and scripts against their sources, the device service's block
+device rules, an fstab that mounts nothing by device name, no owner helpers,
+and the two executables against the image record.
 
-`nightly` takes only a directory that `candidate` compared with the newest
-published generation. It checks every artifact against the directory's
-preparation record, the image with the pinned `image_candidate` verifier, the
-image's embedded source, and a successful CI run of that commit pushed to
-`main`. `promote` requires a published Nightly image and a qualification
-record naming that whole image and its generation. Both write a plan and print
-its digest. `sign` and `publish` take the digest, repeat the checks, and refuse
-if the journal, the candidate, the record, the trusted tools or the command's
-code changed after planning, so plan, sign and publish from the same checkout
-of `main`. Planning and signing use a read-only GitHub client, and only a
-signed plan can be published.
+The prepared candidate is the workspace directory named by the source's first
+eight digits, ready for `nightly`. Its `code.json` names the code that started
+it, and only that code resumes it; after the command's code changes, delete
+the directory and prepare the commit again. Run again after another generation
+is published, the command compares the candidate with the new one and reuses
+the build. `--baseline` compares with an older generation instead, as a check,
+and `nightly` refuses that comparison. `candidate` reads the journal and the
+published bundle without the publisher lock, so a renewal can run during its
+build, and it never signs, publishes or contacts a device.
 
-Every operation signs all five online roles one version higher under the
+`nightly` takes only a directory that the same code prepared and compared with
+the newest published generation. It checks every artifact against the
+directory's preparation record, the image with the pinned `image_candidate`
+verifier, the image's embedded source, and a successful CI run of that commit
+pushed to `main`. `promote` requires a published Nightly image and a
+qualification record naming that whole image and its generation. Both write a
+plan and print its digest. `sign` and `publish` take the digest, repeat the
+checks, and refuse if the journal, the candidate, the record, the trusted tools
+or the command's code changed after planning, so plan, sign and publish from
+the same checkout of `main`. Planning and signing use a read-only GitHub
+client, and only a signed plan can be published.
+
+Every feed operation signs all five online roles one version higher under the
 shared publisher lock, saves a journal checkpoint before and after each signer
 call, hard-links the payloads from the previous bundle, checks the new bundle
 with `feed_inventory` and delivers it timestamp-last. Before delivery it checks

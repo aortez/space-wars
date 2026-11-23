@@ -227,8 +227,9 @@ def run(signer, inventory):
             return delivery.parse_state(feed.release)
 
         first, second = directory / 'first', directory / 'second'
-        prepared_candidate(first, b'first fixture image')
-        prepared_candidate(second, b'second fixture image', baseline=1)  # Planned once the first is published.
+        prepared_candidate(first, b'first fixture image', code=release.code_digests())
+        # Planned once the first is published.
+        prepared_candidate(second, b'second fixture image', baseline=1, code=release.code_digests())
         plan = call('nightly', first)
         check((plan['version'], plan['generation'], plan['targets_after']) == (2, 1, dict(release=0, nightly=1)),
               'Unexpected Nightly plan')

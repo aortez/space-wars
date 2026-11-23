@@ -1,13 +1,13 @@
-"""Owner-local OTA feed publisher: Nightly publication, Release promotion and renewal.
+"""Owner-local OTA feed publisher: candidate preparation, Nightly publication, Release promotion and renewal.
 
-One command replaces the per-generation publication drivers and the renewal
-script. Every operation re-signs all five online roles one version higher under
-the shared publisher lock, checkpoints the journal around each signer call,
-builds a bundle whose payloads are hard links to the previous bundle's, checks
-it with feed_inventory and delivers it timestamp-last. A Nightly publication or
-Release promotion first saves a plan; sign and publish require that plan's
-digest, so the owner approves exactly what is signed. A renewal changes no
-targets and needs no plan.
+One command replaces the per-generation preparation and publication drivers
+and the renewal script. Every feed operation re-signs all five online roles
+one version higher under the shared publisher lock, checkpoints the journal
+around each signer call, builds a bundle whose payloads are hard links to the
+previous bundle's, checks it with feed_inventory and delivers it
+timestamp-last. A Nightly publication or Release promotion first saves a plan;
+sign and publish require that plan's digest, so the owner approves exactly
+what is signed. A renewal changes no targets and needs no plan.
 
   ota_release.py status
   ota_release.py renew sign|publish
@@ -168,7 +168,7 @@ def beside(*modules):
 
 
 def code_digests():
-    """Digests of the code that runs: this command and the modules it imports, which all live beside it."""
+    """Digests of the files the configuration pins: this command and the modules it imports or runs, all beside it."""
     beside(journal, delivery)
     here = Path(__file__).resolve().parent
     return {name: digest((here / name).read_bytes()) for name in CODE}
@@ -320,7 +320,7 @@ class Publisher:
         return json.loads(subprocess.check_output(['gh', *args], timeout=120))
 
     def passed_ci(self, run, source):
-        """The record of a CI run, which must be a completed, successful run of source pushed to main."""
+        """The record of a run of the CI workflow, which must have passed on a push of source to main."""
         ci = self.gh_json(['run', 'view', str(run), '--repo', delivery.REPOSITORY, '--json', CI_FIELDS])
         require(ci.get('status') == 'completed' and ci.get('conclusion') == 'success' and ci.get('event') == 'push'
                 and ci.get('headBranch') == 'main' and ci.get('headSha') == source and ci.get('workflowName') == 'CI',
@@ -682,14 +682,17 @@ class Publisher:
         require(isinstance(report, dict) and report.get('schema') == 2 and isinstance(report.get('prepared_by'), dict)
                 and report['prepared_by'].get('command') == 'ota_release.py candidate',
                 'Prepare candidates with ota_release.py candidate')
+        source = report['source']
+        require(isinstance(source, str) and COMMIT.fullmatch(source), 'Invalid preparation source')
+        # Only the reviewed code that plans may have prepared what it plans.
+        require(report['prepared_by'].get('code') == self.config.code, f'{root} was prepared by other code; '
+                f'delete it and run ota_release.py candidate {source} again')
         # The comparison is only meaningful against what devices now get: the newest published generation.
         compared = report.get('baseline')
         compared = compared.get('generation') if isinstance(compared, dict) else None
         newest = max((e['generation'] for e in self.state['images'].values() if e['nightly'] is not None), default=None)
         require(compared == newest, f'The candidate was compared with generation {compared}, but the newest '
-                f'published generation is {newest}; prepare it again')
-        source = report['source']
-        require(isinstance(source, str) and COMMIT.fullmatch(source), 'Invalid preparation source')
+                f'published generation is {newest}; run ota_release.py candidate {source} again')
         for name in ('policy.json', 'main-ci-run.json', 'candidate/candidate.json', 'candidate/qualification.json',
                      'candidate/image.ext4.zst'):
             require(name in report['artifacts'], 'The preparation record does not pin ' + name)
@@ -758,7 +761,7 @@ class Publisher:
                     plan=str(operation / 'plan.json'), plan_sha256=plan_sha256,
                     next=f'ota_release.py sign {version} --plan-sha256 {plan_sha256}')
 
-    def candidate(self, source=None, accept=None, generation=None):
+    def candidate(self, source=None, accept=None, generation=None, previous_override=None):
         """Builds and prepares a Nightly candidate in a session without the lock; see ota_prepare.py."""
         require(not self.exclusive, 'Prepare candidates without the publisher lock')
         import ota_prepare  # Only candidate needs it, and its YAML parser; status and renew never import it.
@@ -767,7 +770,7 @@ class Publisher:
         # session's private one, and a checkout under it gives changed files modes git never recorded.
         private = os.umask(self.umask)
         try:
-            return ota_prepare.prepare(self, code_digests(), source, accept, generation)
+            return ota_prepare.prepare(self, code_digests(), source, accept, generation, previous_override)
         finally:
             os.umask(private)
 
@@ -877,14 +880,15 @@ def main(argv=None):
     candidate.add_argument('source', nargs='?', help='a commit on main that passed CI; the newest such by default')
     candidate.add_argument('--accept', metavar='SHA256', help='digest of the reviewed differences.json')
     candidate.add_argument('--baseline', type=int, metavar='GENERATION',
-                           help='compare with this published generation rather than the newest')
+                           help='compare with this published generation rather than the newest, for a check; '
+                                'nightly takes only a comparison with the newest')
     nightly = commands.add_parser('nightly', help='plan the Nightly publication of a prepared candidate')
     nightly.add_argument('candidate', type=Path)
     promote = commands.add_parser('promote', help='plan the Release promotion of a published Nightly image')
     promote.add_argument('--payload', required=True, help='compressed SHA-256 of the published Nightly image')
     promote.add_argument('--qualification', type=Path, required=True, help='its release-qualification record')
     promote.add_argument('--notes', type=Path, required=True, help='file holding the release notes')
-    for command in (renew, nightly, promote):
+    for command in (candidate, nightly, promote, renew):
         command.add_argument('--previous-bundle', type=Path, help='bundle of the published feed, when none is recorded')
     for name in ('sign', 'publish'):
         command = commands.add_parser(name, help=name + ' a prepared plan')
@@ -896,7 +900,7 @@ def main(argv=None):
         if args.command == 'status':
             result = publisher.status()
         elif args.command == 'candidate':
-            result = publisher.candidate(args.source, args.accept, args.baseline)
+            result = publisher.candidate(args.source, args.accept, args.baseline, args.previous_bundle)
         elif args.command == 'renew':
             result = publisher.renew(args.action, args.previous_bundle)
         elif args.command == 'nightly':
@@ -913,5 +917,5 @@ def main(argv=None):
 if __name__ == '__main__':
     try:
         main()
-    except ValueError as error:
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
         sys.exit('ota_release.py: ' + str(error))

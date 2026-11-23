@@ -29,9 +29,10 @@ def publisher(root):
     return release.Publisher(release.Config(configuration(root)))
 
 
-def prepared_candidate(directory, payload, embedded='a' * 40, baseline=None):
+def prepared_candidate(directory, payload, embedded='a' * 40, baseline=None, code=None):
     """A candidate directory as ota_release.py candidate leaves it, from source 'a' * 40, compared with the
-    baseline generation, and its image_candidate output."""
+    baseline generation by the code configuration() pins, unless code names other, and its image_candidate
+    output."""
     (directory / 'candidate').mkdir(parents=True)
     descriptor = dict(schema=1, format='rootfs-ext4-zstd', expanded=dict(bytes=4096, sha256=digest(payload * 2)),
                       compressed=dict(bytes=len(payload), sha256=digest(payload)))
@@ -45,7 +46,8 @@ def prepared_candidate(directory, payload, embedded='a' * 40, baseline=None):
              'candidate/qualification.json': json.dumps(dict(schema=1, image=image)).encode()}
     for name, data in files.items():
         (directory / name).write_bytes(data)
-    report = dict(schema=2, prepared_by=dict(command='ota_release.py candidate', code={}), source='a' * 40,
+    code = {name: 'c' * 64 for name in release.CODE} if code is None else code
+    report = dict(schema=2, prepared_by=dict(command='ota_release.py candidate', code=code), source='a' * 40,
                   descriptor=descriptor, baseline=baseline and dict(generation=baseline),
                   artifacts={name: dict(bytes=len(data), sha256=digest(data)) for name, data in files.items()})
     (directory / 'preparation-result.json').write_text(json.dumps(report))
@@ -171,7 +173,7 @@ class CandidateTests(unittest.TestCase):
         session.umask = 0o002  # What __enter__ saved before it set the session's private umask.
         seen = []
 
-        def prepare(publisher, code, source, accept, generation):
+        def prepare(publisher, code, source, accept, generation, previous):
             seen.append(os.umask(0o022))
             os.umask(seen[-1])
             return dict(prepared=True)
@@ -229,10 +231,14 @@ class SelectionTests(unittest.TestCase):
         path.write_text(json.dumps(dict(report, schema=1)))
         with self.assertRaisesRegex(ValueError, 'Prepare candidates with ota_release.py candidate'):
             self.publisher.select_nightly(directory)
+        path.write_text(json.dumps(dict(report, prepared_by=dict(report['prepared_by'], code={}))))
+        with self.assertRaisesRegex(ValueError, 'was prepared by other code; delete it and run '
+                                                'ota_release.py candidate a{40} again'):
+            self.publisher.select_nightly(directory)
         path.write_text(json.dumps(report))
         self.publisher.state = finish(journal.reserve(genesis(), nightly(), NOW), FakeTooling())
         with self.assertRaisesRegex(ValueError, 'compared with generation None, but the newest published '
-                                                'generation is 1; prepare it again'):
+                                                'generation is 1; run ota_release.py candidate a{40} again'):
             self.publisher.select_nightly(directory)
         path.write_text(json.dumps(dict(report, baseline=dict(generation=1))))
         self.assertEqual(self.publisher.select_nightly(directory)[0]['image']['source_commit'], 'a' * 40)

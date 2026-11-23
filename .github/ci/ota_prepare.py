@@ -1,26 +1,28 @@
 """Builds one unsigned Nightly candidate from main and compares it with the newest published generation.
 
-  ota_release.py candidate [SOURCE] [--accept SHA256] [--baseline GENERATION]
+  ota_release.py candidate [SOURCE] [--accept SHA256] [--baseline GENERATION] [--previous-bundle DIR]
 
 SOURCE is a commit on main whose CI push run passed, by default the newest
 such commit. The pinned build driver builds it in the configured build
-checkout and the pinned image_candidate packages it. The baseline is the
-newest generation the journal records as published on Nightly, or the one
---baseline names, and its payload comes from the published bundle. Compared
-with the baseline, these must not change:
+checkout, which may hold nothing but that commit and what builds leave, and
+the pinned image_candidate packages it. The baseline is the newest generation
+the journal records as published on Nightly, or the one --baseline names, and
+its payload comes from the published bundle. Compared with the baseline, these
+must not change:
 
 - anything under yocto/, which holds every build input except the app's own
   source;
-- the machine, architecture, layout, protocols and data range;
-- any entry of the expanded root, in type, mode, owner, content or link
-  target, except the content of the app's files and NSS's self-check files.
+- the data range and the protocols the image needs;
+- any entry of the expanded root, in type, mode, owner, flags, extended
+  attributes, content or link target, except the content of the app's files
+  and NSS's self-check files.
 
 A change to any of them stops preparation and leaves differences.json in the
-candidate directory, with its digest. After reviewing it, run again with
---accept DIGEST: the build is reused, the acceptance is recorded, and the next
-generation is compared with this one. A change to the boot set, or modules
-for another kernel, stops it with no acceptance, since boot set changes take
-the supervised path (#268).
+candidate directory, with its digest and the command that accepts it. That
+command reuses the build and records the acceptance, and the next generation
+is compared with this one. A change to the boot set, machine, architecture or
+layout, or modules for another kernel, stops preparation with no acceptance,
+since such changes take the supervised path (#268).
 
 Every image must also pass the content checks: the packaged image record, the
 packaged service and journal files against their sources, the device
@@ -29,8 +31,10 @@ app's two main binaries against the image record, and none of the owner's
 fault helpers packaged.
 
 The candidate directory is the workspace's <source[:8]>/, which ota_release.py
-nightly then plans. This never signs, publishes, takes the publisher lock or
-contacts a device, and it only reads GitHub.
+nightly then plans. Its code.json names the code that started it, and only
+that code resumes it. A directory compared with an older generation than the
+newest is compared again. This never signs, publishes, takes the publisher
+lock or contacts a device, and it only reads GitHub.
 """
 import fcntl
 import hashlib
@@ -72,9 +76,12 @@ APP_FILES = frozenset({
 # NSS's package script signs its libraries again whenever an image is assembled, and the signatures differ each time.
 SELF_CHECKS = frozenset({'/usr/lib/libfreebl3.chk', '/usr/lib/libnssdbm3.chk', '/usr/lib/libsoftokn3.chk'})
 VARIABLE = APP_FILES | SELF_CHECKS
-# The fields that decide whether a unit may install an image: the image record's name, then the journal's.
-COMPATIBILITY = (('architecture', 'architecture'), ('data', 'data'), ('layout', 'layout'), ('machine', 'machine'),
-                 ('recovery_protocol', 'min_recovery_protocol'), ('updater_protocol', 'min_updater_protocol'))
+# What a Nightly may not change, as a label, the image record's name and the journal's.
+FIXED = (('architecture', 'architecture', 'architecture'), ('boot set', 'boot_identity', 'boot_identity'),
+         ('layout', 'layout', 'layout'), ('machine', 'machine', 'machine'))
+# What a unit needs to install the image, whose change the owner reviews: the image record's name, then the journal's.
+COMPATIBILITY = (('data', 'data'), ('recovery_protocol', 'min_recovery_protocol'),
+                 ('updater_protocol', 'min_updater_protocol'))
 RECIPE = 'yocto/meta-spacewars/recipes-spacewars/spacewars/files/'
 JOURNAL = 'yocto/meta-spacewars/recipes-support/spacewars-journal/files/'
 # Packaged copies of source files, with their modes.
@@ -102,8 +109,8 @@ OWNER_HELPERS = ('bootstrap_retire', 'crash_kiosk_trial', 'fail_recovery_trial',
 BINARIES = (('client', '/usr/bin/engine-client'), ('os_manager', '/usr/bin/engine-os-manager'))
 # What ota_release.py nightly checks, byte for byte, before it plans.
 ARTIFACTS = ('build.json', 'build.log', 'candidate/build.json', 'candidate/candidate.json',
-             'candidate/image.ext4.zst', 'candidate/qualification.json', 'changes.json', 'differences.json',
-             'image-verification.json', 'main-ci-run.json', 'policy.json')
+             'candidate/image.ext4.zst', 'candidate/qualification.json', 'changes.json', 'code.json',
+             'differences.json', 'image-verification.json', 'main-ci-run.json', 'policy.json')
 KINDS = {stat.S_IFREG: 'file', stat.S_IFLNK: 'link', stat.S_IFDIR: 'dir'}
 MAX_ENTRIES = 500_000
 ENTRY = re.compile(rb'/(\d+)/([0-7]+)/(\d+)/(\d+)/([^/]*)/(\d*)/')
@@ -114,6 +121,18 @@ OWNERSHIP = re.compile(rb'(rdump|dump_file): Operation not permitted while chang
 PLAIN_PATH = re.compile(r'/[A-Za-z0-9._/+-]+\Z')
 # Kernel modules sit in a directory per kernel version, under either spelling of the library directory.
 MODULES = ('/lib/modules', '/usr/lib/modules')
+STAT = re.compile(rb'debugfs: stat <(\d+)>')
+HEADER = re.compile(rb'Inode: (\d+) +Type: [A-Za-z ]+ +Mode: +[0-7]+ +Flags: 0x([0-9a-f]+)')
+NAMED = re.compile(rb'  ([A-Za-z0-9._-]+) \((\d+)\)( = .*)?')
+GOT = re.compile(rb'debugfs: ea_get -x <(\d+)> ([A-Za-z0-9._-]+)')
+VALUE = re.compile(rb'([A-Za-z0-9._-]+) \((\d+)\)(?: = ((?:[0-9a-f]{2} )*))?')
+# How ext4 stores an inode rather than anything set on it: hashed directories, huge files, extents, attribute
+# inodes and inline data.
+STORAGE_FLAGS = 0x1000 | 0x40000 | 0x80000 | 0x200000 | 0x10000000
+# What git ignores in a build checkout after builds: the layers kas checks out, the host tool wrappers,
+# externalsrc's links into the build directory and Python's caches.
+LEFTOVERS = re.compile('(yocto/(' + '|'.join(map(re.escape, build_inputs.REPOSITORIES)) + r'|\.hosttools)/'
+                       r'|oe-workdir|oe-logs|(.*/)?__pycache__/.*)\Z')
 
 
 def require(condition, message):
@@ -138,13 +157,22 @@ def blob(path):
         return dict(bytes=os.fstat(stream.fileno()).st_size, sha256=hashlib.file_digest(stream, 'sha256').hexdigest())
 
 
-def save(path, raw):
-    """Replaces one preparation file atomically; until the result is written, a rerun may replace any of them."""
+def save(path, raw, exclusive=False):
+    """Writes one preparation file atomically and durably; an exclusive save never replaces one."""
     with tempfile.NamedTemporaryFile(prefix='.' + path.name + '-', dir=path.parent, delete=False) as stream:
         stream.write(raw)
         stream.flush()
         os.fsync(stream.fileno())
-    os.replace(stream.name, path)
+    try:
+        (os.link if exclusive else os.replace)(stream.name, path)
+    finally:
+        if os.path.lexists(stream.name):
+            os.unlink(stream.name)
+    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
     return raw
 
 
@@ -179,7 +207,7 @@ def ci_runs(publisher, commit=None):
 
 def select_source(publisher, checkout, requested):
     """The commit to build, on main, and the CI push run that passed it."""
-    git(checkout, 'fetch', '--quiet', 'origin', 'main')
+    git(checkout, 'fetch', '--quiet', 'origin', '+refs/heads/main:refs/remotes/origin/main')
     main = git(checkout, 'rev-parse', '--verify', 'origin/main^{commit}').decode().strip()
     if requested is None:
         passed = [run['headSha'] for run in ci_runs(publisher) if run.get('conclusion') == 'success']
@@ -213,12 +241,18 @@ def baseline(state, generation=None):
 
 
 def move(checkout, source):
-    """Puts the build checkout at the source; it must hold no local changes."""
-    clean = ('status', '--porcelain=v1', '--untracked-files=all')
-    require(not git(checkout, *clean), f'The build checkout {checkout} has local changes')
+    """Puts the build checkout at the source. Builds read its working tree, so it may hold no local changes and,
+    of what git ignores, only what builds leave."""
+    def unexpected():
+        status = git(checkout, 'status', '--porcelain=v1', '-z', '--ignored=matching', '--untracked-files=all')
+        return [os.fsdecode(entry[3:]) for entry in status.split(b'\0')
+                if entry and not (entry.startswith(b'!! ') and LEFTOVERS.fullmatch(os.fsdecode(entry[3:])))]
+
+    found = unexpected()
+    require(not found, f'The build checkout {checkout} has local changes or ignored files: ' + ', '.join(found[:5]))
     if head(checkout) != source:
         git(checkout, 'checkout', '--quiet', '--detach', source)
-    require(head(checkout) == source and not git(checkout, *clean), f'The build checkout did not move to {source}')
+    require(head(checkout) == source and not unexpected(), f'The build checkout did not move cleanly to {source}')
 
 
 def yocto_changes(checkout, old, new):
@@ -301,8 +335,8 @@ def debugfs(image, requests):
 
 
 def listing(image):
-    """Every entry's type, mode and owner, by path, from debugfs's listings of each directory inode."""
-    entries, queue = {}, {2: ''}
+    """Every entry's type, mode and owner, and its inode, by path, from debugfs's listings of each directory."""
+    entries, inodes, queue = {}, {}, {2: ''}
     while queue:
         output, errors = debugfs(image, [f'ls -p <{inode}>' for inode in queue])
         if errors:
@@ -329,13 +363,62 @@ def listing(image):
             kind = KINDS.get(stat.S_IFMT(mode))
             require(kind, 'The image holds a device node, pipe or socket: ' + path)
             entries[path] = dict(type=kind, mode=f'{stat.S_IMODE(mode):04o}', uid=int(uid), gid=int(gid))
+            inodes[path] = int(inode)
             if kind == 'dir':
                 if path != '/':
                     following[int(inode)] = path
             else:
                 entries[path]['size'] = int(size or 0)
         queue = following
-    return entries
+    return entries, inodes
+
+
+def attributes(image, entries, inodes):
+    """Adds the inode flags and extended attributes of each entry that has any; inline data is content."""
+    numbers = sorted(set(inodes.values()))
+    output, errors = debugfs(image, [f'stat <{number}>' for number in numbers])
+    if errors:
+        raise ValueError('debugfs could not read the inodes: ' + os.fsdecode(errors[0]))
+    flags, names, current, listed = {}, {}, None, False
+    for line in output.split(b'\n'):
+        echo, header = STAT.fullmatch(line), HEADER.fullmatch(line)
+        if echo:
+            current, listed = int(echo.group(1)), False
+        elif header:
+            require(int(header.group(1)) == current and current not in flags, 'Unexpected debugfs inode record')
+            flags[current] = int(header.group(2), 16) & ~STORAGE_FLAGS
+        elif line == b'Extended attributes:':
+            listed = True
+        elif listed and line.startswith(b'  '):
+            named = NAMED.fullmatch(line)
+            require(named, f'Unexpected extended attribute on inode {current}: ' + os.fsdecode(line[:200]))
+            names.setdefault(current, []).append(named.group(1).decode())
+        else:
+            listed = False
+    require(set(flags) == set(numbers), 'debugfs did not read every inode')
+    wanted = [(number, name) for number, found in sorted(names.items()) for name in found if name != 'system.data']
+    values, asked = {}, None
+    if wanted:
+        # stat leaves out values of 40 bytes or more, so each value is read in full.
+        output, errors = debugfs(image, [f'ea_get -x <{number}> {name}' for number, name in wanted])
+        if errors:
+            raise ValueError('debugfs could not read an extended attribute: ' + os.fsdecode(errors[0]))
+        for line in output.split(b'\n'):
+            got, value = GOT.fullmatch(line), VALUE.fullmatch(line)
+            if got:
+                asked = (int(got.group(1)), got.group(2).decode())
+            elif value and asked and value.group(1).decode() == asked[1]:
+                raw = bytes.fromhex((value.group(3) or b'').decode())
+                require(len(raw) == int(value.group(2)) and asked not in values,
+                        f'Unexpected extended attribute value on inode {asked[0]}')
+                values[asked], asked = raw.hex(), None
+        require(set(values) == set(wanted), 'debugfs did not read every extended attribute')
+    for path, number in inodes.items():
+        if flags[number]:
+            entries[path]['flags'] = f'{flags[number]:#x}'
+        held = {name: value for (owner, name), value in values.items() if owner == number}
+        if held:
+            entries[path]['xattrs'] = held
 
 
 def extracted(tree):
@@ -357,7 +440,8 @@ def extracted(tree):
 
 def inspect(image, scratch):
     """Lists and extracts one expanded root without mounting it; returns its entries and their local copies."""
-    entries = listing(image)
+    entries, inodes = listing(image)
+    attributes(image, entries, inodes)
     tree = scratch / 'tree'
     tree.mkdir()
     require(PLAIN_PATH.fullmatch(str(tree)), f'debugfs needs a plain path to extract into, not {tree}')
@@ -407,10 +491,11 @@ def kernels(entries):
 
 
 def compatibility(image, base, generation):
-    """The fields that decide installation and differ from the baseline's; the boot set may not differ."""
-    require(image['boot_identity'] == base['boot_identity'],
-            f"The boot set differs from generation {generation}'s; boot set changes take the supervised path "
-            '(#268), not a Nightly')
+    """The reviewed fields that differ from the baseline's; the boot set, machine, architecture and layout may not."""
+    fixed = [label for label, name, field in FIXED if image[name] != base[field]]
+    require(not fixed, f"The candidate's {' and '.join(fixed)} {'differs' if len(fixed) == 1 else 'differ'} from "
+            f"generation {generation}'s; a Nightly keeps the boot set, machine, architecture and layout, whose "
+            'changes take the supervised path (#268)')
     return {name: dict(baseline=base[field], candidate=image[name])
             for name, field in COMPATIBILITY if image[name] != base[field]}
 
@@ -446,7 +531,7 @@ def check_contents(entries, found, image, source_file):
     return [installed for installed, _, _ in PACKAGED]
 
 
-def refusal(directory, report, differences):
+def refusal(directory, report, differences, command):
     lines = [f"{report['source'][:12]} differs from generation {report['baseline']['generation']} beyond the app:"]
     if report['yocto']:
         lines.append(f"  yocto/: {len(report['yocto'])} changed, " + ', '.join(c['path'] for c in report['yocto'][:5]))
@@ -454,7 +539,7 @@ def refusal(directory, report, differences):
         lines.append('  compatibility: ' + ', '.join(sorted(report['compatibility'])))
     if report['root']:
         lines.append(f"  root: {len(report['root'])} entries, " + ', '.join(c['path'] for c in report['root'][:5]))
-    lines.append(f"Review {directory / 'differences.json'}, then run again with --accept {differences}")
+    lines.append(f"Review {directory / 'differences.json'}, then accept it with: {command} --accept {differences}")
     return '\n'.join(lines)
 
 
@@ -464,10 +549,12 @@ def summary(directory, report, already=False):
                 accepted=report['accepted'], next=f'ota_release.py nightly {directory}')
 
 
-def prepare(publisher, code, requested=None, accept=None, generation=None):
+def prepare(publisher, code, requested=None, accept=None, generation=None, previous_override=None):
     """Builds, packages and compares one candidate; see this module's description."""
     config = publisher.config
     checkout = config.build['checkout']
+    require(not HERE.is_relative_to(checkout.resolve()),
+            f'The build checkout {checkout} holds the code that runs, which building would move; give it its own')
     require(accept is None or DIGEST.fullmatch(accept), 'Accept the differences by their full SHA-256')
     config.workspace.mkdir(mode=0o700, parents=True, exist_ok=True)
     lock = os.open(config.workspace / '.candidate.lock', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
@@ -484,13 +571,25 @@ def prepare(publisher, code, requested=None, accept=None, generation=None):
         require(ancestor(checkout, base['source_commit'], source),
                 f"{source[:12]} does not descend from generation {number}'s source")
         directory = config.workspace / source[:8]
-        result = directory / 'preparation-result.json'
+        result, started = directory / 'preparation-result.json', directory / 'code.json'
+        pins = encode(dict(code=code, image_candidate=config.tools['image_candidate']))
+        if directory.exists():
+            require(started.exists() or not any(directory.iterdir()),
+                    f'{directory} was not started by ota_release.py candidate; delete it to prepare {source[:12]}')
+            require(not started.exists() or started.read_bytes() == pins,
+                    f'{directory} was started by other code; delete it to prepare {source[:12]} again')
         if result.exists():
             report = json.loads(result.read_bytes())
-            require(report.get('schema') == 2 and report.get('source') == source,
-                    f'{directory} holds another candidate')
-            return summary(directory, report, already=True)
+            require(report.get('source') == source, f'{directory} holds another candidate')
+            compared = report['baseline']['generation']
+            if compared == number:
+                return summary(directory, report, already=True)
+            # nightly takes only a comparison with the newest generation; the build and package are reused.
+            progress(f'{directory} was compared with generation {compared}; comparing it with generation {number}')
+            result.unlink()
         directory.mkdir(mode=0o700, exist_ok=True)
+        if not started.exists():
+            save(started, pins)
         move(checkout, source)
         policy = image_policy.from_source(checkout, source)
         raw = encode(policy)
@@ -505,7 +604,7 @@ def prepare(publisher, code, requested=None, accept=None, generation=None):
                 'Wrong embedded source')
         changed = compatibility(image, base, number)
         progress(f'Comparing with generation {number}')
-        bundle, _ = publisher.previous_bundle()
+        bundle, _ = publisher.previous_bundle(previous_override)
         payload = base['compressed']['sha256']
         with tempfile.TemporaryDirectory(prefix='.candidate-', dir=config.workspace) as scratch:
             scratch = Path(scratch)
@@ -531,7 +630,10 @@ def prepare(publisher, code, requested=None, accept=None, generation=None):
                       compatibility=changed, root=root)
         differences = digest(save(directory / 'differences.json', encode(report)))
         differs = bool(report['yocto'] or report['compatibility'] or report['root'])
-        require(not differs or accept == differences, refusal(directory, report, differences))
+        command = ' '.join(['ota_release.py candidate', source]
+                           + ([f'--baseline {generation}'] if generation is not None else [])
+                           + ([f'--previous-bundle {previous_override}'] if previous_override else []))
+        require(not differs or accept == differences, refusal(directory, report, differences, command))
         save(directory / 'main-ci-run.json', encode(ci))
         save(directory / 'changes.json', encode(changes(checkout, base['source_commit'], source)))
         save(directory / 'image-verification.json', encode(dict(
@@ -549,10 +651,7 @@ def prepare(publisher, code, requested=None, accept=None, generation=None):
             accepted=differences if differs else None,
             artifacts={name: blob(directory / name) for name in ARTIFACTS},
             signed=False, published=False, installed=False, device_accessed=False)
-        with open(os.open(result, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600), 'wb') as stream:
-            stream.write(encode(preparation))
-            stream.flush()
-            os.fsync(stream.fileno())
+        save(result, encode(preparation), exclusive=True)
         return summary(directory, preparation)
     finally:
         os.close(lock)
