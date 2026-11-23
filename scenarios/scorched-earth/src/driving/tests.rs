@@ -182,6 +182,84 @@ fn cpu_drives_both_tanks_and_stops_to_fire() {
 }
 
 #[test]
+fn cpus_drive_into_the_configured_range_and_hold_it() {
+    // The tanks start 40 units apart, so the first range sends them apart and
+    // the second brings them closer.
+    for range in [
+        FiringRange {
+            near: 50.0,
+            far: 60.0,
+        },
+        FiringRange {
+            near: 24.0,
+            far: 30.0,
+        },
+    ] {
+        let mut state = fixture(GrainShape::Hexagon, BankStrength::Off, |_| -5.0);
+        state.config.demo = true;
+        state.config.cpu_driving = true;
+        state.config.cpu_range = range;
+        for _ in 0..600 {
+            step(&mut state, Controls::default());
+        }
+        let x = state
+            .tanks
+            .map(|t| state.physics.motion(t.body).unwrap().position.x);
+        assert!(range.holds(x[1] - x[0]), "{range:?}: {x:?}");
+        assert!(
+            state
+                .driving
+                .iter()
+                .all(|d| d.diagnostics.mode == "hold range"),
+            "{range:?}: {:?}",
+            state.driving.each_ref().map(|d| d.diagnostics.mode)
+        );
+        state.audit().unwrap();
+    }
+}
+
+#[test]
+fn held_fire_leaves_the_cpus_driving_and_keeps_the_turns() {
+    let mut state = fixture(GrainShape::Hexagon, BankStrength::Off, |_| -5.0);
+    let range = FiringRange {
+        near: 50.0,
+        far: 60.0,
+    };
+    state.config.demo = true;
+    state.config.cpu_driving = true;
+    state.config.cpu_range = range;
+    // The left tank's shot is due and the right tank's comes five seconds
+    // later, as when a duel starts, but the host holds fire.
+    state.tanks[0].next_shot = state.tick;
+    state.tanks[1].next_shot = state.tick + 300;
+    state.firing = false;
+    for _ in 0..600 {
+        step(&mut state, Controls::default());
+    }
+    let x = state
+        .tanks
+        .map(|t| state.physics.motion(t.body).unwrap().position.x);
+    assert!(range.holds(x[1] - x[0]), "{x:?}");
+    assert_eq!(state.tanks.map(|t| t.shots), [0, 0]);
+    assert_eq!(state.tanks.map(|t| t.next_shot - state.tick), [0, 300]);
+    state.firing = true;
+    let mut fired = [None; 2];
+    for tick in 0..400 {
+        step(&mut state, Controls::default());
+        for (player, fired) in fired.iter_mut().enumerate() {
+            if fired.is_none() && state.tanks[player].shots > 0 {
+                *fired = Some(tick);
+            }
+        }
+    }
+    assert!(
+        fired[0].is_some_and(|tick| tick < 60) && fired[1].is_some_and(|tick| tick >= 300),
+        "{fired:?}"
+    );
+    state.audit().unwrap();
+}
+
+#[test]
 fn cpu_refuses_a_cliff_and_rechecks_changed_ground() {
     let mut state = fixture(GrainShape::Hexagon, BankStrength::Off, |x| {
         if x < 0.0 { -5.0 } else { -20.0 }

@@ -63,7 +63,7 @@ pub fn lanes(
                 if high < low {
                     return None;
                 }
-                let x = (direction * 27.0 * scale).clamp(low, high);
+                let x = (direction * LANDING_X * scale).clamp(low, high);
                 let bottom = layout.floor_y + 0.5;
                 let top = layout.bounds_max.y;
                 if world.is_some_and(|w| {
@@ -78,7 +78,7 @@ pub fn lanes(
                     return None;
                 }
                 let outer = x < layout.face_origin.x || x > -layout.face_origin.x;
-                Some((outer, (x - direction * 27.0 * scale).abs(), x))
+                Some((outer, (x - direction * LANDING_X * scale).abs(), x))
             })
             .min_by(|(outer_a, distance_a, _), (outer_b, distance_b, _)| {
                 outer_a

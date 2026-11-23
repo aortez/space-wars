@@ -37,7 +37,7 @@ impl Duel {
                 site.rejection = if !self.has_track_support(physics, player) {
                     Some("no support")
                 } else if x.abs() > self.placement.drive_limit()
-                    || !(12.0..=40.0).contains(&site.range)
+                    || !self.config.cpu_range.tolerates(site.range)
                 {
                     Some("firing range")
                 } else if ground.reason.is_some() {
@@ -128,8 +128,8 @@ impl Duel {
         {
             return Some("blocked firing barrel");
         }
-        let range_penalty = (18.0 - site.range).max(0.0) + (site.range - 32.0).max(0.0);
-        // Prefer a level, smooth patch in ordinary firing range; all else
+        let range_penalty = self.config.cpu_range.excess(site.range);
+        // Prefer a level, smooth patch within the firing range; all else
         // equal, get farther from the position that was just hit.
         site.score = Some(
             range_penalty * 0.5

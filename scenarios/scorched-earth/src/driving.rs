@@ -22,6 +22,40 @@ pub(super) type SupportCheckFn = fn(&Duel, &PhysicsWorld, usize) -> bool;
 pub(super) const CURRENT_GROUND_CHECKS: [GroundCheckFn; 2] = [Duel::safe_drive_direction; 2];
 pub(super) const CURRENT_SUPPORT_CHECKS: [SupportCheckFn; 2] = [Duel::has_track_support; 2];
 
+/// How far from the other tank a driving CPU holds, in units. Farther than
+/// `far` it approaches, and closer than `near` it makes room.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FiringRange {
+    pub near: f32,
+    pub far: f32,
+}
+
+impl Default for FiringRange {
+    fn default() -> Self {
+        Self {
+            near: 18.0,
+            far: 32.0,
+        }
+    }
+}
+
+impl FiringRange {
+    pub fn holds(self, distance: f32) -> bool {
+        (self.near..=self.far).contains(&distance)
+    }
+
+    /// How far `distance` lies outside the range.
+    pub(crate) fn excess(self, distance: f32) -> f32 {
+        (self.near - distance).max(0.0) + (distance - self.far).max(0.0)
+    }
+
+    /// Whether a CPU moving after a hit may stop at `distance`: a little
+    /// closer or farther than it holds.
+    pub(crate) fn tolerates(self, distance: f32) -> bool {
+        (self.near - 6.0..=self.far + 8.0).contains(&distance)
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct DrivingDiagnostics {
     /// Track command, not a promise of chassis speed on loose/sloping ground.
@@ -222,13 +256,18 @@ impl Duel {
             self.driving[player].cpu_direction = 0.0;
             return 0.0;
         }
-        if tank.next_shot <= self.tick + 60 && self.tick < tank.next_shot.saturating_add(180) {
+        // A tank stops to aim when its shot comes due, and drives on while its
+        // host holds fire.
+        if self.firing
+            && tank.next_shot <= self.tick + 60
+            && self.tick < tank.next_shot.saturating_add(180)
+        {
             self.driving[player].diagnostics.mode = "aim and fire";
             self.driving[player].cpu_direction = 0.0;
             self.driving[player].next_plan = self.tick;
             return 0.0;
         }
-        if self.tick >= tank.next_shot.saturating_add(180) {
+        if self.firing && self.tick >= tank.next_shot.saturating_add(180) {
             // A moving/unstable support must not trap the CPU in an unlimited
             // wait for a perfect firing pose. Skip this shot and reposition.
             self.tanks[player].next_shot = self.tick + 120;
@@ -277,9 +316,10 @@ impl Duel {
                     },
                 )
                 .is_some();
-            let (direction, mode) = if distance > 32.0 {
+            let range = self.config.cpu_range;
+            let (direction, mode) = if distance > range.far {
                 (toward, "approach")
-            } else if distance < 18.0 {
+            } else if distance < range.near {
                 (-toward, "make room")
             } else if blocked_barrel {
                 (-toward, "clear barrel")

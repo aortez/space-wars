@@ -41,7 +41,7 @@ mod tests;
 pub use action::{Command, Controls, ScorchedAction};
 pub use bot::{CpuPolicy, ShotObservation};
 pub use course::DrivingCourse;
-pub use driving::DrivingDiagnostics;
+pub use driving::{DrivingDiagnostics, FiringRange};
 pub use drop_test::DropHeight;
 pub use engine_rapier::terrain::DirtStrength as BankStrength;
 pub use material::MaterialBalance;
@@ -81,6 +81,11 @@ pub struct ScorchedConfig {
     pub cpu_footing: [bool; 2],
     /// Retain the sweep for controlled comparisons and scripted fixtures.
     pub cpu_policy: [CpuPolicy; 2],
+    /// How far from the other tank driving CPUs hold.
+    pub cpu_range: FiringRange,
+    /// The tank whose first shot comes due at once; the other's comes five
+    /// seconds later.
+    pub first_to_fire: usize,
     /// Compare real sprung wheels with the original rigid moving surface.
     pub suspension: bool,
     /// Explicit wheel experiments; the default retains the established assembly.
@@ -113,6 +118,8 @@ impl Default for ScorchedConfig {
             cpu_driving: true,
             cpu_footing: [false; 2],
             cpu_policy: [CpuPolicy::Sweep; 2],
+            cpu_range: FiringRange::default(),
+            first_to_fire: 0,
             suspension: false,
             wheel_tuning: WheelTuning::default(),
             course: None,

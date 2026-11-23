@@ -1188,8 +1188,9 @@ cooldown; deliberate previews may bypass reuse delays.
 The hills span the entire inner clock width, with a cell size independent of
 that width. Two tank scales are tried against the available space. Entry lanes
 come from the current font's lit cells, with clearance for the whole hull and
-beam, the blinking colon, and the AM/PM label. Each tank prefers a gap through
-its half of the face; the outer margins are fallbacks. The landing positions
+beam, the blinking colon, and the AM/PM label. Each tank prefers the gap
+through its half of the face nearest 40 units from the middle, half the middle
+of the CPUs' range; the outer margins are fallbacks. The landing positions
 therefore vary with the reading. Terrain and full-height lanes are checked
 against current resident shapes before insertion; if none fits, admission leaves
 the current scene intact. Tanks excludes Duck, Crow and Spider in both directions,
@@ -1200,7 +1201,12 @@ and world, and cleanup removes only identities in the Tanks namespace.
 
 Each fight's seed sends in two of Scorched Earth's CPUs: Plotting + move
 against itself, or against Learning + move on either side
-([Plotted aim](scorched-earth.md#plotted-aim)). The face stops shells. One
+([Plotted aim](scorched-earth.md#plotted-aim)). Every three seeds, the other
+side fires first. The CPUs hold 72–88 units apart, where Scorched Earth's own
+range is 18–32: a learning CPU's 50° arc rises about 0.3 of the range, and the
+face starts about 17 units over the hills, so closer arcs pass under it. Fire
+is held while the tanks drive to that range, for at most 12 s. The face stops
+shells. One
 fixed body holds a box for every lit digit cell, both colon cells, even while
 the colon blinks off, and each AM/PM pixel, and the body is rebuilt when the
 reading changes. A shell is a ray each tick, so it bursts on the first box it
@@ -1214,7 +1220,7 @@ shell flies on until it leaves the frame.
 | `raising` | 2 s | Physical hills rise from beneath the floor. |
 | `beam-down` | 2 s, plus at most one 2 s retry | Tanks descend from above the frame, through clear digit gaps, to supported hill positions. A reading/font change that closes a lane replans and restarts transport; a second closure withdraws. |
 | `settling` | 2 s | Both hulls must actually be upright and supported before driving or firing. Failure withdraws the hills. |
-| `fighting` | 60 s | Shared CPU driving, swept shells that burst on the lit face, craters, loose dirt and weak-bank collapse. |
+| `fighting` | 60 s | Fire is held while the tanks drive to their range, for at most 12 s. Then shared CPU driving, swept shells that burst on the lit face, craters, loose dirt and weak-bank collapse. |
 | `finishing-shots` | 10 s | No new driving or fire; existing shells finish before deciding the result. |
 | `crumbling` | 1 s | Each in-view loser becomes physical dirt at its actual pose. |
 | `beam-up` | 2 s | Surviving winners depart. |
@@ -1237,37 +1243,51 @@ clip the battlefield below the face; shells and their bursts are drawn in front
 of it. Entry hulls and beams use the full-height clear lanes. Layout changes
 cancel through the normal owned cleanup path.
 
-How often the face matters depends on the screen. A local survey ran 60 fights
-at each of 4:3, 5:3 and 16:9, at readings that vary with the seed:
+How often the face stops shells depends on the screen. A local survey ran 60
+fights at each of 4:3, 5:3, 16:9, portrait (0.6) and 4:1, at readings that
+vary with the seed, and 60 more at 5:3 in 12-hour time:
 
-- At 4:3, the Picade's shape, the tanks fight about 60 units apart and their
-  arcs rise into the face. Learning + move's shells burst on it on 89 of 171
-  shots; none of Plotting + move's 346 shots did, and every one hit. The first
-  kill comes at a median of 19 s. Two Learning + move tanks took 47 s before
-  the face stopped shells, and take 57 s against it.
-- At 5:3, HyperPixel's shape, and at 16:9 the tanks close to 22–26 units, their
-  arcs stay below the face, and no shell reached it. The first kill comes at a
-  median of 17 s, against 23 s for two Learning + move tanks. Thirty fights
-  each in portrait (0.6) and at 4:1 left the face untouched too.
-- Plotting + move won 104 of its 120 fights against Learning + move, and the
-  other 16 left no survivors. Two plotting tanks left none in 25 of 60 fights.
+- At the HyperPixel's 5:3, the tanks land about 105 units apart, in the gaps
+  beside the outer digits, and close to about 87 before fire opens, at a
+  median of 4.6 s and at most 6.3 s. Learning + move's shells burst on the
+  face on 143 of its 156 shots, in 37 of its 40 fights; in 12-hour time, on
+  131 of 157, in 34 fights. At 18–32 units the tanks fought 22 apart and no
+  shell reached the face.
+- At 16:9, fire opens at a median of 7.6 s and at most 10.1 s, and 132 of
+  Learning + move's 159 shots burst on the face, in 36 of its 40 fights.
+- At the Picade's 4:3, most tanks land in range and fire opens at once. 126
+  of Learning + move's 162 shots burst on the face, in 33 of its 40 fights,
+  against 89 of 171 at 18–32 units.
+- In portrait and at 4:1, no shell reached the face.
+- None of Plotting + move's 1,378 shots burst on the face, and all but one
+  hit. It won 180 of its 200 fights against Learning + move and lost 9; 10
+  left no survivors, and one was a draw.
+- The first kill comes at a median of 23 s at 5:3 and 25 s at 16:9, against
+  17 s at 18–32 units, and at 18 s at 4:3, against 19 s.
+- Two plotting tanks split their fights at 5:3 (10 to 9) and 16:9 (9 to 9).
+  At 4:3 the left won 12 of the 13 that had a winner: its hits there do about
+  33 damage, and the right tank's about 25.
+- The draw, at 4:3, was at full health. The right tank came to rest where
+  Scorched's support probes found no track support, and a CPU without
+  support neither drives nor fires. In portrait, one tank in 60 was knocked
+  off the edge of the hills, as one was at 18–32 units.
 - On the development workstation (`--profile ci`), the 99th-percentile Clock
-  tick during a fight, as a median over each shape's fights, fell from
-  2.3–2.9 ms to 1.4–1.7 ms: fights end sooner and leave less dirt. The slowest
-  tick stayed at 6–7 ms. It has not been timed on a Pi.
+  tick during a fight, as a median over each shape's fights, was 0.9–1.2 ms
+  at 4:3, 5:3 and 16:9, 1.4 ms in portrait and 1.8 ms at 4:1. The slowest
+  tick was 8.2 ms, at 4:1. It has not been timed on a Pi.
 
 The run data stays local.
 
-| Learning + move bursts a shell on the 2 | Plotting + move shoots under the face |
-| --- | --- |
-| ![A plotted shot passing under the face, and a learning tank's shell bursting on the 2](screenshots/clock/tanks-1024x768-face-burst.png) | ![Two plotting tanks' first shots passing under the face](screenshots/clock/tanks-1024x768-plotted-pass.png) |
+| | Learning + move bursts a shell on the face | Plotting + move shoots under it |
+| --- | --- | --- |
+| 1024×768 | ![A learning tank's shell bursting on the bottom of the 2](screenshots/clock/tanks-1024x768-face-burst.png) | ![Two plotting tanks' first shots passing under the face](screenshots/clock/tanks-1024x768-plotted-pass.png) |
+| 800×480 | ![A learning tank's shell bursting on the bottom of the 2](screenshots/clock/tanks-800x480-face-burst.png) | ![Two plotting tanks' first shots passing under the face](screenshots/clock/tanks-800x480-plotted-pass.png) |
 
 Each picture keeps the shells of the frames before it as a trail. On the left,
-the plotting tank's 37° shot passes under the face and hits the learning tank,
-whose 50° reply bursts on the bottom of the 2. On the right, two plotting
-tanks' first shots pass under the face. `SPACEWARS_TANKS_ARTIFACTS=<dir> cargo
-test --locked --profile ci -p engine-client tanks_shells_burst_on_the_face`
-regenerates them.
+the learning tank's 50° shell bursts on the bottom of the 2; on the right, two
+plotting tanks' first shots pass under the face.
+`SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
+engine-client tanks_shells_burst_on_the_face` regenerates them.
 
 `clock state` includes phase, support, world positions, hull and terrain IDs,
 health, the two CPUs (`cpu`), shell/shot counts, the shells the face stopped

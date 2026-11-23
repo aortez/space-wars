@@ -3,7 +3,8 @@ use clap::{Parser, ValueEnum};
 use engine_common::Scenario;
 use engine_rapier::terrain::{GrainShape, SettlingWork};
 use scenario_scorched_earth::{
-    BankStrength, CpuPolicy, DropHeight, FIXED_HZ, ScorchedConfig, ScorchedScenario, WheelTuning,
+    BankStrength, CpuPolicy, DropHeight, FIXED_HZ, FiringRange, ScorchedConfig, ScorchedScenario,
+    WheelTuning,
 };
 use std::time::{Duration, Instant};
 
@@ -131,6 +132,8 @@ fn main() {
             "plotted" => CpuPolicy::Plotted,
             _ => CpuPolicy::Sweep,
         }; 2],
+        cpu_range: FiringRange::default(),
+        first_to_fire: 0,
         suspension: args.suspension,
         wheel_tuning: WheelTuning {
             motor_torque: args

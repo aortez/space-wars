@@ -12,7 +12,7 @@ use engine_rapier::{
 };
 use engine_terrain::{Cell, MaterialId};
 use scenario_scorched_earth::{
-    BankStrength, CpuPolicy, FIXED_HZ, SHELL_LIFETIME_TICKS, ScorchedConfig,
+    BankStrength, CpuPolicy, FIXED_HZ, FiringRange, SHELL_LIFETIME_TICKS, ScorchedConfig,
     host::{Bounds, Budget, HostedDuel, Placement},
 };
 
@@ -48,13 +48,32 @@ pub const POPULATION: Population = Population {
     joints: BUDGET.joints,
 };
 
-pub fn config(shape: GrainShape, cpu_policy: [CpuPolicy; 2]) -> ScorchedConfig {
+/// How far apart the CPUs fight, in the duel's units. A learning CPU's 50°
+/// arc rises about 0.3 of the range, and the face starts about 17 units over
+/// the hills, so at Scorched Earth's own 18 to 32 units every shell passes
+/// below it. From about 72 units apart, the arcs meet the digits beside the
+/// colon.
+const RANGE: FiringRange = FiringRange {
+    near: 72.0,
+    far: 88.0,
+};
+/// Where each tank lands when the reading leaves a gap there, in the duel's
+/// units from the middle: half the middle of the range.
+const LANDING_X: f32 = (RANGE.near + RANGE.far) / 4.0;
+/// The longest the tanks drive to their range before fire opens anyway.
+const OPENING_TICKS: u64 = 12 * FIXED_HZ as u64;
+
+pub fn config(shape: GrainShape, seed: u64) -> ScorchedConfig {
     ScorchedConfig {
         shape,
         max_grains: MAX_GRAINS,
         demo: true,
         cpu_driving: true,
-        cpu_policy,
+        cpu_policy: policies(seed),
+        cpu_range: RANGE,
+        // Every three seeds the other side fires first, so each pairing opens
+        // from both sides.
+        first_to_fire: (seed / 3 % 2) as usize,
         slumping: true,
         cohesion: BankStrength::Weak,
         ..Default::default()
@@ -120,6 +139,8 @@ pub struct TanksEvent {
     pub converted: Vec<TerrainGrain>,
     pub result: Option<ResultKind>,
     combat_ticks: u64,
+    /// The combat tick fire opened on.
+    fire_opened: Option<u64>,
     /// Shells the face has stopped.
     face_hits: u32,
     layout: Layout,
@@ -156,7 +177,7 @@ impl TanksEvent {
         };
         let world = arena.claim_resident(OWNER, layout);
         let policies = policies(seed);
-        let mut duel = match HostedDuel::attach(world, config(shape, policies), seed, place) {
+        let mut duel = match HostedDuel::attach(world, config(shape, seed), seed, place) {
             Ok(duel) => duel,
             Err(_) => {
                 arena.release(OWNER);
@@ -196,6 +217,7 @@ impl TanksEvent {
             converted: Vec::new(),
             result: None,
             combat_ticks: 0,
+            fire_opened: None,
             face_hits: 0,
             layout,
             digits,
@@ -369,8 +391,8 @@ impl TanksEvent {
                         && tank.motion.linear_velocity.length() < 0.6 * self.duel.placement().scale
                 });
                 if ready {
+                    // Fire opens once the tanks hold range.
                     self.duel.set_driving(true);
-                    self.duel.set_firing(true);
                     self.enter(EventPhase::Fighting);
                 } else if self.phase_tick == SETTLE_TICKS {
                     self.entry_failure = Some("Tanks could not settle on supported positions");
@@ -379,6 +401,7 @@ impl TanksEvent {
             }
             EventPhase::Fighting => {
                 self.combat_ticks += 1;
+                self.open_fire(world);
                 if self.combat_ticks == COMBAT_TICKS
                     || self
                         .duel
@@ -404,6 +427,23 @@ impl TanksEvent {
         }
         debug_assert!(self.tick <= MAX_TICKS);
         false
+    }
+
+    /// Opens fire once the tanks stand in range, or when the opening runs out
+    /// with them still driving to it.
+    fn open_fire(&mut self, world: &PhysicsWorld) {
+        if self.fire_opened.is_some() {
+            return;
+        }
+        let place = self.duel.placement();
+        let [left, right] = self
+            .duel
+            .tanks(world)
+            .map(|tank| place.point_from_world(tank.motion.position).x);
+        if RANGE.holds((right - left).abs()) || self.combat_ticks >= OPENING_TICKS {
+            self.duel.set_firing(true);
+            self.fire_opened = Some(self.combat_ticks);
+        }
     }
 
     fn resolve(&mut self, world: &mut PhysicsWorld) {

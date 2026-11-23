@@ -227,10 +227,10 @@ impl Duel {
                 armor: armor::armor(),
                 next_shot: if config.course.is_some() {
                     u64::MAX
-                } else if config.hillside || config.roof {
+                } else if config.hillside || config.roof || index == config.first_to_fire {
                     0
                 } else {
-                    index as u64 * 300
+                    300
                 },
                 shots: 0,
             }
@@ -505,6 +505,11 @@ impl Duel {
                     self.fire(physics, player);
                     self.tanks[player].next_shot = self.tick + 300;
                 }
+            }
+        } else if !self.firing {
+            // While a host holds fire, each tank's next shot waits with it.
+            for tank in &mut self.tanks {
+                tank.next_shot = tank.next_shot.saturating_add(1);
             }
         }
         self.loose.capture_impact_motion(
