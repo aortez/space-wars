@@ -16,7 +16,7 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 36000,
       "ticks": 36000,
-      "trace_sha256": "e68e4e532490bda3305beb9f8eabe116a325bcb18b0d02afd0466da3bf0c76b5"
+      "trace_sha256": "314a4728444d67372ff32fe240a57ca5410e36398d05e38303055e14d86f569a"
     },
     {
       "seed": 2,
@@ -32,7 +32,7 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 36000,
       "ticks": 36000,
-      "trace_sha256": "ff1ac369aed6ddbcf5e2c36f47759cde9d63dd249e9246b41155e92af8093f80"
+      "trace_sha256": "7c01d8448817c685a9bfda149f19b2dc2b1e705dc822d1a8b842e87713ad269d"
     },
     {
       "seed": 4,
@@ -40,7 +40,7 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 36000,
       "ticks": 36000,
-      "trace_sha256": "9c79410a1e294b5d329c046f80446e6493226ff87f1c7e6ed1c2ffa548161147"
+      "trace_sha256": "ecbb8ae8b122efdd1c3138f636de87804f7741d0a2459403ee09396a0bb7b64e"
     },
     {
       "seed": 5,
@@ -48,7 +48,7 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 36000,
       "ticks": 36000,
-      "trace_sha256": "9170ebcde35702a7c09b38d7629286fecea9c5b3d022086ba20489c7ceadda71"
+      "trace_sha256": "124d5d89a970ad18134bf461f1a09be5212eca5f6ad5cf0454147e36bcc52377"
     }
   ]
 }

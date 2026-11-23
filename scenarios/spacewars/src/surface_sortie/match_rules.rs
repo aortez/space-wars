@@ -5,7 +5,6 @@ pub const PILOT_HEALTH: f32 = 100.0;
 pub const POD_HULL_HEALTH: f32 = 100.0;
 const EJECTION_PROTECTION_TICKS: u64 = 180;
 const SAFE_IMPACT_SPEED: f32 = 12.0;
-const MISSILE_DAMAGE: f32 = 25.0;
 const POD_EXPOSURE: f32 = 2.0;
 const ON_FOOT_EXPOSURE: f32 = 4.0;
 
@@ -396,7 +395,7 @@ fn damage_target(
 /// that destroys the full ship never also damages its newly ejected pilot.
 pub(crate) fn apply_lasers(world: &mut SpacewarsState, pilots: &mut [SurfacePilot]) {
     for pilot in pilots {
-        for (entity, exposure) in damage_targets(world, pilot) {
+        for (entity, _) in damage_targets(world, pilot) {
             for index in 0..world.laser_hits.len() {
                 let hit = world.laser_hits[index];
                 let target = match hit.target {
@@ -405,13 +404,8 @@ pub(crate) fn apply_lasers(world: &mut SpacewarsState, pilots: &mut [SurfacePilo
                     _ => continue,
                 };
                 // A beam's charge already counts how exposed the target is.
-                let amount = if world.material_weapons() {
-                    hit.damage
-                } else {
-                    hit.damage * exposure
-                };
                 if target == entity {
-                    damage_target(world, pilot, entity, amount, PilotDamageCause::Laser);
+                    damage_target(world, pilot, entity, hit.damage, PilotDamageCause::Laser);
                 }
             }
         }
@@ -456,17 +450,10 @@ pub(crate) fn apply_contacts(
                 let (amount, cause) = if let Some((index, shell)) =
                     debris.filter(|(_, d)| d.kind == DebrisKind::Shell)
                 {
-                    // A shot's hit stands in for a missile's damage, on the
-                    // body it stopped on alone. Its shell died with the shot.
-                    let amount = if shell.shot {
-                        let Some(amount) = shots::charged(world, shell.physics_id, entity) else {
-                            continue;
-                        };
-                        amount
-                    } else if shell.dead {
+                    // A shell's hit is its shot's, on the body the shot
+                    // stopped on alone. Its shell died with the shot.
+                    let Some(amount) = shots::charged(world, shell.physics_id, entity) else {
                         continue;
-                    } else {
-                        MISSILE_DAMAGE * exposure
                     };
                     if !spent_shells.insert(index) {
                         continue;

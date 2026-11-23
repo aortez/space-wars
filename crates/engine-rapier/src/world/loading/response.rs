@@ -667,6 +667,9 @@ impl PhysicsWorld {
         if loading.response.is_some() {
             return Err(LoadingError::AlreadyEnabled);
         }
+        if loading.speculative_arrivals {
+            return Err(LoadingError::Incompatible);
+        }
         loading.response = Some(ResponseState {
             law: engine_material::LAW_VERSION.into(),
             allocation: shared_impact::PULSE_MODEL_VERSION.into(),

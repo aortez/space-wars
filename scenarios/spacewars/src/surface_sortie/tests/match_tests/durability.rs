@@ -295,7 +295,10 @@ fn native_weapons_and_heat_make_ship_pod_and_on_foot_distinct_tiers() {
     let damage =
         [Form::Ship, Form::Pod, Form::OnFoot].map(|form| missile(form)["damage"].as_f64().unwrap());
     assert!(damage[0] > 0.0 && damage[0] < damage[1], "{damage:?}");
-    assert_eq!(damage[1], 50.0, "a fresh pod survives one supplied missile");
+    assert!(
+        damage[1] < 100.0,
+        "a fresh pod survives one supplied missile: {damage:?}"
+    );
     assert_eq!(
         damage[2], 100.0,
         "an exposed pilot cannot tank a direct missile"
