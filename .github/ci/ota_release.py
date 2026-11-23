@@ -1,26 +1,29 @@
-"""Owner-local OTA feed publisher: Nightly publication, Release promotion and renewal.
+"""Owner-local OTA feed publisher: candidate preparation, Nightly publication, Release promotion and renewal.
 
-One command replaces the per-generation publication drivers and the renewal
-script. Every operation re-signs all five online roles one version higher under
-the shared publisher lock, checkpoints the journal around each signer call,
-builds a bundle whose payloads are hard links to the previous bundle's, checks
-it with feed_inventory and delivers it timestamp-last. A Nightly publication or
-Release promotion first saves a plan; sign and publish require that plan's
-digest, so the owner approves exactly what is signed. A renewal changes no
-targets and needs no plan.
+One command replaces the per-generation preparation and publication drivers
+and the renewal script. Every feed operation re-signs all five online roles
+one version higher under the shared publisher lock, checkpoints the journal
+around each signer call, builds a bundle whose payloads are hard links to the
+previous bundle's, checks it with feed_inventory and delivers it
+timestamp-last. A Nightly publication or Release promotion first saves a plan;
+sign and publish require that plan's digest, so the owner approves exactly
+what is signed. A renewal changes no targets and needs no plan.
 
   ota_release.py status
   ota_release.py renew sign|publish
+  ota_release.py candidate [SOURCE] [--accept SHA256] [--baseline GENERATION]
   ota_release.py nightly CANDIDATE_DIR
   ota_release.py promote --payload SHA256 --qualification RECORD --notes FILE
   ota_release.py sign VERSION --plan-sha256 SHA256
   ota_release.py publish VERSION --plan-sha256 SHA256
   ota_release.py abandon
 
-Paths and the digests of the trusted tools and of the reviewed code come from
-a local configuration file, ~/.config/spacewars-ota/release.json unless
---config names another; see docs/ota-updates.md#publication. Private keys never
-leave the authority.
+candidate builds a commit on main and prepares it for nightly, comparing it
+with the newest published generation; see ota_prepare.py. Paths and the
+digests of the trusted tools and of the reviewed code come from a local
+configuration file, ~/.config/spacewars-ota/release.json unless --config names
+another; see docs/ota-updates.md#publication. Private keys never leave the
+authority.
 """
 import argparse
 from datetime import datetime, timedelta, timezone
@@ -40,8 +43,11 @@ import ota_delivery as delivery
 import ota_publisher_journal as journal
 
 DEFAULT_CONFIG = Path.home() / '.config/spacewars-ota/release.json'
-# The configuration pins these files, and a plan binds them, so only reviewed code signs.
-CODE = ('ota_release.py', 'ota_publisher_journal.py', 'ota_delivery.py')
+# The configuration pins these files, and a plan binds them, so only reviewed code prepares and signs.
+CODE = ('ota_release.py', 'ota_publisher_journal.py', 'ota_delivery.py', 'ota_prepare.py', 'ota_build_inputs.py',
+        'ota_candidate.py', 'ota_image_policy.py')
+# Where candidate builds: the build checkout, the Yocto build directory and the shared cache.
+BUILD = ('cache', 'checkout', 'directory')
 TOOLS = ('feed_sign', 'feed_inventory', 'image_candidate')
 TOOL_ENV = {'PATH': '/usr/bin:/bin', 'LC_ALL': 'C'}
 CHANNELS = ('release', 'nightly')
@@ -59,7 +65,7 @@ RENEW = {'kind': 'renew'}
 TIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 COMMIT = re.compile(r'[0-9a-f]{40}\Z')
 CI_RUN = re.compile(r'https://github\.com/' + re.escape(delivery.REPOSITORY) + r'/actions/runs/([0-9]+)\Z')
-CI_FIELDS = 'status,conclusion,event,headBranch,headSha,url'
+CI_FIELDS = 'status,conclusion,event,headBranch,headSha,url,workflowName'
 
 
 class Refused(ValueError):
@@ -154,11 +160,18 @@ def link(source, target, blob):
     sync(target.parent)
 
 
+def beside(*modules):
+    """Requires imported code to come from this command's own directory, whose files the configuration pins."""
+    here = Path(__file__).resolve().parent
+    for module in modules:
+        require(Path(module.__file__).resolve().parent == here, 'Code imported from outside ' + str(here))
+
+
 def code_digests():
-    """Digests of the code that runs: this command and the two modules it imported."""
-    files = {'ota_release.py': __file__, 'ota_publisher_journal.py': journal.__file__,
-             'ota_delivery.py': delivery.__file__}
-    return {name: digest(Path(path).read_bytes()) for name, path in files.items()}
+    """Digests of the files the configuration pins: this command and the modules it imports or runs, all beside it."""
+    beside(journal, delivery)
+    here = Path(__file__).resolve().parent
+    return {name: digest((here / name).read_bytes()) for name in CODE}
 
 
 def targets(raw):
@@ -251,15 +264,19 @@ def pins(value, names):
 
 class Config:
     """Local paths and the digests of the trusted tools and the reviewed code, kept outside the repository."""
-    FIELDS = {'schema', 'authority', 'workspace', 'root_sha256', 'tools_directory', 'tools', 'code'}
+    FIELDS = {'schema', 'authority', 'workspace', 'root_sha256', 'tools_directory', 'tools', 'code', 'build'}
 
     def __init__(self, value):
         require(isinstance(value, dict) and set(value) == self.FIELDS and value['schema'] == 1
-                and delivery.sha(value['root_sha256']) and pins(value['tools'], TOOLS) and pins(value['code'], CODE),
+                and delivery.sha(value['root_sha256']) and pins(value['tools'], TOOLS) and pins(value['code'], CODE)
+                and isinstance(value['build'], dict) and set(value['build']) == set(BUILD)
+                and all(isinstance(path, str) for path in value['build'].values()),
                 'Invalid release configuration')
         self.authority, self.workspace, self.tools_directory = (
             Path(value[key]) for key in ('authority', 'workspace', 'tools_directory'))
-        require(all(path.is_absolute() for path in (self.authority, self.workspace, self.tools_directory)),
+        self.build = {key: Path(path) for key, path in value['build'].items()}
+        require(all(path.is_absolute() for path in (self.authority, self.workspace, self.tools_directory,
+                                                    *self.build.values())),
                 'Configured paths must be absolute')
         self.root_sha256, self.tools, self.code = value['root_sha256'], dict(value['tools']), dict(value['code'])
         self.public = self.authority / 'public'
@@ -286,10 +303,14 @@ class ReadOnlyGitHub(delivery.GitHub):
 
 
 class Publisher:
-    """One session under the shared publisher lock. Tests replace github(), gh_json() and now()."""
+    """One session under the shared publisher lock. Tests replace github(), gh_json() and now().
 
-    def __init__(self, config):
-        self.config = config
+    A session that is not exclusive takes no lock; candidate preparation uses one, since it only reads the
+    journal and the published bundle and must not hold up a renewal for the length of a build.
+    """
+
+    def __init__(self, config, exclusive=True):
+        self.config, self.exclusive = config, exclusive
 
     def github(self, mutating):
         token = subprocess.check_output(['gh', 'auth', 'token'], timeout=60).decode().strip()
@@ -297,6 +318,14 @@ class Publisher:
 
     def gh_json(self, args):
         return json.loads(subprocess.check_output(['gh', *args], timeout=120))
+
+    def passed_ci(self, run, source):
+        """The record of a run of the CI workflow, which must have passed on a push of source to main."""
+        ci = self.gh_json(['run', 'view', str(run), '--repo', delivery.REPOSITORY, '--json', CI_FIELDS])
+        require(ci.get('status') == 'completed' and ci.get('conclusion') == 'success' and ci.get('event') == 'push'
+                and ci.get('headBranch') == 'main' and ci.get('headSha') == source and ci.get('workflowName') == 'CI',
+                f'{source} has not passed CI on main')
+        return ci
 
     def now(self):
         return datetime.now(timezone.utc).replace(microsecond=0)
@@ -329,11 +358,12 @@ class Publisher:
                         and stat.S_IMODE(info.st_mode) == 0o700, 'Unexpected authority directory ownership/mode')
             self.root = self.config.root_path.read_bytes()
             require(digest(self.root) == self.config.root_sha256, 'Trusted root changed')
-            self.lock = os.open(self.config.lock_path, os.O_RDWR | os.O_NOFOLLOW)
-            try:
-                fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                raise ValueError('Another publisher operation holds the lock') from None
+            if self.exclusive:
+                self.lock = os.open(self.config.lock_path, os.O_RDWR | os.O_NOFOLLOW)
+                try:
+                    fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    raise ValueError('Another publisher operation holds the lock') from None
             self.state_raw = self.config.state_path.read_bytes()
             self.state = journal.load(self.state_raw)
             require(self.state['root_sha256'] == self.config.root_sha256, 'The journal names another root')
@@ -649,8 +679,20 @@ class Publisher:
         root = Path(candidate).resolve(strict=True)
         raw = (root / 'preparation-result.json').read_bytes()
         report = json.loads(raw)
+        require(isinstance(report, dict) and report.get('schema') == 2 and isinstance(report.get('prepared_by'), dict)
+                and report['prepared_by'].get('command') == 'ota_release.py candidate',
+                'Prepare candidates with ota_release.py candidate')
         source = report['source']
         require(isinstance(source, str) and COMMIT.fullmatch(source), 'Invalid preparation source')
+        # Only the reviewed code that plans may have prepared what it plans.
+        require(report['prepared_by'].get('code') == self.config.code, f'{root} was prepared by other code; '
+                f'delete it and run ota_release.py candidate {source} again')
+        # The comparison is only meaningful against what devices now get: the newest published generation.
+        compared = report.get('baseline')
+        compared = compared.get('generation') if isinstance(compared, dict) else None
+        newest = max((e['generation'] for e in self.state['images'].values() if e['nightly'] is not None), default=None)
+        require(compared == newest, f'The candidate was compared with generation {compared}, but the newest '
+                f'published generation is {newest}; run ota_release.py candidate {source} again')
         for name in ('policy.json', 'main-ci-run.json', 'candidate/candidate.json', 'candidate/qualification.json',
                      'candidate/image.ext4.zst'):
             require(name in report['artifacts'], 'The preparation record does not pin ' + name)
@@ -671,10 +713,7 @@ class Publisher:
         require(descriptor == report['descriptor'], 'Payload differs from the preparation record')
         run = CI_RUN.fullmatch(str(json.loads((root / 'main-ci-run.json').read_bytes()).get('url')))
         require(run, 'Unexpected CI run record')
-        ci = self.gh_json(['run', 'view', run.group(1), '--repo', delivery.REPOSITORY, '--json', CI_FIELDS])
-        require(ci.get('status') == 'completed' and ci.get('conclusion') == 'success' and ci.get('event') == 'push'
-                and ci.get('headBranch') == 'main' and ci.get('headSha') == source,
-                'The selected source has not passed CI on main')
+        ci = self.passed_ci(run.group(1), source)
         intent = dict(kind='nightly', image=dict(schema=1, source_commit=source, build_id=image['build_id'],
             **{k: image[k] for k in ('machine', 'architecture', 'layout', 'boot_identity', 'data')},
             **{k: descriptor[k] for k in ('format', 'compressed', 'expanded')},
@@ -721,6 +760,19 @@ class Publisher:
                     payload=payload_of(intent), targets_before=before, targets_after=after,
                     plan=str(operation / 'plan.json'), plan_sha256=plan_sha256,
                     next=f'ota_release.py sign {version} --plan-sha256 {plan_sha256}')
+
+    def candidate(self, source=None, accept=None, generation=None, previous_override=None):
+        """Builds and prepares a Nightly candidate in a session without the lock; see ota_prepare.py."""
+        require(not self.exclusive, 'Prepare candidates without the publisher lock')
+        import ota_prepare  # Only candidate needs it, and its YAML parser; status and renew never import it.
+        beside(ota_prepare, ota_prepare.build_inputs, ota_prepare.packager, ota_prepare.image_policy)
+        # The checkout and the build get the owner's own umask, as from their shell: BitBake refuses the
+        # session's private one, and a checkout under it gives changed files modes git never recorded.
+        private = os.umask(self.umask)
+        try:
+            return ota_prepare.prepare(self, code_digests(), source, accept, generation, previous_override)
+        finally:
+            os.umask(private)
 
     def nightly(self, candidate, previous_override=None):
         intent, selection, _ = self.select_nightly(candidate)
@@ -824,13 +876,19 @@ def main(argv=None):
     commands.add_parser('status', help='versions, expiry, pending work and release capacity; read-only')
     renew = commands.add_parser('renew', help='re-sign every role with unchanged targets')
     renew.add_argument('action', choices=('sign', 'publish'))
+    candidate = commands.add_parser('candidate', help='build a commit on main and prepare it for nightly')
+    candidate.add_argument('source', nargs='?', help='a commit on main that passed CI; the newest such by default')
+    candidate.add_argument('--accept', metavar='SHA256', help='digest of the reviewed differences.json')
+    candidate.add_argument('--baseline', type=int, metavar='GENERATION',
+                           help='compare with this published generation rather than the newest, for a check; '
+                                'nightly takes only a comparison with the newest')
     nightly = commands.add_parser('nightly', help='plan the Nightly publication of a prepared candidate')
     nightly.add_argument('candidate', type=Path)
     promote = commands.add_parser('promote', help='plan the Release promotion of a published Nightly image')
     promote.add_argument('--payload', required=True, help='compressed SHA-256 of the published Nightly image')
     promote.add_argument('--qualification', type=Path, required=True, help='its release-qualification record')
     promote.add_argument('--notes', type=Path, required=True, help='file holding the release notes')
-    for command in (renew, nightly, promote):
+    for command in (candidate, nightly, promote, renew):
         command.add_argument('--previous-bundle', type=Path, help='bundle of the published feed, when none is recorded')
     for name in ('sign', 'publish'):
         command = commands.add_parser(name, help=name + ' a prepared plan')
@@ -838,9 +896,11 @@ def main(argv=None):
         command.add_argument('--plan-sha256', required=True)
     commands.add_parser('abandon', help='drop a pending operation that is not public; its versions stay used')
     args = parser.parse_args(argv)
-    with Publisher(Config.load(args.config)) as publisher:
+    with Publisher(Config.load(args.config), exclusive=args.command != 'candidate') as publisher:
         if args.command == 'status':
             result = publisher.status()
+        elif args.command == 'candidate':
+            result = publisher.candidate(args.source, args.accept, args.baseline, args.previous_bundle)
         elif args.command == 'renew':
             result = publisher.renew(args.action, args.previous_bundle)
         elif args.command == 'nightly':
@@ -855,4 +915,7 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        sys.exit('ota_release.py: ' + str(error))

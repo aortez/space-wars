@@ -5,9 +5,9 @@
 //! hull. The game still stores each body's health, and the region is a view of
 //! it: the region's integrity is the body's health over its full health. So
 //! the rules that change health, such as contacts, solar heat, repairs and
-//! rebuilding, change the region with it, and play is as before. Debris breaks
-//! by the game's rule once it loses a fifth of its full health, so a fifth of
-//! its region's capacity breaks it, and the region itself never fails.
+//! rebuilding, change the region with it. Debris breaks by the game's rule
+//! once it loses a fifth of its full health, so a fifth of its region's
+//! capacity breaks it, and the region itself never fails.
 //!
 //! A [`HealthMap`] is that view for one body. It turns the work a weapon
 //! charges the region into the health the body loses, and health back into
