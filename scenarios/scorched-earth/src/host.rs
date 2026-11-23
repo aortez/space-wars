@@ -413,6 +413,11 @@ impl HostedDuel {
     pub fn shots(&self) -> u64 {
         self.duel.shots
     }
+    /// Whether each tank's CPU is driving out from under a shell, or waiting
+    /// where it stopped for the shell to land.
+    pub fn dodging(&self) -> [bool; 2] {
+        self.duel.dodging()
+    }
     pub fn impacts(&self) -> &[Impact] {
         &self.duel.impact_events
     }

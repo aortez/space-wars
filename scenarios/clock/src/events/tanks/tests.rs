@@ -252,16 +252,17 @@ fn entry_combat_and_departure_share_the_arena_and_keep_the_current_reading() {
 
 #[test]
 fn fights_pair_plotting_with_plotting_or_with_learning_and_open_from_either_side() {
-    let mut openings = Vec::new();
-    for seed in 0..6 {
+    // Every 24 seeds, each pairing opens from either side with each mix of
+    // dodgers: neither, either one, or both.
+    let mut fights = Vec::new();
+    for seed in 0..24 {
         let config = config(GrainShape::Round, seed);
         let pair = config.cpu_policy;
         assert!(pair.contains(&CpuPolicy::Plotted), "{seed}: {pair:?}");
-        if !openings.contains(&(pair, config.first_to_fire)) {
-            openings.push((pair, config.first_to_fire));
-        }
+        let fight = (pair, config.first_to_fire, config.cpu_dodging);
+        assert!(!fights.contains(&fight), "{seed}: {fight:?}");
+        fights.push(fight);
     }
-    assert_eq!(openings.len(), 6, "{openings:?}");
 }
 
 #[test]
