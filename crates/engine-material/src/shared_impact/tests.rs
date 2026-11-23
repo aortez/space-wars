@@ -385,3 +385,51 @@ fn pulse_partition_and_translation_preserve_total_work() {
         }
     }
 }
+
+#[test]
+fn a_component_the_momentum_overshoots_converges_on_a_restarted_pass() {
+    // A hull settling on a floor at two points 0.23 apart near one end of its
+    // face, as a game world gave them. Pushing at either point moves the hull
+    // almost alike, and the plain accelerated pass runs out of iterations.
+    let hull = BodyMotion {
+        center: Vec2::new(16.48265, -2.0336914),
+        linear_velocity: Vec2::new(-0.6950919, -0.16997193),
+        angular_velocity: -0.2116377,
+        inverse_mass: Vec2::splat(0.025773196),
+        inverse_inertia: 0.0221102,
+    };
+    let bodies = [fixed(Vec2::ZERO), hull];
+    let points = [
+        Vec2::new(17.975716, -2.7490492),
+        Vec2::new(17.75, -2.747942),
+    ];
+    let contacts = [0, 1].map(|id| Contact {
+        point: points[id as usize],
+        ..contact(id, Vec2::Y)
+    });
+    let budget = allocate(&bodies, &contacts).unwrap();
+    assert!(budget.iterations > MAX_ITERATIONS, "{}", budget.iterations);
+    // The pulse allocation keeps one pass, so it refuses the budget.
+    assert_eq!(
+        allocate_pulse(&bodies, &contacts).unwrap_err(),
+        BudgetError::NotConverged
+    );
+    // Both rows stay compressed, so the impulses solve the rows' equations
+    // exactly, and the energy is half their work.
+    let lever = points.map(|p| f64::from(p.x) - f64::from(hull.center.x));
+    let approach =
+        lever.map(|r| -(f64::from(hull.linear_velocity.y) + f64::from(hull.angular_velocity) * r));
+    let a = |i: usize, j: usize| {
+        f64::from(hull.inverse_mass.y) + f64::from(hull.inverse_inertia) * lever[i] * lever[j]
+    };
+    let determinant = a(0, 0) * a(1, 1) - a(0, 1) * a(1, 0);
+    let impulses = [
+        (a(1, 1) * approach[0] - a(0, 1) * approach[1]) / determinant,
+        (a(0, 0) * approach[1] - a(1, 0) * approach[0]) / determinant,
+    ];
+    assert!(impulses.iter().all(|p| *p > 0.0), "{impulses:?}");
+    near(
+        total(&budget),
+        0.5 * (impulses[0] * approach[0] + impulses[1] * approach[1]),
+    );
+}

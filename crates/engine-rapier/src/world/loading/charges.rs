@@ -7,20 +7,40 @@
 use super::*;
 use engine_material::shared_impact::{self, BudgetError};
 use engine_material::{
-    ContactGeometry, Impact, MIN_EFFECTIVE_MASS, MaterialError, Outcome, Region, Section, impact,
-    patch_width_from_radii,
+    ContactGeometry, Impact, MIN_EFFECTIVE_MASS, MaterialError, Outcome, Region, Section,
+    deformation_depth, impact, patch_width_from_radii,
 };
+
+/// Normals closer than this, as a cosine, push along one patch.
+const PATCH_NORMAL_COSINE: f64 = 0.999;
+/// Lengths below this, in the world's length units, are none: closer patch
+/// ends are one point, and narrower gaps between pieces close.
+const COINCIDENT: f64 = 1.0e-3;
 
 /// The material behind one contact source, as the host keeps it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ContactSurface {
     /// The region, with the capacity it has left.
     pub region: Region,
-    pub section: Section,
+    /// Represented depth into the screen, `wu`.
+    pub thickness: f32,
+    pub depth: Depth,
     /// The surface's radius of curvature where it meets others, `wu`. `None`
-    /// is flat. The patch width comes from the two radii, so an impact
-    /// between two flat surfaces is not priced.
+    /// is flat. Where two surfaces meet is as wide as their points span, or
+    /// as the two radii give if that is wider, so a single point between two
+    /// flat surfaces is not priced.
     pub radius: Option<f32>,
+}
+
+/// How deep the material behind a surface deforms along the contact normal.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Depth {
+    /// A fixed depth, `wu`, such as a plate's.
+    Fixed(f32),
+    /// As deep as the patch is wide, up to how far the material reaches
+    /// behind the contact, as `deformation_depth` gives. `None` is a
+    /// half-space.
+    Patch(Option<f32>),
 }
 
 /// The host's side of contact charges: the surface behind each source, and
@@ -49,7 +69,8 @@ pub enum Unpriced {
     /// The new impacts that shared its bodies in its substep could not share
     /// one budget, such as when they have more points than a budget takes.
     Budget(BudgetError),
-    /// The material law refused the impact, such as two flat surfaces.
+    /// The material law refused the impact, such as at a single point between
+    /// two flat surfaces.
     Material(MaterialError),
 }
 
@@ -80,20 +101,43 @@ pub enum ContactCharge {
 }
 
 /// One approaching point of a new impact, in its substep's budget.
+#[derive(Clone, Copy)]
 struct Row {
     impact: usize,
     bodies: [usize; 2],
+    piece: Piece,
     point: Vec2,
     normal: Vec2,
 }
 
-/// A new impact's share of its substep's energy, and the fastest approach
-/// among its points, which carries that energy into the law.
-#[derive(Debug, Clone, Copy, Default)]
+/// A new impact's share of its substep's energy, the fastest approach among
+/// its points, which carries that energy into the law, and where its points
+/// meet.
+#[derive(Debug, Clone, Default)]
 struct Share {
     energy: f64,
     speed: f64,
+    coverage: Coverage,
 }
+
+/// The colliders, or their compound children, that meet at a point. Each
+/// piece of a contact is convex, so its points bound one interval of it.
+type Piece = ([ColliderId; 2], [Option<u32>; 2]);
+
+/// A point for [`patches`] to group: whose it is, its piece, where it is and
+/// the normal it pushes along.
+#[derive(Clone, Copy)]
+struct PatchPoint {
+    group: usize,
+    piece: Piece,
+    point: Vec2,
+    normal: Vec2,
+}
+
+/// What a group's points cover: for each patch, the intervals along it that
+/// its pieces meet on, apart and in order. An interval no longer than the
+/// coincident length is a point.
+type Coverage = Vec<Vec<[f64; 2]>>;
 
 impl PhysicsWorld {
     /// Prices each new impact of the last step against the host's surfaces,
@@ -104,11 +148,12 @@ impl PhysicsWorld {
     /// The new impacts of one substep that share a dynamic body share its
     /// motion: their approaching points are one coupled budget, and each
     /// impact takes its own points' share. The impact law then prices that
-    /// energy across the patch the two surfaces' radii give.
+    /// energy across what the impact's points cover.
     pub fn charge_contact_impacts(
         &mut self,
         surfaces: &mut impl ContactSurfaces,
     ) -> Result<Vec<ContactCharge>, LoadingError> {
+        let coincident = COINCIDENT * f64::from(self.length_unit());
         let state = self.loading.as_mut().ok_or(LoadingError::Disabled)?;
         if !state.speculative_arrivals {
             return Err(LoadingError::ArrivalsDisabled);
@@ -124,7 +169,7 @@ impl PhysicsWorld {
                 .iter()
                 .filter(|e| e.transition == EpisodeTransition::Impact)
                 .collect();
-            let shares = state.shares(batch, &impacts);
+            let shares = state.shares(batch, &impacts, coincident);
             for (event, share) in impacts.into_iter().zip(shares) {
                 charges.push(charge(state, surfaces, event, share));
             }
@@ -142,6 +187,7 @@ impl LoadingState {
         &self,
         batch: &ContactBatch,
         impacts: &[&EpisodeEvent],
+        coincident: f64,
     ) -> Vec<Result<Share, BudgetError>> {
         let index: BTreeMap<_, _> = impacts.iter().enumerate().map(|(i, e)| (e.id, i)).collect();
         let mut bodies = BTreeMap::new();
@@ -162,6 +208,7 @@ impl LoadingState {
                         motions.len() - 1
                     })
                 }),
+                piece: (record.colliders, record.subshapes),
                 point: record.point,
                 normal: record.normal,
             };
@@ -169,6 +216,17 @@ impl LoadingState {
                 rows.push(row);
             }
         }
+        let points: Vec<_> = rows
+            .iter()
+            .map(|row| PatchPoint {
+                group: row.impact,
+                piece: row.piece,
+                point: row.point,
+                normal: row.normal,
+            })
+            .collect();
+        let (kept, coverages) = patches(&points, impacts.len(), coincident);
+        let rows: Vec<_> = kept.into_iter().map(|i| rows[i]).collect();
         // Impacts that share a dynamic body join one budget. Fixed and
         // kinematic bodies give no way, so they couple nothing.
         let mut roots: Vec<_> = (0..impacts.len()).collect();
@@ -211,8 +269,97 @@ impl LoadingState {
                 }
             }
         }
+        for (share, coverage) in shares.iter_mut().zip(coverages) {
+            if let Ok(share) = share {
+                share.coverage = coverage;
+            }
+        }
         shares
     }
+}
+
+/// Each group's patches: its points that push along one normal. For rigid
+/// bodies, the points between a patch's two ends add no way to push, so only
+/// the ends are kept, and ends closer than `coincident` are one point. Each
+/// piece's points cover one interval of their patch. Intervals closer than
+/// `coincident` join, and the gaps between the rest cover nothing. Returns
+/// the kept points' indices and what each group's points cover.
+fn patches(points: &[PatchPoint], groups: usize, coincident: f64) -> (Vec<usize>, Vec<Coverage>) {
+    struct Patch {
+        group: usize,
+        normal: Vec2,
+        low: (f64, usize),
+        high: (f64, usize),
+        pieces: Vec<(Piece, [f64; 2])>,
+    }
+    let along = |normal: Vec2, point: Vec2| {
+        f64::from(point.y) * f64::from(normal.x) - f64::from(point.x) * f64::from(normal.y)
+    };
+    let mut patches: Vec<Patch> = Vec::new();
+    for (index, point) in points.iter().enumerate() {
+        let same = |patch: &Patch| {
+            patch.group == point.group
+                && f64::from(patch.normal.x) * f64::from(point.normal.x)
+                    + f64::from(patch.normal.y) * f64::from(point.normal.y)
+                    >= PATCH_NORMAL_COSINE
+        };
+        let patch = match patches.iter().position(same) {
+            Some(found) => &mut patches[found],
+            None => {
+                let at = along(point.normal, point.point);
+                patches.push(Patch {
+                    group: point.group,
+                    normal: point.normal,
+                    low: (at, index),
+                    high: (at, index),
+                    pieces: Vec::new(),
+                });
+                patches.last_mut().unwrap()
+            }
+        };
+        let at = along(patch.normal, point.point);
+        if at < patch.low.0 {
+            patch.low = (at, index);
+        }
+        if at > patch.high.0 {
+            patch.high = (at, index);
+        }
+        match patch
+            .pieces
+            .iter_mut()
+            .find(|(piece, _)| *piece == point.piece)
+        {
+            Some((_, interval)) => {
+                interval[0] = interval[0].min(at);
+                interval[1] = interval[1].max(at);
+            }
+            None => patch.pieces.push((point.piece, [at, at])),
+        }
+    }
+    let mut kept = Vec::new();
+    let mut coverages = vec![Coverage::new(); groups];
+    for patch in patches {
+        kept.push(patch.low.1);
+        if patch.high.0 - patch.low.0 > coincident {
+            kept.push(patch.high.1);
+        }
+        let mut intervals: Vec<_> = patch.pieces.into_iter().map(|(_, i)| i).collect();
+        intervals.sort_by(|a, b| a[0].total_cmp(&b[0]));
+        let mut covered: Vec<[f64; 2]> = Vec::new();
+        for [low, high] in intervals {
+            match covered.last_mut() {
+                Some(last) if low <= last[1] + coincident => last[1] = last[1].max(high),
+                _ => covered.push([low, high]),
+            }
+        }
+        for interval in &mut covered {
+            if interval[1] - interval[0] <= coincident {
+                *interval = [0.5 * (interval[0] + interval[1]); 2];
+            }
+        }
+        coverages[patch.group].push(covered);
+    }
+    (kept, coverages)
 }
 
 fn root(roots: &mut [usize], mut i: usize) -> usize {
@@ -314,7 +461,7 @@ fn charge(
     let [Some(a), Some(b)] = event.sources.map(|s| surfaces.surface(s)) else {
         return unpriced(Some(share.energy), Unpriced::Undeclared);
     };
-    let outcome = match price(a, b, share) {
+    let outcome = match price(a, b, &share) {
         Ok(outcome) => outcome,
         Err(error) => return unpriced(Some(share.energy), Unpriced::Material(error)),
     };
@@ -338,14 +485,63 @@ fn charge(
     }
 }
 
-/// The impact law on a share of energy, across the patch the radii give.
-fn price(a: ContactSurface, b: ContactSurface, share: Share) -> Result<Outcome, MaterialError> {
-    let width = match (a.radius, b.radius) {
+/// How wide what a group's points cover is, between two surfaces. Each
+/// interval is widened about its middle to the patch the surfaces' radii give,
+/// if it is narrower, and each patch is as wide as the union of its intervals.
+/// A point between two flat surfaces is as wide as nothing, so points alone
+/// there are not priced.
+fn width(
+    a: &ContactSurface,
+    b: &ContactSurface,
+    coverage: &Coverage,
+) -> Result<f32, MaterialError> {
+    let curved = match (a.radius, b.radius) {
         (Some(radius), other) => patch_width_from_radii(radius, other)?,
         (None, Some(radius)) => patch_width_from_radii(radius, None)?,
-        (None, None) => return Err(MaterialError::InvalidGeometry),
+        (None, None) => 0.0,
     };
-    let contact = ContactGeometry::new(width, a.section, b.section);
+    let curved = f64::from(curved);
+    let mut width = 0.0;
+    for patch in coverage {
+        let mut widened: Vec<_> = patch
+            .iter()
+            .map(|&[low, high]| {
+                let pad = 0.5 * (curved - (high - low)).max(0.0);
+                [low - pad, high + pad]
+            })
+            .collect();
+        widened.sort_by(|a, b| a[0].total_cmp(&b[0]));
+        let mut end = f64::NEG_INFINITY;
+        for [low, high] in widened {
+            width += (high - low.max(end)).max(0.0);
+            end = end.max(high);
+        }
+    }
+    // Points that cover nothing, such as an impact whose points all took none
+    // of the motion, are as wide as the radii give.
+    let width = width.max(curved) as f32;
+    if width > 0.0 {
+        Ok(width)
+    } else {
+        Err(MaterialError::InvalidGeometry)
+    }
+}
+
+/// The section behind a surface, under a patch `width` wide.
+fn section(surface: &ContactSurface, width: f32) -> Result<Section, MaterialError> {
+    Ok(Section::new(
+        surface.thickness,
+        match surface.depth {
+            Depth::Fixed(depth) => depth,
+            Depth::Patch(extent) => deformation_depth(width, extent)?,
+        },
+    ))
+}
+
+/// The impact law on a share of energy, across what the impact's points cover.
+fn price(a: ContactSurface, b: ContactSurface, share: &Share) -> Result<Outcome, MaterialError> {
+    let width = width(&a, &b, &share.coverage)?;
+    let contact = ContactGeometry::new(width, section(&a, width)?, section(&b, width)?);
     let effective_mass = (2.0 * share.energy / (share.speed * share.speed)) as f32;
     if share.energy == 0.0 || effective_mass < MIN_EFFECTIVE_MASS {
         // The impact's points took none of the motion, or too little for the

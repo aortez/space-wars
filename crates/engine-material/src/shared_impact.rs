@@ -166,6 +166,8 @@ fn valid_body(b: &BodyMotion) -> bool {
 /// whole isolated budget. No timestep, gravity, friction or joint response is
 /// inferred. The caller must reject incomplete contact sets and account for
 /// constraints/external forces separately. Failure returns no partial budget.
+/// A component the first pass doesn't finish gets a second pass that restarts
+/// the momentum.
 pub fn allocate(bodies: &[BodyMotion], contacts: &[Contact]) -> Result<Budget, BudgetError> {
     allocate_model(bodies, contacts, false)
 }
@@ -176,6 +178,8 @@ pub fn allocate(bodies: &[BodyMotion], contacts: &[Contact]) -> Result<Budget, B
 /// wave propagation, nonlinear redistribution or repeated compression cycles.
 /// Equivalent scalar inputs preserve each share's energy and compression
 /// impulse; their loading speed is not the measured initial approach speed.
+/// Each component gets one pass, so the native response's version,
+/// `shared-elastic-pulse-v1`, refuses the budgets it always refused.
 pub fn allocate_pulse(bodies: &[BodyMotion], contacts: &[Contact]) -> Result<Budget, BudgetError> {
     allocate_model(bodies, contacts, true)
 }
@@ -288,7 +292,7 @@ fn allocate_model(
             cursor += 1;
         }
         group.sort_unstable();
-        let (impulses, iterations) = solve(&rows, &matrix, &group)?;
+        let (impulses, iterations) = solve(&rows, &matrix, &group, !pulse)?;
         result.iterations += iterations;
         let mut dot = 0.0;
         let mut quadratic = 0.0;
@@ -360,6 +364,7 @@ fn solve(
     rows: &[Row],
     matrix: &[Vec<f64>],
     group: &[usize],
+    restarted_pass: bool,
 ) -> Result<(Vec<f64>, usize), BudgetError> {
     let n = group.len();
     let max_stiffness = group
@@ -382,49 +387,71 @@ fn solve(
     if speed_scale == 0.0 {
         return Ok((vec![0.0; n], 0));
     }
-    let mut x = vec![0.0; n];
-    let mut extrapolated = x.clone();
-    let mut acceleration = 1.0_f64;
-    for iteration in 1..=MAX_ITERATIONS {
-        let next: Vec<_> = (0..n)
-            .map(|i| {
-                let gradient = b[i]
-                    .iter()
-                    .zip(&extrapolated)
-                    .map(|(a, v)| a * v)
+    // The momentum can overshoot a component whose rows act almost alike, such
+    // as two close points of one face, until it runs out of iterations. A
+    // second pass restarts the momentum whenever it opposes the step, which
+    // keeps the accelerated rate there. Components the first pass finishes
+    // are unchanged.
+    let passes = if restarted_pass { 2 } else { 1 };
+    for pass in 0..passes {
+        let restart = pass > 0;
+        let mut x = vec![0.0; n];
+        let mut extrapolated = x.clone();
+        let mut acceleration = 1.0_f64;
+        for iteration in 1..=MAX_ITERATIONS {
+            let next: Vec<_> = (0..n)
+                .map(|i| {
+                    let gradient = b[i]
+                        .iter()
+                        .zip(&extrapolated)
+                        .map(|(a, v)| a * v)
+                        .sum::<f64>()
+                        - scale[i] * rows[group[i]].speed;
+                    (extrapolated[i] - gradient / lipschitz).max(0.0)
+                })
+                .collect();
+            let impulses: Vec<_> = next.iter().zip(&scale).map(|(x, s)| x * s).collect();
+            if !impulses.iter().all(|p| p.is_finite()) {
+                return Err(BudgetError::Range);
+            }
+            let max_impulse = impulses.iter().copied().fold(0.0, f64::max);
+            let converged = group.iter().enumerate().all(|(i, &row)| {
+                let residual = rows[row].speed
+                    - group
+                        .iter()
+                        .enumerate()
+                        .map(|(j, &col)| matrix[row][col] * impulses[j])
+                        .sum::<f64>();
+                let violation = if impulses[i] > max_impulse * 1.0e-12 {
+                    residual.abs()
+                } else {
+                    residual.max(0.0)
+                };
+                violation <= RESIDUAL_TOLERANCE * speed_scale
+            });
+            if converged {
+                return Ok((impulses, pass * MAX_ITERATIONS + iteration));
+            }
+            let opposed = restart
+                && (0..n)
+                    .map(|i| (extrapolated[i] - next[i]) * (next[i] - x[i]))
                     .sum::<f64>()
-                    - scale[i] * rows[group[i]].speed;
-                (extrapolated[i] - gradient / lipschitz).max(0.0)
-            })
-            .collect();
-        let impulses: Vec<_> = next.iter().zip(&scale).map(|(x, s)| x * s).collect();
-        if !impulses.iter().all(|p| p.is_finite()) {
-            return Err(BudgetError::Range);
+                    > 0.0;
+            if opposed {
+                acceleration = 1.0;
+                extrapolated.clone_from(&next);
+                x = next;
+                continue;
+            }
+            let next_acceleration =
+                0.5 * (1.0 + libm::sqrt(1.0 + 4.0 * acceleration * acceleration));
+            for i in 0..n {
+                extrapolated[i] =
+                    next[i] + (acceleration - 1.0) / next_acceleration * (next[i] - x[i]);
+            }
+            x = next;
+            acceleration = next_acceleration;
         }
-        let max_impulse = impulses.iter().copied().fold(0.0, f64::max);
-        let converged = group.iter().enumerate().all(|(i, &row)| {
-            let residual = rows[row].speed
-                - group
-                    .iter()
-                    .enumerate()
-                    .map(|(j, &col)| matrix[row][col] * impulses[j])
-                    .sum::<f64>();
-            let violation = if impulses[i] > max_impulse * 1.0e-12 {
-                residual.abs()
-            } else {
-                residual.max(0.0)
-            };
-            violation <= RESIDUAL_TOLERANCE * speed_scale
-        });
-        if converged {
-            return Ok((impulses, iteration));
-        }
-        let next_acceleration = 0.5 * (1.0 + libm::sqrt(1.0 + 4.0 * acceleration * acceleration));
-        for i in 0..n {
-            extrapolated[i] = next[i] + (acceleration - 1.0) / next_acceleration * (next[i] - x[i]);
-        }
-        x = next;
-        acceleration = next_acceleration;
     }
     Err(BudgetError::NotConverged)
 }

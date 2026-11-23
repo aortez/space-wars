@@ -1,5 +1,7 @@
 use super::*;
-use engine_material::{ContactBody, HULL, Material, ROCK, SOFT_TISSUE, effective_mass};
+use engine_material::{
+    ContactBody, HULL, Material, ROCK, SOFT_TISSUE, effective_mass, shared_impact,
+};
 
 const DT: f32 = 1.0 / 120.0;
 const SECTION: Section = Section::new(1.0, 0.5);
@@ -90,7 +92,8 @@ fn add(
         source,
         ContactSurface {
             region: Region::new(material, 1.0).unwrap(),
-            section: SECTION,
+            thickness: SECTION.thickness,
+            depth: Depth::Fixed(SECTION.depth),
             radius,
         },
     );
@@ -133,10 +136,17 @@ fn law(
         closing_speed: 1.0,
         effective_mass: 2.0 * energy,
     };
+    let section = |surface: ContactSurface| {
+        let depth = match surface.depth {
+            Depth::Fixed(depth) => depth,
+            Depth::Patch(extent) => engine_material::deformation_depth(width, extent).unwrap(),
+        };
+        Section::new(surface.thickness, depth)
+    };
     impact(
         &a.region,
         &b.region,
-        ContactGeometry::new(width, a.section, b.section),
+        ContactGeometry::new(width, section(a), section(b)),
         load,
     )
     .unwrap()
@@ -374,7 +384,9 @@ fn a_wall_takes_the_whole_approach_and_a_moving_support_brings_its_own() {
                     None,
                 ),
             ];
-            (1, 3.0, patch_width_from_radii(1.0, None).unwrap(), slabs)
+            // The slabs' faces meet across their height, 2, which is wider
+            // than the patch the radius gives.
+            (1, 3.0, 2.0, slabs)
         } else {
             let flying = BodySpec {
                 position: -Vec2::X * 1.5,
@@ -477,64 +489,300 @@ fn charges_do_not_depend_on_collider_partitions_or_insertion_order() {
     }
 }
 
+/// A hull 3 wide, its center over 0, falling flat at 6 and spinning at
+/// `spin` from 0.0005 above a rock half-space. The half-space's pieces, on one
+/// source, span the intervals of `floor`.
+fn landing(
+    host: &mut Host,
+    floor: &[[f32; 2]],
+    spin: f32,
+    radius: Option<f32>,
+) -> (PhysicsWorld, [ContactSource; 2]) {
+    let mut world = world(Vec2::ZERO);
+    let falling = BodySpec {
+        position: Vec2::Y * 0.2505,
+        linear_velocity: -Vec2::Y * 6.0,
+        angular_velocity: spin,
+        can_sleep: false,
+        ..Default::default()
+    };
+    let fixed = BodySpec {
+        kind: BodyKind::Fixed,
+        ..Default::default()
+    };
+    let parts: Vec<_> = (0..)
+        .zip(floor)
+        .map(|(part, &[low, high])| {
+            let mut spec = cuboid(2, part, (high - low) / 2.0, 0.5);
+            spec.local_position = Vec2::new((low + high) / 2.0, -0.5);
+            spec
+        })
+        .collect();
+    let hull = cuboid(1, 0, 1.5, 0.25);
+    let sources = [
+        add(&mut world, host, 1, falling, &[hull], HULL, radius),
+        add(&mut world, host, 2, fixed, &parts, ROCK, None),
+    ];
+    host.surfaces.get_mut(&sources[1]).unwrap().depth = Depth::Patch(None);
+    (world, sources)
+}
+
+/// `pieces` equal pieces across a floor 8 wide.
+fn even(pieces: u16) -> Vec<[f32; 2]> {
+    let piece = 8.0 / f32::from(pieces);
+    (0..pieces)
+        .map(|part| {
+            let low = -4.0 + f32::from(part) * piece;
+            [low, low + piece]
+        })
+        .collect()
+}
+
+#[test]
+fn a_face_landing_flat_is_priced_across_its_span() {
+    // The hull's points span its face, so the patch is 3 wide whether the
+    // hull declares a corner's radius or none, and the floor deforms as deep
+    // as the patch is wide.
+    for radius in [Some(0.2), None] {
+        let mut host = Host::default();
+        let (mut world, sources) = landing(&mut host, &even(1), 0.0, radius);
+        let fresh = host.surfaces.clone();
+        let charges = first_charges(&mut world, &mut host);
+        assert_eq!(charges.len(), 1, "{charges:?}");
+        let (closing, outcome) = charged(&charges[0]);
+        assert!(close(closing, 6.0, 1.0e-4), "{closing}");
+        let mass = world.body_mass(body(1)).unwrap();
+        let expected = law(&fresh, sources, 3.0, 0.5 * mass * 36.0);
+        assert_priced(&outcome, &expected, &host, sources);
+        assert!(
+            close(
+                outcome.ledger.peak_force,
+                expected.ledger.peak_force,
+                1.0e-3
+            ),
+            "{outcome:?} vs {expected:?}"
+        );
+    }
+}
+
+#[test]
+fn a_face_across_many_colliders_is_priced_as_across_one() {
+    // The hull lands spinning, so its ends strike at different speeds. On a
+    // floor of 4 pieces, its face meets 2 of them, and they meet at its
+    // middle. On a floor of 80, it meets 30 of them at two points each, more
+    // points than a budget holds. Only the patch's two ends enter the budget,
+    // and the pieces cover the face between them, so each landing is priced
+    // as on a floor of one piece.
+    let mut outcomes = Vec::new();
+    for pieces in [1, 4, 80] {
+        let mut host = Host::default();
+        let (mut world, _) = landing(&mut host, &even(pieces), 1.0, Some(0.2));
+        let charges = first_charges(&mut world, &mut host);
+        assert_eq!(charges.len(), 1, "{pieces} pieces: {charges:?}");
+        if pieces == 80 {
+            let points: usize = world
+                .loading_batches()
+                .iter()
+                .map(|b| b.contacts.len())
+                .sum();
+            assert!(points > shared_impact::MAX_CONTACTS, "{points}");
+        }
+        outcomes.push(charged(&charges[0]).1);
+    }
+    let one = outcomes[0];
+    for many in &outcomes[1..] {
+        assert!(close(many.ledger.available, one.ledger.available, 1.0e-4));
+        assert!(close(many.ledger.peak_force, one.ledger.peak_force, 1.0e-4));
+        for side in 0..2 {
+            assert!(
+                close(many.consumed[side], one.consumed[side], 1.0e-4),
+                "{many:?} vs {one:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_face_across_a_gap_is_priced_across_what_it_meets() {
+    // The hull's face spans 3, but a gap 1 wide under its middle leaves it
+    // meeting the floor across 2.
+    let mut host = Host::default();
+    let floor = [[-4.0, -0.5], [0.5, 4.0]];
+    let (mut world, sources) = landing(&mut host, &floor, 0.0, Some(0.2));
+    let fresh = host.surfaces.clone();
+    let charges = first_charges(&mut world, &mut host);
+    assert_eq!(charges.len(), 1, "{charges:?}");
+    let (_, outcome) = charged(&charges[0]);
+    let mass = world.body_mass(body(1)).unwrap();
+    let expected = law(&fresh, sources, 2.0, 0.5 * mass * 36.0);
+    assert_priced(&outcome, &expected, &host, sources);
+    assert!(
+        close(
+            outcome.ledger.peak_force,
+            expected.ledger.peak_force,
+            1.0e-3
+        ),
+        "{outcome:?} vs {expected:?}"
+    );
+}
+
+#[test]
+fn ends_closer_than_a_thousandth_of_the_length_unit_are_one_point() {
+    // A flat hull lands with 0.05 of its face over a flat ledge. At a length
+    // unit of 1, the overlap is a patch 0.05 wide. At 100, its ends are one
+    // point, which flat surfaces don't price.
+    for (unit, priced) in [(1.0, true), (100.0, false)] {
+        let mut host = Host::default();
+        let (mut world, _) = landing(&mut host, &[[1.45, 4.0]], 0.0, None);
+        assert!(world.set_length_unit(unit));
+        let charges = first_charges(&mut world, &mut host);
+        assert_eq!(charges.len(), 1, "{charges:?}");
+        match &charges[0] {
+            ContactCharge::Charged { .. } if priced => {}
+            ContactCharge::Unpriced {
+                reason: Unpriced::Material(MaterialError::InvalidGeometry),
+                ..
+            } if !priced => {}
+            other => panic!("length unit {unit}: {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn a_patch_keeps_its_two_ends_and_covers_only_where_its_pieces_meet() {
+    let point = |group, piece: u16, x: f32, normal: Vec2| PatchPoint {
+        group,
+        piece: ([collider(1, 0), collider(2, piece)], [None, None]),
+        point: Vec2::new(x, 0.0),
+        normal,
+    };
+    let tilted = |degrees: f32| {
+        let (sin, cos) = degrees.to_radians().sin_cos();
+        Vec2::new(-sin, cos)
+    };
+    let points = [
+        // Group 0 meets one face on three pieces: two that abut, and one past
+        // a gap. Their points span 4 but cover 3. A fourth piece meets it at
+        // one point, closer to its end than the coincident length, which
+        // joins it.
+        point(0, 0, 1.0, Vec2::Y),
+        point(0, 0, 0.0, Vec2::Y),
+        point(0, 1, 1.0, Vec2::Y),
+        point(0, 1, 2.0, Vec2::Y),
+        point(0, 2, 4.0, Vec2::Y),
+        point(0, 2, 3.0, Vec2::Y),
+        point(0, 4, 2.0005, Vec2::Y),
+        // A point 2 degrees off the face's normal is on the face, and one 3
+        // degrees off is a patch of its own.
+        point(0, 3, 1.5, tilted(2.0)),
+        point(0, 3, 6.0, tilted(3.0)),
+        // Group 1 meets one piece at two points closer than the coincident
+        // length, which are one point.
+        point(1, 0, 5.0, Vec2::Y),
+        point(1, 0, 5.0005, Vec2::Y),
+        // Group 2 meets two pieces at a point each, 0.05 apart.
+        point(2, 0, 7.0, Vec2::Y),
+        point(2, 1, 7.05, Vec2::Y),
+    ];
+    let (kept, coverages) = patches(&points, 3, 1.0e-3);
+    assert_eq!(kept, [4, 1, 8, 10, 12, 11]);
+    let flat = ContactSurface {
+        region: Region::new(ROCK, 1.0).unwrap(),
+        thickness: 1.0,
+        depth: Depth::Fixed(0.5),
+        radius: None,
+    };
+    let curved = ContactSurface {
+        radius: Some(0.4),
+        ..flat
+    };
+    // Between flat surfaces, a point covers nothing.
+    let narrow = width(&flat, &flat, &coverages[0]).unwrap();
+    assert!(close(narrow, 3.0005, 1.0e-6), "{narrow}");
+    for points in &coverages[1..] {
+        assert_eq!(
+            width(&flat, &flat, points),
+            Err(MaterialError::InvalidGeometry)
+        );
+    }
+    // With a radius, a point covers the patch the radii give, and so does
+    // nothing at all. Points closer than that share what they cover.
+    let patch = patch_width_from_radii(0.4, None).unwrap();
+    let wide = width(&curved, &flat, &coverages[0]).unwrap();
+    assert!(close(wide, 3.0005 + patch, 1.0e-6), "{wide}");
+    assert_eq!(width(&curved, &flat, &coverages[1]), Ok(patch));
+    let pair = width(&curved, &flat, &coverages[2]).unwrap();
+    assert!(close(pair, patch + 0.05, 1.0e-5), "{pair}");
+    assert_eq!(width(&curved, &flat, &Coverage::new()), Ok(patch));
+}
+
 #[test]
 fn a_body_landing_on_two_surfaces_at_once_spends_its_motion_once() {
     // A box falls flat onto two floors that meet left of its center. Priced
     // alone, the right floor's impact would stop the whole box, and the left
-    // one's would add more.
-    let mut world = world(Vec2::ZERO);
-    let mut host = Host::default();
-    let falling = BodySpec {
-        position: Vec2::Y * (0.25 + 0.001),
-        linear_velocity: -Vec2::Y * 4.0,
-        can_sleep: false,
-        ..Default::default()
-    };
-    let floor = |x: f32| BodySpec {
-        kind: BodyKind::Fixed,
-        position: Vec2::new(x, -0.5),
-        ..Default::default()
-    };
-    let mut block = cuboid(1, 0, 0.5, 0.25);
-    block.density = 4.0;
-    add(
-        &mut world,
-        &mut host,
-        1,
-        falling,
-        &[block],
-        HULL,
-        Some(0.25),
-    );
-    add(
-        &mut world,
-        &mut host,
-        2,
-        floor(-1.6),
-        &[cuboid(2, 0, 1.4, 0.5)],
-        ROCK,
-        None,
-    );
-    add(
-        &mut world,
-        &mut host,
-        3,
-        floor(1.4),
-        &[cuboid(3, 0, 1.6, 0.5)],
-        ROCK,
-        None,
-    );
-    let charges = first_charges(&mut world, &mut host);
-    assert_eq!(charges.len(), 2, "{charges:?}");
-    let energies = charges.iter().map(|c| charged(c).1.ledger.available);
-    assert!(energies.clone().all(|e| e > 0.0), "{charges:?}");
-    let mass = world.body_mass(body(1)).unwrap();
-    let total: f32 = energies.sum();
-    assert!(
-        close(total, 0.5 * mass * 16.0, 1.0e-3),
-        "{total} vs {}",
-        8.0 * mass
-    );
+    // one's would add more. Split in two halves, the box is priced the same.
+    let mut priced = Vec::new();
+    for parts in [1, 2] {
+        let mut world = world(Vec2::ZERO);
+        let mut host = Host::default();
+        let falling = BodySpec {
+            position: Vec2::Y * (0.25 + 0.001),
+            linear_velocity: -Vec2::Y * 4.0,
+            can_sleep: false,
+            ..Default::default()
+        };
+        let floor = |x: f32| BodySpec {
+            kind: BodyKind::Fixed,
+            position: Vec2::new(x, -0.5),
+            ..Default::default()
+        };
+        let half = 0.5 / f32::from(parts);
+        let blocks: Vec<_> = (0..parts)
+            .map(|part| {
+                let mut block = cuboid(1, part, half, 0.25);
+                block.local_position.x = -0.5 + (2.0 * f32::from(part) + 1.0) * half;
+                block.density = 4.0;
+                block
+            })
+            .collect();
+        add(&mut world, &mut host, 1, falling, &blocks, HULL, Some(0.25));
+        add(
+            &mut world,
+            &mut host,
+            2,
+            floor(-1.6),
+            &[cuboid(2, 0, 1.4, 0.5)],
+            ROCK,
+            None,
+        );
+        add(
+            &mut world,
+            &mut host,
+            3,
+            floor(1.4),
+            &[cuboid(3, 0, 1.6, 0.5)],
+            ROCK,
+            None,
+        );
+        let charges = first_charges(&mut world, &mut host);
+        assert_eq!(charges.len(), 2, "{charges:?}");
+        let energies: Vec<_> = charges
+            .iter()
+            .map(|c| charged(c).1.ledger.available)
+            .collect();
+        assert!(energies.iter().all(|&e| e > 0.0), "{charges:?}");
+        let mass = world.body_mass(body(1)).unwrap();
+        let total: f32 = energies.iter().sum();
+        assert!(
+            close(total, 0.5 * mass * 16.0, 1.0e-3),
+            "{total} vs {}",
+            8.0 * mass
+        );
+        priced.push(energies);
+    }
+    for (whole, split) in priced[0].iter().zip(&priced[1]) {
+        assert!(close(*split, *whole, 1.0e-3), "{priced:?}");
+    }
 }
 
 #[test]
@@ -825,16 +1073,39 @@ fn impacts_the_host_cannot_price_are_reported_with_their_energy() {
 fn a_share_too_small_for_the_law_costs_nothing() {
     let surface = |material, radius| ContactSurface {
         region: Region::new(material, 1.0).unwrap(),
-        section: SECTION,
+        thickness: SECTION.thickness,
+        depth: Depth::Fixed(SECTION.depth),
         radius,
     };
     let tiny = Share {
         energy: 1.0e-12,
         speed: 1.0,
+        ..Default::default()
     };
     assert_eq!(
-        price(surface(HULL, Some(0.5)), surface(ROCK, None), tiny),
+        price(surface(HULL, Some(0.5)), surface(ROCK, None), &tiny),
         Ok(Outcome::default())
+    );
+}
+
+#[test]
+fn a_patch_deep_surface_is_as_deep_as_the_patch_is_wide_up_to_its_extent() {
+    let surface = |depth| ContactSurface {
+        region: Region::new(ROCK, 1.0).unwrap(),
+        thickness: 1.0,
+        depth,
+        radius: None,
+    };
+    let capped = surface(Depth::Patch(Some(0.1)));
+    for (width, depth) in [(0.05, 0.05), (1.0, 0.1)] {
+        assert_eq!(
+            section(&capped, width),
+            section(&surface(Depth::Fixed(depth)), width)
+        );
+    }
+    assert_eq!(
+        section(&surface(Depth::Patch(None)), 1.0),
+        section(&surface(Depth::Fixed(1.0)), 1.0)
     );
 }
 

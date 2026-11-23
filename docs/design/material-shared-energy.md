@@ -193,16 +193,27 @@ response contract. Linear and angular momentum remain checked for dynamic chains
 
 The kernel accepts at most 64 bodies and 32 contacts. It sorts by stable patch ID
 and uses double-precision intermediates with `libm` for square roots. Each
-component gets at most 2048 accelerated projected-gradient iterations; each
-iteration costs at most quadratic work in its row count. The matrix occupies
-at most 32 by 32 doubles. `Budget::iterations` sums all component iterations.
-The speed residual tolerance is `1e-9` times the largest approach in the component.
+component pass takes at most 2048 accelerated projected-gradient iterations;
+each iteration costs at most quadratic work in its row count. In `allocate`, a
+component the first pass doesn't finish gets a second pass that restarts the
+momentum whenever it opposes the step, so a component there takes at most 4096
+iterations. Rows that act almost alike, such as two close points of one face,
+need it: the momentum overshoots them. Components the first pass finishes are
+unchanged. `allocate_pulse` keeps one pass, so `shared-elastic-pulse-v1`
+refuses the budgets it always refused. The matrix occupies at most 32 by 32
+doubles. `Budget::iterations` sums all component
+iterations, and a component that needed the second pass counts 2048 for the
+first. The speed residual tolerance is `1e-9` times the largest approach in the
+component.
 
 Invalid/nonfinite inputs, duplicate IDs, separating rows, immovable contacts,
 range failures and nonconvergence return an error with no partial budget.
-Opposing incompatible driven contacts exercise bounded nonconvergence. An
-empty batch or stationary normal mode returns zero work. Completeness of the
-input set is a host responsibility and cannot be inferred by this kernel.
+Opposing incompatible driven contacts exercise bounded nonconvergence. A
+hull's two close points on a floor, taken from a game world, converge on
+`allocate`'s second pass, and `allocate_pulse` refuses them. An empty batch or
+stationary normal mode returns zero work.
+Completeness of the input set is a host responsibility and cannot be inferred
+by this kernel.
 
 The production admission policy must decide what to do when a batch is refused;
 silently skipping its damage is not an implemented policy. The current
