@@ -5,6 +5,11 @@ the strongest form, the escape pod appreciably weaker, and the on-foot pilot
 fragile. **Both vehicles fully shield their occupant.** Ship hull, pod hull and
 persistent pilot health are separate: damage never reaches an occupied pilot.
 
+Since [#330](https://github.com/aortez/space-wars/issues/330), material weapons
+replace this page's laser and missile rules, and
+[Under material weapons](#under-material-weapons) gives what they change. The
+heat and impact rules, the shielding and the protection window still hold.
+
 ## Rules
 
 The full ship retains its existing hull health, weapons, collision damage and
@@ -83,11 +88,33 @@ landing cushion while making it less durable than a full hull.
 
 Protected laser and heat cases are recorded separately. They first lose
 hull or pilot health at tick 180. The native supplied-missile braking test also
-confirms that a fresh pod retains 50 hull health and 100 pilot health, and can
-brake below 2 units/s after the hit. Physical transfer tests preserve both a
+confirms that a fresh pod survives the hit with 100 pilot health and can brake
+below 2 units/s after it. Its hull kept 50 health under #154's rules and keeps
+about 30.9 under material weapons. Physical transfer tests preserve both a
 wounded pod hull and its wounded pilot; rebuilding preserves pilot health.
 Native lethal laser and missile tests verify that pod destruction releases one
 pilot without damage spillover, healing, or another protection period.
+
+## Under material weapons
+
+The same probe on #330's material weapons, with seed 42 and the fixture above:
+
+| Exposure | Ship #154 → #330 | Pod #154 → #330 | On foot #154 → #330 |
+| --- | --- | --- | --- |
+| Continuous laser, 40-unit pivot separation: seconds to loss | 13.88 → 13.87 | 7.18 → 5.75 | 3.62 → 2.87 |
+| First supplied missile contact, 300 units/s: health lost | 28.96 → 20.75 | 50 → 69.07 | 100 → 100 |
+| Incoming missiles every 2s: seconds to loss | 4.03 → 6.03 | 2.05 → 2.05 | 0.05 → 0.05 |
+
+Heat and planet impacts involve no weapon and measure as before. Every ship
+and pod exposure still leaves the pilot at 100 health, and the protected laser
+cases still first lose health at tick 180.
+
+The laser still makes each form last more than 1.8 times the next. A missile's
+cost now follows the energy it closes with: the ship takes four missiles where
+it took three, and the pod still breaks on its second. A missile closing at
+this fixture's 300 units/s kills a pilot on foot, but one closing slower than
+about 236 does not. The paired bot matches below ran under #154's rules, and
+#330 did not rerun them.
 
 ## Paired bot matches
 
@@ -137,10 +164,12 @@ the known blocked-route cases. Aggression and pursuit changes remain under
 
 ## Evidence and reproduction
 
-[Machine-readable results](data/durability-154-v2.json) include every case,
-health/protection settings, separate hull-loss/death meanings, pod losses,
-causes, physical rebuilds, recovery completions, outcomes and executable hashes. Full commands, action
-traces, snapshots and the retained baseline/tuned executables are under
+#154's machine-readable results, `docs/data/durability-154-v2.json`, held
+every case, health/protection settings, separate hull-loss/death meanings, pod
+losses, causes, physical rebuilds, recovery completions, outcomes and
+executable hashes. #330's last PR deleted the file, which stays in git
+history: `git show 44623ec:docs/data/durability-154-v2.json`. Full commands,
+action traces, snapshots and the retained baseline/tuned executables are under
 `target/durability-154/`. These desktop measurements use Rust 1.94.1 on the
 same machine; they are not Pi performance measurements. No device deployment
 or automatic Clock settings change is part of this work.

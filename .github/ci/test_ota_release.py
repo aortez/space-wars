@@ -5,7 +5,9 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
+import ota_prepare
 import ota_publisher_journal as journal
 import ota_release as release
 from ota_delivery import digest
@@ -18,7 +20,8 @@ CI_URL = 'https://github.com/aortez/space-wars/actions/runs/7'
 def configuration(root):
     return dict(schema=1, authority=str(root / 'authority'), workspace=str(root / 'workspace'),
                 root_sha256=digest(ROOT), tools_directory=str(root / 'tools'),
-                tools={name: 'f' * 64 for name in release.TOOLS}, code={name: 'c' * 64 for name in release.CODE})
+                tools={name: 'f' * 64 for name in release.TOOLS}, code={name: 'c' * 64 for name in release.CODE},
+                build=dict(cache=str(root / 'cache'), checkout=str(root / 'checkout'), directory=str(root / 'build')))
 
 
 def publisher(root):
@@ -26,8 +29,10 @@ def publisher(root):
     return release.Publisher(release.Config(configuration(root)))
 
 
-def prepared_candidate(directory, payload, embedded='a' * 40):
-    """A candidate directory as preparation leaves it, from source 'a' * 40, and its image_candidate output."""
+def prepared_candidate(directory, payload, embedded='a' * 40, baseline=None, code=None):
+    """A candidate directory as ota_release.py candidate leaves it, from source 'a' * 40, compared with the
+    baseline generation by the code configuration() pins, unless code names other, and its image_candidate
+    output."""
     (directory / 'candidate').mkdir(parents=True)
     descriptor = dict(schema=1, format='rootfs-ext4-zstd', expanded=dict(bytes=4096, sha256=digest(payload * 2)),
                       compressed=dict(bytes=len(payload), sha256=digest(payload)))
@@ -41,7 +46,9 @@ def prepared_candidate(directory, payload, embedded='a' * 40):
              'candidate/qualification.json': json.dumps(dict(schema=1, image=image)).encode()}
     for name, data in files.items():
         (directory / name).write_bytes(data)
-    report = dict(source='a' * 40, descriptor=descriptor,
+    code = {name: 'c' * 64 for name in release.CODE} if code is None else code
+    report = dict(schema=2, prepared_by=dict(command='ota_release.py candidate', code=code), source='a' * 40,
+                  descriptor=descriptor, baseline=baseline and dict(generation=baseline),
                   artifacts={name: dict(bytes=len(data), sha256=digest(data)) for name, data in files.items()})
     (directory / 'preparation-result.json').write_text(json.dumps(report))
     return files['candidate/qualification.json']
@@ -142,6 +149,8 @@ class ConfigTests(unittest.TestCase):
             value = configuration(root)
             for case, changed in (('a missing tool', dict(value, tools={'feed_sign': 'f' * 64})),
                                   ('missing code pins', dict(value, code={})),
+                                  ('no build paths', dict(value, build={})),
+                                  ('a relative build path', dict(value, build=dict(value['build'], cache='cache'))),
                                   ('a relative path', dict(value, workspace='workspace')),
                                   ('an unknown field', dict(value, extra=1))):
                 with self.subTest(case), self.assertRaises(ValueError):
@@ -155,6 +164,31 @@ class ConfigTests(unittest.TestCase):
                 release.Config.load(path)
 
 
+class CandidateTests(unittest.TestCase):
+    def test_preparation_runs_without_the_lock_under_the_owners_umask(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        config = release.Config(configuration(Path(temporary.name)))
+        session = release.Publisher(config, exclusive=False)
+        session.umask = 0o002  # What __enter__ saved before it set the session's private umask.
+        seen = []
+
+        def prepare(publisher, code, source, accept, generation, previous):
+            seen.append(os.umask(0o022))
+            os.umask(seen[-1])
+            return dict(prepared=True)
+
+        private = os.umask(0o077)
+        try:
+            with patch.object(ota_prepare, 'prepare', prepare):
+                self.assertEqual(session.candidate(), dict(prepared=True))
+            self.assertEqual((seen, os.umask(0o077)), ([0o002], 0o077))
+        finally:
+            os.umask(private)
+        with self.assertRaisesRegex(ValueError, 'without the publisher lock'):
+            release.Publisher(config).candidate()
+
+
 class SelectionTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -166,8 +200,10 @@ class SelectionTests(unittest.TestCase):
         """A prepared candidate, verified by a fake image_candidate and passed by a fake CI run on main."""
         directory = self.root / 'candidate'
         qualification = prepared_candidate(directory, b'compressed image', embedded)
+        self.publisher.state = genesis()
         self.publisher.run = lambda name, *args, timeout=120: qualification
-        self.ci = dict(status='completed', conclusion='success', event='push', headBranch='main', headSha='a' * 40)
+        self.ci = dict(status='completed', conclusion='success', event='push', headBranch='main', headSha='a' * 40,
+                       workflowName='CI')
         self.publisher.gh_json = lambda args: dict(self.ci, url=args[2])
         return directory, b'compressed image'
 
@@ -178,14 +214,34 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual((intent['image']['source_commit'], intent['image']['min_recovery_protocol']), ('a' * 40, 2))
         self.assertEqual((selection['ci']['url'], image), ('7', directory / 'candidate/image.ext4.zst'))
         for case, field, value in (('another branch', 'headBranch', 'feature'), ('another commit', 'headSha', 'b' * 40),
-                                   ('a failed run', 'conclusion', 'failure')):
+                                   ('a failed run', 'conclusion', 'failure'), ('another workflow', 'workflowName',
+                                                                             'Clock mixed-event regression')):
             with self.subTest(case), self.assertRaisesRegex(ValueError, 'has not passed CI on main'):
                 self.ci[field] = value
                 self.publisher.select_nightly(directory)
-            self.ci = dict(self.ci, headBranch='main', headSha='a' * 40, conclusion='success')
+            self.ci = dict(self.ci, headBranch='main', headSha='a' * 40, conclusion='success', workflowName='CI')
         (directory / 'candidate/candidate.json').write_text('{}')
         with self.assertRaisesRegex(ValueError, 'Preparation artifact changed'):
             self.publisher.select_nightly(directory)
+
+    def test_nightly_selection_requires_a_candidate_the_command_compared_with_the_newest_generation(self):
+        directory, _ = self.candidate()
+        path = directory / 'preparation-result.json'
+        report = json.loads(path.read_bytes())
+        path.write_text(json.dumps(dict(report, schema=1)))
+        with self.assertRaisesRegex(ValueError, 'Prepare candidates with ota_release.py candidate'):
+            self.publisher.select_nightly(directory)
+        path.write_text(json.dumps(dict(report, prepared_by=dict(report['prepared_by'], code={}))))
+        with self.assertRaisesRegex(ValueError, 'was prepared by other code; delete it and run '
+                                                'ota_release.py candidate a{40} again'):
+            self.publisher.select_nightly(directory)
+        path.write_text(json.dumps(report))
+        self.publisher.state = finish(journal.reserve(genesis(), nightly(), NOW), FakeTooling())
+        with self.assertRaisesRegex(ValueError, 'compared with generation None, but the newest published '
+                                                'generation is 1; run ota_release.py candidate a{40} again'):
+            self.publisher.select_nightly(directory)
+        path.write_text(json.dumps(dict(report, baseline=dict(generation=1))))
+        self.assertEqual(self.publisher.select_nightly(directory)[0]['image']['source_commit'], 'a' * 40)
 
     def test_nightly_selection_requires_the_embedded_source(self):
         directory, _ = self.candidate(embedded='c' * 40)

@@ -1,13 +1,14 @@
 //! Cannon shells as material weapon shots (#330).
 //!
-//! A game that enables material weapons carries each cannon shell as one of
-//! the world's [`Weapons`](engine_rapier::world::weapon::Weapons) shots from
-//! its first step. A shot stops on the body its shell pushed hardest in a step,
+//! The game carries each cannon shell as one of the world's
+//! [`Weapons`](engine_rapier::world::weapon::Weapons) shots from its first
+//! step. A shot stops on the body its shell pushed hardest in a step,
 //! and its source charges that body's region by the impact law: the shell's
 //! mass and speed against the body's motion, and the shell's own material
 //! against the body's. The body's [`HealthMap`] turns that work into the health
 //! it costs. The contact rules take that health where they took a shell's
-//! damage, so a hit's records, particles and deaths follow as before.
+//! damage, so a hit's records and deaths follow as before. Its sparks keep the
+//! old shell's size, so a hit that costs nothing still throws them.
 //!
 //! A shell's first hard contact stops it. Whatever it meets outside the
 //! material model, such as a planet, terrain or the edge of the universe,
@@ -15,7 +16,6 @@
 //! no longer bounces off the edge of the universe. In a match, pods and pilots
 //! on foot take hits unless their ejection protection covers them. Outside a
 //! match, pods and pilots take no harm, so they are outside the model.
-//! Material weapons are off by default, which keeps the old damage rules.
 use super::*;
 use engine_material::{Part, Region, Section};
 use engine_rapier::world::weapon::{
@@ -33,14 +33,11 @@ pub(super) struct ShotHit {
 }
 
 /// Launches each shell that has a body in the world and no shot yet. A shell
-/// whose shot is refused keeps the old rules.
+/// whose shot is refused charges nothing.
 pub(super) fn launch(state: &mut SpacewarsState) {
     let SpacewarsState {
         debris, physics, ..
     } = state;
-    if !physics.weapons_enabled() {
-        return;
-    }
     for shell in debris.iter_mut().filter(|item| {
         item.kind == DebrisKind::Shell && !item.dead && !item.shot && item.physics_id != 0
     }) {
@@ -66,7 +63,7 @@ pub(super) fn launch(state: &mut SpacewarsState) {
 }
 
 /// Records the motion each body brings into the step, which the shots' hits
-/// are measured from. None while material weapons are off or no shot flies.
+/// are measured from. None while no shot flies.
 pub(super) fn prepare(state: &SpacewarsState, dt: f32) -> Option<Prepared> {
     state.physics.prepare_shots(dt)
 }
@@ -132,6 +129,27 @@ pub(super) fn settle(
                     );
                 }
             }
+            WeaponEvent::Excluded {
+                source,
+                part: Part::Kinetic,
+                recipient: Recipient::Unmodeled(body),
+                reason: Exclusion::Unmodeled,
+                ..
+            } => {
+                // A ship outside the model, such as a pod outside a match,
+                // stops the shot uncharged, and the hit still counts.
+                if let Some(target @ MechanicalEntity::Ship(_)) =
+                    physics::classify_entity(body.entity)
+                {
+                    shot_hits.insert(
+                        source,
+                        ShotHit {
+                            target,
+                            health: 0.0,
+                        },
+                    );
+                }
+            }
             WeaponEvent::Retired { source, .. } => retired.push(source),
             _ => {}
         }
@@ -147,7 +165,8 @@ pub(super) fn settle(
 }
 
 /// The health a shot shell's hit cost `target`, if the shot stopped on it, and
-/// none if protection covered it. `None` for any other body the shell touched.
+/// none if protection covered it or the model leaves it out, as it does a pod
+/// outside a match. `None` for any other body the shell touched.
 pub(super) fn charged(state: &SpacewarsState, shell: u64, target: MechanicalEntity) -> Option<f32> {
     state
         .shot_hits
@@ -258,7 +277,7 @@ mod tests {
     use super::*;
 
     /// Two ships at rest 700 units apart in an empty universe.
-    fn space(material: bool) -> SpacewarsState {
+    fn space() -> SpacewarsState {
         let config = SpacewarsConfig {
             use_planets: false,
             asteroid_probability_per_sec: 0.0,
@@ -267,9 +286,6 @@ mod tests {
             ..SpacewarsConfig::default()
         };
         let mut state = SpacewarsScenario::init(config, 123);
-        if material {
-            state.enable_material_weapons();
-        }
         state.ships[0].position = Vec2::new(300.0, 1_000.0);
         state.ships[1].position = Vec2::new(1_000.0, 1_000.0);
         for ship in &mut state.ships {
@@ -305,22 +321,19 @@ mod tests {
     }
 
     #[test]
-    fn shells_are_shots_from_their_first_step_only_with_material_weapons() {
-        for material in [false, true] {
-            let mut state = space(material);
-            assert_eq!(state.material_weapons(), material);
-            let at = state.ships[0].position + Vec2::Y * 100.0;
-            let shell = fire(&mut state, at, Vec2::Y * CANNON_SHELL_SPEED, true);
-            step(&mut state);
-            let id = state.debris[shell].physics_id;
-            assert_eq!(state.debris[shell].shot, material);
-            assert_eq!(state.physics.shot_ids() == [id], material);
-        }
+    fn shells_are_shots_from_their_first_step() {
+        let mut state = space();
+        let at = state.ships[0].position + Vec2::Y * 100.0;
+        let shell = fire(&mut state, at, Vec2::Y * CANNON_SHELL_SPEED, true);
+        step(&mut state);
+        let id = state.debris[shell].physics_id;
+        assert!(state.debris[shell].shot);
+        assert_eq!(state.physics.shot_ids(), [id]);
     }
 
     #[test]
     fn a_shot_charges_the_ship_it_stops_on_and_dies_with_its_shell() {
-        let mut state = space(true);
+        let mut state = space();
         let target = state.ships[1].position + SHIP_PIVOT;
         fire(&mut state, target - Vec2::X * 12.0, Vec2::X * 300.0, true);
         let before = state.ships[1].life;
@@ -336,7 +349,7 @@ mod tests {
 
     #[test]
     fn an_armed_shot_can_hit_its_own_ship() {
-        let mut state = space(true);
+        let mut state = space();
         let own = state.ships[0].position + SHIP_PIVOT;
         // The shell arms after its first step, well short of its ship's hull.
         fire(&mut state, own + Vec2::X * 20.0, -Vec2::X * 300.0, true);
@@ -347,33 +360,28 @@ mod tests {
     }
 
     #[test]
-    fn a_shot_stops_at_the_edge_of_the_universe_where_a_shell_bounced() {
-        for material in [false, true] {
-            let mut state = space(material);
-            let at = Vec2::new(1_000.0, 1_500.0);
-            fire(&mut state, at, Vec2::Y * 300.0, true);
-            let mut farthest = 0.0_f32;
-            for _ in 0..240 {
-                step(&mut state);
-                let Some(shell) = state.debris.iter().find(|d| d.kind == DebrisKind::Shell) else {
-                    break;
-                };
-                farthest = farthest.max(shell.position.y);
-            }
-            let left = state.debris.iter().find(|d| d.kind == DebrisKind::Shell);
-            assert!(farthest > 1_990.0, "{farthest}");
-            if material {
-                assert!(left.is_none());
-                assert!(state.physics.shot_ids().is_empty());
-            } else {
-                assert!(left.is_some_and(|shell| shell.velocity.y < 0.0), "{left:?}");
-            }
+    fn a_shot_stops_at_the_edge_of_the_universe() {
+        let mut state = space();
+        let at = Vec2::new(1_000.0, 1_500.0);
+        fire(&mut state, at, Vec2::Y * 300.0, true);
+        let mut farthest = 0.0_f32;
+        for _ in 0..240 {
+            step(&mut state);
+            let Some(shell) = state.debris.iter().find(|d| d.kind == DebrisKind::Shell) else {
+                break;
+            };
+            farthest = farthest.max(shell.position.y);
         }
+        // The shell reached the edge and went no farther, where an old shell
+        // bounced back.
+        assert!(farthest > 1_990.0, "{farthest}");
+        assert!(state.debris.iter().all(|d| d.kind != DebrisKind::Shell));
+        assert!(state.physics.shot_ids().is_empty());
     }
 
     #[test]
     fn a_shot_retires_when_its_shell_dies_another_way() {
-        let mut state = space(true);
+        let mut state = space();
         let ship = &mut state.ships[0];
         ship.direction = Vec2::X;
         ship.rotation_radians = rotation_for_direction(Vec2::X);
@@ -412,9 +420,15 @@ mod tests {
 
     #[test]
     fn a_round_costs_an_asteroid_what_a_shell_did() {
-        for radius in [10.0_f32, 40.0, 100.0] {
-            let [old, new] = [false, true].map(|material| {
-                let mut state = space(material);
+        // The health a shell took from each rock under the old rules, and the
+        // chips it knocked off. A shell destroyed the smallest.
+        for (radius, old) in [
+            (10.0_f32, None),
+            (40.0, Some((14.33, 2))),
+            (100.0, Some((14.64, 0))),
+        ] {
+            let new = (|| {
+                let mut state = space();
                 let at = Vec2::new(1_000.0, 1_300.0);
                 state.debris.push(DebrisState::new(
                     DebrisKind::Asteroid,
@@ -440,17 +454,15 @@ mod tests {
                 let rock = state.debris.iter().find(|d| Some(d.physics_id) == rock)?;
                 assert_eq!(rock.kind, DebrisKind::Asteroid);
                 let lost = rock.life_max - rock.life;
-                if material {
-                    // The rock loses what the shot charged it, and no old damage.
-                    assert!(
-                        (lost - charged).abs() < 1.0e-3,
-                        "r{radius}: {lost} {charged}"
-                    );
-                }
+                // The rock loses what the shot charged it, and no old damage.
+                assert!(
+                    (lost - charged).abs() < 1.0e-3,
+                    "r{radius}: {lost} {charged}"
+                );
                 Some((lost, rock.chip_count))
-            });
+            })();
             match (old, new) {
-                (None, None) => assert_eq!(radius, 10.0),
+                (None, None) => {}
                 (Some((old, old_chips)), Some((new, new_chips))) => {
                     assert!((new - old).abs() < 1.0, "r{radius}: {old} then, {new} now");
                     assert_eq!(new_chips, old_chips, "r{radius}");
@@ -461,16 +473,8 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "select material weapons before stepping")]
-    fn material_weapons_are_chosen_before_the_first_step() {
-        let mut state = space(false);
-        step(&mut state);
-        state.enable_material_weapons();
-    }
-
-    #[test]
     fn two_shots_in_one_step_charge_a_ship_no_more_than_it_has() {
-        let mut state = space(true);
+        let mut state = space();
         let ship = &mut state.ships[1];
         ship.direction = Vec2::Y;
         ship.rotation_radians = rotation_for_direction(Vec2::Y);
@@ -494,16 +498,13 @@ mod tests {
     /// A world with a rover of ship 0's on the largest planet that takes one,
     /// and a round of ship 1's closing on its chassis from 7 units above at
     /// `speed`, as the chassis rides the planet.
-    fn rover_under_fire(material: bool, speed: f32) -> (SpacewarsState, usize, RoverState) {
+    fn rover_under_fire(speed: f32) -> (SpacewarsState, usize, RoverState) {
         let config = SpacewarsConfig {
             asteroid_probability_per_sec: 0.0,
             use_starfield: false,
             ..SpacewarsConfig::default()
         };
         let mut state = SpacewarsScenario::init(config, 123);
-        if material {
-            state.enable_material_weapons();
-        }
         let planet = (0..state.planets.len())
             .filter(|&at| state.planets[at].radius >= ROVER_MIN_PLANET_RADIUS)
             .max_by(|&a, &b| state.planets[a].radius.total_cmp(&state.planets[b].radius))
@@ -532,31 +533,25 @@ mod tests {
 
     #[test]
     fn a_round_destroys_a_rover_as_a_shell_did() {
-        for material in [false, true] {
-            let (mut state, planet, rover) = rover_under_fire(material, CANNON_SHELL_SPEED);
-            let mut charged = None;
-            for _ in 0..30 {
-                step(&mut state);
-                charged = charged.or(state.shot_hits.values().next().copied());
-                if state.rovers.is_empty() {
-                    break;
-                }
-            }
-            assert!(state.rovers.is_empty(), "material {material}");
-            assert_eq!(state.rover_builds[planet].progress, 0.0);
-            if material {
-                let hit = charged.unwrap();
-                assert_eq!(hit.target, MechanicalEntity::Rover(rover.id));
-                assert!(hit.health >= ROVER_LIFE_MAX, "{hit:?}");
-            } else {
-                assert_eq!(charged, None);
+        let (mut state, planet, rover) = rover_under_fire(CANNON_SHELL_SPEED);
+        let mut charged = None;
+        for _ in 0..30 {
+            step(&mut state);
+            charged = charged.or(state.shot_hits.values().next().copied());
+            if state.rovers.is_empty() {
+                break;
             }
         }
+        assert!(state.rovers.is_empty());
+        assert_eq!(state.rover_builds[planet].progress, 0.0);
+        let hit = charged.unwrap();
+        assert_eq!(hit.target, MechanicalEntity::Rover(rover.id));
+        assert!(hit.health >= ROVER_LIFE_MAX, "{hit:?}");
     }
 
     #[test]
     fn a_slow_round_costs_a_rover_what_its_shot_charged() {
-        let (mut state, _, rover) = rover_under_fire(true, 60.0);
+        let (mut state, _, rover) = rover_under_fire(60.0);
         let hit = hit(&mut state);
         assert_eq!(hit.target, MechanicalEntity::Rover(rover.id));
         assert!(hit.health > 0.0 && hit.health < ROVER_LIFE_MAX, "{hit:?}");
@@ -569,7 +564,7 @@ mod tests {
 
     #[test]
     fn a_shot_records_no_contact_with_a_body_it_did_not_charge() {
-        let (mut state, _, rover) = rover_under_fire(true, CANNON_SHELL_SPEED);
+        let (mut state, _, rover) = rover_under_fire(CANNON_SHELL_SPEED);
         step(&mut state);
         let round = *state.debris.iter().find(|d| d.shot).unwrap();
         assert!(state.shot_hits.is_empty());
@@ -599,7 +594,7 @@ mod tests {
 
     #[test]
     fn a_shot_hit_counts_only_for_the_body_it_stopped_on() {
-        let mut state = space(true);
+        let mut state = space();
         let hit = ShotHit {
             target: MechanicalEntity::Ship(1),
             health: 12.0,
@@ -623,7 +618,7 @@ mod tests {
                 step(state);
             }
         };
-        let mut first = space(true);
+        let mut first = space();
         let mut second = first.clone();
         play(100, &mut first);
         assert!(first.physics.shot_ids().len() >= 3);
