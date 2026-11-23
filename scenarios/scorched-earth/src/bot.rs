@@ -3,9 +3,11 @@ use super::*;
 
 mod aim;
 pub(crate) mod comparison;
+mod plot;
 mod position;
 mod priority;
 use aim::{Aim, Geometry};
+use plot::Plot;
 #[cfg(test)]
 mod tests;
 
@@ -16,6 +18,10 @@ pub enum CpuPolicy {
     Sweep,
     Calibrated,
     Reactive,
+    /// Traces a shell for each elevation through the world before every shot,
+    /// so it can fire through an opening, and moves after hits as `Reactive`
+    /// does.
+    Plotted,
 }
 
 impl CpuPolicy {
@@ -24,13 +30,15 @@ impl CpuPolicy {
             Self::Sweep => "Sweep",
             Self::Calibrated => "Learning",
             Self::Reactive => "Learning + move",
+            Self::Plotted => "Plotting + move",
         }
     }
     pub fn next(self) -> Self {
         match self {
             Self::Sweep => Self::Calibrated,
             Self::Calibrated => Self::Reactive,
-            Self::Reactive => Self::Sweep,
+            Self::Reactive => Self::Plotted,
+            Self::Plotted => Self::Sweep,
         }
     }
 }
@@ -110,6 +118,10 @@ pub(super) struct Bot {
     last_relocation: Option<RelocationOutcome>,
     #[serde(skip_serializing_if = "Option::is_none")]
     shot_priority: Option<priority::ShotPriority>,
+    /// The plotted CPU's plot for its next shot, kept after firing until the
+    /// next one begins.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    plot: Option<Plot>,
 }
 
 #[derive(Clone, Serialize)]
@@ -162,14 +174,22 @@ impl Bot {
     // Call after refreshing aim against the current poses. This is also the
     // checkpoint boundary used by the lab; it does not reset learned history.
     fn wants_relocation(&self, state: &Duel, player: usize) -> bool {
-        state.config.cpu_policy[player] == CpuPolicy::Reactive
+        let policy = state.config.cpu_policy[player];
+        // A plotted tank is confident while its last plot found an arc that
+        // reaches the target.
+        let confident = if policy == CpuPolicy::Plotted {
+            self.plotted_hit()
+        } else {
+            self.aim.confident
+        };
+        matches!(policy, CpuPolicy::Reactive | CpuPolicy::Plotted)
             && self.relocation.is_none()
             && self
                 .shot_priority
                 .as_ref()
                 .is_none_or(|p| p.ended.is_some())
             && self.hit_serial != self.considered_hit
-            && !self.aim.confident
+            && !confident
             && !self.require_shot
             && state.tick >= self.relocate_after
             && self
@@ -196,6 +216,7 @@ impl Bot {
             self.relocations += 1;
             self.require_shot = true;
             self.aim.confident = false;
+            self.plot = None;
             // Gate firing before the drive ramp changes measured velocity.
             self.mode = "relocating after hit";
         } else {
@@ -254,7 +275,9 @@ impl Bot {
             };
             return Some(0.0);
         }
-        self.mode = if self.aim.confident {
+        self.mode = if state.config.cpu_policy[player] == CpuPolicy::Plotted {
+            self.plot.as_ref().map_or("waiting to plot", Plot::mode)
+        } else if self.aim.confident {
             "aim acquired"
         } else {
             "ranging"
@@ -311,10 +334,16 @@ impl Duel {
     pub(super) fn bot_allows_fire(&self, player: usize) -> bool {
         !self.calibrated_cpu(player)
             || (self.bots[player].pending.is_none()
-                && (!self.config.cpu_driving || self.bots[player].relocation.is_none()))
+                && (!self.config.cpu_driving || self.bots[player].relocation.is_none())
+                && (self.config.cpu_policy[player] != CpuPolicy::Plotted
+                    || self.bots[player].plotted_arc().is_some()))
     }
 
     pub(super) fn aim_calibrated(&mut self, physics: &mut PhysicsWorld, player: usize) {
+        if self.config.cpu_policy[player] == CpuPolicy::Plotted {
+            self.aim_plotted(physics, player);
+            return;
+        }
         let geometry = Geometry::read(self, physics, player);
         let aim = &mut self.bots[player].aim;
         aim.refresh(geometry);
@@ -355,6 +384,9 @@ impl Duel {
             bot.hold_until = 0;
             bot.mode = "watching shot";
             bot.priority_launched(launch.id, launch.tick);
+            if let Some(plot) = &mut bot.plot {
+                plot.fired = true;
+            }
         }
         Flight {
             launch,
@@ -393,12 +425,17 @@ impl Duel {
             bot.pending = None;
         }
         if result.launch.calibrated {
-            bot.aim.learn(&result);
-            bot.mode = if bot.aim.confident {
-                "aim acquired"
+            // A plotted tank plots each shot afresh and learns nothing from one.
+            if self.config.cpu_policy[shell.owner] == CpuPolicy::Plotted {
+                bot.mode = "waiting to plot";
             } else {
-                "ranging"
-            };
+                bot.aim.learn(&result);
+                bot.mode = if bot.aim.confident {
+                    "aim acquired"
+                } else {
+                    "ranging"
+                };
+            }
         }
         bot.last_shot = Some(result);
         bot.priority_observed(&result);

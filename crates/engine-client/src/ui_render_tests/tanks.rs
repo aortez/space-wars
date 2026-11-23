@@ -8,7 +8,7 @@ use scenario_clock::{ClockAction, ClockConfig, ClockReading, ClockScenario};
 use std::time::Duration;
 
 // Every capture owns a fresh pixel buffer, so request full repainting.
-struct CapturePlatform(Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>);
+pub(super) struct CapturePlatform(pub(super) Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>);
 impl Platform for CapturePlatform {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
         let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
@@ -17,7 +17,7 @@ impl Platform for CapturePlatform {
     }
 }
 
-fn draw(
+pub(super) fn draw(
     ui: &MainWindow,
     window: &MinimalSoftwareWindow,
     frame: &engine_common::RenderFrame,

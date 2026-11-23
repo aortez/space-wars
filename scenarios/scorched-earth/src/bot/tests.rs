@@ -269,6 +269,8 @@ fn bot_comparison_button_restarts_same_seed_and_clears_learning() {
     state.command(Command::CpuAim);
     assert_eq!(state.config.cpu_policy, [CpuPolicy::Reactive; 2]);
     state.command(Command::CpuAim);
+    assert_eq!(state.config.cpu_policy, [CpuPolicy::Plotted; 2]);
+    state.command(Command::CpuAim);
     assert_eq!(state.config.cpu_policy, [CpuPolicy::Sweep; 2]);
 }
 

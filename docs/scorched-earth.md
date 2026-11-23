@@ -58,8 +58,9 @@ or switching to manual preserves the goal's history; Reset starts a fresh run.
 
 **Angular** is the initial dirt choice. **Demo** controls both tanks with the
 selected CPU policy. The playable default is **Learning + move**; the bottom-right
-button cycles **Sweep → Learning → Learning + move**, restarting the same seed
-for comparison. The headless default retains the original seeded sweep.
+button cycles **Sweep → Learning → Learning + move → Plotting + move**,
+restarting the same seed for comparison. The headless default retains the
+original seeded sweep.
 Power is muzzle speed (12–48 world units/s); elevation ranges from 5° to 85°.
 Human shots have a 1.25-second cooldown.
 
@@ -164,7 +165,8 @@ height at the target's original X. Movement exceeding 1.5 units during flight
 invalidates a static-target correction. Collisions, leaving the arena and the
 ten-second shell lifetime all release the pending-shot gate. The last 64 shot
 outcomes are retained for inspection, including actual damage and miss reason.
-There are no hidden simulated trial shots or deliberately forced opening misses.
+Learning has no hidden simulated trial shots or deliberately forced opening
+misses.
 
 Moving either tank more than one unit, or changing the shooter's pitch by more
 than 8°, clears the local bracket/confidence while retaining the learned power
@@ -217,12 +219,13 @@ start/end ticks, and reason (`arrived`, `blocked ground`, `no support`, `stalled
 or `deadline`). An ended attempt is not counted as an arrival.
 
 The physics, weapons, ordinary five-second CPU shot interval, range driver and
-footing checks remain shared. Waiting for an outstanding shot can extend the
-interval. Bank/Drop/Hillside/Roof/Barrage and driving courses retain their scripts;
-the learned policy is only used in ordinary duels.
+footing checks remain shared. Waiting for an outstanding shot, or for a plot, can
+extend the interval. Bank/Drop/Hillside/Roof/Barrage and driving courses retain
+their scripts; the learned and plotted policies are only used in ordinary duels.
 
 Reproduce a controlled comparison with fixed tanks and the actual shell/blast
-path (cases: `flat`, `uphill`, `downhill`, `ridge`; `duel` uses normal moving tanks):
+path (cases: `flat`, `uphill`, `downhill`, `ridge`, `wall`; `duel` uses normal moving
+tanks):
 
 ```sh
 cargo +1.89.0 run --locked --profile ci -p scenario-scorched-earth \
@@ -232,7 +235,7 @@ cargo +1.89.0 run --locked --profile ci -p scenario-scorched-earth \
   --cpu-driving --cpu-footing --suspension --bot reactive --replay
 ```
 
-Both runners accept `--bot sweep|calibrated|reactive`. The aiming lab emits
+Both runners accept `--bot sweep|calibrated|reactive|plotted`. The aiming lab emits
 per-shot results and per-second controller/pose traces; the benchmark keeps
 observations and replay outside its update timer. A normal duel is not an
 isolated timing measurement of the controller: different shots change the dirt,
@@ -386,6 +389,95 @@ new barrel obstruction, driving toggles and a late observation. Deadlines and
 evidence reuse remain bounded. This pass changes the decision between moving
 and trying a correction; native driving, terrain physics and shot cadence are
 unchanged. No new Pi timing qualification is claimed.
+
+## Plotted aim
+
+**Plotting + move**, for [#675](https://github.com/aortez/space-wars/issues/675),
+can fire through an opening, such as a gap between Clock digits. Unlike
+Learning, it does not range with real shots. Before each shot it traces a trial
+shell for each whole degree from 10° to 80° through the current world, flying
+it on the same per-tick ray a fired shell casts. Each trial's power is the one
+whose arc from the muzzle passes through the target's center, counting the
+tank's own motion as a launch does. A trial ends where it strikes something,
+where a shell would expire or leave the arena, or half a second after it should
+have passed the target.
+
+A trial reaches the target when it strikes the tank or bursts within 1.5 units
+of its center. An opening shows up as a band of neighboring elevations that
+reach, and the tank fires the middle of the widest band, which leaves the most
+room on either side. With no band it fires the trial that bursts nearest the
+target. It never fires a trial whose barrel is blocked or whose shell would
+fall back on its own tank. With nothing it can fire, it waits and plots again a
+second later.
+
+A plot begins a second before the next shot is due, once the tank's last shell
+has landed, and begins again if the tank moves more than a unit or tilts more
+than 8°. A full plot is about 10,000 rays. At most 512 are cast in a tick, so a
+plot takes about 20 ticks, and the shot waits for it. Firing keeps the plotted
+elevation and aims its power at where the target is then, which is the plotted
+power when the target has not moved. A plotted tank learns nothing from its
+shots.
+
+It moves after enemy hits as Learning + move does, except that it counts as
+confident while its last plot found an arc that reaches. With a plotted hit it
+stays and fires back; without one it may move. Besides the shared labels, the
+label above the tank shows `plotting`, `plotted hit`, `plotted near miss`, `no
+plotted shot` or `waiting to plot`. Clock's Tanks event still uses Learning +
+move.
+
+The aiming lab's `wall` case shuts the fixed tanks in a dirt room, divided
+halfway by a wall with one window, so the window is the only way through.
+Plotting fires through it; Learning's shells strike the wall:
+
+| Plotting + move: through the window | Learning: into the wall |
+| --- | --- |
+| ![A plotted shell passing through the window in the wall](screenshots/scorched-earth/plotted-800x480-wall-plotting.png) | ![Learning's first shell bursting on the wall above the window](screenshots/scorched-earth/plotted-800x480-wall-learning.png) |
+
+In an ordinary duel both tanks plot, then both shells fly:
+
+| Both tanks have plotted a hit | Both shells in the air |
+| --- | --- |
+| ![Two plotted tanks labelled plotted hit, waiting to fire](screenshots/scorched-earth/plotted-800x480-duel-aimed.png) | ![Two shells in flight between tanks labelled watching shot](screenshots/scorched-earth/plotted-800x480-duel-crossing.png) |
+
+These are display-free captures through the client's raster renderer and native
+text overlay, not device screenshots. Regenerate them with
+`SPACEWARS_SCORCHED_ARTIFACTS=<dir> cargo test --locked --profile ci -p engine-client plotted_shots_and_labels`.
+
+### Plotted aim review, 2026-11-22
+
+The runs are kept locally in `target/scorched-plotted-675/`, with the temporary
+survey example and summary script that made them.
+
+- The fixed-tank aiming lab (`scorched_aim_lab --bot plotted`, all four cases
+  and both shapes) makes a useful hit with the first shot in every case. Learning
+  needs 2, 1, 4 and 2 on Flat, Uphill, Downhill and Ridge. Plotting kills in
+  three shots on Flat, Downhill and Ridge and four Uphill, against Learning's
+  five, five, six and four. Over the ridge it lobs at 68°.
+- In the `wall` case, Plotting's first shot goes through the window, at the
+  middle of the band of arcs that reach, and so does every later one: it kills
+  in four shots. Learning's shells strike the wall at 50°, 60° and 70°, then
+  the roof at 80°, and do no damage in 30 s. The room has outer walls so that
+  the dirt above the window stays joined to the ground. Without them, the
+  first blast splits that dirt off as a loose body, and it falls into the
+  window. With no opening at all, Plotting fires the burst nearest the target.
+  On every aiming-lab terrain the plotted shell lands where its trial did.
+- Ordinary duels, 32 per pairing (seeds 1, 62, …, 916 on both shapes, sprung
+  wheels and footing, each to its first kill): Learning + move against itself
+  reaches its first kill at a median of 36.8 s, close to the calibration
+  review's 36 s.
+  Plotting + move against itself does at 22.5 s, the longest at 26.4 s. Against
+  Learning + move, Plotting wins 60 of 64, on either side, at a median of 22.5
+  to 23.9 s.
+- Every one of Plotting's 120 misses in those duels was a target that moved
+  more than 1.5 units during the flight. The tanks start 54 units apart and
+  drive closer between shots while beyond 32. Tank 0 may fire at once and tank
+  1 only after 5 s, so tank 0's first shells fly at a tank still closing in. As
+  tank 0, Plotting makes useful hits with 60–65% of its shots; as tank 1, with
+  91–98%. Run shot by shot in the aiming lab's duel case, tank 0's first shot
+  missed in all 32 mirror duels, and 57 of the 63 misses were a tank's first or
+  second shot.
+- A full plot took 0.19 ms on this workstation, about 20 ns a ray, in the
+  standalone world's 16 to 20 colliders. It has not been timed on a Pi.
 
 ## Tank driving
 

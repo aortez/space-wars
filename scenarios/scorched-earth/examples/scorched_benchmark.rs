@@ -41,8 +41,9 @@ struct Args {
     /// Enable nearby firing-footing goals for the moving CPU comparison.
     #[arg(long, requires = "cpu_driving")]
     cpu_footing: bool,
-    /// Retain the sweep, learn from shots, or also relocate after incoming hits.
-    #[arg(long, default_value = "sweep", value_parser = ["sweep", "calibrated", "reactive"])]
+    /// Retain the sweep, learn from shots, also relocate after incoming hits,
+    /// or plot each shot through the world and relocate.
+    #[arg(long, default_value = "sweep", value_parser = ["sweep", "calibrated", "reactive", "plotted"])]
     bot: String,
     /// Use larger physical wheels with native spring/damper suspension.
     #[arg(long)]
@@ -127,6 +128,7 @@ fn main() {
         cpu_policy: [match args.bot.as_str() {
             "calibrated" => CpuPolicy::Calibrated,
             "reactive" => CpuPolicy::Reactive,
+            "plotted" => CpuPolicy::Plotted,
             _ => CpuPolicy::Sweep,
         }; 2],
         suspension: args.suspension,
