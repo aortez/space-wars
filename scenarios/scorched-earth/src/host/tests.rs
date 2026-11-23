@@ -51,8 +51,10 @@ fn wider_hills_reserve_their_chunks_and_support_custom_landings() {
         duel.tanks(&world).map(|tank| tank.motion.position.x),
         [-80.0, 80.0]
     );
+    // Held fire leaves the CPUs driving in, so hold it only long enough to
+    // see both move and keep the shots long.
     duel.set_firing(false);
-    for _ in 0..600 {
+    for _ in 0..120 {
         step(&mut duel, &mut world);
     }
     assert!(

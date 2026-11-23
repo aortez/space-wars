@@ -229,13 +229,12 @@ fn tanks_shells_burst_on_the_face_in_front_of_it() {
     if let Some(path) = &output {
         std::fs::create_dir_all(path).unwrap();
     }
-    let (width, height) = (1024, 768);
-    let viewport = Viewport::new(width as f32, height as f32);
     let window = windows.borrow()[0].clone();
-    window.set_size(PhysicalSize::new(width, height));
-    // The frame at tick `to` of the fight at `seed`, with every shell drawn
-    // since tick `from` left on it as a trail.
-    let picture = |name: &str, seed: u64, from: usize, to: usize| {
+    // The frame at tick `to` of the fight at `seed` on a `width` by `height`
+    // screen, with every shell drawn since tick `from` left on it as a trail.
+    let picture = |(width, height): (u32, u32), name: &str, seed: u64, from: usize, to: usize| {
+        let viewport = Viewport::new(width as f32, height as f32);
+        window.set_size(PhysicalSize::new(width, height));
         let mut state = face_fight(viewport, seed);
         for _ in 0..from {
             step(&mut state);
@@ -274,31 +273,36 @@ fn tanks_shells_burst_on_the_face_in_front_of_it() {
         state
     };
 
-    // The 2.5 s up to the face's first stop, in a fight between a learning
-    // tank on the left and a plotting one on the right.
-    let state = face_fight(viewport, 2);
-    assert_eq!(
-        state.tanks_state().unwrap().cpu,
-        ["Learning + move", "Plotting + move"]
-    );
-    let hits = record(state, |tanks| tanks.face_hits);
-    let hit = hits
-        .iter()
-        .position(|&stopped| stopped > 0)
-        .expect("the face stopped a shell");
-    let state = picture("face-burst", 2, hit.saturating_sub(150), hit + 8);
-    assert_eq!(state.tanks_state().unwrap().face_hits, 1);
-
-    // Two plotting tanks' first shots, until both land, clear of the face.
-    let state = face_fight(viewport, 3);
-    assert_eq!(state.tanks_state().unwrap().cpu, ["Plotting + move"; 2]);
-    let shots = record(state, |tanks| (tanks.shots, tanks.shells));
-    let first = shots.iter().position(|&(shots, _)| shots > 0).unwrap();
-    let landed = first
-        + shots[first..]
+    // On the Picade's 4:3 and the HyperPixel's 5:3 alike.
+    for size in [(1024, 768), (800, 480)] {
+        let viewport = Viewport::new(size.0 as f32, size.1 as f32);
+        // The 2.5 s up to the face's first stop, in a fight between a
+        // learning tank on the left and a plotting one on the right.
+        let state = face_fight(viewport, 2);
+        assert_eq!(
+            state.tanks_state().unwrap().cpu,
+            ["Learning + move", "Plotting + move"]
+        );
+        let hits = record(state, |tanks| tanks.face_hits);
+        let hit = hits
             .iter()
-            .position(|&(shots, shells)| shots >= 2 && shells == 0)
-            .unwrap();
-    let state = picture("plotted-pass", 3, first, landed + 8);
-    assert_eq!(state.tanks_state().unwrap().face_hits, 0);
+            .position(|&stopped| stopped > 0)
+            .expect("the face stopped a shell");
+        let state = picture(size, "face-burst", 2, hit.saturating_sub(150), hit + 8);
+        assert_eq!(state.tanks_state().unwrap().face_hits, 1);
+
+        // Two plotting tanks' first shots, until both land, clear of the
+        // face.
+        let state = face_fight(viewport, 3);
+        assert_eq!(state.tanks_state().unwrap().cpu, ["Plotting + move"; 2]);
+        let shots = record(state, |tanks| (tanks.shots, tanks.shells));
+        let first = shots.iter().position(|&(shots, _)| shots > 0).unwrap();
+        let landed = first
+            + shots[first..]
+                .iter()
+                .position(|&(shots, shells)| shots >= 2 && shells == 0)
+                .unwrap();
+        let state = picture(size, "plotted-pass", 3, first, landed + 8);
+        assert_eq!(state.tanks_state().unwrap().face_hits, 0);
+    }
 }

@@ -65,7 +65,7 @@ impl Duel {
             let x = motion.position.x + direction * MOVE_DISTANCE;
             if x.abs() > self.placement.drive_limit()
                 || (drive.diagnostics.mode == "hold range"
-                    && !(18.0..=32.0).contains(&(enemy_x - x).abs()))
+                    && !self.config.cpu_range.holds((enemy_x - x).abs()))
             {
                 continue;
             }

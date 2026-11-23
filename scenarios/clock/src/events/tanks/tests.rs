@@ -245,23 +245,56 @@ fn entry_combat_and_departure_share_the_arena_and_keep_the_current_reading() {
 }
 
 #[test]
-fn fights_pair_plotting_with_plotting_or_with_learning_on_either_side() {
-    let mut pairs = Vec::new();
+fn fights_pair_plotting_with_plotting_or_with_learning_and_open_from_either_side() {
+    let mut openings = Vec::new();
     for seed in 0..6 {
-        let pair = policies(seed);
+        let config = config(GrainShape::Round, seed);
+        let pair = config.cpu_policy;
         assert!(pair.contains(&CpuPolicy::Plotted), "{seed}: {pair:?}");
-        if !pairs.contains(&pair) {
-            pairs.push(pair);
+        if !openings.contains(&(pair, config.first_to_fire)) {
+            openings.push((pair, config.first_to_fire));
         }
     }
-    assert_eq!(pairs.len(), 3, "{pairs:?}");
+    assert_eq!(openings.len(), 6, "{openings:?}");
+}
+
+#[test]
+fn the_tanks_land_wide_and_hold_fire_until_they_stand_in_range() {
+    // On the HyperPixel's 5:3, the gaps beside the colon would land the tanks
+    // about 22 units apart. They land beside the outer digits instead, and
+    // close in before either fires.
+    let mut state = ready(5.0 / 3.0, 2, ClockTimeFormat::TwentyFourHour);
+    start_fighting(&mut state);
+    let apart = |state: &ClockState| {
+        let event = tanks(state);
+        let place = event.duel.placement();
+        let [left, right] = event
+            .duel
+            .tanks(state.arena.world().unwrap())
+            .map(|tank| place.point_from_world(tank.motion.position).x);
+        right - left
+    };
+    assert!(apart(&state) > RANGE.far, "{}", apart(&state));
+    while tanks(&state).fire_opened.is_none() {
+        assert_eq!(state.tanks_state().unwrap().shots, 0);
+        tick(&mut state);
+    }
+    assert!(RANGE.holds(apart(&state)), "{}", apart(&state));
+    assert!(tanks(&state).fire_opened.unwrap() < OPENING_TICKS);
 }
 
 #[test]
 fn the_face_stops_shells_in_front_of_it_and_plotted_shots_clear_it() {
-    // At 4:3 the tanks fight far enough apart for shells to reach the face.
-    // In this fight the left tank learns and the right one plots.
-    let mut state = ready(4.0 / 3.0, 2, ClockTimeFormat::TwentyFourHour);
+    // On the Picade's 4:3 and the HyperPixel's 5:3 alike, the learning tank
+    // on the left sends shells into the face and the plotting one on the
+    // right shoots past it.
+    for aspect in [4.0 / 3.0, 5.0 / 3.0] {
+        face_stops_shells(aspect);
+    }
+}
+
+fn face_stops_shells(aspect: f32) {
+    let mut state = ready(aspect, 2, ClockTimeFormat::TwentyFourHour);
     start_fighting(&mut state);
     assert_eq!(
         state.tanks_state().unwrap().cpu,
@@ -325,9 +358,12 @@ fn the_face_stops_shells_in_front_of_it_and_plotted_shots_clear_it() {
     }
     assert!(
         face_hits[0] > 0,
-        "the learning tank's shells reach the face"
+        "at {aspect}, the learning tank's shells reach the face"
     );
-    assert_eq!(face_hits[1], 0, "the plotting tank's shots clear it");
+    assert_eq!(
+        face_hits[1], 0,
+        "at {aspect}, the plotting tank's shots clear it"
+    );
     assert_eq!(state.tanks_state().unwrap().face_hits, face_hits[0]);
 }
 
@@ -507,7 +543,7 @@ fn timeout_waits_for_a_real_final_hit_then_converts_the_living_loser() {
                 break shell;
             }
             tick(&mut state);
-            assert!(state.tanks_state().unwrap().combat_ticks < 300);
+            assert!(state.tanks_state().unwrap().combat_ticks < OPENING_TICKS + 300);
         };
         event(&mut state).duel.set_firing(false);
         event(&mut state).combat_ticks = COMBAT_TICKS - 1;

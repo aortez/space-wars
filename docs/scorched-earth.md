@@ -181,8 +181,9 @@ cost another ranging shot even with previously acquired aim.
 still apply. Each candidate's three-unit footprint must be continuous fixed
 terrain, with predicted pitch at most 18°, profile deviation at most 0.35 units,
 and an unobstructed estimated barrel position. The footprint fits within the
-existing four-unit route lookahead. Candidates keep 12–40 units of separation;
-scoring prefers level, smooth ground and the ordinary 18–32 unit firing range.
+existing four-unit route lookahead. Candidates may stand up to 6 units closer
+than the firing range or 8 units farther, 12–40 units by default; scoring
+prefers level, smooth ground within the range.
 No suitable option means continuing the firing policy. Self damage and
 unattributed lab blasts do not trigger this preference.
 
@@ -502,8 +503,10 @@ friction, hull geometry, rubble and changing footing still matter. Pausing,
 switching tanks, and toggling Demo clear drive input. A held axis must return to
 neutral before driving a newly selected tank.
 
-The CPU makes a local decision every half second: approach beyond 32 units,
-back away within 18, and try to clear a blocked barrel otherwise. A terrain
+The CPU makes a local decision every half second: approach while farther than
+its firing range, back away while closer, and try to clear a blocked barrel
+otherwise. The range is 18–32 units unless a host sets
+`ScorchedConfig::cpu_range`. A terrain
 height profile checks the next four units while moving, including ground
 changed by a crater. Nine downward probes are spaced half a unit apart.
 Adjacent samples may rise or fall by one cell plus 0.08 units of tolerance;
@@ -2200,7 +2203,12 @@ boundary.
 
 `set_driving(false)` and `set_firing(false)` permit a physical settling phase.
 Stopping fire leaves existing shots alive under the exported `MAX_SHELLS` and
-`SHELL_LIFETIME_TICKS` limits. Tank motion, real hull/wheel bounds, support, health,
+`SHELL_LIFETIME_TICKS` limits. While fire is held, each tank's next shot waits
+with it, and a driving CPU drives on instead of stopping to aim, so a host can
+let the tanks take their range before the first shot.
+`ScorchedConfig::first_to_fire` names the tank whose first shot is due at once;
+the other's comes five seconds later. Tank motion, real hull/wheel bounds,
+support, health,
 barrels, terrain ownership, grains and world-space shells are readable without
 advancing the simulation. `retire_tank` preserves the final hull pose and source
 identity for airborne-shot bookkeeping. `retire` cancels the remaining owned
