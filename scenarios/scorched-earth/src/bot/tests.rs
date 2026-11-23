@@ -266,12 +266,23 @@ fn bot_comparison_button_restarts_same_seed_and_clears_learning() {
     assert_eq!(state.config.cpu_policy, [CpuPolicy::Calibrated; 2]);
     assert_eq!(state.tick, 0);
     assert_eq!(state.bots[0].hit_serial, 0);
-    state.command(Command::CpuAim);
-    assert_eq!(state.config.cpu_policy, [CpuPolicy::Reactive; 2]);
-    state.command(Command::CpuAim);
-    assert_eq!(state.config.cpu_policy, [CpuPolicy::Plotted; 2]);
-    state.command(Command::CpuAim);
-    assert_eq!(state.config.cpu_policy, [CpuPolicy::Sweep; 2]);
+    let mut labels = Vec::new();
+    for _ in 0..5 {
+        state.command(Command::CpuAim);
+        assert_eq!(state.config.cpu_label(0), state.config.cpu_label(1));
+        labels.push(state.config.cpu_label(0));
+    }
+    assert_eq!(
+        labels,
+        [
+            "Learning + move",
+            "Learning + dodge",
+            "Plotting + move",
+            "Plotting + dodge",
+            "Sweep"
+        ]
+    );
+    assert_eq!(state.config.cpu_dodging, [false; 2]);
 }
 
 #[test]

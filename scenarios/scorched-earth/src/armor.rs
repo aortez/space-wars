@@ -56,7 +56,7 @@ const CASING: Section = Section::new(0.5, 0.1);
 /// Explosive energy of one shell.
 const PAYLOAD: f32 = 28_000.0;
 /// How far a burst reaches to a tank's surface.
-const BLAST_REACH: f32 = 5.0;
+pub(crate) const BLAST_REACH: f32 = 5.0;
 
 /// Circles standing in for the rigid hull, in its body's frame. Like the
 /// chassis's, they lie within the collider, so a shell bursting off the hull

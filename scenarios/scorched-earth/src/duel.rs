@@ -13,6 +13,23 @@ pub(crate) fn shell_ray(
     velocity: Vec2,
     age: u32,
 ) -> (Vec2, Option<RayHit>) {
+    shell_ray_through(
+        physics,
+        placement,
+        (age < 8).then_some(shooter),
+        position,
+        velocity,
+    )
+}
+
+/// The ray of `shell_ray`, passing through `through` instead of the shooter.
+pub(crate) fn shell_ray_through(
+    physics: &PhysicsWorld,
+    placement: &host::Placement,
+    through: Option<PhysicsId>,
+    position: Vec2,
+    velocity: Vec2,
+) -> (Vec2, Option<RayHit>) {
     let movement = velocity * DT + Vec2::new(0.0, -0.5 * GRAVITY * DT * DT);
     let hit = physics.cast_ray(
         placement.point_to_world(position),
@@ -20,7 +37,7 @@ pub(crate) fn shell_ray(
         RayCastOptions {
             max_distance: movement.length() * placement.scale,
             collision_groups: host::FIGHT,
-            exclude_entity: (age < 8).then_some(shooter),
+            exclude_entity: through,
             ..Default::default()
         },
     );
@@ -695,6 +712,9 @@ impl Duel {
         }
         if state.config.cpu_footing.iter().any(|enabled| *enabled) {
             payload["cpu_footing"] = serde_json::json!(state.config.cpu_footing);
+        }
+        if state.config.cpu_dodging.iter().any(|enabled| *enabled) {
+            payload["cpu_dodging"] = serde_json::json!(state.config.cpu_dodging);
         }
         if state.config.cpu_policy != [CpuPolicy::Sweep; 2] {
             payload["cpu_policy"] = serde_json::json!(state.config.cpu_policy);
