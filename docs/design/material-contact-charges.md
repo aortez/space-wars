@@ -2,9 +2,11 @@
 
 `PhysicsWorld::charge_contact_impacts` prices each new impact that
 [contact capture](material-contact-records.md) saw in a step, after the step,
-against the surfaces the host keeps. The host then absorbs what each impact
-consumed. The physics is unchanged: Rapier's restitution still sets the
-bounce, and having the work ledger set the bounce is a later part of #327.
+against the surfaces the host keeps. `PhysicsWorld::charge_contact_supports`
+then prices the load each steady support carried in the step, as a sustained
+load. The host absorbs what each consumed. The physics is unchanged: Rapier's
+restitution still sets the bounce, and having the work ledger set the bounce
+is a later part of #327.
 
 The [native response](material-native-response.md) prices and responds inside
 the solve, so it admits only restricted worlds. Charges admit any world:
@@ -31,9 +33,12 @@ uses either charges or the native response, never both.
    - `protected(source)` shields a source for now, as a host might shield a
      ship just after it spawns. A shielded side is priced as any other. Its
      work is reported rather than charged.
-4. Call `charge_contact_impacts` after every step. The next step drops this
-   step's records, and a clone or snapshot carries none, so a step left
-   unpriced stays unpriced. A second call after the same step prices nothing.
+4. Call `charge_contact_impacts` after every step, then
+   `charge_contact_supports`. The next step drops this step's records, and a
+   clone or snapshot carries none, so a step left unpriced stays unpriced. A
+   second call after the same step prices nothing.
+   - Supports read the impulses the solve left in Rapier's contacts. A
+     collider removed before the call takes its supports with it.
 5. Watch `loading_diagnostics().rejected_batches`. A batch that capture refused
    is missing from the charges, and its impacts may start later, on whatever
    approach the solver left.
@@ -52,7 +57,13 @@ Each new impact is reported once, as a `ContactCharge`:
   - `Material`: the law refused the impact, such as at a single point
     between two flat surfaces, or a load outside the law's range.
 
-## Pricing
+Each support is reported once a step, as a `SupportCharge`:
+
+- `Charged` carries the episode, its sources, the force, the patch width, the
+  duration, each side's own `Outcome` and which sides were shielded.
+- `Unpriced` carries the force and the reason, `Undeclared` or `Material`.
+
+## Impacts
 
 Each CCD substep's batch is priced in order, one new `Impact` episode at a
 time:
@@ -103,15 +114,87 @@ time:
 Impacts are priced in turn, and each reads the surfaces after the charges of
 the one before it.
 
+## Supports
+
+`charge_contact_supports` prices each steady support in the step, in turn,
+after the impacts' charges:
+
+1. **Supports.** A support is an open episode whose pair the step's solve
+   acted on and loaded, and whose points held steady: each point the solve
+   acted on moved against the other surface no faster than a tenth of the
+   length unit a second, along the normal or across it. Other steps are not
+   a support's:
+   - A step that starts the episode with an impact is the impact's.
+   - A step in which a point moves faster along the normal is a hit's or a
+     bounce's. Capture folds a hit into the open episode, and nothing prices
+     it. Separating points carry an impulse only when something in the step
+     drives them back together, such as gravity, a joint or another contact.
+     That is an impact within the step, which capture cannot see: it records
+     the motion before the solve.
+   - A step in which a point slides faster is a grind's. Its load moves
+     across both surfaces rather than resting on one patch.
+   - A step in which the solve stops a point that was apart, such as a corner
+     that gravity lands within the step, is a landing's.
+   - Rapier solves a pair when it has a dynamic body and each of its dynamic
+     bodies is awake. A pair it did not solve, such as one whose body sleeps,
+     keeps an earlier solve's impulses.
+   - A step that CCD splits, or with a batch that capture refused, prices no
+     supports.
+2. **Force.** The force is the solve's own: the normal impulse the step's
+   solve applied to the support's points, over the step.
+   - Rapier reports each point's impulse with the warm start counted in. Its
+     solve begins from the previous solve's last impulse and adds that to the
+     total it reports. The report less the warm start is what this solve
+     applied. At four solver iterations, a resting box reports a quarter more
+     than its weight, and its support carries exactly its weight.
+   - Joints and other contacts reach a support through that impulse. A
+     chassis welded onto a foot loads the foot's support with both bodies'
+     weight.
+3. **Width.** As for an impact, the support is priced across what its pieces
+   cover, summed over its patches. A face resting on several points is
+   indeterminate, and the solve can load any of them, so each piece it loaded
+   covers all its points within a thousandth of the length unit of touching.
+   Points apart, such as speculative points beside a wall, cover nothing. A
+   `Depth::Patch` side is as deep as that width, up to its extent.
+4. **Law.** `sustained()` prices each side over the whole step at that force
+   and width, with no measured plastic displacement.
+   - A load whose stress, its force over the patch's width times the side's
+     thickness, is at or below the side's effective strength costs nothing
+     however long it rests.
+   - An overload follows the law's fallback progression. Work grows with the
+     overstress and the time, at `CRUSH_TIME_CONSTANT` (0.25 s), up to the
+     region's remaining capacity.
+   - Each unshielded side with consumed work is charged.
+
 ## Limits
 
-- Only new impacts are priced. Support episodes and sustained loads are not.
-  Capture also folds a distinct impact into an episode that is still open,
-  such as a hull that lands flat and then rocks onto its corners.
+- Capture folds a distinct impact into an episode that is still open, such as
+  a hull that lands flat and then rocks onto its corners. That impact is
+  priced neither as an impact nor as a support.
+- Only steady supports are priced. A support is not priced in a step a point
+  of it moves faster than a tenth of the length unit a second, such as a hull
+  rocking on a corner or bodies grinding past each other, nor in a step it
+  lands in. A load within its side's strength costs nothing either way, but
+  an overload is under-charged by the steps skipped.
+- A sleeping support is not priced. A host that wants a resting load priced
+  keeps the body awake, with `can_sleep: false`.
+- A step that CCD splits prices no supports. Rapier splits the whole world's
+  step at a CCD body's impact, so every support in the world misses that
+  step. The last substep's impulse could carry a hit delivered in a small
+  part of the step.
+- A hit carried through a support is priced as a load over the whole step,
+  so its force depends on the step's length. At 120 Hz the same hit loads
+  the support twice as hard, for half as long. The figures below are at
+  Scorched's 60 Hz.
+- Supports are priced for their normal load alone, not for friction.
+- No plastic displacement is measured, so an overload follows the law's
+  fallback progression. The solve still holds the body up, so a crushed
+  support does not give way.
 - A budget holds only the substep's new impacts. A contact that carries on from
   an earlier substep, such as a support under a body, is not in it, so a
   supported body gives way as if it were free. This under-prices a hit that
-  drives a body into its support.
+  drives a body into its support. The support carries what the hit drives
+  through it, and is priced for that as a sustained load.
 - Joints are not in the budget: a jointed body gives way by its own mass and
   inertia alone.
 - A piece is as wide as its points span, as if the whole face met at once.
@@ -189,6 +272,55 @@ games ran.
   and charges cost 3 to 6 µs a step. Capture's cost needs measuring on the Pi
   before adoption.
 
+**Supports.** The same probes then priced supports. The first draft's records
+are in `/home/data2/space-wars3-artifacts/support-loads-probe-20261122`, and
+those of the rule above in
+`/home/data2/space-wars3-artifacts/support-loads-review-probe-20261122`.
+- **Tanks:** no tank side yielded, in the scripted contacts or the 48 duels.
+  The highest stress on a tank side was 0.85 of its armor's effective
+  strength, when a sprung tank was thrown into the other at 8 u/s. In the
+  duels it was 0.36.
+- **Hits through a support:** a trunk of mass 3.6 dropped from 20 units onto
+  a resting rigid tank loads the tank's support with 6,600. That is the
+  tank's weight, about 700, and the trunk's momentum stopped within the
+  step. A rigid tank thrown into the other at 8, 12 and 16 u/s loads a
+  hull's support on the ground with up to 6,800, 18,600 and 23,200. A sprung
+  tank's suspension spreads the trunk's blow, and its wheels' supports carry
+  at most 1,200.
+- **Landings:** which steps of a landing are steady varies. A sprung tank
+  dropped from 5 units loads a wheel's support with 15,800 in one step, but
+  dropped from 10 or 20 units its supports carry at most 370. From 30 units
+  its hull reaches the ground, and that support carries 6,900.
+- **Steady steps:** 93% of the tanks' loaded support steps were steady in
+  the scripted contacts, and 91% in the duels. Of the duels' other steps,
+  54% slid faster than 0.1 u/s, 36% moved along the normal faster than that,
+  6.5% started an impact and 2.8% landed. CCD split one step.
+- **Rock:** rock sides yielded 1,286 times over the duels. Each of the 60
+  the probe printed was a grain on the terrain or on another grain, carrying
+  29 to 2,400 across a span of 0.0015 to 0.07. Grains are declared flat, so
+  a grain resting on two close points is priced across their span.
+- **Flat on flat:** two flat surfaces meeting at one touching point are
+  refused as `Material(InvalidGeometry)`, as impacts are. That was 4.6
+  million of the duels' 6.6 million supports, none of them on a tank.
+- **Spacewars:** no support in 300 seconds. With no gravity nothing rests.
+  Every loaded pair in an open episode was moving, sliding, landing or
+  starting an impact, or in one of the 1,866 steps of 18,000 that CCD split.
+  Spacewars' steady limit is 1 u/s, a tenth of its length unit. Two drafts
+  priced supports there:
+  - One that also priced separating points priced 27 supports, of which 24
+    yielded, at up to 4.4 million force. Each was a deep overlap being
+    pushed apart on one point.
+  - One that judged steadiness by motion along the normal alone priced 78
+    pair-steps in which bodies slid past each other at 1.1 to 295 u/s, and 3
+    of them yielded.
+- **Cost:** other jobs loaded the workstation, at a load average of 8 to 16
+  on 16 cores. In Scorched's duels supports took 43 µs a step at the median,
+  adding 10 to 13% to the scenario's step, against 1.4% for the impacts.
+  Most of those supports touch no tank, and a host prices only pairs whose
+  colliders it has bound. In Spacewars supports took 3 µs of a 1.3 ms step,
+  against 6 µs for the impacts. Their cost also needs measuring on the Pi
+  before adoption.
+
 ## Evidence
 
 `crates/engine-rapier/src/world/loading/charges/tests.rs` covers:
@@ -238,5 +370,44 @@ games ran.
   is priced at half the ball's mass times its approach squared, and motion is
   identical with and without charges.
 - **Arrivals:** charges need a capture that admits speculative arrivals.
+
+`crates/engine-rapier/src/world/loading/charges/tests/supports.rs` covers
+supports:
+
+- **Resting and crushing:** a light box on rock costs nothing. A heavy one on
+  soft tissue, a half-space, is charged what `sustained()` gives until the
+  tissue fails, and its charges sum to the tissue's capacity. Each step's
+  force is the box's weight.
+- **CCD:** a step that a CCD ball's hit elsewhere splits prices no supports,
+  and the steps around it price a resting box at its weight.
+- **Joints:** a chassis welded onto a foot loads the foot's support with both
+  bodies' weight, and motion is identical with and without supports.
+- **Landings:** a box dropped from 1, or 0.0001 above the floor at 0.05, is
+  priced as an impact when it lands and as a support once it rests. A tilted
+  box that lands on one corner and rocks onto the other is not priced as a
+  support while its corners approach. A resting box lifted 0.0019 and dropped
+  at 0.2 lands within the step, and that step is not priced.
+- **Steady points:** a resting box set moving along the floor's normal at
+  0.05, rising or pressed in, is priced at what the step applied. At 0.5, or
+  at 0.05 with a length unit of 0.1, it is not, although the floor stops it.
+  A box sliding along the floor at 0.05 is priced at its weight, and one
+  grinding along at 0.5 is not. A box touching the floor without gravity
+  carries nothing and is not reported.
+- **Width:** a box sliding slowly toward a wall is priced across its face 2
+  wide. A ball rolling away from a wall at 0.15 holds its floor point still
+  and is priced across its own patch, although its point by the wall moves
+  at 0.21: the solve doesn't act on it. The wall's speculative points carry
+  nothing, so they neither widen the patch nor unsettle the support. A box
+  tilted onto one corner, its other one 0.0019 off the floor, is priced
+  across the corner's patch. A box resting across a gap 1 wide, in a floor of
+  two colliders, carries its whole weight across the 1 it rests on. A wheel
+  is priced across the patch its radius gives.
+- **Host rules:** each step is priced once, and a shielded side is priced but
+  not charged. Undeclared and flat-on-flat supports are reported with their
+  force. Nothing is priced for a sleeping support, a body removed after the
+  step, a step with a refused batch, or a world restored since its last step.
+  A box resting on a body that the host froze asleep as fixed is priced, as
+  Rapier solves their pair.
+- **Arrivals:** supports need a capture that admits speculative arrivals.
 
 Run `RUST_MIN_STACK=16777216 cargo test -p engine-rapier --lib world::loading::charges`.

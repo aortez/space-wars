@@ -230,6 +230,9 @@ pub(super) struct LoadingState {
     // Whether the host has priced this step's impacts.
     #[serde(skip)]
     charged: bool,
+    // Whether the host has priced this step's supports.
+    #[serde(skip)]
+    supported: bool,
     #[serde(skip)]
     diagnostics: CaptureDiagnostics,
     #[serde(skip)]
@@ -266,6 +269,7 @@ impl LoadingState {
             speculative_arrivals: false,
             batches: Vec::new(),
             charged: false,
+            supported: false,
             diagnostics: CaptureDiagnostics::default(),
             records: 0,
             response: None,
@@ -280,6 +284,7 @@ impl LoadingState {
     pub(super) fn begin_step(&mut self) {
         self.batches.clear();
         self.charged = false;
+        self.supported = false;
         self.diagnostics = CaptureDiagnostics::default();
         self.records = 0;
         if let Some(response) = &mut self.response {
