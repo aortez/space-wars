@@ -2227,14 +2227,25 @@ charged through, and bodies that stop a burst's energy. The duel sees them at
 its own scale, so each loses the share of its capacity the same shell would
 cost it at scale 1. Clock supplies none yet, and `finish_step` supplies none.
 
+A host can share the duel's world with scenery: bodies that rest on the hills
+and the dirt but stay out of the fight. A collider whose only membership is
+`host::SCENERY` rests on the terrain and the grains, and pushes them as any
+body would, but the tanks' hulls and wheels never touch it, and none of the
+duel's rays meet it: shells' sweeps, support probes, drive checks and plotted
+trial shells pass through it. Bursts push only the duel's own grains and
+chunks, so they leave scenery where it lies, though it falls into a crater dug
+beneath it. Every other host body stays in the fight. Clock's loose digit cells
+are scenery.
+
 Clone `HostedDuel` together with its canonical world for a same-build replay
 checkpoint. `observe` retains the standalone diagnostic payload in duel-local
-coordinates; it is not a serialized restore format. The host tests compare
-1,200 ticks of seeded standalone/shared observations for Round and Angular dirt,
+coordinates; it is not a serialized restore format. The host tests compare 1,200
+ticks of seeded standalone/shared observations for Round and Angular dirt,
 including driving, damage, cratering and deposition. They also exercise foreign
-shot obstacles and supports, repeated rigid/sprung cleanup, capacity refusal,
-reserved conversion IDs, host-gravity changes, phase ordering and replay after
-removing a firing tank with a shell airborne.
+shot obstacles and supports, scenery that the tanks and shells pass through,
+repeated rigid/sprung cleanup, capacity refusal, reserved conversion IDs,
+host-gravity changes, phase ordering and replay after removing a firing tank
+with a shell airborne.
 
 ## Repeatable development
 

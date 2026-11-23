@@ -1,9 +1,15 @@
 use super::*;
 use crate::{
-    ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState, events::ActiveEvent,
+    ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState, DIGIT_SLOT_COUNT,
+    SegmentRepresentation,
+    digit_surface_tests::{Loss, Markers, assert_face_agreement, lit_cells},
+    digit_surfaces::{Retirement, SurfaceSource},
+    events::{ActiveEvent, REFORMING_TICKS},
+    fonts::CellMask,
 };
 use engine_common::{ClockEventProfile, ClockTimeFormat, Scenario};
-use engine_rapier::world::physics_activity;
+use engine_rapier::world::{RayCastOptions, physics_activity};
+use scenario_scorched_earth::host::SCENERY;
 use std::time::Duration;
 
 fn ready(aspect: f32, seed: u64, format: ClockTimeFormat) -> ClockState {
@@ -670,4 +676,309 @@ fn health_outcomes_and_periodic_registration_cover_every_result() {
             assert_eq!(state.event_kind(), Some(ClockEventKind::Tanks));
         }
     }
+}
+
+/// Steps the fight to the tick its first shell bursts on the face, and
+/// returns where it burst.
+fn to_the_first_face_hit(state: &mut ClockState) -> Vec2 {
+    loop {
+        assert!(tanks(state).result.is_none(), "a shell reaches the face");
+        tick(state);
+        if let Some(impact) = tanks(state)
+            .duel
+            .impacts()
+            .iter()
+            .find(|impact| impact.collider.entity == digits::BODY)
+        {
+            return impact.point;
+        }
+    }
+}
+
+/// Whether every segment of `slot` keeps at least half its cells.
+fn readable(state: &ClockState, slot: usize) -> bool {
+    let loose = tanks(state).damage.loose_cells(slot);
+    state
+        .segments()
+        .iter()
+        .filter(|segment| usize::from(segment.id.digit_slot) == slot && segment.lit)
+        .all(|segment| {
+            let cells = segment.shape.cells().count();
+            let lost = segment
+                .shape
+                .cells()
+                .filter(|cell| loose.contains(*cell))
+                .count();
+            2 * lost <= cells
+        })
+}
+
+#[test]
+fn a_burst_knocks_loose_the_cells_beside_it_and_they_land_on_the_hills() {
+    for aspect in [4.0 / 3.0, 5.0 / 3.0] {
+        let mut state = ready(aspect, 2, ClockTimeFormat::TwentyFourHour);
+        start_fighting(&mut state);
+        let layout = tanks(&state).layout;
+        let burst = to_the_first_face_hit(&mut state);
+        let loose = tanks(&state).damage.blocks();
+        assert!((1..=3).contains(&loose.len()), "at {aspect}: {loose:?}");
+        for ((slot, cell), _) in &loose {
+            let home = layout.slot_cell_center(usize::from(*slot), *cell);
+            assert!(
+                home.distance_to(burst) <= 1.2 * layout.pitch,
+                "at {aspect}, {home:?} stood beside the burst at {burst:?}"
+            );
+            assert!(readable(&state, usize::from(*slot)), "at {aspect}");
+        }
+        // Each leaves a hole in the face that later shells fly through.
+        tick(&mut state);
+        for ((slot, cell), _) in &loose {
+            let home = layout.slot_cell_center(usize::from(*slot), *cell);
+            assert!(
+                !tanks(&state)
+                    .digits
+                    .cells()
+                    .iter()
+                    .any(|box_| box_.center.distance_to(home) < 1e-3),
+                "at {aspect}, a box stands where {home:?} came loose"
+            );
+        }
+        let carried = state
+            .digit_surfaces()
+            .iter()
+            .filter(|surface| surface.source == SurfaceSource::Rigid)
+            .count();
+        assert_eq!(carried, loose.len(), "each block carries its surface");
+        // The blocks come to rest on the hills, where the duel's rays look
+        // straight through them to the ground beneath. A later burst may
+        // knock one about again, so each is judged the first time it rests.
+        let mut still = vec![0; loose.len()];
+        let mut rested = vec![false; loose.len()];
+        for _ in 0..600 {
+            tick(&mut state);
+            assert_face_agreement(&state, &format!("at {aspect}"));
+            let world = state.arena.world().unwrap();
+            for (index, (_, body)) in loose.iter().enumerate() {
+                if rested[index] {
+                    continue;
+                }
+                let motion = world.motion(*body).expect("the block still lies loose");
+                still[index] = if motion.linear_velocity.length() < 0.02 * layout.pitch {
+                    still[index] + 1
+                } else {
+                    0
+                };
+                if still[index] < 10 {
+                    continue;
+                }
+                rested[index] = true;
+                let ground = world
+                    .cast_ray(
+                        motion.position + Vec2::Y * layout.pitch,
+                        -Vec2::Y,
+                        RayCastOptions {
+                            max_distance: 4.0 * layout.pitch,
+                            collision_groups: CollisionGroups {
+                                memberships: u32::MAX,
+                                filter: !SCENERY,
+                            },
+                            ..Default::default()
+                        },
+                    )
+                    .expect("ground under the block");
+                let height = (motion.position.y - ground.point.y) / layout.pitch;
+                assert!(
+                    (0.3..1.0).contains(&height),
+                    "at {aspect}, a block rests {height} pitches over the ground"
+                );
+                let reach = motion.position.distance_to(
+                    layout.slot_cell_center(usize::from(loose[index].0.0), loose[index].0.1),
+                );
+                assert!(
+                    reach < 10.0 * layout.pitch,
+                    "at {aspect}, a block came to rest {reach} from home"
+                );
+            }
+        }
+        assert!(
+            rested.iter().all(|rested| *rested),
+            "at {aspect}: {rested:?}"
+        );
+    }
+}
+
+#[test]
+fn a_damaged_digit_re_forms_into_a_new_reading_from_where_its_cells_are() {
+    let mut state = ready(5.0 / 3.0, 2, ClockTimeFormat::TwentyFourHour);
+    start_fighting(&mut state);
+    to_the_first_face_hit(&mut state);
+    for _ in 0..120 {
+        tick(&mut state);
+    }
+    let slot = (0..DIGIT_SLOT_COUNT)
+        .find(|slot| tanks(&state).damage.standing()[*slot].is_some())
+        .expect("a damaged digit");
+    let loose = tanks(&state).damage.blocks();
+    let before = state.digit_surfaces();
+    // The reading changes the damaged digit of 23:59.
+    let mut digits = [2, 3, 5, 9];
+    digits[slot] -= 1;
+    let reading =
+        ClockReading::new(digits[0] * 10 + digits[1], digits[2] * 10 + digits[3], 0).unwrap();
+    ClockScenario::step(
+        &mut state,
+        &[ClockAction::set_reading(reading)],
+        Duration::ZERO,
+    );
+    assert_eq!(
+        tanks(&state).damage.standing()[slot],
+        Some(CellMask(0)),
+        "the digit's cells are on their way home"
+    );
+    let world = state.arena.world().unwrap();
+    for (_, body) in &loose {
+        assert!(!world.contains_body(*body), "the blocks left the arena");
+    }
+    // They start from where they lay and stood.
+    let now = state.digit_surfaces();
+    for surface in before
+        .iter()
+        .filter(|surface| usize::from(surface.slot) == slot)
+    {
+        let moving = now
+            .iter()
+            .find(|moving| moving.id == surface.id)
+            .expect("the cell is on its way home");
+        assert_eq!(moving.source, SurfaceSource::Return);
+        assert!(
+            moving.origin.distance_to(surface.origin) < 1e-3,
+            "{surface:?}"
+        );
+    }
+    assert_face_agreement(&state, "the return's start");
+    for step in 0..REFORMING_TICKS {
+        tick(&mut state);
+        assert_face_agreement(&state, &format!("{step} ticks into the return"));
+    }
+    assert!(tanks(&state).damage.whole());
+    assert!(
+        state
+            .segments()
+            .iter()
+            .all(|segment| segment.representation == SegmentRepresentation::Anchored)
+    );
+    let fresh = ready(5.0 / 3.0, 2, ClockTimeFormat::TwentyFourHour);
+    let mut fresh = fresh;
+    ClockScenario::step(
+        &mut fresh,
+        &[ClockAction::set_reading(reading)],
+        Duration::ZERO,
+    );
+    assert_eq!(
+        lit_cells(&state),
+        lit_cells(&fresh),
+        "the face reads the new time"
+    );
+    // A cell that stood, and is lit in the new reading too, kept its surface
+    // and its place.
+    let after = state.digit_surfaces();
+    let mut kept = 0;
+    for surface in before.iter().filter(|surface| {
+        usize::from(surface.slot) == slot && surface.source == SurfaceSource::Anchored
+    }) {
+        if let Some(home) = after
+            .iter()
+            .find(|home| home.origin.distance_to(surface.origin) < 1e-3)
+        {
+            assert_eq!(home.id, surface.id, "{surface:?}");
+            kept += 1;
+        }
+    }
+    assert!(kept > 0);
+}
+
+#[test]
+fn every_loose_cell_rides_its_block_and_comes_home_before_the_tanks_leave() {
+    let mut state = ready(5.0 / 3.0, 2, ClockTimeFormat::TwentyFourHour);
+    let whole = lit_cells(&state);
+    start_fighting(&mut state);
+    let mut markers = Markers::attach(&state, |_| Some(Vec2::ZERO));
+    let marked = markers.attached().count();
+    let mut rode = 0;
+    while state.active_event.is_some() {
+        tick(&mut state);
+        assert_face_agreement(&state, "the fight");
+        let surfaces = markers.follow(&state);
+        rode = rode.max(
+            surfaces
+                .iter()
+                .filter(|surface| surface.source == SurfaceSource::Rigid && markers.on(surface.id))
+                .count(),
+        );
+        if state.active_event.is_some() {
+            assert!(tanks(&state).damage.blocks().len() <= MAX_LOOSE);
+            for slot in 0..DIGIT_SLOT_COUNT {
+                assert!(
+                    readable(&state, slot),
+                    "slot {slot} keeps half of each segment"
+                );
+            }
+        }
+    }
+    assert!(rode > 0, "a marked cell was knocked loose");
+    assert_eq!(
+        markers.attached().count(),
+        marked,
+        "every marker came home on its cell"
+    );
+    assert_eq!(lit_cells(&state), whole);
+    assert!(!state.arena.world().is_some_and(|world| {
+        world
+            .entity_ids()
+            .any(|id| canonical::TANKS_CELLS.contains(&id.value()))
+    }));
+}
+
+#[test]
+fn a_fight_cut_short_keeps_what_stands_and_retires_what_lies_loose() {
+    let mut state = ready(5.0 / 3.0, 2, ClockTimeFormat::TwentyFourHour);
+    let whole = lit_cells(&state);
+    start_fighting(&mut state);
+    to_the_first_face_hit(&mut state);
+    tick(&mut state);
+    let surfaces = state.digit_surfaces();
+    let loose: Vec<_> = surfaces
+        .iter()
+        .filter(|surface| surface.source == SurfaceSource::Rigid)
+        .copied()
+        .collect();
+    let slot = loose[0].slot;
+    let standing: Vec<_> = surfaces
+        .iter()
+        .filter(|surface| surface.slot == slot && surface.source == SurfaceSource::Anchored)
+        .map(|surface| surface.id)
+        .collect();
+    assert!(!standing.is_empty());
+    let mut markers = Markers::attach(&state, |_| Some(Vec2::ZERO));
+    state.finish_event();
+    ClockScenario::step(&mut state, &[], Duration::ZERO);
+    markers.follow(&state);
+    for surface in &loose {
+        let marker = markers
+            .markers
+            .iter()
+            .find(|marker| marker.surface == surface.id)
+            .unwrap();
+        assert_eq!(marker.lost, Some(Loss::Retired(Retirement::Interrupted)));
+    }
+    for id in standing {
+        assert!(markers.on(id), "what stood stays");
+    }
+    assert_eq!(lit_cells(&state), whole, "the face draws the digit whole");
+    assert_face_agreement(&state, "after the fight");
+    assert!(!state.arena.world().is_some_and(|world| {
+        world
+            .entity_ids()
+            .any(|id| canonical::TANKS_CELLS.contains(&id.value()))
+    }));
 }

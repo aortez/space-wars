@@ -101,6 +101,84 @@ fn obstacle(world: &mut PhysicsWorld, id: u64, point: Vec2, half: Vec2, dynamic:
     body
 }
 
+/// A box of the host's scenery: in the duel's world and out of its fight.
+fn scenery(world: &mut PhysicsWorld, id: u64, point: Vec2, half: Vec2, dynamic: bool) -> BodyId {
+    let body = obstacle(world, id, point, half, dynamic);
+    assert!(world.set_collision_groups(
+        ColliderId::new(body.entity, ColliderRole::PRIMARY, 0),
+        CollisionGroups {
+            memberships: SCENERY,
+            filter: u32::MAX,
+        },
+    ));
+    body
+}
+
+#[test]
+fn scenery_rests_on_the_hills_but_the_tanks_and_shells_pass_through_it() {
+    let (mut duel, mut world) = quiet(1.0);
+    let place = duel.placement().clone();
+    let down = RayCastOptions {
+        max_distance: 100.0,
+        ..Default::default()
+    };
+    let tank = tank_at(&duel, &world, 1);
+    let between = (tank_at(&duel, &world, 0).x + tank.x) / 2.0;
+    let hill = duel
+        .duel
+        .cast_ray(&world, Vec2::new(between, 60.0), -Vec2::Y, down)
+        .expect("the hill between the tanks");
+    let block = scenery(
+        &mut world,
+        900_000,
+        place.point_to_world(hill.point + Vec2::Y * 3.0),
+        Vec2::splat(0.4),
+        true,
+    );
+    // A slab through the right tank's hull and over it.
+    scenery(
+        &mut world,
+        900_001,
+        place.point_to_world(tank + Vec2::Y * 0.5),
+        Vec2::new(4.0, 2.0),
+        false,
+    );
+    let hull = world.motion(duel.duel.tanks[1].body).unwrap().position;
+    for _ in 0..240 {
+        step(&mut duel, &mut world);
+    }
+    // The block lands on the hill, and the duel's own ray down through it
+    // finds the hill under it, not the block.
+    let rest = world.motion(block).unwrap();
+    assert!(rest.linear_velocity.length() < 0.2, "{rest:?}");
+    let at = place.point_from_world(rest.position);
+    let ground = duel
+        .duel
+        .cast_ray(&world, at + Vec2::Y * 10.0, -Vec2::Y, down)
+        .expect("the hill under the block");
+    assert_ne!(ground.collider.entity, block.entity);
+    assert!(
+        (at.y - 0.4 - ground.point.y).abs() < 0.15,
+        "the block rests on the hill: {at:?} over {:?}",
+        ground.point
+    );
+    // The tank inside the slab never felt it, and a shell falling through
+    // the slab strikes the tank under it.
+    let moved = world.motion(duel.duel.tanks[1].body).unwrap().position - hull;
+    assert!(
+        moved.length() < 0.02,
+        "the slab moved the tank by {moved:?}"
+    );
+    drop_shell(
+        &mut duel,
+        &mut world,
+        &mut armor::NoRecipients,
+        1,
+        8.0,
+        20.0,
+    );
+}
+
 #[test]
 fn shared_duel_matches_standalone_with_both_dirt_shapes() {
     for shape in [GrainShape::Round, GrainShape::Hexagon] {

@@ -857,6 +857,12 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
             }
         }
     }
+    // The digits Tanks' shells have damaged, and the cells they knocked loose.
+    if let Some(crate::events::ActiveEvent::Tanks(event)) = &state.active_event {
+        for (center, side, angle) in event.face_cells() {
+            render_square(frame, center, side / 0.8, angle, 1.0, palette);
+        }
+    }
 }
 
 fn render_colon(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {

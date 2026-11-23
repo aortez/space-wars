@@ -36,10 +36,10 @@ use crate::{
 };
 
 pub(crate) mod magpie;
-mod reassembly;
+pub(crate) mod reassembly;
 pub use magpie::GATHERING_TICKS;
 use magpie::{Magpie, Support};
-use reassembly::{Destination, Reassembly};
+use reassembly::{Destination, Piece, Reassembly};
 
 pub const WARNING_TICKS: u64 = 36;
 pub const BURST_TICKS: u64 = 210;
@@ -82,6 +82,24 @@ impl Debris {
 /// A digit cell: its slot and its place in the slot's grid.
 pub(crate) type Home = (u8, GridCell);
 
+impl Cell {
+    /// A block of the digit cell `home`, whose place is `origin`, at
+    /// `position` and `angle`.
+    pub(crate) fn digit(home: Home, origin: Vec2, position: Vec2, angle: f32, side: f32) -> Self {
+        Self {
+            origin,
+            position,
+            angle,
+            side,
+            label: false,
+            taken: false,
+            home: Some(home),
+            velocity: Vec2::ZERO,
+            spin: 0.0,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Cell {
     pub origin: Vec2,
@@ -96,13 +114,6 @@ pub(crate) struct Cell {
     home: Option<Home>,
     velocity: Vec2,
     spin: f32,
-}
-
-/// The surface a digit block carries.
-#[derive(Clone, Copy, Debug)]
-struct Piece {
-    id: SurfaceId,
-    departing: bool,
 }
 
 enum Mechanics {
@@ -680,40 +691,10 @@ impl ExplosionEvent {
         }
     }
 
-    /// Brings every block's surface up to where the return is taking it. A
-    /// block coming home to a digit cell keeps the surface it has, whichever
-    /// cell that is; one with none, or with one already departing, gets a new
-    /// surface for that cell. A block that turns into an AM/PM pixel gives its
-    /// surface up, and a surplus block's surface departs as it shrinks away.
+    /// Brings every block's surface up to where the return is taking it.
     fn assign_pieces(&mut self, surfaces: &mut SurfaceLedger) {
-        let Some(reassembly) = &self.reassembly else {
-            return;
-        };
-        self.pieces.resize(self.cells.len(), None);
-        for (index, piece) in self.pieces.iter_mut().enumerate() {
-            let surviving = piece.is_some_and(|piece| !piece.departing);
-            match reassembly.destination(index) {
-                Destination::Cell(_) if surviving => (),
-                Destination::Cell((slot, cell)) => {
-                    if let Some(old) = piece.take() {
-                        surfaces.retire(old.id, Retirement::Replaced);
-                    }
-                    *piece = Some(Piece {
-                        id: surfaces.admit(slot, cell, SurfaceSource::Return),
-                        departing: false,
-                    });
-                }
-                Destination::Label => {
-                    if let Some(old) = piece.take() {
-                        surfaces.retire(old.id, Retirement::Replaced);
-                    }
-                }
-                Destination::Merging => {
-                    if let Some(piece) = piece {
-                        piece.departing = true;
-                    }
-                }
-            }
+        if let Some(reassembly) = &self.reassembly {
+            reassembly.assign(&mut self.pieces, surfaces);
         }
     }
 

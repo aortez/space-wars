@@ -7,7 +7,7 @@ fn display(hour: u8, minute: u8, format: ClockTimeFormat) -> DisplaySnapshot {
 }
 
 fn debris(display: DisplaySnapshot, layout: Layout) -> Vec<Cell> {
-    targets(display, layout)
+    targets(Scope::FACE, display, layout)
         .into_iter()
         .enumerate()
         .map(|(index, target)| Cell {
@@ -25,7 +25,7 @@ fn debris(display: DisplaySnapshot, layout: Layout) -> Vec<Cell> {
 }
 
 fn assert_assignments(assembly: &Reassembly, display: DisplaySnapshot, layout: Layout) {
-    let targets = targets(display, layout);
+    let targets = targets(Scope::FACE, display, layout);
     let assigned = assembly
         .flights
         .iter()
@@ -39,7 +39,7 @@ fn assert_assignments(assembly: &Reassembly, display: DisplaySnapshot, layout: L
 }
 
 fn assert_arrived(cells: &[Cell], display: DisplaySnapshot, layout: Layout) {
-    let targets = targets(display, layout);
+    let targets = targets(Scope::FACE, display, layout);
     let visible = cells
         .iter()
         .filter(|cell| cell.side > 0.0)
@@ -110,7 +110,9 @@ fn denser_sparser_midnight_and_format_changes_assign_every_target_once() {
                 let assembly = Reassembly::new(&mut cells, target, layout);
                 assert_eq!(
                     cells.len(),
-                    original.len().max(targets(target, layout).len())
+                    original
+                        .len()
+                        .max(targets(Scope::FACE, target, layout).len())
                 );
                 assert!(cells.len() <= MAX_EXPLOSION_CELLS);
                 assert_assignments(&assembly, target, layout);
@@ -150,7 +152,7 @@ fn mid_return_changes_preserve_unchanged_paths_and_do_not_move_existing_blocks()
         assert_eq!(cell.side, before.side);
     }
     for (flight, before) in assembly.flights.iter().zip(flights) {
-        if targets(target, layout).contains(&before.target) {
+        if targets(Scope::FACE, target, layout).contains(&before.target) {
             assert_eq!(
                 *flight, before,
                 "unchanged slots retain their whole trajectory"
@@ -194,7 +196,7 @@ fn repeated_corrections_reuse_surplus_slots_and_still_finish_at_the_deadline() {
         assembly.sample(&mut cells, tick + 1);
         assert_eq!(
             cells.len(),
-            targets(full, layout).len(),
+            targets(Scope::FACE, full, layout).len(),
             "reuse, never accumulate"
         );
         assert!(cells.len() <= MAX_EXPLOSION_CELLS);

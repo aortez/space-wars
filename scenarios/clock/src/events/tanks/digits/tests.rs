@@ -3,6 +3,9 @@ use crate::arena::mechanics_config;
 use engine_common::ClockFont;
 use engine_rapier::world::RayCastOptions;
 
+/// A face no shell has damaged.
+const WHOLE: [Option<CellMask>; DIGIT_SLOT_COUNT] = [None; DIGIT_SLOT_COUNT];
+
 /// 12:00 AM in the Classic font.
 fn midnight() -> DisplaySnapshot {
     DisplaySnapshot {
@@ -32,8 +35,8 @@ fn rays_meet_the_face_and_bodies_fall_through_it() {
     let layout = Layout::new(4.0 / 3.0);
     let mut world = PhysicsWorld::new(mechanics_config(layout));
     let mut solids = Solids::default();
-    solids.synchronize(&mut world, layout, midnight());
-    let cells = cells(layout, midnight());
+    solids.synchronize(&mut world, layout, midnight(), WHOLE);
+    let cells = cells(layout, midnight(), WHOLE);
     assert_eq!(solids.cells(), cells);
     // A ball dropped onto the face's highest cell.
     let top = *cells
@@ -73,31 +76,71 @@ fn the_boxes_follow_the_reading_but_not_the_blinking_colon() {
     let layout = Layout::new(4.0 / 3.0);
     let mut world = PhysicsWorld::new(mechanics_config(layout));
     let mut solids = Solids::default();
-    solids.synchronize(&mut world, layout, midnight());
+    solids.synchronize(&mut world, layout, midnight(), WHOLE);
     let blinked = DisplaySnapshot {
         colon_lit: false,
         ..midnight()
     };
-    assert_eq!(cells(layout, blinked), cells(layout, midnight()));
+    assert_eq!(
+        cells(layout, blinked, WHOLE),
+        cells(layout, midnight(), WHOLE)
+    );
     // A minute later a one, with fewer cells, replaces the last zero.
     let later = DisplaySnapshot {
         digits: [Some(1), Some(2), Some(0), Some(1)],
         ..midnight()
     };
-    solids.synchronize(&mut world, layout, later);
+    solids.synchronize(&mut world, layout, later, WHOLE);
     world.step(1.0 / 60.0);
-    let lit = cells(layout, later);
+    let lit = cells(layout, later, WHOLE);
     assert_eq!(solids.cells(), lit);
     assert_eq!(
         world.collider_ids().filter(|id| id.entity == BODY).count(),
         lit.len()
     );
-    let dark: Vec<_> = cells(layout, midnight())
+    let dark: Vec<_> = cells(layout, midnight(), WHOLE)
         .into_iter()
         .filter(|cell| !lit.contains(cell))
         .collect();
     assert!(!dark.is_empty());
     for cell in dark {
         assert_eq!(box_at(&world, cell.center), None, "{cell:?}");
+    }
+}
+
+#[test]
+fn a_damaged_digit_keeps_boxes_only_for_the_cells_that_stand() {
+    let layout = Layout::new(4.0 / 3.0);
+    let mut world = PhysicsWorld::new(mechanics_config(layout));
+    let mut solids = Solids::default();
+    solids.synchronize(&mut world, layout, midnight(), WHOLE);
+    // The last zero loses its lowest cell, and the two is on its way home.
+    let zero = crate::fonts::glyph(ClockFont::Classic, Some(0));
+    let lost = zero.cells().min_by_key(|cell| (cell.y, cell.x)).unwrap();
+    let mut standing = WHOLE;
+    standing[3] = Some(CellMask(zero.0 & !(1 << (lost.y * 6 + lost.x))));
+    standing[1] = Some(CellMask(0));
+    solids.synchronize(&mut world, layout, midnight(), standing);
+    world.step(1.0 / 60.0);
+    assert_eq!(box_at(&world, layout.slot_cell_center(3, lost)), None);
+    for cell in zero.cells().filter(|cell| *cell != lost) {
+        assert!(
+            box_at(&world, layout.slot_cell_center(3, cell)).is_some(),
+            "{cell:?}"
+        );
+    }
+    let two = crate::fonts::glyph(ClockFont::Classic, Some(2));
+    for cell in two.cells() {
+        assert_eq!(
+            box_at(&world, layout.slot_cell_center(1, cell)),
+            None,
+            "{cell:?}"
+        );
+    }
+    // The other digits keep every box.
+    for (slot, digit) in [(0, 1), (2, 0)] {
+        for cell in crate::fonts::glyph(ClockFont::Classic, Some(digit)).cells() {
+            assert!(box_at(&world, layout.slot_cell_center(slot, cell)).is_some());
+        }
     }
 }
