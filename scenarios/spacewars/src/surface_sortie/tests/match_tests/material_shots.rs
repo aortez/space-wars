@@ -10,7 +10,7 @@ pub(super) enum Target {
 }
 
 /// Seat 1 at rest in `target`'s form, 200 units over the first planet with
-/// gravity off, and seat 0's ship 40 units off, under material weapons.
+/// gravity off, and seat 0's ship 40 units off.
 pub(super) fn fixture(target: Target) -> SurfaceSortieState {
     let state = arrange(round(), target);
     assert_eq!(health(&state, target), 100.0);
@@ -19,7 +19,6 @@ pub(super) fn fixture(target: Target) -> SurfaceSortieState {
 
 /// `state` laid out as [`fixture`] lays out a match.
 pub(super) fn arrange(mut state: SurfaceSortieState, target: Target) -> SurfaceSortieState {
-    state.world.enable_material_weapons();
     weightless(&mut state);
     let center = state.world.planets[0].position + Vec2::Y * 200.0;
     let shooter = &mut state.world.ships[0];

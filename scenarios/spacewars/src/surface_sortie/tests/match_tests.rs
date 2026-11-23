@@ -401,27 +401,24 @@ fn physical_missile_hit_consumes_one_round_and_damages_pilot_once() {
             .unwrap()
             .motion
             .position;
-        state.world.debris.push(DebrisState::new_shell(
-            0,
-            0,
-            position - Vec2::X * 8.0,
-            Vec2::X * 100.0,
-            0.0,
-        ));
+        // A supplied round, as every shell in a match is.
+        let mut shell =
+            DebrisState::new_shell(0, 0, position - Vec2::X * 8.0, Vec2::X * 100.0, 0.0);
+        shell.inertial_mass = Some(weapons::ROUND_MASS);
+        state.world.debris.push(shell);
         idle(&mut state, 30);
-        assert_eq!(
-            vitals(&state, 1).health,
-            if on_foot { 0.0 } else { PILOT_HEALTH },
-            "{on_foot}: {:?}",
-            vitals(&state, 1)
-        );
         if on_foot {
-            assert_eq!(
-                vitals(&state, 1).last_damage.unwrap().cause,
-                PilotDamageCause::Missile
-            );
+            // One hit, closing at 100, too slow to kill a pilot on foot.
+            let vitals = vitals(&state, 1);
+            let damage = vitals.last_damage.unwrap();
+            assert_eq!(damage.cause, PilotDamageCause::Missile);
+            assert!(damage.amount > 0.0, "{vitals:?}");
+            assert_eq!(vitals.health, PILOT_HEALTH - damage.amount, "{vitals:?}");
         } else {
-            assert_eq!(state.world.ships[1].life, 50.0);
+            // The pod's hull takes the hit, and its pilot nothing.
+            assert_eq!(vitals(&state, 1).health, PILOT_HEALTH);
+            let life = state.world.ships[1].life;
+            assert!(life > 0.0 && life < POD_HULL_HEALTH, "{life}");
             assert!(vitals(&state, 1).last_damage.is_none());
         }
         assert!(
@@ -481,8 +478,12 @@ fn supplied_missile_impact_leaves_a_physical_pod_braking_opportunity() {
             assert_eq!(vitals(&state, 1).health, PILOT_HEALTH);
         }
     }
-    assert_eq!(results[0].0, 0.0, "legacy counterfactual: {results:?}");
-    assert_eq!(results[1].0, 50.0, "supplied missile: {results:?}");
+    assert_eq!(results[0].0, 0.0, "heavy shell counterfactual: {results:?}");
+    // The pod survives the round to brake.
+    assert!(
+        results[1].0 > 0.0 && results[1].0 < POD_HULL_HEALTH,
+        "supplied missile: {results:?}"
+    );
     assert!(
         results[1].1 > 20.0 && results[1].1 < results[0].1 * 0.7,
         "{results:?}"

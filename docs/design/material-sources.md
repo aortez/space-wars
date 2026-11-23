@@ -288,13 +288,13 @@ around its collision shape's perimeter.
 | Escape pod hull, in a match | pod hull | plate around the pod's 7.39 perimeter, 1 deep | 17,724, for 100 health | 177.2 |
 | Pilot on foot | pilot tissue | the pilot's capsule, 0.3 deep | 2,632, for 100 health | 26.3 |
 | Asteroid, chip or breakup fragment | asteroid rock | what the body weighed when made, giving way 1 deep behind a struck face | 4,398 per unit of radius | 1,400 |
-| Cannon shell | shell | what the shell weighed when fired | 4,712, or 375 for a supplied round, for 1 health | 4,712 or 375 |
+| Cannon shell | shell | what the shell weighed when fired | 375 for a round, or 4,712 for a classic shell, for 1 health | 375 or 4,712 |
 | Rover hull | hull | plate around the chassis's 11.2 perimeter, 2 deep | 8,960, for 25 health | 358.4 |
 
 The game still stores health, and a body's region is a view of it: the
 region's integrity is the body's health over its full health. Contacts, solar
 heat, repairs and rebuilding still change health, so they change the region
-with it, and play is unchanged. `HealthMap` turns the work charged to a region
+with it. `HealthMap` turns the work charged to a region
 into the health it costs, and health back into work, as healing paid for in
 energy would need ([#246](https://github.com/aortez/space-wars/issues/246)).
 
@@ -336,14 +336,15 @@ the laser, as [Lasers as beams](#lasers-as-beams) says.
 
 ### Cannon shells as shots
 
-`SpacewarsState::enable_material_weapons`, chosen before the first step, flies
-each cannon shell as a `Weapons` shot from the step it is fired in. The game
-still replaces a shell's body when the shell arms, and the shot flies on with
-the new one. The shot stops on the body its strongest contact pushed, and the
-impact law charges that body's region. `HealthMap` turns the work into health,
-and the contact rules take that health where they took the shell's damage, so
-particles, telemetry and breakups follow as before. The old damage rules stay
-the default until the game's AI baselines move with the new ones.
+The game flies each cannon shell as a `Weapons` shot from the step it is fired
+in. It still replaces a shell's body when the shell arms, and the shot flies on
+with the new one. The shot stops on the body its strongest contact pushed, and
+the impact law charges that body's region. `HealthMap` turns the work into
+health, and the contact rules charge that health to the body, so telemetry and
+breakups follow as before. Sparks keep the old shell's size, set by how hard
+the shell hit, so a hit that costs nothing, such as one on a pod outside a
+match or on a protected pod, still throws them. A shell's contacts do no
+damage of their own, so a shell whose shot is refused charges nothing.
 
 - The first contact that pushes anything stops a shell, so it no longer
   bounces off the edge of the universe. Planets, the sun, terrain and the edge
@@ -352,22 +353,29 @@ the default until the game's AI baselines move with the new ones.
 - In a match, a pod or a pilot on foot takes a shot's hit unless ejection
   protection covers it, and a protected one still stops the shell. Outside a
   match, pods and pilots are outside the model and stop a shell uncharged: a
-  pod's health there is its rebuild's progress.
+  pod's health there is its rebuild's progress. A hit on a pod there still
+  counts, as a protected one's does.
 - A shot whose shell dies earlier in the step, such as to a laser or terrain,
   or leaves the game retires before it can land a hit. The old rules spared a
   pod or a pilot on foot such a hit, but not a ship.
-- A classic cannon shell weighs 12.57 times a supplied round, and the impact
-  law charges its energy. It fails a fresh ship's hull on the 2nd hit, where
-  the old rules took the 3rd, and breaks asteroids up to a radius of about 120
+- Every ship's cannon fires a shell that weighs what a supplied round does, in
+  a match or not. A classic shell weighs 12.57 times as much, and the impact
+  law charges its energy: it failed a fresh ship's hull on the 2nd hit, where
+  the old rules took the 3rd, and broke asteroids up to a radius of about 120
   in one hit, where the old rules broke those up to about 20. In a default game
-  with seed 7, the first classic shell takes all of the struck ship's health,
-  where the old rules left it 4.8. What a classic shell should weigh is not
-  settled yet.
+  with seed 7, the first one took all of the struck ship's health, where the
+  old rules left it 4.8. At a round's weight, the first takes 51.2 and the
+  second 47.4, which leaves the ship 1.4. Only the missile a recovery lab fires
+  at a seat without weapons still weighs a classic shell, so it shoves as it
+  did. The impact law charges its energy too, so its hit costs a full ship
+  about 70 health, in flight or parked, where the old rules took about 32 in
+  flight and 48 parked. A pod there is outside the model and still takes
+  nothing.
 
 ### Lasers as beams
 
-With material weapons, each ship's laser is also a `Weapons` beam. Each tick a
-laser shines, it fires one pulse from the muzzle along the ship's heading, as
+Each ship's laser is a `Weapons` beam. Each tick a laser shines, it fires one
+pulse from the muzzle along the ship's heading, as
 far as the beam has grown, a tick's growth past where it last ended. The
 pulse's energy is 8,950 over that length, as the old damage was 10 over it, so
 the beam keeps the old laser's falloff. The first solid surface ends the pulse,
@@ -381,7 +389,9 @@ keep their old size.
   than it, so a ship or an asteroid would take the whole pulse hundreds of
   units away. The game sets each pulse's energy instead.
 - **Width.** The beam is 0.01 wide. A face's safe limit grows with the beam's
-  width, so a narrow beam loses little of a pulse to it.
+  width, so a narrow beam loses little of a pulse to it. The limit is a larger
+  share of a weaker pulse, so a hit on a ship from 250 units off costs about
+  0.1% less than the old laser's, and one from 1,350 about 1.4% less.
 - **Calibration.** From 40 units off in the match tests' fixture, the beam
   fails a fresh ship's hull in 13.87 seconds, where the old laser took 13.88.
   A pod's hull is half as thick as the beam is tall, so it takes half of each
@@ -395,20 +405,22 @@ keep their old size.
   where the old rules' round killed at every speed from 50 to 300. A softer
   pilot dies to slower rounds and sooner to the laser: at a toughness of
   8,750, a round closing at 150 kills one, and the laser takes 0.72 seconds.
+  The game keeps the tougher tissue, so the laser keeps its tiers.
 - **Protection.** In a match, a pod or a pilot on foot takes a beam's hit
   unless ejection protection covers it, and a protected one still ends the
   beam. Outside a match, the beam ends on pods and pilots uncharged, as it ends
   on planets, the sun, terrain and the edge of the universe.
-- **Other bodies.** Nothing else is calibrated for the beam yet:
+- **Other bodies.** The rest keep their materials, and the beam wears them at
+  its own rate:
   - A rover keeps the reference hull, so each pulse costs it 2.5 times the old
     damage. A rover 40 units off lasts 1.5 seconds in the beam, where it lasted
     3.7 in the old laser.
   - Rock takes 0.64 times the old damage from each pulse, so an asteroid lasts
     about 1.6 times as long in the beam.
-  - A supplied round's 1 health stands for 375, so the beam destroys one about
-    as fast as the old laser did: in 1 tick from 40 units off and 10 from 300,
-    where the old laser took 2 and 12. A classic shell's stands for 4,712, so
-    the beam takes 10 ticks from 40 units off and 62 from 300.
+  - A round's 1 health stands for 375, so the beam destroys one about as fast
+    as the old laser did: in 1 tick from 40 units off and 10 from 300, where
+    the old laser took 2 and 12. A classic shell's stands for 4,712, so the
+    beam takes 10 ticks from 40 units off and 62 from 300.
 - **A muzzle inside a body.** The beam then ends at the muzzle, where the old
   ray ended where it left the body.
 
@@ -660,8 +672,7 @@ Scorched's shells:
 `scenarios/spacewars/src/shots.rs` and the match and terrain tests cover
 shells as shots:
 
-- shells flying as shots from their first step, only once material weapons
-  are chosen, which they must be before the first step;
+- shells flying as shots from their first step;
 - a shot charging the ship it stops on, which loses that and no old damage
   besides, the contact still recorded and the shell gone with the shot, and a
   hit counting for that body alone;
@@ -672,11 +683,15 @@ shells as shots:
 - a round that a laser destroys in the step it strikes a ship or a pod landing
   no hit and counting none;
 - a shot recording no contact with a ship or a rover it did not charge;
+- a shell contact that no shot carries costing neither the body nor the shell
+  and recording nothing, however hard it pushes;
+- a shot that charges a ship nothing still counting its hit and throwing the
+  sparks the old shell's damage did;
 - two shots in one step charging a ship no more than it has;
 - a round costing asteroids of radius 10, 40 and 100 what it did under the
   old rules, with the same chips and exactly what its shot charged;
-- a round destroying a rover under both rules, and a slow round costing a
-  rover what its shot charged;
+- a round destroying a rover as a shell did, and a slow round costing a rover
+  what its shot charged;
 - a game with rounds in flight playing the same twice and from a clone made
   mid-game, with a hit landing after the clone;
 - a round failing a match's ship on the 4th hit, a pod on the 2nd and a pilot
@@ -695,7 +710,6 @@ shells as shots:
 - two beams in one step charging a body no more than it has;
 - a beam wearing a rover by its hull, and a rover with less left than a pulse
   takes losing what it has and dying;
-- choosing material weapons twice changing nothing;
 - a game with lasers playing the same twice and from a clone;
 - the laser failing a match's ship in 13.87 seconds from 40 units off, a pod in
   5.75 and a pilot on foot in 2.87, each step's loss what the beam charged and

@@ -83,18 +83,25 @@ the same seed with fresh health, terrain, ownership and bot state.
 
 The full ship is the strongest form. Both its **Hull** and the separate
 **Pod hull** absorb damage without harming the pilot inside. A fresh pod has
-100 hull health, takes twice the raw laser damage of a full ship, and loses
-50 hull health to a direct missile. Destroying it releases the same pilot at
-the cockpit, preserving health, jetpack charge and physical motion.
+100 hull health. Destroying it releases the same pilot at the cockpit,
+preserving health, jetpack charge and physical motion.
+
+Weapons charge each form by its material
+([#330](https://github.com/aortez/space-wars/issues/330)). From 40 units off,
+the laser fails a full ship in about 14 seconds, a pod in about 6 and a pilot
+on foot in about 3. Rounds closing at 300 fail a still ship on the 4th or 5th
+hit and a pod on the 2nd, and kill a pilot on foot on the 1st. A slower round
+costs less: one closing slower than about 236 does not kill a pilot on foot.
 
 The on-foot **Pilot** meter is a persistent 100-point health pool. On foot,
-laser and solar damage are twice the pod-hull rate, a direct missile costs
-100 health, and hard landings hurt more. Boarding never repairs either health
-pool; rebuilding supplies a new ship without healing the pilot. Ship ejection
-grants three seconds of protection. Pod destruction and ordinary transfers do
-not renew that window, and a destroying hit never spills into the pilot's
-health. See the [durability measurements](durability-balance.md) for the rules
-and controlled comparisons.
+solar damage is twice the pod-hull rate and hard landings hurt more. Boarding
+never repairs either health pool; rebuilding supplies a new ship without
+healing the pilot. Ship ejection grants three seconds of protection. Pod
+destruction and ordinary transfers do not renew that window, and a destroying
+hit never spills into the pilot's health. See the
+[durability measurements](durability-balance.md) for heat and impacts, and the
+[weapons' calibration](design/material-sources.md#spacewars-bodies) for lasers
+and rounds.
 
 **Match length** defaults to ten minutes of gameplay time. Settings offers
 5, 10, or 15 minutes and Unlimited. The HUD shows the remaining time; pausing
@@ -170,8 +177,10 @@ elimination rule is distinct from the material match's pilot survival rule.
 The historical visual/headless benchmark explicitly uses Classic;
 `--benchmark` without a scenario also selects it. All terrain, arena, travel,
 recovery and surface lab IDs remain available with their previous controllers
-and rules. In particular, the arena lab still forces human P1/bot P2, while
-its duel variant forces two bots independently of normal match settings.
+and rules, except their weapons: Classic and every lab fire the same material
+weapons as the match. In particular, the arena lab still forces human P1/bot
+P2, while its duel variant forces two bots independently of normal match
+settings.
 
 Saved settings add `spacewars.player_1_controller`, defaulting to `human` when
 reading an older file. The existing `player_2_controller` and historical world
