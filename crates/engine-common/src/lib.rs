@@ -1178,6 +1178,12 @@ pub struct ClockTanksState {
     pub retired_tank_mass_milli: u32,
     pub conversion_area_milli: u32,
     pub entry_failure: Option<String>,
+    /// The two CPUs, as Scorched Earth's bot button names them.
+    #[serde(default)]
+    pub cpu: [String; 2],
+    /// Shells the face has stopped.
+    #[serde(default)]
+    pub face_hits: u32,
 }
 
 /// One of the two lamps in the upper corners of the Clock's frame.

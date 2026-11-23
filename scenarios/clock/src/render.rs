@@ -43,6 +43,11 @@ pub(crate) const GLOW_LAYER: i32 = 2;
 const INACTIVE_CELL_LAYER: i32 = 3;
 pub(crate) const ACTIVE_CELL_LAYER: i32 = 4;
 pub(crate) const LABEL_LAYER: i32 = 5;
+/// Tanks' shells and their bursts, in front of the face and its AM/PM label.
+/// The ceiling's parcels share the layer, and the ceiling never opens during
+/// Tanks.
+pub(crate) const SHOT_LAYER: i32 = 6;
+const _: () = assert!(SHOT_LAYER > LABEL_LAYER && LABEL_LAYER > ACTIVE_CELL_LAYER);
 /// The creatures over the face: the crow, the magpie and the spider.
 const CREATURE_LAYER: i32 = 8;
 

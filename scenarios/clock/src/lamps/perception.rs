@@ -27,7 +27,7 @@ use crate::{ClockReading, FIXED_HZ, digits::DIGIT_SLOT_COUNT};
 const MAX_MOVERS: usize = 6;
 const MAX_IMPACTS: usize = 4;
 /// The most bodies looked at in a tick, across every world. The arena holds
-/// at most 255, or 335 under Tanks.
+/// at most 255, or 336 under Tanks.
 const MAX_BODIES: usize = 512;
 /// A body moving at this many cells a second or more is a mover.
 pub(super) const MOVING: f32 = 1.0;

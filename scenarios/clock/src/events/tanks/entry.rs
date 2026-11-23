@@ -1,36 +1,14 @@
 use super::*;
-use crate::{digit_surfaces::CELL_HALF, digits::DisplaySnapshot, fonts, meridiem::Glyph};
+use crate::digits::DisplaySnapshot;
 
 pub const BEAM_HALF_WIDTH: f32 = 2.1;
 
-/// Project the actual lit cells onto x: a lane must pass every row of the face.
-/// Reserve the colon even while it blinks off.
+/// Project the face's cells onto x: a lane must pass every row of the face.
 fn ink(layout: Layout, display: DisplaySnapshot) -> Vec<[f32; 2]> {
-    let mut spans = Vec::new();
-    let mut add = |x: f32, half: f32| spans.push([x - half, x + half]);
-    for (slot, digit) in display.digits.into_iter().enumerate() {
-        for cell in fonts::glyph(display.font, digit).cells() {
-            add(
-                layout.slot_cell_center(slot, cell).x,
-                CELL_HALF * layout.pitch,
-            );
-        }
-    }
-    add(
-        layout.face_origin.x + 14.5 * layout.pitch,
-        CELL_HALF * layout.pitch,
-    );
-    if let Some(label) = display.meridiem {
-        for glyph in Glyph::for_label(label) {
-            for cell in glyph.cells() {
-                add(
-                    glyph.cell_center(layout, cell).x,
-                    crate::meridiem::PIXEL_SIZE * layout.pitch * 0.5,
-                );
-            }
-        }
-    }
-    spans
+    super::digits::cells(layout, display)
+        .into_iter()
+        .map(|cell| [cell.center.x - cell.half, cell.center.x + cell.half])
+        .collect()
 }
 
 pub fn clear(layout: Layout, display: DisplaySnapshot, scale: f32, x: f32) -> bool {
@@ -45,7 +23,9 @@ fn excluded(world: Option<&PhysicsWorld>) -> Vec<PhysicsId> {
         .into_iter()
         .flat_map(PhysicsWorld::entity_ids)
         .filter(|id| {
-            canonical::ARENA_FLOOR.contains(&id.value()) || canonical::TANKS.contains(&id.value())
+            canonical::ARENA_FLOOR.contains(&id.value())
+                || canonical::TANKS.contains(&id.value())
+                || canonical::TANKS_DIGITS.contains(&id.value())
         })
         .collect()
 }
@@ -158,10 +138,11 @@ fn fit_placement(
     place.terrain_width = terrain_width;
     place.spawn_x = spawn_x;
     place.reserved_grains = 2 * DIRT_PER_TANK;
+    // A shell flies on in front of the face until it leaves the frame.
     let edge = terrain_width as f32 * 0.25 + 5.0;
     place.bounds = Bounds {
         min: Vec2::new(-edge, -40.0),
-        max: Vec2::new(edge, 65.0),
+        max: Vec2::new(edge, (layout.canopy_y - place.origin.y) / scale),
     };
     Some(place)
 }

@@ -16,8 +16,13 @@ const TEAMS: [RenderColor; 2] = [
     RenderColor::rgb(0.98, 0.51, 0.27),
 ];
 
-// Combat stays below the face; transport uses a clear lane through it.
-fn polygon(frame: &mut RenderFrame, mut points: Vec<Vec2>, bounds: Bounds, color: RenderColor) {
+fn polygon(
+    frame: &mut RenderFrame,
+    layer: i32,
+    mut points: Vec<Vec2>,
+    bounds: Bounds,
+    color: RenderColor,
+) {
     for (axis, edge, greater) in [
         (0, bounds.min.x, true),
         (0, bounds.max.x, false),
@@ -51,7 +56,7 @@ fn polygon(frame: &mut RenderFrame, mut points: Vec<Vec2>, bounds: Bounds, color
     }
     if points.len() >= 3 {
         frame.push_primitive(
-            ARENA_LAYER,
+            layer,
             RenderPrimitive::Polygon(RenderPolygon::filled(
                 points
                     .into_iter()
@@ -63,9 +68,17 @@ fn polygon(frame: &mut RenderFrame, mut points: Vec<Vec2>, bounds: Bounds, color
     }
 }
 
-fn disc(frame: &mut RenderFrame, center: Vec2, radius: f32, bounds: Bounds, color: RenderColor) {
+fn disc(
+    frame: &mut RenderFrame,
+    layer: i32,
+    center: Vec2,
+    radius: f32,
+    bounds: Bounds,
+    color: RenderColor,
+) {
     polygon(
         frame,
+        layer,
         (0..16)
             .map(|i| center + Vec2::from_radians(i as f32 * std::f32::consts::TAU / 16.0) * radius)
             .collect(),
@@ -86,6 +99,7 @@ fn strip(
     let side = Vec2::new(-direction.y, direction.x) * width * 0.5;
     polygon(
         frame,
+        ARENA_LAYER,
         vec![a - side, b - side, b + side, a + side],
         bounds,
         color,
@@ -98,12 +112,19 @@ pub(super) fn render(
     world: &PhysicsWorld,
     layout: Layout,
 ) {
+    // The battlefield stays below the face, and transport uses a clear lane
+    // through it. Shells and their bursts fly in front of it, up to the
+    // canopy.
     let bounds = Bounds {
         min: Vec2::new(layout.bounds_min.x + layout.frame_width, layout.floor_y),
         max: Vec2::new(
             layout.bounds_max.x - layout.frame_width,
             layout.face_origin.y - 4.0,
         ),
+    };
+    let sky = Bounds {
+        max: Vec2::new(bounds.max.x, layout.canopy_y),
+        ..bounds
     };
     let scale = event.duel.placement().scale;
     for field in event.duel.terrain() {
@@ -115,6 +136,7 @@ pub(super) fn render(
                 let half = rect.half_extents(&field.terrain);
                 polygon(
                     frame,
+                    ARENA_LAYER,
                     [
                         Vec2::new(-half.x, -half.y),
                         Vec2::new(half.x, -half.y),
@@ -130,6 +152,7 @@ pub(super) fn render(
             for patch in &chunk.polygons {
                 polygon(
                     frame,
+                    ARENA_LAYER,
                     patch.vertices.iter().map(|p| transform(*p)).collect(),
                     bounds,
                     EARTH,
@@ -142,6 +165,7 @@ pub(super) fn render(
         if let Some(vertices) = grain.shape().vertices(grain.radius()) {
             polygon(
                 frame,
+                ARENA_LAYER,
                 vertices
                     .into_iter()
                     .map(|p| motion.position + p.rotate_radians(motion.angle))
@@ -150,7 +174,14 @@ pub(super) fn render(
                 GRAIN,
             );
         } else {
-            disc(frame, motion.position, grain.radius(), bounds, GRAIN);
+            disc(
+                frame,
+                ARENA_LAYER,
+                motion.position,
+                grain.radius(),
+                bounds,
+                GRAIN,
+            );
         }
     }
     if event.phase != EventPhase::Raising {
@@ -191,6 +222,7 @@ pub(super) fn render(
                 };
                 polygon(
                     frame,
+                    ARENA_LAYER,
                     vec![
                         Vec2::new(x - width, bottom),
                         Vec2::new(x + width, bottom),
@@ -205,6 +237,7 @@ pub(super) fn render(
                 |p: Vec2| tank.motion.position + (p * scale).rotate_radians(tank.motion.angle);
             polygon(
                 frame,
+                ARENA_LAYER,
                 RIGID_TANK_HULL.map(local).to_vec(),
                 tank_bounds,
                 color,
@@ -214,6 +247,7 @@ pub(super) fn render(
                 track.a = color.a;
                 disc(
                     frame,
+                    ARENA_LAYER,
                     local(Vec2::new(x, -0.45)),
                     0.28 * scale,
                     tank_bounds,
@@ -225,7 +259,14 @@ pub(super) fn render(
             } else {
                 tank.barrel
             };
-            disc(frame, barrel[0], 0.65 * scale, tank_bounds, color);
+            disc(
+                frame,
+                ARENA_LAYER,
+                barrel[0],
+                0.65 * scale,
+                tank_bounds,
+                color,
+            );
             strip(
                 frame,
                 barrel[0],
@@ -239,9 +280,10 @@ pub(super) fn render(
     for shell in event.duel.shells() {
         disc(
             frame,
+            SHOT_LAYER,
             shell.position,
             0.24 * scale,
-            bounds,
+            sky,
             RenderColor::rgb(1.0, 0.91, 0.62),
         );
     }
@@ -249,9 +291,10 @@ pub(super) fn render(
         let t = age as f32 / 22.0;
         disc(
             frame,
+            SHOT_LAYER,
             point,
             (0.5 + 2.0 * t) * scale,
-            bounds,
+            sky,
             RenderColor::rgba(1.0, 0.65, 0.18, 0.6 * (1.0 - t)),
         );
     }
