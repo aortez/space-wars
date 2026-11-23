@@ -314,10 +314,13 @@ fn choose(arcs: &[TracedArc]) -> Option<TracedArc> {
 
 impl Bot {
     /// Advances the plot for this tank's next shot. A plot begins a little
-    /// before the shot is due, once the last shell has landed, and begins
-    /// again whenever the tank moves off its pose.
+    /// before the shot is due, once the last shell has landed and any dodge is
+    /// over, and begins again whenever the tank moves off its pose.
     fn advance_plot(&mut self, state: &Duel, physics: &PhysicsWorld, player: usize) {
-        if self.pending.is_some() || state.tick + LEAD_TICKS < state.tanks[player].next_shot {
+        if self.pending.is_some()
+            || self.dodging()
+            || state.tick + LEAD_TICKS < state.tanks[player].next_shot
+        {
             return;
         }
         let redo = self.plot.as_ref().is_none_or(|plot| {

@@ -1,6 +1,6 @@
-//! Scorched Earth's plotted CPU, drawn through the client's raster and text
-//! overlay. Set SPACEWARS_SCORCHED_ARTIFACTS to a directory to keep the
-//! pictures.
+//! Scorched Earth's plotted and dodging CPUs, drawn through the client's
+//! raster and text overlay. Set SPACEWARS_SCORCHED_ARTIFACTS to a directory to
+//! keep the pictures.
 use super::{
     tanks::{CapturePlatform, draw},
     *,
@@ -60,7 +60,7 @@ fn first_wall_shot(policy: CpuPolicy) -> ShotObservation {
 /// first at which a shell is halfway through its flight while the other
 /// tank's shell is in the air too.
 fn duel_frame_ticks(viewport: Viewport) -> (u64, u64) {
-    let mut state = duel();
+    let mut state = duel(false);
     let mut aimed = None;
     while state.tick < 60 * u64::from(FIXED_HZ) {
         step(&mut state);
@@ -88,14 +88,16 @@ fn duel_frame_ticks(viewport: Viewport) -> (u64, u64) {
     )
 }
 
-/// An ordinary duel as the client starts one, in Demo with both tanks plotting.
-fn duel() -> ScorchedState {
+/// An ordinary duel as the client starts one, in Demo with both tanks
+/// plotting, and dodging when `dodging`.
+fn duel(dodging: bool) -> ScorchedState {
     ScorchedState::new(
         ScorchedConfig {
             demo: true,
             suspension: true,
             cpu_footing: [true; 2],
             cpu_policy: [CpuPolicy::Plotted; 2],
+            cpu_dodging: [dodging; 2],
             course_goal_driving: true,
             ..Default::default()
         },
@@ -161,11 +163,124 @@ fn plotted_shots_and_labels_render_through_the_client_overlay() {
     ];
     // One duel steps forward through both frames.
     frames.sort_by_key(|&(_, tick, _)| tick);
-    let mut state = duel();
+    let mut state = duel(false);
     for (name, tick, label) in frames {
         step_to(&mut state, tick);
         let text = picture(&format!("duel-{name}"), &state);
         assert_eq!(count(&text, label), 2, "{name}: {text:?}");
         assert_eq!(count(&text, "Plotting + move"), 1, "{name}: {text:?}");
     }
+}
+
+/// The frame of a dodging duel at tick `to`, with every pixel of `trail`'s
+/// color drawn since tick `from` left on it.
+fn trail_frame(
+    ui: &MainWindow,
+    window: &MinimalSoftwareWindow,
+    viewport: Viewport,
+    trail: Rgb8Pixel,
+    from: u64,
+    to: u64,
+) -> (SharedPixelBuffer<Rgb8Pixel>, Vec<String>) {
+    let near = |pixel: &Rgb8Pixel| {
+        pixel.r.abs_diff(trail.r) <= 2
+            && pixel.g.abs_diff(trail.g) <= 2
+            && pixel.b.abs_diff(trail.b) <= 2
+    };
+    let mut state = duel(true);
+    step_to(&mut state, from);
+    let mut drawn = vec![false; (viewport.width * viewport.height) as usize];
+    loop {
+        let pixels = draw(
+            ui,
+            window,
+            &ScorchedScenario::render_frame(&state),
+            viewport,
+            false,
+        );
+        for (on, pixel) in drawn.iter_mut().zip(pixels.as_slice()) {
+            *on |= near(pixel);
+        }
+        if state.tick == to {
+            let mut pixels = pixels;
+            for (pixel, on) in pixels.make_mut_slice().iter_mut().zip(drawn) {
+                if on {
+                    *pixel = trail;
+                }
+            }
+            let text = overlay_text(&ScorchedScenario::render_frame(&state), viewport);
+            return (pixels, text);
+        }
+        step(&mut state);
+    }
+}
+
+#[test]
+fn a_dodging_tank_drives_out_from_under_the_next_shell() {
+    let windows = Rc::new(RefCell::new(Vec::new()));
+    slint::platform::set_platform(Box::new(CapturePlatform(windows.clone()))).unwrap();
+    let ui = MainWindow::new().unwrap();
+    ui.show().unwrap();
+    let output = std::env::var_os("SPACEWARS_SCORCHED_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(path) = &output {
+        std::fs::create_dir_all(path).unwrap();
+    }
+    let (width, height) = (800, 480);
+    let viewport = Viewport::new(width as f32, height as f32);
+    let window = windows.borrow()[0].clone();
+    window.set_size(PhysicalSize::new(width, height));
+
+    // The first dodge of the duel, from the hit that earned it to the burst
+    // of the shell it dodged.
+    let mut state = duel(true);
+    let (dodger, started) = loop {
+        step(&mut state);
+        let modes = state.driving_diagnostics().map(|drive| drive.mode);
+        if let Some(dodger) = modes.iter().position(|mode| *mode == "dodging") {
+            break (dodger, state.tick);
+        }
+        assert!(state.tick < 60 * u64::from(FIXED_HZ), "no tank dodged");
+    };
+    let shooter = 1 - dodger;
+    // The dodge lasts until the shell lands, so the shell's outcome is in
+    // once it ends.
+    while state.driving_diagnostics()[dodger].mode == "dodging" {
+        step(&mut state);
+    }
+    let shots = state.shot_observations();
+    let dodged = *shots
+        .iter()
+        .filter(|shot| shot.launch.owner == shooter && shot.launch.tick < started)
+        .max_by_key(|shot| shot.launch.tick)
+        .unwrap();
+    let hit = *shots
+        .iter()
+        .filter(|shot| {
+            shot.launch.owner == shooter && shot.tick < started && shot.damage[dodger] > 0.0
+        })
+        .max_by_key(|shot| shot.tick)
+        .unwrap();
+    assert!(
+        dodged.damage[dodger] < hit.damage[dodger] / 3.0,
+        "{dodged:?} {hit:?}"
+    );
+
+    // The shooter's shells are drawn in its team's color, and it holds still
+    // while they fly, so a trail of that color shows each shell's flight.
+    let trail = [Rgb8Pixel::new(97, 207, 171), Rgb8Pixel::new(245, 135, 79)][shooter];
+    let picture = |name: &str, from: u64, to: u64| {
+        let (pixels, text) = trail_frame(&ui, &window, viewport, trail, from, to);
+        if let Some(path) = &output {
+            write_png(
+                &path.join(format!("dodge-{width}x{height}-{name}.png")),
+                &pixels,
+            );
+        }
+        assert!(text.iter().any(|t| t == "Plotting + dodge"), "{text:?}");
+        text
+    };
+    picture("hit", hit.launch.tick, hit.tick + 6);
+    let text = picture("dodging", dodged.launch.tick, started + 40);
+    assert!(text.iter().any(|t| t == "dodging"), "{text:?}");
+    picture("missed", dodged.launch.tick, dodged.tick + 6);
 }

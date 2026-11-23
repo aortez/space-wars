@@ -74,6 +74,9 @@ pub struct ScorchedConfig {
     pub shape: GrainShape,
     pub max_grains: usize,
     pub demo: bool,
+    /// After each hit, drive out from under the next shell fired at the tank,
+    /// in place of the small move after a hit. Only the CPUs that move dodge.
+    pub cpu_dodging: [bool; 2],
     /// Local CPU repositioning; disable for the retained stationary duel.
     pub cpu_driving: bool,
     /// Seek nearby flatter firing positions; per-tank switches permit isolated
@@ -115,6 +118,7 @@ impl Default for ScorchedConfig {
             shape: GrainShape::Hexagon,
             max_grains: 192,
             demo: false,
+            cpu_dodging: [false; 2],
             cpu_driving: true,
             cpu_footing: [false; 2],
             cpu_policy: [CpuPolicy::Sweep; 2],
@@ -481,7 +485,7 @@ impl ScorchedState {
                 *self = Self::new(self.config, self.seed);
             }
             Command::CpuAim => {
-                self.config.cpu_policy = [self.config.cpu_policy[0].next(); 2];
+                self.config.next_cpu();
                 *self = Self::new(self.config, self.seed);
             }
             Command::Course => {

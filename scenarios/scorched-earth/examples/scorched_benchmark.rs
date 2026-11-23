@@ -46,6 +46,9 @@ struct Args {
     /// or plot each shot through the world and relocate.
     #[arg(long, default_value = "sweep", value_parser = ["sweep", "calibrated", "reactive", "plotted"])]
     bot: String,
+    /// Dodge the next shell after each hit, in place of the move after a hit.
+    #[arg(long, requires = "cpu_driving")]
+    dodge: bool,
     /// Use larger physical wheels with native spring/damper suspension.
     #[arg(long)]
     suspension: bool,
@@ -124,6 +127,7 @@ fn main() {
     );
     let config = ScorchedConfig {
         demo: true,
+        cpu_dodging: [args.dodge; 2],
         cpu_driving: args.cpu_driving,
         cpu_footing: [args.cpu_footing; 2],
         cpu_policy: [match args.bot.as_str() {

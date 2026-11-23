@@ -605,7 +605,7 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
             Some(DrivingCourse::Trench) => "Course: trench",
             Some(DrivingCourse::Rubble) => "Course: rubble",
         },
-        state.config.cpu_policy[0].label(),
+        state.config.cpu_label(0),
     ]
     .into_iter()
     .enumerate()

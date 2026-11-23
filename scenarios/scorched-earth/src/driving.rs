@@ -9,6 +9,8 @@ pub use goal::{GoalDecision, TravelGoal};
 
 const DRIVE_SPEED: f32 = 2.5;
 const DRIVE_ACCELERATION: f32 = 5.0;
+/// How far a tank driving at full speed rolls on once it brakes.
+pub(crate) const BRAKING_DISTANCE: f32 = DRIVE_SPEED * DRIVE_SPEED / (2.0 * DRIVE_ACCELERATION);
 const PLAN_TICKS: u64 = 30;
 pub(super) const ROUTE_SAMPLES: usize = 9;
 const ROUTE_SPACING: f32 = CELL_SIZE;
@@ -21,6 +23,11 @@ pub(super) type GroundCheckFn = fn(&Duel, &PhysicsWorld, usize, f32) -> bool;
 pub(super) type SupportCheckFn = fn(&Duel, &PhysicsWorld, usize) -> bool;
 pub(super) const CURRENT_GROUND_CHECKS: [GroundCheckFn; 2] = [Duel::safe_drive_direction; 2];
 pub(super) const CURRENT_SUPPORT_CHECKS: [SupportCheckFn; 2] = [Duel::has_track_support; 2];
+
+/// How much closer than its range a CPU that moves after a hit may stop.
+const CLOSER: f32 = 6.0;
+/// How much farther than its range a CPU that moves after a hit may stop.
+const FARTHER: f32 = 8.0;
 
 /// How far from the other tank a driving CPU holds, in units. Farther than
 /// `far` it approaches, and closer than `near` it makes room.
@@ -52,7 +59,17 @@ impl FiringRange {
     /// Whether a CPU moving after a hit may stop at `distance`: a little
     /// closer or farther than it holds.
     pub(crate) fn tolerates(self, distance: f32) -> bool {
-        (self.near - 6.0..=self.far + 8.0).contains(&distance)
+        (self.near - CLOSER..=self.far + FARTHER).contains(&distance)
+    }
+
+    /// How far a CPU at `distance` may move after a hit, away from the other
+    /// tank or toward it, and still stop at a distance it tolerates.
+    pub(crate) fn leeway(self, distance: f32, away: bool) -> f32 {
+        if away {
+            self.far + FARTHER - distance
+        } else {
+            distance - (self.near - CLOSER)
+        }
     }
 }
 

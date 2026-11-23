@@ -58,8 +58,8 @@ or switching to manual preserves the goal's history; Reset starts a fresh run.
 
 **Angular** is the initial dirt choice. **Demo** controls both tanks with the
 selected CPU policy. The playable default is **Learning + move**; the bottom-right
-button cycles **Sweep → Learning → Learning + move → Plotting + move**,
-restarting the same seed for comparison. The headless default retains the
+button cycles **Sweep → Learning → Learning + move → Learning + dodge →
+Plotting + move → Plotting + dodge**, restarting the same seed for comparison. The headless default retains the
 original seeded sweep.
 Power is muzzle speed (12–48 world units/s); elevation ranges from 5° to 85°.
 Human shots have a 1.25-second cooldown.
@@ -479,6 +479,79 @@ survey example and summary script that made them.
   second shot.
 - A full plot took 0.19 ms on this workstation, about 20 ns a ray, in the
   standalone world's 16 to 20 colliders. It has not been timed on a Pi.
+
+## CPU dodging
+
+**Learning + dodge** and **Plotting + dodge**, for
+[#677](https://github.com/aortez/space-wars/issues/677), answer a hit with a
+dodge instead of the move after a hit. A hit shows that the other tank has the
+range, so its next shell is likely to land close. A quarter second after that
+shell is fired, the hit tank flies it on through the world, as fired shells fly
+but passing through its own hull, to find where it will burst. A burst more than
+6.9 units from the tank's middle, the blast's 5-unit reach past the end of the
+hull, cannot hurt it, and the tank lets the shell fly. Otherwise it drives away
+from the burst until it is out of reach or the shell lands, and waits where it
+stopped until the shell lands. A burst within half a unit of its middle may be
+left either way, toward the shooter first. A shell aimed at the tank's middle
+flies on past it, so the tank usually dodges toward the shooter, under the
+shell.
+
+A dodge keeps to ground the drive check accepts, but only the ground it will
+cross: it stops short of a drop or a step, leaving room to brake, and ignores
+the ground beyond. It stays inside the field and within the distances a moving
+CPU accepts, 6 units closer than its firing range and 8 farther. A tank that
+cannot drive 2 units, or as far as it needs when that is less, stays and fires.
+While it dodges it holds its own shot, and its label reads `dodging`. Any damage
+from the other tank is a hit, so a dodged shell whose blast still catches the
+tank earns a dodge from the next one. Only the CPUs that move after a hit can
+dodge instead; Sweep and Learning do neither. `ScorchedConfig::cpu_dodging`
+turns dodging on for each tank, and `scorched_benchmark --cpu-driving --dodge`
+for both.
+
+In a duel of two Plotting + dodge tanks, the right tank's shell hits the left
+one, which dodges the next shell by driving under it. The shell bursts behind
+it and costs it 6 health:
+
+| The hit | Dodging the next shell | The dodged shell's burst |
+| --- | --- | --- |
+| ![The right tank's shell bursting on the left tank](screenshots/scorched-earth/dodge-800x480-hit.png) | ![The left tank, labelled dodging, driving toward the right tank under its next shell](screenshots/scorched-earth/dodge-800x480-dodging.png) | ![The shell bursting behind the left tank](screenshots/scorched-earth/dodge-800x480-missed.png) |
+
+Each picture keeps the shooter's shell as a trail from its launch. Regenerate
+them with
+`SPACEWARS_SCORCHED_ARTIFACTS=<dir> cargo test --locked --profile ci -p engine-client a_dodging_tank`;
+a relative `<dir>` is taken from the client crate's directory.
+
+### Dodging review, 2026-11-22
+
+The runs are kept locally in `target/scorched-dodge-677/`, with the temporary
+survey example and summary scripts that made them. Each pairing ran 32 ordinary
+duels: seeds 0 to 15 on both shapes, with sprung wheels and footing, each to
+its first kill, which came within 120 s in every duel.
+
+- Plotting + move against itself: tank 1 wins 25 of 32, since tank 0's first
+  shells fly at a tank still closing in, and the first kill comes at a median
+  18.5 s. When one tank dodges instead, it wins 29 of 32 as tank 0 and 31 of 32
+  as tank 1, at 22.4 and 21.9 s. When both dodge, tank 1 wins 22 of 32, at
+  28.0 s.
+- Plotting against Learning: Plotting wins all 32 at 23.2 s. When Plotting
+  dodges, it still wins all 32, at 24.4 s, and takes a median 27 damage in a
+  duel instead of 44. When Learning dodges, it wins 4 of 32, at 30.8 s. When
+  both dodge, Plotting wins all 32 at 31.3 s.
+- Learning + move against itself: tank 0 wins 24 of 32 at 32.3 s. When both
+  dodge, tank 0 wins 15 of 32 at 42.0 s.
+- A Plotting shell that the tank does not dodge does a median 28 to 34 damage.
+  One that it dodges does a median 6 to 7: the shell flies for about 2 s, too
+  short to drive the 5 units or more out of its reach. Learning's shells, less
+  often on target, do a median of 0 to 4 once dodged.
+- The dodging tanks waited for 1,019 shells. They let 35 fly (3%), which would
+  burst out of reach, and found no room or no support for 220 (22%). From the
+  other 764 they drove a median 2.7 units. In 534 of those the shell landed
+  while the tank was still driving, in 89 the tank got out of reach first, and
+  in 141 it stopped short at a drop or a step.
+- Two earlier rules were dropped. Driving away from the shooter took the tank
+  to where a shell aimed at its middle flies on to, and the shell struck the
+  front of the hull. Driving toward the shooter without tracing the shell drove
+  into 37% of Learning's short shells.
 
 ## Tank driving
 

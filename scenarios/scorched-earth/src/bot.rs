@@ -3,6 +3,7 @@ use super::*;
 
 mod aim;
 pub(crate) mod comparison;
+mod dodge;
 mod plot;
 mod position;
 mod priority;
@@ -33,13 +34,45 @@ impl CpuPolicy {
             Self::Plotted => "Plotting + move",
         }
     }
-    pub fn next(self) -> Self {
-        match self {
-            Self::Sweep => Self::Calibrated,
-            Self::Calibrated => Self::Reactive,
-            Self::Reactive => Self::Plotted,
-            Self::Plotted => Self::Sweep,
+    /// Whether a CPU on this policy drives in a fight after it is hit.
+    pub fn moves(self) -> bool {
+        matches!(self, Self::Reactive | Self::Plotted)
+    }
+}
+
+impl ScorchedConfig {
+    /// The name of `player`'s CPU, as the duel's CPU button shows it.
+    pub fn cpu_label(&self, player: usize) -> &'static str {
+        match self.cpu_policy[player] {
+            CpuPolicy::Reactive if self.cpu_dodging[player] => "Learning + dodge",
+            CpuPolicy::Plotted if self.cpu_dodging[player] => "Plotting + dodge",
+            policy => policy.label(),
         }
+    }
+
+    /// Whether `player`'s CPU dodges after a hit: it must move, and have
+    /// dodging on.
+    pub(crate) fn dodges(&self, player: usize) -> bool {
+        self.cpu_dodging[player] && self.cpu_policy[player].moves()
+    }
+
+    /// Moves both tanks to the next CPU on the duel's CPU button.
+    pub(crate) fn next_cpu(&mut self) {
+        const CYCLE: [(CpuPolicy, bool); 6] = [
+            (CpuPolicy::Sweep, false),
+            (CpuPolicy::Calibrated, false),
+            (CpuPolicy::Reactive, false),
+            (CpuPolicy::Reactive, true),
+            (CpuPolicy::Plotted, false),
+            (CpuPolicy::Plotted, true),
+        ];
+        let index = CYCLE
+            .iter()
+            .position(|&cpu| cpu == (self.cpu_policy[0], self.dodges(0)))
+            .expect("every CPU is on the button");
+        let (policy, dodging) = CYCLE[(index + 1) % CYCLE.len()];
+        self.cpu_policy = [policy; 2];
+        self.cpu_dodging = [dodging; 2];
     }
 }
 
@@ -122,6 +155,9 @@ pub(super) struct Bot {
     /// next one begins.
     #[serde(skip_serializing_if = "Option::is_none")]
     plot: Option<Plot>,
+    /// A dodging CPU's dodges, from its first hit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dodging: Option<dodge::Dodging>,
 }
 
 #[derive(Clone, Serialize)]
@@ -182,7 +218,7 @@ impl Bot {
         } else {
             self.aim.confident
         };
-        matches!(policy, CpuPolicy::Reactive | CpuPolicy::Plotted)
+        policy.moves()
             && self.relocation.is_none()
             && self
                 .shot_priority
@@ -236,35 +272,42 @@ impl Bot {
 
     fn drive(&mut self, state: &Duel, physics: &PhysicsWorld, player: usize) -> Option<f32> {
         self.aim.refresh(Geometry::read(state, physics, player));
-        if let Some(move_goal) = &mut self.relocation {
-            let decision = move_goal.goal.decide_in(state, physics, player);
-            if state.tick >= move_goal.deadline
-                || matches!(
-                    decision.mode,
-                    "arrived" | "stalled" | "blocked ground" | "no support"
-                )
-            {
-                let reason = if state.tick >= move_goal.deadline {
-                    "deadline"
-                } else {
-                    decision.mode
-                };
-                self.finish_relocation(state, physics, player, reason);
-                return Some(0.0);
+        // A dodging CPU answers a hit with a dodge instead of a move.
+        if state.config.dodges(player) {
+            if let Some(axis) = self.dodge(state, physics, player) {
+                return Some(axis);
             }
-            self.mode = "relocating after hit";
-            return Some(decision.axis);
-        }
-        if self.protect_correction(state, physics, player) {
-            return Some(0.0);
-        }
-        if self.wants_relocation(state, player) {
-            self.react_to_hit(state, physics, player);
+        } else {
+            if let Some(move_goal) = &mut self.relocation {
+                let decision = move_goal.goal.decide_in(state, physics, player);
+                if state.tick >= move_goal.deadline
+                    || matches!(
+                        decision.mode,
+                        "arrived" | "stalled" | "blocked ground" | "no support"
+                    )
+                {
+                    let reason = if state.tick >= move_goal.deadline {
+                        "deadline"
+                    } else {
+                        decision.mode
+                    };
+                    self.finish_relocation(state, physics, player, reason);
+                    return Some(0.0);
+                }
+                self.mode = "relocating after hit";
+                return Some(decision.axis);
+            }
             if self.protect_correction(state, physics, player) {
                 return Some(0.0);
             }
-            if self.relocation.is_some() {
-                return self.drive(state, physics, player);
+            if self.wants_relocation(state, player) {
+                self.react_to_hit(state, physics, player);
+                if self.protect_correction(state, physics, player) {
+                    return Some(0.0);
+                }
+                if self.relocation.is_some() {
+                    return self.drive(state, physics, player);
+                }
             }
         }
         if state.tick < self.hold_until || self.pending.is_some() {
@@ -334,7 +377,8 @@ impl Duel {
     pub(super) fn bot_allows_fire(&self, player: usize) -> bool {
         !self.calibrated_cpu(player)
             || (self.bots[player].pending.is_none()
-                && (!self.config.cpu_driving || self.bots[player].relocation.is_none())
+                && (!self.config.cpu_driving
+                    || (self.bots[player].relocation.is_none() && !self.bots[player].dodging()))
                 && (self.config.cpu_policy[player] != CpuPolicy::Plotted
                     || self.bots[player].plotted_arc().is_some()))
     }
