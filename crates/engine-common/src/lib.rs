@@ -1181,6 +1181,10 @@ pub struct ClockTanksState {
     /// The two CPUs, as Scorched Earth's bot button names them.
     #[serde(default)]
     pub cpu: [String; 2],
+    /// Whether each CPU is dodging a shell, from when it sets off until the
+    /// shell lands.
+    #[serde(default)]
+    pub dodging: [bool; 2],
     /// Shells the face has stopped.
     #[serde(default)]
     pub face_hits: u32,

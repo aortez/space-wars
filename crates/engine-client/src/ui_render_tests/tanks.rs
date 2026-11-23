@@ -219,22 +219,54 @@ fn record<T>(
     readings
 }
 
-#[test]
-fn tanks_shells_burst_on_the_face_and_knock_cells_loose() {
-    let windows = Rc::new(RefCell::new(Vec::new()));
-    slint::platform::set_platform(Box::new(CapturePlatform(windows.clone()))).unwrap();
-    let ui = MainWindow::new().unwrap();
-    ui.show().unwrap();
-    let output = std::env::var_os("SPACEWARS_TANKS_ARTIFACTS").map(std::path::PathBuf::from);
-    if let Some(path) = &output {
-        std::fs::create_dir_all(path).unwrap();
+/// Draws Tanks fights through the client, and keeps the pictures in the
+/// directory SPACEWARS_TANKS_ARTIFACTS names.
+struct Camera {
+    ui: MainWindow,
+    window: Rc<MinimalSoftwareWindow>,
+    output: Option<std::path::PathBuf>,
+}
+
+impl Camera {
+    fn new() -> Self {
+        let windows = Rc::new(RefCell::new(Vec::new()));
+        slint::platform::set_platform(Box::new(CapturePlatform(windows.clone()))).unwrap();
+        let ui = MainWindow::new().unwrap();
+        ui.show().unwrap();
+        let output = std::env::var_os("SPACEWARS_TANKS_ARTIFACTS").map(std::path::PathBuf::from);
+        if let Some(path) = &output {
+            std::fs::create_dir_all(path).unwrap();
+        }
+        let window = windows.borrow()[0].clone();
+        Self { ui, window, output }
     }
-    let window = windows.borrow()[0].clone();
-    // The frame at tick `to` of the fight at `seed` on a `width` by `height`
-    // screen, with every shell drawn since tick `from` left on it as a trail.
-    let picture = |(width, height): (u32, u32), name: &str, seed: u64, from: usize, to: usize| {
+
+    /// Keeps the frame at tick `to` of the fight at `seed` on a `width` by
+    /// `height` screen as `name`, with every shell drawn since tick `from`
+    /// left on it as a trail.
+    fn picture(
+        &self,
+        (width, height): (u32, u32),
+        name: &str,
+        seed: u64,
+        from: usize,
+        to: usize,
+    ) -> scenario_clock::ClockState {
+        let (state, pixels) = self.frame((width, height), seed, from, to);
+        self.keep(&format!("{width}x{height}-{name}"), &pixels);
+        state
+    }
+
+    /// The frame `picture` keeps, without keeping it.
+    fn frame(
+        &self,
+        (width, height): (u32, u32),
+        seed: u64,
+        from: usize,
+        to: usize,
+    ) -> (scenario_clock::ClockState, SharedPixelBuffer<Rgb8Pixel>) {
         let viewport = Viewport::new(width as f32, height as f32);
-        window.set_size(PhysicalSize::new(width, height));
+        self.window.set_size(PhysicalSize::new(width, height));
         let mut state = face_fight(viewport, seed);
         for _ in 0..from {
             step(&mut state);
@@ -244,8 +276,8 @@ fn tanks_shells_burst_on_the_face_and_knock_cells_loose() {
         let mut pixels = None;
         for tick in from..=to {
             let drawn = draw(
-                &ui,
-                &window,
+                &self.ui,
+                &self.window,
                 &ClockScenario::render_frame(&state),
                 viewport,
                 false,
@@ -264,14 +296,66 @@ fn tanks_shells_burst_on_the_face_and_knock_cells_loose() {
                 *pixel = shell;
             }
         }
-        if let Some(path) = &output {
-            write_png(
-                &path.join(format!("tanks-{width}x{height}-{name}.png")),
-                &pixels,
-            );
+        (state, pixels)
+    }
+
+    /// Writes `pixels` as `tanks-{name}.png`, when there is a directory to
+    /// keep them in.
+    fn keep(&self, name: &str, pixels: &SharedPixelBuffer<Rgb8Pixel>) {
+        if let Some(path) = &self.output {
+            write_png(&path.join(format!("tanks-{name}.png")), pixels);
         }
-        state
-    };
+    }
+}
+
+/// Where `point`, in thousandths of a world unit, falls on a `width` by
+/// `height` screen.
+fn on_screen(
+    state: &scenario_clock::ClockState,
+    (width, height): (u32, u32),
+    point: [i32; 2],
+) -> [f32; 2] {
+    let camera = ClockScenario::render_frame(state).camera;
+    let scale = height as f32 / camera.height;
+    [
+        width as f32 / 2.0 + (point[0] as f32 / 1000.0 - camera.center.x) * scale,
+        height as f32 / 2.0 - (point[1] as f32 / 1000.0 - camera.center.y) * scale,
+    ]
+}
+
+/// The patch of each frame around `centre`, side by side and four times
+/// larger.
+fn zoom(
+    frames: [&SharedPixelBuffer<Rgb8Pixel>; 2],
+    centre: [f32; 2],
+) -> SharedPixelBuffer<Rgb8Pixel> {
+    const PATCH: (usize, usize) = (100, 40);
+    const SCALE: usize = 4;
+    const GAP: usize = 8;
+    let (width, height) = (PATCH.0 * SCALE, PATCH.1 * SCALE);
+    let mut zoomed = SharedPixelBuffer::<Rgb8Pixel>::new((2 * width + GAP) as u32, height as u32);
+    let stride = zoomed.width() as usize;
+    let pixels = zoomed.make_mut_slice();
+    for (side, frame) in frames.into_iter().enumerate() {
+        let (frame_width, frame_height) = (frame.width() as usize, frame.height() as usize);
+        let left = (centre[0].round() as usize).saturating_sub(PATCH.0 / 2);
+        let top = (centre[1].round() as usize).saturating_sub(PATCH.1 / 2);
+        for y in 0..height {
+            for x in 0..width {
+                let source_x = (left + x / SCALE).min(frame_width - 1);
+                let source_y = (top + y / SCALE).min(frame_height - 1);
+                pixels[y * stride + side * (width + GAP) + x] =
+                    frame.as_slice()[source_y * frame_width + source_x];
+            }
+        }
+    }
+    zoomed
+}
+
+#[test]
+fn tanks_shells_burst_on_the_face_and_knock_cells_loose() {
+    let camera = Camera::new();
+    let picture = |size, name, seed, from, to| camera.picture(size, name, seed, from, to);
 
     // On the Picade's 4:3 and the HyperPixel's 5:3 alike.
     for size in [(1024, 768), (800, 480)] {
@@ -316,5 +400,65 @@ fn tanks_shells_burst_on_the_face_and_knock_cells_loose() {
                 .unwrap();
         let state = picture(size, "plotted-pass", 3, first, landed + 8);
         assert_eq!(state.tanks_state().unwrap().face_hits, 0);
+    }
+}
+
+#[test]
+fn tanks_dodge_the_next_shell_after_a_hit() {
+    let camera = Camera::new();
+    // On the Picade's 4:3, a plotting tank that dodges against one that moves
+    // after hits. On the HyperPixel's 5:3, two plotting tanks that dodge.
+    for (size, seed, cpu) in [
+        ((1024, 768), 33, ["Plotting + dodge", "Plotting + move"]),
+        ((800, 480), 234, ["Plotting + dodge", "Plotting + dodge"]),
+    ] {
+        let viewport = Viewport::new(size.0 as f32, size.1 as f32);
+        let state = face_fight(viewport, seed);
+        assert_eq!(state.tanks_state().unwrap().cpu, cpu);
+        let ticks = record(state, |tanks| {
+            (tanks.health_milli, tanks.dodging, tanks.positions_milli)
+        });
+        // The fight's first dodge, from when the tank sets off until the shell
+        // lands.
+        let started = ticks
+            .iter()
+            .position(|(_, dodging, _)| dodging.contains(&true))
+            .expect("a tank dodged");
+        let dodger = ticks[started]
+            .1
+            .iter()
+            .position(|&dodging| dodging)
+            .unwrap();
+        let landed = started
+            + ticks[started..]
+                .iter()
+                .position(|(_, dodging, _)| !dodging[dodger])
+                .unwrap();
+        // Eight ticks on, the burst still shows and its damage is done.
+        let burst = landed + 8;
+        // The hit that set it off cost the tank more than three times what the
+        // dodged shell did.
+        let health = |i: usize| ticks[i].0[dodger];
+        let hit = (1..started)
+            .rev()
+            .find(|&i| health(i) < health(i - 1))
+            .unwrap();
+        let dodged = health(started) - health(burst);
+        let struck = health(hit - 1) - health(hit);
+        assert!(3 * dodged < struck, "{dodged} of {struck}");
+
+        // The frames as the tank sets off and as the dodged shell bursts, with
+        // every shell fired since the hit left as a trail. The burst is kept
+        // whole, and both frames as a patch around the tank's way.
+        let (state, setting_off) = camera.frame(size, seed, hit, started);
+        let (_, bursting) = camera.frame(size, seed, hit, burst);
+        let [from, to] = [started, burst].map(|i| on_screen(&state, size, ticks[i].2[dodger]));
+        let middle = [(from[0] + to[0]) / 2.0, (from[1] + to[1]) / 2.0];
+        let name = format!("{}x{}", size.0, size.1);
+        camera.keep(&format!("{name}-dodged"), &bursting);
+        camera.keep(
+            &format!("{name}-dodge-zoom"),
+            &zoom([&setting_off, &bursting], middle),
+        );
     }
 }

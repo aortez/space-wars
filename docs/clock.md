@@ -1199,14 +1199,18 @@ reservation is separate from the existing visitor combinations; inspection
 reports the capacity for the current composition. Residents keep their bodies
 and world, and cleanup removes only identities in the Tanks namespace.
 
-Each fight's seed sends in two of Scorched Earth's CPUs: Plotting + move
-against itself, or against Learning + move on either side
+Each fight's seed sends in two of Scorched Earth's CPUs: Plotting against
+itself, or against Learning on either side
 ([Plotted aim](scorched-earth.md#plotted-aim)). Every three seeds, the other
-side fires first. The CPUs hold 72–88 units apart, where Scorched Earth's own
-range is 18–32: a learning CPU's 50° arc rises about 0.3 of the range, and the
-face starts about 17 units over the hills, so closer arcs pass under it. Fire
-is held while the tanks drive to that range, for at most 12 s. The face stops
-shells. One
+side fires first. Each side dodges the next shell after a hit in half the
+fights, as Plotting + dodge or Learning + dodge, and moves after hits in the
+rest, as Plotting + move or Learning + move
+([CPU dodging](scorched-earth.md#cpu-dodging)). Every 24 seeds, each pairing
+opens from either side with neither tank, either one or both dodging. The CPUs
+hold 72–88 units apart, where Scorched Earth's own range is 18–32: a learning
+CPU's 50° arc rises about 0.3 of the range, and the face starts about 17 units
+over the hills, so closer arcs pass under it. Fire is held while the tanks
+drive to that range, for at most 12 s. The face stops shells. One
 fixed body holds a box for every lit digit cell, both colon cells, even while
 the colon blinks off, and each AM/PM pixel, and the body is rebuilt when the
 reading changes or a cell comes loose. A shell is a ray each tick, so it
@@ -1238,7 +1242,7 @@ ones `interrupted`, as any event cut short does.
 | `raising` | 2 s | Physical hills rise from beneath the floor. |
 | `beam-down` | 2 s, plus at most one 2 s retry | Tanks descend from above the frame, through clear digit gaps, to supported hill positions. A reading/font change that closes a lane replans and restarts transport; a second closure withdraws. |
 | `settling` | 2 s | Both hulls must actually be upright and supported before driving or firing. Failure withdraws the hills. |
-| `fighting` | 60 s | Fire is held while the tanks drive to their range, for at most 12 s. Then shared CPU driving, swept shells that burst on the lit face and knock cells loose, craters, loose dirt and weak-bank collapse. |
+| `fighting` | 60 s | Fire is held while the tanks drive to their range, for at most 12 s. Then shared CPU driving and dodging, swept shells that burst on the lit face and knock cells loose, craters, loose dirt and weak-bank collapse. |
 | `finishing-shots` | 10 s | No new driving or fire; existing shells finish before deciding the result. |
 | `crumbling` | 1 s | Each in-view loser becomes physical dirt at its actual pose. |
 | `beam-up` | 2 s | Surviving winners depart. |
@@ -1314,6 +1318,44 @@ The same survey, run again with cells coming loose, found:
   percentile, within noise: 1.18 ms both ways at 4:3, and 0.94 ms against
   0.90 ms at 5:3.
 
+The survey, run again over 120 seeds at each shape, once with each seed's
+dodgers and once with none, found:
+
+- Except in portrait, most dodges fall short. Dodging tanks drove a median
+  of 1.3 units at 4:3, 1.5 at 5:3, 2.4 at 16:9 and 2.3 at 4:1, and 3.9 in
+  portrait. At 4:3, 5:3 and 16:9, of the 705 shells that dodging tanks waited
+  for, they let 18 fly and found no room or no support for 207; of the 480
+  dodges they drove, 157 stopped at a step the drive check finds too high and
+  61 at a drop. In Scorched Earth's own duels, where the tanks ride sprung
+  wheels, dodges drove a median of 2.7 units and 22% found no room or no
+  support; Clock's tanks have rigid hulls.
+- A Plotting shell that a tank dodged did a median of 24–26 damage at 4:3,
+  5:3, 16:9 and 4:1, against 26.5–33 for Plotting's hits on tanks that don't
+  dodge, and 4.4 in portrait, against 32. Where the tank drove 2 units or
+  more, the shell did a median of 4.0–5.4 at every shape.
+- Fights ran a little longer. The first kill came at a median of 20.4 s at
+  4:3, 23.7 s at 5:3, 25.9 s at 16:9, 22.9 s in portrait and 22.5 s at 4:1,
+  against 18.3, 22.9, 25.2, 19.9 and 18.8 s with no dodgers. Five fights with
+  dodgers ran the full minute, four of them at 16:9, against none with no
+  dodgers; in each, a dodging Learning tank held out against Plotting. A
+  sixth, at 4:3, is a draw at full health that runs the full minute either
+  way.
+- In plotting mirrors at 4:3, 5:3 and 16:9, a lone dodger won 28 of the 44
+  fights that had a winner. Plotting won 234 of the 235 fights there against
+  Learning that had a winner, whoever dodged. In portrait and at 4:1, Learning
+  won 5 of 33 when it alone dodged, against 2 of 34 with no dodgers.
+- A shell that bursts on the ground instead of a tank throws more dirt loose.
+  At the busiest moment of a fight, a median of 29–65 grains lay loose,
+  depending on the screen, against 26–51 with no dodgers, and at most 143,
+  against 112. Battle debris may use 144.
+- On the development workstation, two fights at a time, the 99th-percentile
+  tick, as a median over each shape's fights, was 1.2–1.3 ms at 4:3, 5:3 and
+  16:9 with dodgers, against 1.1–1.3 ms with none, 1.7 ms in portrait against
+  1.4 ms, and 2.0 ms at 4:1 against 1.9 ms. With dodgers, 14 of the 600
+  fights had a 99th-percentile tick over 4 ms, against none with no dodgers,
+  and the slowest tick was 9.2 ms, at 16:9, against 7.1 ms. It has not been
+  timed on a Pi.
+
 The run data stays local.
 
 | | Learning + move bursts a shell on the face | Plotting + move shoots under it |
@@ -1336,10 +1378,24 @@ fight ends, every cell still loose flies home from where it lies.
 `SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
 engine-client tanks_shells_burst_on_the_face` regenerates all ten.
 
+| | The dodged shell bursts | Setting off, then the burst, four times larger |
+| --- | --- | --- |
+| 1024×768 | ![The left tank up the slope, with the shell it dodged bursting where it stood](screenshots/clock/tanks-1024x768-dodged.png) | ![The left tank on the slope, then higher up it, with the burst where it stood](screenshots/clock/tanks-1024x768-dodge-zoom.png) |
+| 800×480 | ![The right tank moved left, with the shell it dodged bursting where it stood](screenshots/clock/tanks-800x480-dodged.png) | ![The right tank, then 4 units to the left, with the burst where it stood](screenshots/clock/tanks-800x480-dodge-zoom.png) |
+
+At 4:3, a 29-damage hit sends the left tank, Plotting + dodge, 3.3 units up
+the slope toward the shooter, and the next shell bursts where it stood, for 4
+damage. At 5:3, the right tank, also Plotting + dodge, drives 4.0 units toward
+the shooter after a 33-damage hit, and the next shell does 4. Each picture
+keeps every shell fired since the hit as a trail.
+`SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
+engine-client tanks_dodge_the_next_shell` regenerates all four.
+
 `clock state` includes phase, support, world positions, hull and terrain IDs,
-health, the two CPUs (`cpu`), shell/shot counts, the shells the face stopped
-(`face_hits`), the cells they knocked loose (`knocked_loose`), conversion
-accounting and any settling failure in `tanks`.
+health, the two CPUs (`cpu`), whether each is dodging a shell (`dodging`),
+shell/shot counts, the shells the face stopped (`face_hits`), the cells they
+knocked loose (`knocked_loose`), conversion accounting and any settling
+failure in `tanks`.
 Values with a `_milli` suffix use thousandths of their inspection
 unit (positions, area and mass use host units). The common damage-material migration
 and damage to resident plants remain follow-up work: this integration uses Scorched's current tank HP rule and does

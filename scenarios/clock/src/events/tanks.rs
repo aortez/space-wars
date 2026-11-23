@@ -70,6 +70,7 @@ pub fn config(shape: GrainShape, seed: u64) -> ScorchedConfig {
         shape,
         max_grains: MAX_GRAINS,
         demo: true,
+        cpu_dodging: dodging(seed),
         cpu_driving: true,
         cpu_policy: policies(seed),
         cpu_range: RANGE,
@@ -90,6 +91,13 @@ pub fn policies(seed: u64) -> [CpuPolicy; 2] {
         1 => [CpuPolicy::Plotted, CpuPolicy::Reactive],
         _ => [CpuPolicy::Reactive, CpuPolicy::Plotted],
     }
+}
+
+/// Which of the CPUs a fight's seed sends in dodge after a hit. Each side
+/// dodges in half the fights, so every 24 seeds each pairing opens from either
+/// side with each mix of dodgers.
+pub fn dodging(seed: u64) -> [bool; 2] {
+    [seed / 6 % 2 == 1, seed / 12 % 2 == 1]
 }
 
 mod damage;
@@ -150,7 +158,8 @@ pub struct TanksEvent {
     layout: Layout,
     digits: digits::Solids,
     damage: damage::Damage,
-    policies: [CpuPolicy; 2],
+    /// The CPUs' names, as Scorched Earth's CPU button shows them.
+    cpu: [&'static str; 2],
     ground: BodyId,
     spawn: [(BodyId, BodyMotion); 2],
     departure: Vec<(BodyId, BodyMotion)>,
@@ -181,8 +190,9 @@ impl TanksEvent {
             GrainShape::Hexagon
         };
         let world = arena.claim_resident(OWNER, layout);
-        let policies = policies(seed);
-        let mut duel = match HostedDuel::attach(world, config(shape, seed), seed, place) {
+        let config = config(shape, seed);
+        let cpu = [config.cpu_label(0), config.cpu_label(1)];
+        let mut duel = match HostedDuel::attach(world, config, seed, place) {
             Ok(duel) => duel,
             Err(_) => {
                 arena.release(OWNER);
@@ -228,7 +238,7 @@ impl TanksEvent {
             layout,
             digits,
             damage,
-            policies,
+            cpu,
             ground,
             spawn,
             departure: Vec::new(),
@@ -665,7 +675,8 @@ impl TanksEvent {
                 * (0.5 * self.duel.placement().scale).powi(2))
             .round() as u32,
             entry_failure: self.entry_failure.map(str::to_owned),
-            cpu: self.policies.map(|policy| policy.label().to_owned()),
+            cpu: self.cpu.map(str::to_owned),
+            dodging: self.duel.dodging(),
             face_hits: self.face_hits,
             knocked_loose: self.damage.knocked_loose(),
         }

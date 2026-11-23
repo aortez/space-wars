@@ -200,6 +200,11 @@ impl Bot {
 }
 
 impl Duel {
+    /// Whether each tank's CPU is dodging a shell.
+    pub(crate) fn dodging(&self) -> [bool; 2] {
+        self.bots.each_ref().map(Bot::dodging)
+    }
+
     /// The first shell the other tank fired at `tick` or later that is still
     /// in flight.
     fn incoming(&self, player: usize, tick: u64) -> Option<&Shell> {
