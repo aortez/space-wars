@@ -1184,6 +1184,9 @@ pub struct ClockTanksState {
     /// Shells the face has stopped.
     #[serde(default)]
     pub face_hits: u32,
+    /// Digit cells the shells have knocked loose.
+    #[serde(default)]
+    pub knocked_loose: u32,
 }
 
 /// One of the two lamps in the upper corners of the Clock's frame.

@@ -78,6 +78,7 @@ pub(super) fn spec(tuning: WheelTuning) -> RoverSpec {
         wheel_motor_torque: tuning.motor_torque,
         wheel_brake_torque: 120.0,
         wheel_motor_damping: tuning.motor_damping,
+        collision_groups: crate::host::FIGHT,
         ..Default::default()
     }
 }

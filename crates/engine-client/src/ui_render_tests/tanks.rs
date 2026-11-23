@@ -220,7 +220,7 @@ fn record<T>(
 }
 
 #[test]
-fn tanks_shells_burst_on_the_face_in_front_of_it() {
+fn tanks_shells_burst_on_the_face_and_knock_cells_loose() {
     let windows = Rc::new(RefCell::new(Vec::new()));
     slint::platform::set_platform(Box::new(CapturePlatform(windows.clone()))).unwrap();
     let ui = MainWindow::new().unwrap();
@@ -290,6 +290,18 @@ fn tanks_shells_burst_on_the_face_in_front_of_it() {
             .expect("the face stopped a shell");
         let state = picture(size, "face-burst", 2, hit.saturating_sub(150), hit + 8);
         assert_eq!(state.tanks_state().unwrap().face_hits, 1);
+        assert!((1..=3).contains(&state.tanks_state().unwrap().knocked_loose));
+
+        // Half a second after the burst, the cells it knocked loose fly off
+        // the face, and their holes show. Seven seconds on they lie on the
+        // hills.
+        picture(size, "cells-loose", 2, hit.saturating_sub(150), hit + 30);
+        picture(size, "cells-landed", 2, hit + 420, hit + 420);
+        // Halfway through the return as the fight ends, the cells still
+        // loose fly home.
+        let end = hits.len();
+        let state = picture(size, "cells-fly-home", 2, end + 45, end + 45);
+        assert!(state.tanks_state().unwrap().result.is_some());
 
         // Two plotting tanks' first shots, until both land, clear of the
         // face.

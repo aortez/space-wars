@@ -529,7 +529,7 @@ impl ActiveEvent {
     ) -> bool {
         match self {
             Self::Grass(event) => event.step(),
-            Self::Tanks(event) => event.step(arena, context.display),
+            Self::Tanks(event) => event.step(arena, context.display, context.surfaces),
             Self::Aquarium(event) => event.step(context, visit, arena),
             Self::Falling(event) => event.step(context),
             Self::Explosion(event) | Self::Coins(event) => {
@@ -563,7 +563,7 @@ impl ActiveEvent {
         debug_assert!(self.shares_visit_arena());
         match self {
             Self::Aquarium(event) => event.observe(visit, arena),
-            Self::Tanks(event) => event.observe(arena),
+            Self::Tanks(event) => event.observe(context, arena),
             Self::Falling(event) => event.observe(context, arena),
             Self::Explosion(event) | Self::Coins(event) => {
                 event.observe(context, arena);
@@ -685,6 +685,7 @@ impl ActiveEvent {
             Self::Falling(event) => event.surfaces(layout, segments, out),
             Self::Meltdown(event) => event.surfaces(layout, out),
             Self::SlotMachine(event) => event.surfaces(layout, out),
+            Self::Tanks(event) => event.surfaces(layout, out),
             _ => (),
         }
     }
@@ -706,6 +707,7 @@ impl ActiveEvent {
             Self::Marquee(event) => event.release_surfaces(surfaces),
             Self::Meltdown(event) => event.release_surfaces(segments, surfaces),
             Self::SlotMachine(event) => event.release_surfaces(surfaces),
+            Self::Tanks(event) => event.release_surfaces(surfaces),
             _ => (),
         }
     }

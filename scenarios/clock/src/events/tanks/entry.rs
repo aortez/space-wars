@@ -4,8 +4,9 @@ use crate::digits::DisplaySnapshot;
 pub const BEAM_HALF_WIDTH: f32 = 2.1;
 
 /// Project the face's cells onto x: a lane must pass every row of the face.
+/// The tanks arrive before any shell flies, so the face is whole.
 fn ink(layout: Layout, display: DisplaySnapshot) -> Vec<[f32; 2]> {
-    super::digits::cells(layout, display)
+    super::digits::cells(layout, display, [None; crate::DIGIT_SLOT_COUNT])
         .into_iter()
         .map(|cell| [cell.center.x - cell.half, cell.center.x + cell.half])
         .collect()

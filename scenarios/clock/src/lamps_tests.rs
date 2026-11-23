@@ -240,8 +240,9 @@ const HOT_AFTER_SECONDS: u32 = 10;
 fn a_bulb_goes_out_after_long_bright_work_and_the_lamps_never_move_the_scene() {
     use ClockLampActivity::{Out, Track};
     // Demo at this seed overheats a bulb during an event in its second
-    // minute.
-    let seed = 12;
+    // minute. Its run holds no Tanks fight, so tuning the duel cannot move
+    // it.
+    let seed = 23;
     let mut lively = clock(ClockEventProfile::Demo, ClockLampMode::Lively, seed);
     let mut again = clock(ClockEventProfile::Demo, ClockLampMode::Lively, seed);
     let mut steady = clock(ClockEventProfile::Demo, ClockLampMode::Steady, seed);

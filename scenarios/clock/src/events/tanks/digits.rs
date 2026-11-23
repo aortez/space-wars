@@ -1,10 +1,16 @@
 //! The face as the duel meets it: one fixed body with a box for every lit
-//! digit cell, both colon cells and the AM/PM pixels, rebuilt when the reading
-//! changes. Rays meet the boxes, so shells burst on them and a plotting CPU
-//! plots around them. Contacts with them push nothing, so dirt and tanks pass
-//! the face as they always have.
+//! digit cell that stands, both colon cells and the AM/PM pixels, rebuilt when
+//! the reading changes or a cell comes loose. Rays meet the boxes, so shells
+//! burst on them and a plotting CPU plots around them. Contacts with them push
+//! nothing, so dirt and tanks pass the face as they always have.
 use super::*;
-use crate::{digit_surfaces::CELL_HALF, digits::DisplaySnapshot, fonts, meridiem};
+use crate::{
+    DIGIT_SLOT_COUNT,
+    digit_surfaces::CELL_HALF,
+    digits::DisplaySnapshot,
+    fonts::{self, CellMask},
+    meridiem,
+};
 use engine_rapier::world::{BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec};
 
 pub(super) const BODY: PhysicsId = PhysicsId::new(canonical::TANKS_DIGITS.start);
@@ -26,11 +32,17 @@ pub struct Cell {
 }
 
 /// The squares the face draws for `display`: the lit digit cells, both colon
-/// cells even while the colon blinks off, and the AM/PM pixels.
-pub fn cells(layout: Layout, display: DisplaySnapshot) -> Vec<Cell> {
+/// cells even while the colon blinks off, and the AM/PM pixels. A digit the
+/// shells have damaged has only the cells `standing` gives it.
+pub fn cells(
+    layout: Layout,
+    display: DisplaySnapshot,
+    standing: [Option<CellMask>; DIGIT_SLOT_COUNT],
+) -> Vec<Cell> {
     let mut cells = Vec::new();
     for (slot, digit) in display.digits.into_iter().enumerate() {
-        for cell in fonts::glyph(display.font, digit).cells() {
+        let lit = standing[slot].unwrap_or_else(|| fonts::glyph(display.font, digit));
+        for cell in lit.cells() {
             cells.push(Cell {
                 center: layout.slot_cell_center(slot, cell),
                 half: CELL_HALF * layout.pitch,
@@ -67,15 +79,16 @@ pub struct Solids {
 
 impl Solids {
     /// Builds the boxes for `display`, or rebuilds them when its cells differ
-    /// from the last: a new minute, font or time format. The colon's blinking
-    /// changes nothing.
+    /// from the last: a new minute, font or time format, or a cell come
+    /// loose. The colon's blinking changes nothing.
     pub fn synchronize(
         &mut self,
         world: &mut PhysicsWorld,
         layout: Layout,
         display: DisplaySnapshot,
+        standing: [Option<CellMask>; DIGIT_SLOT_COUNT],
     ) {
-        let cells = cells(layout, display);
+        let cells = cells(layout, display, standing);
         if cells == self.cells {
             return;
         }

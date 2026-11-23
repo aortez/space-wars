@@ -1,8 +1,12 @@
 //! Visual return paths after the physics batch is retired. Keep unchanged cell
 //! destinations, then deterministically reuse spare blocks for the latest face.
 //! This is bounded choreography, not another physics world or a path planner.
+//! Explosion and Coins bring the whole face home; Tanks brings home one
+//! damaged digit at a time.
 use super::{Cell, Home, MAX_EXPLOSION_CELLS, REFORMING_TICKS};
 use crate::{
+    DIGIT_SLOT_COUNT,
+    digit_surfaces::{Retirement, SurfaceId, SurfaceLedger, SurfaceSource},
     digits::{self, DisplaySnapshot},
     layout::Layout,
     meridiem::{Glyph, PIXEL_SIZE},
@@ -22,9 +26,50 @@ struct Target {
     home: Option<Home>,
 }
 
+/// The part of the face a return brings home: some of its digits, and its
+/// AM/PM pixels or not.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Scope {
+    slots: [bool; DIGIT_SLOT_COUNT],
+    meridiem: bool,
+}
+
+impl Scope {
+    /// Every digit and the AM/PM pixels.
+    pub(crate) const FACE: Self = Self {
+        slots: [true; DIGIT_SLOT_COUNT],
+        meridiem: true,
+    };
+
+    /// One digit alone.
+    pub(crate) const fn slot(slot: usize) -> Self {
+        let mut slots = [false; DIGIT_SLOT_COUNT];
+        slots[slot] = true;
+        Self {
+            slots,
+            meridiem: false,
+        }
+    }
+
+    /// Whether the part of `display` this scope covers differs from `last`'s.
+    fn changed(self, last: DisplaySnapshot, display: DisplaySnapshot) -> bool {
+        last.font != display.font
+            || (0..DIGIT_SLOT_COUNT)
+                .any(|slot| self.slots[slot] && last.digits[slot] != display.digits[slot])
+            || (self.meridiem && last.meridiem != display.meridiem)
+    }
+}
+
+/// The surface a digit block carries.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Piece {
+    pub id: SurfaceId,
+    pub departing: bool,
+}
+
 /// Where the return is taking one block.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Destination {
+pub(crate) enum Destination {
     Cell(Home),
     /// An AM/PM pixel.
     Label,
@@ -41,16 +86,20 @@ struct Flight {
     started: u64,
 }
 
-pub(super) struct Reassembly {
+pub(crate) struct Reassembly {
+    scope: Scope,
     display: DisplaySnapshot,
     flights: Vec<Flight>,
 }
 
-fn targets(display: DisplaySnapshot, layout: Layout) -> Vec<Target> {
+fn targets(scope: Scope, display: DisplaySnapshot, layout: Layout) -> Vec<Target> {
     let mut targets = Vec::with_capacity(MAX_EXPLOSION_CELLS);
     let mut segments = digits::create_segments();
     digits::apply_snapshot(&mut segments, display);
-    for segment in segments.iter().filter(|segment| segment.lit) {
+    for segment in segments
+        .iter()
+        .filter(|segment| segment.lit && scope.slots[usize::from(segment.id.digit_slot)])
+    {
         for cell in segment.cells() {
             targets.push(Target {
                 position: layout.cell_center(segment.id, cell),
@@ -60,7 +109,12 @@ fn targets(display: DisplaySnapshot, layout: Layout) -> Vec<Target> {
             });
         }
     }
-    for glyph in display.meridiem.into_iter().flat_map(Glyph::for_label) {
+    for glyph in display
+        .meridiem
+        .filter(|_| scope.meridiem)
+        .into_iter()
+        .flat_map(Glyph::for_label)
+    {
         for cell in glyph.cells() {
             targets.push(Target {
                 position: glyph.cell_center(layout, cell),
@@ -75,8 +129,20 @@ fn targets(display: DisplaySnapshot, layout: Layout) -> Vec<Target> {
 }
 
 impl Reassembly {
-    pub(super) fn new(cells: &mut Vec<Cell>, display: DisplaySnapshot, layout: Layout) -> Self {
+    /// The whole face's return.
+    pub(crate) fn new(cells: &mut Vec<Cell>, display: DisplaySnapshot, layout: Layout) -> Self {
+        Self::within(Scope::FACE, cells, display, layout)
+    }
+
+    /// The return of the part of the face `scope` covers.
+    pub(crate) fn within(
+        scope: Scope,
+        cells: &mut Vec<Cell>,
+        display: DisplaySnapshot,
+        layout: Layout,
+    ) -> Self {
         let mut result = Self {
+            scope,
             display,
             flights: cells
                 .iter()
@@ -97,18 +163,16 @@ impl Reassembly {
         result
     }
 
-    pub(super) fn synchronize(
+    pub(crate) fn synchronize(
         &mut self,
         cells: &mut Vec<Cell>,
         display: DisplaySnapshot,
         layout: Layout,
         tick: u64,
     ) {
-        // The colon blinks independently; seconds must not restart flight paths.
-        if self.display.font != display.font
-            || self.display.digits != display.digits
-            || self.display.meridiem != display.meridiem
-        {
+        // The colon blinks independently; seconds must not restart flight
+        // paths, and nor may a reading outside the return's scope.
+        if self.scope.changed(self.display, display) {
             self.retarget(cells, display, layout, tick);
         }
     }
@@ -120,7 +184,7 @@ impl Reassembly {
         layout: Layout,
         tick: u64,
     ) {
-        let targets = targets(display, layout);
+        let targets = targets(self.scope, display, layout);
         let mut claimed = vec![false; targets.len()];
         let mut used = vec![false; cells.len()];
         // Preserve both identity and trajectory for every still-needed slot.
@@ -220,7 +284,7 @@ impl Reassembly {
     }
 
     /// Where block `index` is going, in the order of the event's blocks.
-    pub(super) fn destination(&self, index: usize) -> Destination {
+    pub(crate) fn destination(&self, index: usize) -> Destination {
         let flight = &self.flights[index];
         match (flight.assigned, flight.target.home) {
             (false, _) => Destination::Merging,
@@ -229,7 +293,42 @@ impl Reassembly {
         }
     }
 
-    pub(super) fn sample(&self, cells: &mut [Cell], tick: u64) {
+    /// Brings every block's surface, in `pieces`, up to where the return is
+    /// taking it. A block coming home to a digit cell keeps the surface it
+    /// has, whichever cell that is; one with none, or with one already
+    /// departing, gets a new surface for that cell. A block that turns into an
+    /// AM/PM pixel gives its surface up, and a surplus block's surface departs
+    /// as it shrinks away.
+    pub(crate) fn assign(&self, pieces: &mut Vec<Option<Piece>>, surfaces: &mut SurfaceLedger) {
+        pieces.resize(self.flights.len(), None);
+        for (index, piece) in pieces.iter_mut().enumerate() {
+            let surviving = piece.is_some_and(|piece| !piece.departing);
+            match self.destination(index) {
+                Destination::Cell(_) if surviving => (),
+                Destination::Cell((slot, cell)) => {
+                    if let Some(old) = piece.take() {
+                        surfaces.retire(old.id, Retirement::Replaced);
+                    }
+                    *piece = Some(Piece {
+                        id: surfaces.admit(slot, cell, SurfaceSource::Return),
+                        departing: false,
+                    });
+                }
+                Destination::Label => {
+                    if let Some(old) = piece.take() {
+                        surfaces.retire(old.id, Retirement::Replaced);
+                    }
+                }
+                Destination::Merging => {
+                    if let Some(piece) = piece {
+                        piece.departing = true;
+                    }
+                }
+            }
+        }
+    }
+
+    pub(crate) fn sample(&self, cells: &mut [Cell], tick: u64) {
         for (cell, flight) in cells.iter_mut().zip(&self.flights) {
             let t = (tick.saturating_sub(flight.started) as f32
                 / (REFORMING_TICKS - flight.started).max(1) as f32)

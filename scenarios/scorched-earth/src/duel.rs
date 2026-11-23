@@ -19,6 +19,7 @@ pub(crate) fn shell_ray(
         movement,
         RayCastOptions {
             max_distance: movement.length() * placement.scale,
+            collision_groups: host::FIGHT,
             exclude_entity: (age < 8).then_some(shooter),
             ..Default::default()
         },
@@ -176,6 +177,7 @@ impl Duel {
             }
             collider.density = 8.0;
             collider.friction = 1.0;
+            collider.collision_groups = host::FIGHT;
             let position = Vec2::new(
                 x,
                 if let Some(course) = config.course {

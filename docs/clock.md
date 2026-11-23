@@ -1209,18 +1209,36 @@ is held while the tanks drive to that range, for at most 12 s. The face stops
 shells. One
 fixed body holds a box for every lit digit cell, both colon cells, even while
 the colon blinks off, and each AM/PM pixel, and the body is rebuilt when the
-reading changes. A shell is a ray each tick, so it bursts on the first box it
-meets, and a plotting tank's trial shells find the arcs that pass the face.
-The boxes push nothing, so dirt and tanks pass through the face as before.
-Shells and their bursts are drawn in front of the face, up to the canopy, and a
-shell flies on until it leaves the frame.
+reading changes or a cell comes loose. A shell is a ray each tick, so it
+bursts on the first box it meets, and a plotting tank's trial shells find the
+arcs that pass the face. The boxes push nothing, so dirt and tanks pass
+through the face as before. Shells and their bursts are drawn in front of the
+face, up to the canopy, and a shell flies on until it leaves the frame.
+
+A shell that bursts on the face knocks loose the lit digit cells within 1.2
+grid units of the burst: the cell it struck and those beside the spot. The
+colon and the AM/PM letters stop shells but never come loose. A digit gives up
+a cell only while every lit segment the cell is in keeps at least half its
+cells, and at most 12 cells lie loose at once, so the face still reads. Where a
+cell came loose the face draws a dim cell and holds no box, so later shells fly
+through the hole, and a plotting tank's trial shells can find it. Each loose
+cell is a block in the duel's [scenery](scorched-earth.md#host-owned-duel), as
+heavy as the dirt: the burst throws it onto the hills, where it comes to rest,
+and the tanks and shells pass through it. A block that falls out of view stops
+there. Each block carries its cell's digit surface. A damaged digit re-forms
+when its reading changes, and every cell still loose flies home over the 1.5 s
+after the result is latched, while the loser crumbles and the winners beam up.
+Both follow Exploding digits' return: each cell starts from where it lies or
+stands, and none appears in its place. A fight cut short, by a resize or a
+cancel, gives the face back the cells that still stand and retires the loose
+ones `interrupted`, as any event cut short does.
 
 | Phase | Maximum time | Behavior |
 | --- | --- | --- |
 | `raising` | 2 s | Physical hills rise from beneath the floor. |
 | `beam-down` | 2 s, plus at most one 2 s retry | Tanks descend from above the frame, through clear digit gaps, to supported hill positions. A reading/font change that closes a lane replans and restarts transport; a second closure withdraws. |
 | `settling` | 2 s | Both hulls must actually be upright and supported before driving or firing. Failure withdraws the hills. |
-| `fighting` | 60 s | Fire is held while the tanks drive to their range, for at most 12 s. Then shared CPU driving, swept shells that burst on the lit face, craters, loose dirt and weak-bank collapse. |
+| `fighting` | 60 s | Fire is held while the tanks drive to their range, for at most 12 s. Then shared CPU driving, swept shells that burst on the lit face and knock cells loose, craters, loose dirt and weak-bank collapse. |
 | `finishing-shots` | 10 s | No new driving or fire; existing shells finish before deciding the result. |
 | `crumbling` | 1 s | Each in-view loser becomes physical dirt at its actual pose. |
 | `beam-up` | 2 s | Surviving winners depart. |
@@ -1276,6 +1294,26 @@ vary with the seed, and 60 more at 5:3 in 12-hour time:
   at 4:3, 5:3 and 16:9, 1.4 ms in portrait and 1.8 ms at 4:1. The slowest
   tick was 8.2 ms, at 4:1. It has not been timed on a Pi.
 
+The same survey, run again with cells coming loose, found:
+
+- Between 33% and 45% of the shells that burst on the face knocked nothing
+  loose: they burst where a segment had already lost half its cells. The rest
+  knocked one cell or two loose, and once three. A fight with face hits lost
+  a median of 2.5 to 4 cells, depending on the screen, and at most 6. No more
+  than 6 lay loose at once.
+- Four in five loose cells came to rest before going home. They came to
+  rest a median of 5.0–5.3 s after the burst, most of it the fall from the
+  face, and a median of 2.3–2.4 grid units to either side of their place;
+  none rested farther than 6.5. None fell out of view.
+- Every cell was home 1.5 s after the result was latched.
+- At 4:3 and 5:3, every fight that knocked cells loose ended as it did with
+  the face kept whole. Slightly fewer shells burst on the face: 126 against
+  128 at 4:3, and 145 against 149 at 5:3.
+- Run alone, with and without cells coming loose, fights that knocked cells
+  loose took about 20 µs more on a median tick, and the same at the 99th
+  percentile, within noise: 1.18 ms both ways at 4:3, and 0.94 ms against
+  0.90 ms at 5:3.
+
 The run data stays local.
 
 | | Learning + move bursts a shell on the face | Plotting + move shoots under it |
@@ -1286,12 +1324,22 @@ The run data stays local.
 Each picture keeps the shells of the frames before it as a trail. On the left,
 the learning tank's 50° shell bursts on the bottom of the 2; on the right, two
 plotting tanks' first shots pass under the face.
+
+| | Cells knocked loose | At rest on the hills | Flying home |
+| --- | --- | --- | --- |
+| 1024×768 | ![Two cells flying off the bottom of the 2, half a second after the burst](screenshots/clock/tanks-1024x768-cells-loose.png) | ![Two cells resting on the hills below the 2, whose bottom row shows two dim cells](screenshots/clock/tanks-1024x768-cells-landed.png) | ![Cells from three digits flying home as the fight ends](screenshots/clock/tanks-1024x768-cells-fly-home.png) |
+| 800×480 | ![Two cells flying off the bottom of the 2, half a second after the burst](screenshots/clock/tanks-800x480-cells-loose.png) | ![Two cells resting on the hills below the 2, whose bottom row shows two dim cells](screenshots/clock/tanks-800x480-cells-landed.png) | ![Cells from two digits flying home as the fight ends](screenshots/clock/tanks-800x480-cells-fly-home.png) |
+
+The first shell to burst on the face knocks two cells off the bottom of the 2,
+which come to rest on the hills; the face draws their places dim. As the
+fight ends, every cell still loose flies home from where it lies.
 `SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
-engine-client tanks_shells_burst_on_the_face` regenerates them.
+engine-client tanks_shells_burst_on_the_face` regenerates all ten.
 
 `clock state` includes phase, support, world positions, hull and terrain IDs,
 health, the two CPUs (`cpu`), shell/shot counts, the shells the face stopped
-(`face_hits`), conversion accounting and any settling failure in `tanks`.
+(`face_hits`), the cells they knocked loose (`knocked_loose`), conversion
+accounting and any settling failure in `tanks`.
 Values with a `_milli` suffix use thousandths of their inspection
 unit (positions, area and mass use host units). The common damage-material migration
 and damage to resident plants remain follow-up work: this integration uses Scorched's current tank HP rule and does
@@ -3682,6 +3730,7 @@ What each event does with the face's surfaces:
 | Exploding digits | Blocks carry the cells' surfaces through the burst and the flight home. A surplus block departs and is merged away when it has shrunk to nothing. A block split off the debris is a new surface that grows from zero |
 | Coins | As Exploding digits: the pieces carry the surfaces out and home. A round piece's footprint is the square inside its disc, and a turning piece's is as wide as it is drawn |
 | Meltdown | Solid blocks carry their surfaces until they melt, leave the view or are reclaimed. The refill is a new face that grows upward. Water is never a surface |
+| Tanks | A cell a shell knocks loose carries its surface on its block. A damaged digit's cells, loose or still standing, come home with their surfaces by Exploding digits' return |
 | Marquee, clock recipes | The face's surfaces ride the recipe's transform, at the opacity the recipe draws. The fading anchored copy is presentation and owns nothing |
 | Marquee, text recipes | The face's surfaces are carried clear of the frame and brought back as themselves |
 | Cell Swap | Each surface rides its exchange to the cell it lands on. A reading that changes fades surfaces out and new ones in |

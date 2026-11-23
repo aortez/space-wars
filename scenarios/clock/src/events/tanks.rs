@@ -1,7 +1,8 @@
 //! A bounded Scorched duel in Clock's canonical arena. Only Clock steps physics.
-use super::EventPhase;
+use super::{EventContext, EventPhase};
 use crate::{
     arena::{ClockArena, Owner, Population, Unavailable, ids::canonical},
+    digit_surfaces::{SurfaceId, SurfaceLedger, SurfacePose},
     layout::Layout,
 };
 use engine_common::{ClockEventKind, ClockTanksState};
@@ -41,10 +42,11 @@ const BUDGET: Budget = Budget::for_terrain(
     false,
     scenario_scorched_earth::host::MAX_TERRAIN_WIDTH,
 );
-/// The duel's budget, and the face's fixed body of boxes.
+/// The duel's budget, the face's fixed body of boxes, and the cells the
+/// shells knock loose.
 pub const POPULATION: Population = Population {
-    bodies: BUDGET.bodies + 1,
-    colliders: BUDGET.colliders + digits::MAX_CELLS,
+    bodies: BUDGET.bodies + 1 + MAX_LOOSE,
+    colliders: BUDGET.colliders + digits::MAX_CELLS + MAX_LOOSE,
     joints: BUDGET.joints,
 };
 
@@ -90,8 +92,10 @@ pub fn policies(seed: u64) -> [CpuPolicy; 2] {
     }
 }
 
+mod damage;
 mod digits;
 mod entry;
+pub use damage::MAX_LOOSE;
 pub use entry::placement;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -145,6 +149,7 @@ pub struct TanksEvent {
     face_hits: u32,
     layout: Layout,
     digits: digits::Solids,
+    damage: damage::Damage,
     policies: [CpuPolicy; 2],
     ground: BodyId,
     spawn: [(BodyId, BodyMotion); 2],
@@ -206,8 +211,9 @@ impl TanksEvent {
                 false,
             );
         }
+        let damage = damage::Damage::new(seed);
         let mut digits = digits::Solids::default();
-        digits.synchronize(world, layout, display);
+        digits.synchronize(world, layout, display, damage.standing());
         Ok(Self {
             seed,
             tick: 0,
@@ -221,6 +227,7 @@ impl TanksEvent {
             face_hits: 0,
             layout,
             digits,
+            damage,
             policies,
             ground,
             spawn,
@@ -247,11 +254,19 @@ impl TanksEvent {
         self.spawn[slot].1.position
     }
 
-    /// Keeps the event to the reading: the face's boxes throughout, and the
-    /// entry lanes while the tanks arrive.
-    pub fn synchronize(&mut self, arena: &mut ClockArena, display: crate::digits::DisplaySnapshot) {
+    /// Keeps the event to the reading: the damaged digits and the face's
+    /// boxes throughout, and the entry lanes while the tanks arrive.
+    pub fn synchronize(
+        &mut self,
+        arena: &mut ClockArena,
+        display: crate::digits::DisplaySnapshot,
+        surfaces: &mut SurfaceLedger,
+    ) {
         let world = arena.held_mut(OWNER).expect("Tanks holds the arena");
-        self.digits.synchronize(world, self.layout, display);
+        self.damage
+            .synchronize(world, self.layout, display, surfaces);
+        self.digits
+            .synchronize(world, self.layout, display, self.damage.standing());
         self.synchronize_entry(arena, display);
     }
 
@@ -298,8 +313,9 @@ impl TanksEvent {
         &mut self,
         arena: &mut ClockArena,
         display: crate::digits::DisplaySnapshot,
+        surfaces: &mut SurfaceLedger,
     ) -> bool {
-        self.synchronize(arena, display);
+        self.synchronize(arena, display, surfaces);
         let world = arena.held_mut(OWNER).expect("Tanks holds the arena");
         let scale = self.duel.placement().scale;
         match self.phase {
@@ -351,19 +367,37 @@ impl TanksEvent {
         false
     }
 
-    pub fn observe(&mut self, arena: &mut ClockArena) -> bool {
+    pub fn observe(&mut self, context: EventContext<'_>, arena: &mut ClockArena) -> bool {
+        let EventContext {
+            segments,
+            surfaces,
+            display,
+            ..
+        } = context;
         let world = arena.held_mut(OWNER).expect("Tanks holds the arena");
         if self.simulates_duel() {
             self.duel
                 .finish_step(world)
                 .expect("one completion per Clock tick");
-            self.face_hits += self
-                .duel
-                .impacts()
-                .iter()
-                .filter(|impact| impact.collider.entity == digits::BODY)
-                .count() as u32;
+            // Loose cells fall as the dirt does.
+            let gravity = self.duel.gravity_scale(world);
+            for impact in self.duel.impacts() {
+                if impact.collider.entity == digits::BODY {
+                    self.face_hits += 1;
+                    self.damage.knock_loose(
+                        world,
+                        self.layout,
+                        segments,
+                        surfaces,
+                        gravity,
+                        impact.point,
+                        impact.velocity,
+                    );
+                }
+            }
         }
+        self.damage.observe(world, self.layout);
+        self.damage.advance(segments, surfaces);
         self.tick += 1;
         self.phase_tick += 1;
         match self.phase {
@@ -422,8 +456,17 @@ impl TanksEvent {
             EventPhase::FinishingShots if self.duel.active_shells() == 0 => self.resolve(world),
             EventPhase::Crumbling if self.phase_tick == CRUMBLE_TICKS => self.begin_beam_up(world),
             EventPhase::BeamUp if self.phase_tick == BEAM_UP_TICKS => self.begin_withdrawal(world),
-            EventPhase::Withdrawing if self.phase_tick == WITHDRAW_TICKS => return true,
+            EventPhase::Withdrawing if self.phase_tick == WITHDRAW_TICKS => {
+                debug_assert!(self.damage.whole(), "every cell is home");
+                return true;
+            }
             _ => (),
+        }
+        // Once the last shell has landed, every damaged digit comes home.
+        if self.result.is_some() {
+            let world = arena.held_mut(OWNER).expect("Tanks holds the arena");
+            self.damage
+                .bring_home(world, self.layout, display, surfaces);
         }
         debug_assert!(self.tick <= MAX_TICKS);
         false
@@ -551,10 +594,30 @@ impl TanksEvent {
 
     pub fn release(&mut self, arena: &mut ClockArena) {
         if let Some(world) = arena.held_mut(OWNER) {
+            self.damage.release(world);
             self.duel.retire(world);
         }
         self.converted.clear();
         arena.release(OWNER);
+    }
+
+    /// The surfaces of the digits the shells have damaged, and of the cells
+    /// they knocked loose.
+    pub fn surfaces(&self, layout: Layout, out: &mut Vec<(SurfaceId, SurfacePose)>) {
+        // A resize ends the event, so the face never moves under it.
+        debug_assert_eq!(layout.pitch, self.layout.pitch);
+        self.damage.surfaces(self.layout, out);
+    }
+
+    /// Gives the face back the digits the event still holds.
+    pub fn release_surfaces(&mut self, surfaces: &mut SurfaceLedger) {
+        self.damage.release_surfaces(surfaces);
+    }
+
+    /// The digit cells the event draws for the face, as (middle, side,
+    /// angle).
+    pub fn face_cells(&self) -> Vec<(Vec2, f32, f32)> {
+        self.damage.cells(self.layout)
     }
 
     pub fn diagnostics(&self, arena: &ClockArena) -> ClockTanksState {
@@ -604,6 +667,7 @@ impl TanksEvent {
             entry_failure: self.entry_failure.map(str::to_owned),
             cpu: self.policies.map(|policy| policy.label().to_owned()),
             face_hits: self.face_hits,
+            knocked_loose: self.damage.knocked_loose(),
         }
     }
 }

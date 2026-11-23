@@ -5,11 +5,23 @@
 //! Both use downward gravity. Contact fracture requires event collection.
 use super::*;
 use engine_rapier::world::weapon::Recipients;
-use engine_rapier::world::{BodyMotion, RayHit, SurfaceDrive};
+use engine_rapier::world::{BodyMotion, CollisionGroups, RayHit, SurfaceDrive};
 use std::ops::Range;
 
 /// Bounded host terrain; the standalone field retains its original dimensions.
 pub const MAX_TERRAIN_WIDTH: u32 = 2049;
+
+/// The collision group a host puts its scenery in: bodies that share the
+/// duel's world but stay out of the fight. Scenery rests on the hills and the
+/// dirt, but the tanks never touch it, and none of the duel's rays meet it,
+/// whether a shell's, a probe's or a plot's.
+pub const SCENERY: u32 = 1 << 31;
+
+/// What the tanks and the duel's rays meet: everything but scenery.
+pub(crate) const FIGHT: CollisionGroups = CollisionGroups {
+    memberships: u32::MAX,
+    filter: !SCENERY,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Bounds {
@@ -314,6 +326,12 @@ impl HostedDuel {
         }
     }
 
+    /// The gravity scale that gives a body in `world` the duel's own fall, as
+    /// the duel's dirt has, for a host's scenery.
+    pub fn gravity_scale(&self, world: &PhysicsWorld) -> f32 {
+        Self::gravity(world, self.duel.placement.scale).expect("admitted downward gravity")
+    }
+
     fn sync_gravity(&self, world: &mut PhysicsWorld) {
         let scale =
             Self::gravity(world, self.duel.placement.scale).expect("admitted downward gravity");
@@ -571,6 +589,7 @@ impl Duel {
         mut options: RayCastOptions,
     ) -> Option<RayHit> {
         options.max_distance *= self.placement.scale;
+        options.collision_groups.filter &= !SCENERY;
         let mut hit = world.cast_ray(self.placement.point_to_world(point), direction, options)?;
         hit.point = self.placement.point_from_world(hit.point);
         hit.distance /= self.placement.scale;

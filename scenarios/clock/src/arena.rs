@@ -200,7 +200,7 @@ impl Owner {
             Self::Event(ClockEventKind::Aquarium) => &[AQUARIUM_LINER, AQUARIUM_DIGITS],
             Self::Event(ClockEventKind::Explosion) => &[EXPLOSION_CELLS],
             Self::Event(ClockEventKind::Coins) => &[COIN_CELLS, MAGPIE],
-            Self::Event(ClockEventKind::Tanks) => &[TANKS, TANKS_DIGITS],
+            Self::Event(ClockEventKind::Tanks) => &[TANKS, TANKS_CELLS, TANKS_DIGITS],
             Self::Event(ClockEventKind::Falling) => &[FALLING_SEGMENTS, FALLING_LETTERS],
             Self::Event(ClockEventKind::Meltdown) => &[MELTDOWN_CELLS],
             Self::Event(_) => &[],
@@ -1285,7 +1285,7 @@ pub(crate) mod ids {
             digits::{DIGIT_SLOT_COUNT, SegmentKind},
             events::{
                 duck::planner::MAX_SURFACES, explosion::MAX_EXPLOSION_CELLS,
-                meltdown::MAX_MELTDOWN_CELLS,
+                meltdown::MAX_MELTDOWN_CELLS, tanks::MAX_LOOSE,
             },
         };
 
@@ -1332,6 +1332,8 @@ pub(crate) mod ids {
         pub(crate) const AQUARIUM_DIGITS: Range<u64> = 6100..6101;
         /// Tanks' digit compound, which shells burst on.
         pub(crate) const TANKS_DIGITS: Range<u64> = 6200..6201;
+        /// The digit cells Tanks' shells have knocked loose.
+        pub(crate) const TANKS_CELLS: Range<u64> = 6201..6201 + MAX_LOOSE as u64;
         /// The arena fixture's balls, `MAX_FIXTURE_BALLS` for each of its
         /// owners.
         pub(crate) const FIXTURE_BALLS: Range<u64> =
@@ -1433,6 +1435,7 @@ pub(crate) mod ids {
             ("AQUARIUM_LINER", AQUARIUM_LINER),
             ("AQUARIUM_DIGITS", AQUARIUM_DIGITS),
             ("TANKS_DIGITS", TANKS_DIGITS),
+            ("TANKS_CELLS", TANKS_CELLS),
             ("FIXTURE_BALLS", FIXTURE_BALLS),
             ("SPIDER", SPIDER),
             ("SPIDER_FRAME", SPIDER_FRAME),
