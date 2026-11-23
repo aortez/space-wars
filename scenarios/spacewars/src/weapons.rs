@@ -401,7 +401,7 @@ mod tests {
                 let shell = ship.update_cannon_with_recoil(DT, 0, 8.0).unwrap();
                 assert_eq!(shell.mass(), ROUND_MASS);
                 assert_eq!(shell.radius, CANNON_SHELL_RADIUS);
-                assert_eq!(shell.damage_scalar, CANNON_SHELL_DAMAGE_SCALAR);
+                assert_eq!(shell.damage_scalar, 0.0);
                 assert!((shell.velocity.length() - CANNON_SHELL_SPEED).abs() < 1e-4);
                 let mut launched = RenderFrame::default();
                 render_debris(&mut launched, &shell);

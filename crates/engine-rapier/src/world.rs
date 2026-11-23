@@ -92,6 +92,9 @@ const COMPRESSION_SNAPSHOT_TAG: u64 = 0x434f_4d50_5245_5353;
 /// Marks the weights carried into a step not yet taken, which follow
 /// whatever else a snapshot holds and only when there are any.
 const CARRIED_WEIGHT_SNAPSHOT_TAG: u64 = 0x4341_5252_4945_4457;
+/// Marks a capture that admits speculative arrivals. The tag carries nothing
+/// else and comes first among a snapshot's tagged sections.
+const SPECULATIVE_ARRIVALS_SNAPSHOT_TAG: u64 = 0x5350_4543_4152_5256;
 const USER_DATA_COLLIDER_TAG: u128 = 0x43;
 const USER_DATA_BODY_TAG: u128 = 0x42;
 const USER_DATA_ROLE_SHIFT: u32 = 64;
@@ -3079,6 +3082,10 @@ impl PhysicsWorld {
                 bincode::serialize_into(&mut bytes, tracker)
                     .map_err(|error| PhysicsWorldError(error.to_string()))?;
             }
+            if loading.speculative_arrivals {
+                bincode::serialize_into(&mut bytes, &SPECULATIVE_ARRIVALS_SNAPSHOT_TAG)
+                    .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            }
         }
         if !self.carried_weights.is_empty() {
             bincode::serialize_into(&mut bytes, &CARRIED_WEIGHT_SNAPSHOT_TAG)
@@ -3268,8 +3275,8 @@ impl PhysicsWorld {
                 ));
             }
         }
-        // Optional tagged sections follow in a fixed order: carried weights,
-        // then connections.
+        // Optional tagged sections follow in a fixed order: speculative
+        // arrivals, carried weights, then connections.
         let next_tag = |reader: &mut std::io::Cursor<&[u8]>| {
             if reader.position() < bytes.len() as u64 {
                 bincode::deserialize_from::<_, u64>(reader)
@@ -3280,6 +3287,13 @@ impl PhysicsWorld {
             }
         };
         let mut tag = next_tag(&mut reader)?;
+        if tag == Some(SPECULATIVE_ARRIVALS_SNAPSHOT_TAG) {
+            loading
+                .as_mut()
+                .ok_or_else(|| PhysicsWorldError("speculative arrivals without a capture".into()))?
+                .speculative_arrivals = true;
+            tag = next_tag(&mut reader)?;
+        }
         let mut carried_weights = Vec::new();
         if tag == Some(CARRIED_WEIGHT_SNAPSHOT_TAG) {
             carried_weights = bincode::deserialize_from(&mut reader)
