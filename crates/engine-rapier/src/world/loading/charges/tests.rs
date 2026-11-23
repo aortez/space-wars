@@ -3,6 +3,7 @@ use engine_material::{
     ContactBody, HULL, Material, ROCK, SOFT_TISSUE, effective_mass, shared_impact,
 };
 
+mod reference;
 mod supports;
 
 const DT: f32 = 1.0 / 120.0;
@@ -214,6 +215,64 @@ fn balls(host: &mut Host, radii: [Option<f32>; 2]) -> (PhysicsWorld, [ContactSou
         ),
     ];
     (world, sources)
+}
+
+/// A fixed floor of `material`, its top at zero, declared flat.
+fn floor(
+    world: &mut PhysicsWorld,
+    host: &mut Host,
+    material: Material,
+    depth: Depth,
+) -> ContactSource {
+    let ground = BodySpec {
+        kind: BodyKind::Fixed,
+        position: -Vec2::Y * 0.5,
+        ..Default::default()
+    };
+    let source = add(
+        world,
+        host,
+        1,
+        ground,
+        &[cuboid(1, 0, 10.0, 0.5)],
+        material,
+        None,
+    );
+    host.surfaces.get_mut(&source).unwrap().depth = depth;
+    source
+}
+
+/// Body `n`, a hull box 2 wide and 1 tall of `density`, resting flat on the
+/// floor.
+fn resting_box(
+    world: &mut PhysicsWorld,
+    host: &mut Host,
+    n: u64,
+    density: f32,
+    can_sleep: bool,
+) -> ContactSource {
+    let mut shape = cuboid(n, 0, 1.0, 0.5);
+    shape.density = density;
+    let at = BodySpec {
+        position: Vec2::Y * 0.5,
+        can_sleep,
+        ..Default::default()
+    };
+    add(world, host, n, at, &[shape], HULL, None)
+}
+
+/// A priced support's force, width, duration and outcomes.
+fn supported(charge: &SupportCharge) -> (f32, f32, f32, [Outcome; 2]) {
+    match charge {
+        SupportCharge::Charged {
+            force,
+            width,
+            duration,
+            outcomes,
+            ..
+        } => (*force, *width, *duration, *outcomes),
+        other => panic!("{other:?}"),
+    }
 }
 
 #[test]

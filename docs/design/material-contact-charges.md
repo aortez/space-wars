@@ -410,4 +410,46 @@ supports:
   Rapier solves their pair.
 - **Arrivals:** supports need a capture that admits speculative arrivals.
 
+`crates/engine-rapier/src/world/loading/charges/tests/reference.rs` runs
+#326's reference cases, as [`material-model-v2.md`](../data/material-model-v2.md)
+publishes them, on real physics. Each case's bodies, from
+`engine_material::fixtures`, are built with their masses, inertias and
+surfaces and struck or pressed as the case does it. Each charge's energy, peak
+force and stresses, consumed work, yields and failures are the case's, to
+within rounding, and the host absorbs what it consumed:
+
+- **Safe bumps:** five pairs bump a thousand times each at half their
+  safe-limit speed. Each bump is its own impact, and none costs anything.
+- **Single strikes:** gentle and harder landings, wood against armor, a stone
+  on tissue and on wood, two hulls of one material, and a shell with more
+  energy than the plate can take.
+- **Progressive hits:** fresh shells wear a plate down hit by hit, and it
+  fails at the 18th, as in the case. A plate of twice the volume takes 36
+  hits. A strike that dents the plate dents nothing when it is twice as
+  thick.
+- **Glancing:** a strike at 30, 60 and 80 degrees is priced on its normal
+  approach.
+- **Angular:** a strike 1 to 3 off the boulder's center of mass is priced on
+  the mass its lever arm leaves, and turns the boulder.
+- **Partition:** a shell striking a seam, where two of the plate's colliders
+  meet it at one point, is priced once, as one contact.
+- **Resting support:** the tank's weight rests on a wood plank for a thousand
+  ticks at no cost. The press of 1.5 times the plank's safe stress fails it on
+  the case's tick, and the press of 1.05 times a tick after the case's.
+- **Fixed step:** at 30, 60, 120 and 240 Hz, the press of 1.05 times consumes
+  the same work by 1/30 s. It fails the plank a tick after the case's 0.2 s at
+  every rate.
+
+The press of 1.05 times is a tick late because the solver's force is one f32
+step under 6,300, a part in ten million. Fallback work goes with the
+overstress, 150 of the 3,150 stress, so each tick does 1.7 parts in a million
+less work than the case's. The case's ticks overrun the plank by 2.3e-5, and
+the solver's leave 3.9e-4 of it, which one more tick takes.
+
+The connection cases, `beam_connections` and `fixed_step`'s moments, load
+welds, not contacts, so they are not run here. Nor are `failure_allocation`'s
+cases, which are a host's choices of where a failure's excess goes, or
+`resting_support`'s press with a measured plastic displacement, which charges
+never measure.
+
 Run `RUST_MIN_STACK=16777216 cargo test -p engine-rapier --lib world::loading::charges`.

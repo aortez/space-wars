@@ -3,50 +3,6 @@ use engine_material::{ARMOR, Beam, Connection, SOFT_TISSUE, SustainedLoad, susta
 
 const GRAVITY: f32 = 10.0;
 
-/// A fixed floor of `material`, its top at zero, declared flat.
-fn floor(
-    world: &mut PhysicsWorld,
-    host: &mut Host,
-    material: Material,
-    depth: Depth,
-) -> ContactSource {
-    let ground = BodySpec {
-        kind: BodyKind::Fixed,
-        position: -Vec2::Y * 0.5,
-        ..Default::default()
-    };
-    let source = add(
-        world,
-        host,
-        1,
-        ground,
-        &[cuboid(1, 0, 10.0, 0.5)],
-        material,
-        None,
-    );
-    host.surfaces.get_mut(&source).unwrap().depth = depth;
-    source
-}
-
-/// Body `n`, a hull box 2 wide and 1 tall of `density`, resting flat on the
-/// floor.
-fn resting_box(
-    world: &mut PhysicsWorld,
-    host: &mut Host,
-    n: u64,
-    density: f32,
-    can_sleep: bool,
-) -> ContactSource {
-    let mut shape = cuboid(n, 0, 1.0, 0.5);
-    shape.density = density;
-    let at = BodySpec {
-        position: Vec2::Y * 0.5,
-        can_sleep,
-        ..Default::default()
-    };
-    add(world, host, n, at, &[shape], HULL, None)
-}
-
 /// The sustained law's outcome for `force` on `surface`, across a patch
 /// `width` wide.
 fn held(surface: &ContactSurface, force: f32, width: f32, duration: f32) -> Outcome {
@@ -65,20 +21,6 @@ fn held(surface: &ContactSurface, force: f32, width: f32, duration: f32) -> Outc
         },
     )
     .unwrap()
-}
-
-/// A priced support's force, width, duration and outcomes.
-fn supported(charge: &SupportCharge) -> (f32, f32, f32, [Outcome; 2]) {
-    match charge {
-        SupportCharge::Charged {
-            force,
-            width,
-            duration,
-            outcomes,
-            ..
-        } => (*force, *width, *duration, *outcomes),
-        other => panic!("{other:?}"),
-    }
 }
 
 /// The normal impulse the last step's solve applied, over all contacts.
