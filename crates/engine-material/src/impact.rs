@@ -14,6 +14,9 @@ use serde::Serialize;
 /// It is an event-local loading curve, not persistent strength hardening.
 pub const POST_YIELD_STIFFNESS_FRACTION: f32 = 0.01;
 
+/// The smallest effective mass the impact law prices, `mu`.
+pub const MIN_EFFECTIVE_MASS: f32 = 1.0e-9;
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct Impact {
     /// Relative normal approach speed at the contact, `wu / s`.
@@ -27,7 +30,7 @@ impl Impact {
         if self.closing_speed.is_finite()
             && (0.0..=1.0e6).contains(&self.closing_speed)
             && self.effective_mass.is_finite()
-            && (1.0e-9..=1.0e12).contains(&self.effective_mass)
+            && (MIN_EFFECTIVE_MASS..=1.0e12).contains(&self.effective_mass)
         {
             Ok(())
         } else {

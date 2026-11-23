@@ -226,5 +226,8 @@ first integration with explicit admission, duplicate ball contacts, unioned
 rotation-locked face intervals and staged material changes. General footprints
 and contact-set admission remain unfinished.
 The pulse split is an explicit approximation that still needs calibration.
+[Contact charges](material-contact-charges.md) price each new impact after the
+step from these records, in any world whose capture admits speculative
+arrivals, and leave the physics unchanged.
 Sustained/connection loads, attributable external work, nonblocking soft queries
 and gameplay consequences remain separate unfinished parts of #327/#328.

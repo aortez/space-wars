@@ -32,7 +32,9 @@ pub use geometry::{
     PATCH_WIDTH_FRACTION, Section, closing_speed, deformation_depth, effective_mass, lever,
     patch_width_from_radii, point_velocity,
 };
-pub use impact::{Impact, POST_YIELD_STIFFNESS_FRACTION, deposit, impact, yield_speed};
+pub use impact::{
+    Impact, MIN_EFFECTIVE_MASS, POST_YIELD_STIFFNESS_FRACTION, deposit, impact, yield_speed,
+};
 pub use ledger::{LEDGER_TOLERANCE, Outcome, WorkLedger};
 pub use material::{FailureMode, Material};
 pub use reach::{
