@@ -278,6 +278,26 @@ impl SpacelingAssembly {
         self.collider
     }
 
+    pub fn spec(&self) -> SpacelingSpec {
+        self.spec
+    }
+
+    /// Changes how the spaceling moves and keeps its feet, as when it breaks
+    /// into a run. Its shape and what it meets stay as they were, and so does
+    /// its balance until its next tick. Answers false, changing nothing, for
+    /// a spec that is not valid or would change them.
+    pub fn set_spec(&mut self, spec: SpacelingSpec) -> bool {
+        if !spec.valid()
+            || spec.radius != self.spec.radius
+            || spec.half_segment != self.spec.half_segment
+            || spec.collision_groups != self.spec.collision_groups
+        {
+            return false;
+        }
+        self.spec = spec;
+        true
+    }
+
     /// Call once before each world step. The caller applies the supplied gravity
     /// acceleration over that same `dt`. The previous commanded velocity plus
     /// gravity is a disturbance reference only, never a second pose integrator.

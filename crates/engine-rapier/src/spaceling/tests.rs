@@ -321,6 +321,55 @@ fn idle_character_tracks_rotating_planet_and_contact_point_velocity() {
 }
 
 #[test]
+fn a_new_spec_changes_its_gait_but_never_its_shape() {
+    let (mut world, mut spaceling) = floor_fixture(0.0, Vec2::ZERO);
+    settle(&mut world, &mut spaceling);
+    let walker = spaceling.spec();
+    for refused in [
+        SpacelingSpec {
+            radius: walker.radius * 2.0,
+            ..walker
+        },
+        SpacelingSpec {
+            half_segment: walker.half_segment * 0.5,
+            ..walker
+        },
+        SpacelingSpec {
+            collision_groups: CollisionGroups::NONE,
+            ..walker
+        },
+        SpacelingSpec {
+            walk_speed: f32::NAN,
+            ..walker
+        },
+    ] {
+        assert!(!spaceling.set_spec(refused));
+        assert_eq!(spaceling.spec(), walker);
+    }
+    let runner = SpacelingSpec {
+        walk_speed: 3.0 * walker.walk_speed,
+        ground_acceleration: 3.0 * walker.ground_acceleration,
+        ..walker
+    };
+    assert!(spaceling.set_spec(runner));
+    assert_eq!(spaceling.spec(), runner);
+    let walk = SpacelingControl {
+        walk: 1.0,
+        jump_held: false,
+    };
+    for _ in 0..120 {
+        tick(&mut world, &mut spaceling, walk, GRAVITY);
+    }
+    let running = spaceling.snapshot(&world).unwrap();
+    assert!(running.grounded());
+    assert!(
+        (running.relative_speed - runner.walk_speed).abs() < 0.3,
+        "{}",
+        running.relative_speed
+    );
+}
+
+#[test]
 fn invalid_specs_do_not_insert_partial_entities_and_control_is_bounded() {
     let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
     assert!(

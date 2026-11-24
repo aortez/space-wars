@@ -308,8 +308,13 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
             }
             for (side, survivor) in ["Left", "Right"].into_iter().zip(&tanks.survivors) {
                 if let Some(survivor) = survivor {
+                    // An ending that fell back says which it drew, and why.
+                    let fallback = survivor
+                        .fallback
+                        .map(|why| format!(" (drew {}, {})", survivor.drawn.as_str(), why.as_str()))
+                        .unwrap_or_default();
                     println!(
-                        "{side} spaceling: {}, got out {}, ending {}, position={:?}, stood up={}, knockdowns={}",
+                        "{side} spaceling: {}, got out {}, ending {}{fallback}, position={:?}, stood up={}, knockdowns={}",
                         survivor.phase.as_str(),
                         survivor.ejection.as_str(),
                         survivor.ending.as_str(),

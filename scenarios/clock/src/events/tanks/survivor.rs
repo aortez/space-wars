@@ -1,41 +1,60 @@
-//! A loser's spaceling getting out as its tank blows up, and the beam that
-//! rescues it.
+//! A loser's spaceling getting out as its tank blows up, and how it leaves.
 //!
 //! One loser in five gets out, by a roll the fight's seed gives each side
 //! from a stream of its own. Half of those the blast throws clear, tumbling,
 //! and they land, settle and get up as the physics crate's spaceling does.
 //! The rest ride out in an escape pod that arcs away like a shell, lands and
 //! may tip. A moment after it comes to rest, it opens and the spaceling
-//! climbs out. Once up, the spaceling looks around and waves, then a beam
-//! comes down on it and lifts it out as the winner beams up. The empty pod
-//! stays until the hills withdraw, and goes with them.
+//! climbs out.
+//!
+//! Each spaceling that gets out draws its ending evenly from those that fit
+//! the fight, by a roll from another stream of its own. The rescue beam
+//! always fits: once up, the spaceling looks around and waves, then a beam
+//! comes down on it and lifts it out as the winner beams up. With a winner
+//! in view, it may stow away instead: it runs to the winner, jumping where
+//! it must, climbs onto the back of its roof and rides it out. Or it
+//! surrenders: it raises a white flag, the winner's turret turns onto it,
+//! and a beam in the winner's colors comes down on it and draws it to the
+//! winner's side, to go up with the winner. A stowaway with no way to the
+//! winner, or no time left to reach it, waves for the rescue beam instead,
+//! as does one still surrendering when its time runs out. The empty pods
+//! stay until the hills withdraw, and go with them.
 //!
 //! The spacelings and the pods meet the hills, the dirt, the floor and the
 //! winner, and pass the pieces of the wreck, the face and one another. One
 //! that leaves the view retires there. A spaceling still down when its time
 //! runs out is lifted out as it lies.
 use super::*;
-use engine_common::{ClockTanksEnding, ClockTanksSurvivor};
+use engine_common::ClockTanksSurvivor;
 use engine_rapier::{
     spaceling::{
         SpacelingAssembly, SpacelingBalance, SpacelingBalanceSpec, SpacelingControl,
         SpacelingGetUpResult, SpacelingSpec,
     },
-    world::{BodyRole, BodySpec, ColliderId, ColliderMassProperties, ColliderRole, ColliderSpec},
+    world::{
+        BodyRole, BodySpec, ColliderId, ColliderMassProperties, ColliderRole, ColliderSpec,
+        RayCastOptions,
+    },
 };
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use scenario_scorched_earth::host::TankState;
+use std::f32::consts::{FRAC_PI_2, PI, TAU};
 use wreck::Puff;
 
 pub use engine_common::ClockTanksEjection as Ejection;
+pub use engine_common::ClockTanksEnding as Ending;
+pub use engine_common::ClockTanksFallback as Fallback;
 pub use engine_common::ClockTanksSurvivorPhase as Phase;
 
 /// The bodies the survivors take in the arena: each side's spaceling and its
 /// pod.
 pub const MAX_SURVIVOR_BODIES: usize = 4;
-/// The longest the aftermath lasts, from the end of the blow-up until the
-/// rescue.
-pub const AFTERMATH_TICKS: u64 = 6 * FIXED_HZ as u64;
+/// The longest the aftermath waits for a spaceling that leaves from where it
+/// stands, from the end of the blow-up until the beam-up.
+pub const RESCUE_BY_TICKS: u64 = 6 * FIXED_HZ as u64;
+/// The longest the aftermath lasts: as long as a stowaway may take to reach
+/// the winner and climb on.
+pub const AFTERMATH_TICKS: u64 = 8 * FIXED_HZ as u64;
 /// Clock's spaceling beside the physics crate's 1.8-unit one: about 1 of the
 /// duel's units, a third of a tank's height from the bottom of its wheels to
 /// the top of its turret.
@@ -82,7 +101,65 @@ const POD_TRAIL_TICKS: u64 = 4;
 const REST_SPEED: f32 = 0.5;
 /// One turning slower than this, in radians a second, is still.
 const REST_SPIN: f32 = 1.5;
+/// How fast a stowaway runs, in the duel's units a second: three times the
+/// spaceling's walk, a scurry that crosses most of the battlefield in a few
+/// seconds.
+pub const RUN_SPEED: f32 = 15.0;
+/// How much time a stowaway wants in hand to set out, so it never gives up
+/// as it starts.
+const SET_OUT_SPARE_TICKS: u64 = FIXED_HZ as u64 / 2;
+/// How long a stowaway looks toward the winner before it runs.
+pub const SPOT_TICKS: u64 = FIXED_HZ as u64 / 2;
+/// How long a stowaway takes to climb onto the winner's roof, and how long
+/// it sits there before the winner may leave.
+pub const CLIMB_TICKS: u64 = FIXED_HZ as u64 / 2;
+pub const RIDE_TICKS: u64 = FIXED_HZ as u64 / 2;
+/// The most the ground may rise within a unit of a stowaway's run, in the
+/// duel's units, for it to jump up there.
+const MAX_STEP: f32 = 1.3;
+/// The deepest drop a stowaway runs off, in the duel's units: from deeper
+/// it would land knocked down.
+const MAX_DROP: f32 = 3.5;
+/// A step ahead higher than this, in the duel's units, a stowaway jumps.
+const HOP_STEP: f32 = 0.3;
+/// How far ahead of a step a stowaway jumps, in the duel's units, and in
+/// seconds of its run, so it is still rising as it reaches it.
+const HOP_LEAD: f32 = 0.6;
+const HOP_LEAD_SECONDS: f32 = 0.2;
+/// How near the winner's side a stowaway climbs on from, in the duel's
+/// units.
+const REACH: f32 = 0.5;
+/// Within this of the winner's side, in the duel's units, a stowaway slows
+/// to climb on.
+const SLOWING: f32 = 3.0;
+/// How long a running stowaway may make no headway before it gives up, and
+/// the headway that counts, in the duel's units.
+const STUCK_TICKS: u64 = 3 * FIXED_HZ as u64 / 2;
+const HEADWAY: f32 = 0.5;
+/// How long the white flag takes to go up.
+pub const FLAG_TICKS: u64 = 2 * FIXED_HZ as u64 / 5;
+/// How fast the winner's turret turns onto a spaceling that surrenders, in
+/// radians a second.
+pub const TURRET_SPEED: f32 = 2.0;
+/// How long the winner's beam takes to come down on a spaceling that
+/// surrenders, and how long it takes until it has drawn it to the winner's
+/// side.
+pub const TAKE_DESCENT_TICKS: u64 = FIXED_HZ as u64 / 2;
+pub const TAKE_TICKS: u64 = 2 * FIXED_HZ as u64;
+/// Where the winner's beam holds a spaceling that surrendered, in the
+/// duel's units: out from the side of the winner's hull, and up from its
+/// middle.
+const BESIDE: Vec2 = Vec2::new(1.0, 0.6);
+/// How high the winner's beam lifts a spaceling on its way to the winner's
+/// side, in the duel's units: at least this, and at most enough for its
+/// feet to clear the hills and the dirt between, within the highest.
+const TAKE_ARC: f32 = 1.5;
+const TAKE_ARC_MOST: f32 = 5.0;
 const DT: f32 = 1.0 / FIXED_HZ as f32;
+
+/// The endings in the order a roll picks among them: the rescue beam, which
+/// always fits, then those that need a winner in view.
+const ENDINGS: [Ending; 3] = [Ending::RescueBeam, Ending::Stowaway, Ending::Surrender];
 
 /// Clock's spaceling: the physics crate's, shrunk by [`PILOT_SCALE`], at
 /// the duel's `scale` and in its fall. In the duel's units it moves as Space
@@ -110,6 +187,28 @@ pub fn spec(scale: f32) -> SpacelingSpec {
     }
 }
 
+/// A stowaway's spaceling once it breaks into a run: Clock's, running at
+/// [`RUN_SPEED`] and quick to reach it, in the air as on the ground. At a
+/// run every bump in the dirt knocks it about, so it rights itself faster,
+/// and only a knock three times as hard as one that fells a walker knocks
+/// it down.
+pub fn runner_spec(scale: f32) -> SpacelingSpec {
+    let walker = spec(scale);
+    SpacelingSpec {
+        walk_speed: RUN_SPEED * scale,
+        ground_acceleration: 3.0 * walker.ground_acceleration,
+        air_acceleration: 3.0 * walker.air_acceleration,
+        max_angular_speed: 2.0 * walker.max_angular_speed,
+        angular_acceleration: 8.0 * walker.angular_acceleration,
+        balance: SpacelingBalanceSpec {
+            knockdown_velocity_change: 3.0 * walker.balance.knockdown_velocity_change,
+            knockdown_angular_speed: 3.0 * walker.balance.knockdown_angular_speed,
+            ..walker.balance
+        },
+        ..walker
+    }
+}
+
 /// How each side's spaceling gets out if its tank blows up, or none for one
 /// that does not: one in five gets out, half of those thrown clear and half
 /// in a pod. Both sides roll, whatever the fight brings, from a stream of
@@ -124,11 +223,244 @@ pub fn rolls(seed: u64) -> [Option<Ejection>; 2] {
     })
 }
 
+/// Each side's roll for its spaceling's ending, from another stream of their
+/// own: a fraction that picks evenly among the endings that fit the fight.
+pub fn ending_rolls(seed: u64) -> [f64; 2] {
+    let mut rng = StdRng::seed_from_u64(seed ^ 0x454e_4449_4e47_5321);
+    std::array::from_fn(|_| rng.random::<f64>())
+}
+
+/// The ending a `roll` draws, evenly from those that fit the fight: any of
+/// them with a winner in view, and the rescue beam alone without one.
+pub fn ending(roll: f64, winner_in_view: bool) -> Ending {
+    let fit = if winner_in_view { ENDINGS.len() } else { 1 };
+    ENDINGS[((roll * fit as f64) as usize).min(fit - 1)]
+}
+
+/// The winner as it stands, for a stowaway running to it and a spaceling
+/// surrendering to it.
+#[derive(Debug, Clone, Copy)]
+pub struct Winner {
+    pub slot: usize,
+    pub hull: BodyMotion,
+    /// Half its hull box's width and height.
+    pub half: Vec2,
+    /// The lowest and highest corners of its hull and wheels.
+    pub bounds: [Vec2; 2],
+    /// Its barrel's pivot and muzzle.
+    pub barrel: [Vec2; 2],
+}
+
+impl Winner {
+    /// How far `x` lies outside the winner's hull and wheels, across.
+    fn gap(&self, x: f32) -> f32 {
+        (self.bounds[0].x - x).max(x - self.bounds[1].x).max(0.0)
+    }
+}
+
+/// The direction a turret turns its `barrel` to in a tick, toward `target`
+/// and no further than the turret turns in that time. It turns over the
+/// top, never down through the hull.
+pub fn turn_barrel([pivot, muzzle]: [Vec2; 2], target: Vec2) -> Vec2 {
+    let over = |v: Vec2| {
+        let angle = v.y.atan2(v.x);
+        if angle < -FRAC_PI_2 {
+            angle + TAU
+        } else {
+            angle
+        }
+    };
+    let from = over(muzzle - pivot);
+    let to = over(target - pivot);
+    let most = TURRET_SPEED * DT;
+    Vec2::from_radians(from + (to - from).clamp(-most, most))
+}
+
+/// Whether a `barrel` points at `target`, near enough.
+fn on_target([pivot, muzzle]: [Vec2; 2], target: Vec2) -> bool {
+    let along = (muzzle - pivot).normalized();
+    along.dot((target - pivot).normalized()) > 0.05_f32.cos()
+}
+
+/// What a stowaway finds under a point on its way.
+enum Ground {
+    /// Ground at this height.
+    At(f32),
+    /// Ground higher than it steps or jumps up to.
+    Wall,
+    /// No ground within the deepest drop it runs off.
+    Pit,
+}
+
+/// The ground under `x` for a spaceling whose feet stand at `feet`. The ray
+/// comes down from just above the highest step it could take, so the face
+/// high above never answers. It finds only what a spaceling meets, and never
+/// the `spaceling` itself.
+fn ground(world: &PhysicsWorld, x: f32, feet: f32, scale: f32, spaceling: PhysicsId) -> Ground {
+    let above = (MAX_STEP + 0.2) * scale;
+    let hit = world.cast_ray(
+        Vec2::new(x, feet + above),
+        Vec2::new(0.0, -1.0),
+        RayCastOptions {
+            max_distance: above + MAX_DROP * scale,
+            collision_groups: wreck::GROUPS,
+            exclude_entity: Some(spaceling),
+            ..Default::default()
+        },
+    );
+    match hit {
+        Some(hit) if hit.distance <= 1e-3 * scale => Ground::Wall,
+        Some(hit) => Ground::At(hit.point.y),
+        None => Ground::Pit,
+    }
+}
+
+/// Whether a stowaway with its feet at `feet` has a way over the hills to
+/// `to`, beside the winner: within each unit of its run the ground rises no
+/// higher than it jumps, it drops no deeper than it lands from on its feet,
+/// and nothing stands in its way.
+fn way_clear(world: &PhysicsWorld, feet: Vec2, to: f32, scale: f32, spaceling: PhysicsId) -> bool {
+    const PER_UNIT: usize = 4;
+    let step = scale / PER_UNIT as f32;
+    let dir = (to - feet.x).signum();
+    let mut behind = [feet.y; PER_UNIT];
+    let (mut x, mut height) = (feet.x, feet.y);
+    let mut index = 0;
+    loop {
+        x += dir * step;
+        if (to - x) * dir <= 0.0 {
+            return true;
+        }
+        let Ground::At(y) = ground(world, x, height, scale, spaceling) else {
+            return false;
+        };
+        let lowest = behind.iter().copied().fold(f32::INFINITY, f32::min);
+        if y - lowest > MAX_STEP * scale {
+            return false;
+        }
+        behind[index % PER_UNIT] = y;
+        height = y;
+        index += 1;
+    }
+}
+
+/// Whether a running stowaway with its feet at `feet`, running at `speed`
+/// across toward `dir`, jumps now: just ahead, short of `clear` on, lies a
+/// step steeper than it runs up, or something in its way. It runs up the
+/// slopes it can, and jumps late enough to keep its speed and early enough
+/// to be rising still as it reaches the step.
+fn hop(
+    world: &PhysicsWorld,
+    feet: Vec2,
+    dir: f32,
+    speed: f32,
+    clear: f32,
+    scale: f32,
+    spaceling: PhysicsId,
+) -> bool {
+    let reach = (HOP_LEAD * scale + speed * HOP_LEAD_SECONDS).min(clear);
+    let step = 0.25 * scale;
+    let mut last = feet.y;
+    for ahead in (1..)
+        .map(|index| index as f32 * step)
+        .take_while(|&ahead| ahead <= reach)
+    {
+        match ground(world, feet.x + dir * ahead, last, scale, spaceling) {
+            // A face steeper than a slope it runs up, rising to a step.
+            Ground::At(y) if y - last > step && y - feet.y > HOP_STEP * scale => return true,
+            Ground::At(y) => last = y,
+            Ground::Wall => return true,
+            Ground::Pit => return false,
+        }
+    }
+    false
+}
+
+/// Whether a stowaway `gap` from the winner's side at `tick`, running, can
+/// reach it and climb on before the aftermath ends at `deadline`, with
+/// `spare` ticks to spare.
+fn in_time(gap: f32, scale: f32, tick: u64, deadline: u64, spare: u64) -> bool {
+    let run = (gap / (RUN_SPEED * scale) * FIXED_HZ as f32) as u64;
+    tick + run + CLIMB_TICKS + FIXED_HZ as u64 / 4 + spare <= deadline
+}
+
+/// Where a stowaway is `ticks` into its climb onto the winner, along its
+/// `path` in the frame of the winner's hull: from where it set out, up the
+/// hull's side to the edge of its roof, over the turret if it must, and onto
+/// the roof behind the turret.
+fn climbing(path: [Vec2; 4], ticks: u64) -> Vec2 {
+    let ease = |u: f32| u * u * (3.0 - 2.0 * u);
+    let lengths = [0, 1, 2].map(|leg| path[leg].distance_to(path[leg + 1]));
+    let total: f32 = lengths.iter().sum();
+    let mut along = ease((ticks as f32 / CLIMB_TICKS as f32).min(1.0)) * total;
+    for (leg, length) in lengths.into_iter().enumerate() {
+        if along <= length && length > 0.0 {
+            return path[leg] + (path[leg + 1] - path[leg]) * (along / length);
+        }
+        along -= length;
+    }
+    path[3]
+}
+
+/// Where a spaceling the winner's beam takes is `ticks` into it: where it
+/// stood, `from`, while the beam comes down on it, then drawn over an `arc`
+/// that high to `beside` the winner.
+fn taking(from: Vec2, beside: Vec2, ticks: u64, arc: f32) -> Vec2 {
+    let ease = |u: f32| u * u * (3.0 - 2.0 * u);
+    let u = (ticks.saturating_sub(TAKE_DESCENT_TICKS) as f32
+        / (TAKE_TICKS - TAKE_DESCENT_TICKS) as f32)
+        .min(1.0);
+    from + (beside - from) * ease(u) + Vec2::Y * (arc * (PI * u).sin())
+}
+
+/// How high the winner's beam lifts a spaceling on its way from `from` to
+/// `to`, for its feet to clear the hills and the dirt between, every
+/// quarter of a unit across. A ray that starts inside the face never
+/// answers.
+fn take_arc(world: &PhysicsWorld, from: Vec2, to: Vec2, scale: f32) -> f32 {
+    let clear = spec(scale).half_height() + 0.2 * scale;
+    let most = TAKE_ARC_MOST * scale;
+    let steps = ((to.x - from.x).abs() / (0.25 * scale)).ceil().max(1.0) as usize;
+    let mut arc = TAKE_ARC * scale;
+    for step in 1..steps {
+        // How far across, and how far into the draw it is there, undoing
+        // the ease in [`taking`].
+        let across = step as f32 / steps as f32;
+        let u = 0.5 - ((1.0 - 2.0 * across).asin() / 3.0).sin();
+        let lift = (PI * u).sin();
+        if lift < 0.25 {
+            continue;
+        }
+        let line = from + (to - from) * across;
+        let hit = world.cast_ray(
+            line + Vec2::Y * most,
+            Vec2::new(0.0, -1.0),
+            RayCastOptions {
+                max_distance: most + clear + to.y.max(from.y) - to.y.min(from.y),
+                collision_groups: wreck::GROUPS,
+                ..Default::default()
+            },
+        );
+        if let Some(hit) = hit
+            && hit.distance > 1e-3 * scale
+        {
+            arc = arc.max((hit.point.y + clear - line.y) / lift);
+        }
+    }
+    arc.min(most)
+}
+
 /// A loser's spaceling that got out.
 pub struct Survivor {
     /// The tank it came from.
     pub slot: usize,
     pub ejection: Ejection,
+    /// The ending its roll drew.
+    pub drawn: Ending,
+    /// The ending it is on: the one it drew, or the rescue beam once that
+    /// one falls back, and why it did.
+    pub ending: Ending,
+    pub fallback: Option<Fallback>,
     pub phase: Phase,
     /// The event's tick its tank blew up on.
     pub blast_tick: u64,
@@ -145,8 +477,21 @@ pub struct Survivor {
     /// What the beam lifts, and where from: the spaceling, or a pod it never
     /// climbed out of.
     pub lifted: Option<(BodyId, BodyMotion)>,
+    /// For a spaceling the winner's beam takes: where it stood as the beam
+    /// came, where the beam holds it, from the middle of the winner's hull,
+    /// and how high it lifts it on the way.
+    pub taken: Option<(BodyMotion, Vec2, f32)>,
+    /// For a stowaway: its climb onto the winner's roof, in the frame of the
+    /// winner's hull, from where it climbs on to where it rides.
+    pub climb: Option<[Vec2; 4]>,
     /// Whether it has stood up since it got out.
     pub stood_up: bool,
+    /// Whether it set out for the winner, so it runs on once back up.
+    ran: bool,
+    /// The tick it last made headway on, and where across it was.
+    headway: (u64, f32),
+    /// Whether it held its jump last tick, to jump a step.
+    hopped: bool,
     /// The ticks its pod has lain still for, then it has stood still for.
     still: u32,
     /// Whether its pod has come down since it flew out.
@@ -164,6 +509,21 @@ impl Survivor {
         self.still = 0;
     }
 
+    /// Settles on the winner's roof at `tick`, facing the turret.
+    fn ride(&mut self, tick: u64) {
+        if let Some([.., deck]) = self.climb {
+            self.facing = -deck.x.signum();
+        }
+        self.enter(Phase::Riding, tick);
+    }
+
+    /// Gives up its own ending for the rescue beam, `why`, and waves for it.
+    fn fall_back(&mut self, why: Fallback, tick: u64) {
+        self.ending = Ending::RescueBeam;
+        self.fallback = Some(why);
+        self.enter(Phase::Waving, tick);
+    }
+
     /// How far its pod's hatch has swung open, from shut to wide open.
     pub fn hatch(&self, tick: u64) -> f32 {
         match self.phase {
@@ -179,12 +539,34 @@ impl Survivor {
     pub fn pod_lifted(&self) -> bool {
         self.lifted.is_some_and(|(body, _)| self.pod == Some(body))
     }
+
+    /// How far its white flag is up at `tick`, from down to all the way.
+    pub fn flag(&self, tick: u64) -> f32 {
+        match self.phase {
+            Phase::Surrendering => ((tick - self.since) as f32 / FLAG_TICKS as f32).min(1.0),
+            Phase::Taken => 1.0,
+            _ => 0.0,
+        }
+    }
+
+    /// How far it has faded from view `phase_tick` ticks into the beam-up,
+    /// from not at all to gone: as its own beam lifts it out, or as the
+    /// winner it rides or goes with fades.
+    pub fn fade(&self, phase_tick: u64) -> f32 {
+        match self.phase {
+            Phase::Riding | Phase::Taken => phase_tick as f32 / BEAM_UP_TICKS as f32,
+            Phase::BeamedUp => Survivors::rescued(phase_tick),
+            _ => 0.0,
+        }
+    }
 }
 
-/// The losers' spacelings that got out, from the blast to the rescue.
+/// The losers' spacelings that got out, from the blast until they leave.
 pub struct Survivors {
     /// How each side's spaceling gets out if its tank blows up.
     pub rolls: [Option<Ejection>; 2],
+    /// Each side's roll for its spaceling's ending.
+    pub ending_rolls: [f64; 2],
     pub out: Vec<Survivor>,
     /// The smoke the pods left behind them as they flew.
     pub puffs: Vec<Puff>,
@@ -202,6 +584,7 @@ impl Survivors {
     pub fn new(seed: u64, scale: f32) -> Self {
         Self {
             rolls: rolls(seed),
+            ending_rolls: ending_rolls(seed),
             out: Vec::new(),
             puffs: Vec::new(),
             scale,
@@ -217,13 +600,16 @@ impl Survivors {
     }
 
     /// The spaceling of the loser in `slot`, blowing up at `tick` as `tank`
-    /// last stood, gets out if its roll says so. It leaves toward the middle
-    /// of the view, and falls as the duel's dirt does, by `gravity_scale`.
+    /// last stood, gets out if its roll says so, and draws its ending from
+    /// those that fit, whether or not there is a winner in view. It leaves
+    /// toward the middle of the view, and falls as the duel's dirt does, by
+    /// `gravity_scale`.
     pub fn eject(
         &mut self,
         world: &mut PhysicsWorld,
         slot: usize,
         tank: &TankState,
+        winner_in_view: bool,
         gravity_scale: f32,
         tick: u64,
     ) {
@@ -232,6 +618,7 @@ impl Survivors {
         };
         self.gravity_scale = gravity_scale;
         let scale = self.scale;
+        let drawn = ending(self.ending_rolls[slot], winner_in_view);
         let hull = tank.motion;
         let [hatch, _] = tank.barrel;
         let arm = hatch - hull.position;
@@ -240,6 +627,9 @@ impl Survivors {
         let mut survivor = Survivor {
             slot,
             ejection,
+            drawn,
+            ending: drawn,
+            fallback: None,
             phase: Phase::Flying,
             blast_tick: tick,
             since: tick,
@@ -248,7 +638,12 @@ impl Survivors {
             facing: inward,
             position: hatch,
             lifted: None,
+            taken: None,
+            climb: None,
             stood_up: false,
+            ran: false,
+            headway: (tick, hatch.x),
+            hopped: false,
             still: 0,
             landed: false,
             pressed: None,
@@ -305,6 +700,7 @@ impl Survivors {
             .unwrap_or(position + Vec2::Y * (2.0 * half.y))
     }
 
+    /// The spaceling from the tank in `slot`, set off with `motion`.
     fn insert_spaceling(
         &self,
         world: &mut PhysicsWorld,
@@ -376,28 +772,68 @@ impl Survivors {
     /// the duel gives its bodies, `gravity`. Each stands where it is, and one
     /// that lies settled asks to get up, at most twice a second. One with no
     /// room to get up, under the dirt or a ledge, crawls out from under it,
-    /// the way it faces and then back the other way.
-    pub fn control(&mut self, world: &mut PhysicsWorld, gravity: Vec2, tick: u64) {
-        let settle = spec(self.scale).balance;
+    /// the way it faces and then back the other way. A stowaway runs for the
+    /// `winner`, slowing as it comes up to it, and jumps the steps ahead of
+    /// it. Climbing on, and on the winner's roof, it goes where the hull
+    /// carries it. One the winner's beam has taken goes where the beam draws
+    /// it.
+    pub fn control(
+        &mut self,
+        world: &mut PhysicsWorld,
+        gravity: Vec2,
+        tick: u64,
+        winner: Option<Winner>,
+    ) {
+        let scale = self.scale;
+        let walker = spec(scale);
         for survivor in &mut self.out {
-            if matches!(survivor.phase, Phase::BeamedUp | Phase::Lost) {
-                continue;
-            }
             let Some(spaceling) = &mut survivor.spaceling else {
                 continue;
             };
+            // Where it is once the arena has stepped: the event's tick has
+            // moved on by then.
+            let ticks = tick + 1 - survivor.since;
+            match survivor.phase {
+                Phase::BeamedUp | Phase::Lost => continue,
+                Phase::Climbing | Phase::Riding => {
+                    if let (Some(winner), Some(climb)) = (winner, survivor.climb) {
+                        let local = if survivor.phase == Phase::Riding {
+                            climb[3]
+                        } else {
+                            climbing(climb, ticks)
+                        };
+                        world.set_next_kinematic_pose(
+                            spaceling.body(),
+                            winner.hull.position + local.rotate_radians(winner.hull.angle),
+                            winner.hull.angle,
+                        );
+                    }
+                    continue;
+                }
+                Phase::Taken => {
+                    if let (Some(winner), Some((from, beside, arc))) = (winner, survivor.taken) {
+                        world.set_next_kinematic_pose(
+                            spaceling.body(),
+                            taking(from.position, winner.hull.position + beside, ticks, arc),
+                            from.angle,
+                        );
+                    }
+                    continue;
+                }
+                _ => (),
+            }
             let snapshot = spaceling.snapshot(world).expect("a survivor's spaceling");
             let press = snapshot.needs_get_up()
                 && snapshot.contacts > 0
-                && snapshot.motion.linear_velocity.length() < settle.settle_speed
-                && snapshot.motion.angular_velocity.abs() < settle.settle_angular_speed
+                && snapshot.motion.linear_velocity.length() < walker.balance.settle_speed
+                && snapshot.motion.angular_velocity.abs() < walker.balance.settle_angular_speed
                 && survivor
                     .pressed
                     .is_none_or(|pressed| tick - pressed >= PRESS_TICKS);
             if press {
                 survivor.pressed = Some(tick);
             }
-            let walk = if snapshot.needs_get_up()
+            let mut walk = if snapshot.needs_get_up()
                 && snapshot.get_up_result == SpacelingGetUpResult::Blocked
             {
                 let since = *survivor.blocked.get_or_insert(tick);
@@ -410,11 +846,37 @@ impl Survivors {
                 survivor.blocked = None;
                 0.0
             };
+            let mut hopping = false;
+            // A runner knocked about but not down rights itself as it runs.
+            if survivor.phase == Phase::Running
+                && snapshot.balance == SpacelingBalance::Balanced
+                && let Some(winner) = winner
+            {
+                let at = snapshot.motion.position;
+                let dir = (winner.hull.position.x - at.x).signum();
+                let gap = winner.gap(at.x);
+                survivor.facing = dir;
+                walk = dir * (gap / (SLOWING * scale)).clamp(0.3, 1.0);
+                if snapshot.grounded() {
+                    hopping = hop(
+                        world,
+                        at - Vec2::Y * walker.half_height(),
+                        dir,
+                        snapshot.motion.linear_velocity.x.abs(),
+                        gap - REACH * scale,
+                        scale,
+                        spaceling.body().entity,
+                    );
+                }
+            }
+            // A jump takes a fresh press, so it lets go between jumps.
+            let jump = hopping && !survivor.hopped;
+            survivor.hopped = jump;
             spaceling.apply_control(
                 world,
                 SpacelingControl {
                     walk,
-                    jump_held: press,
+                    jump_held: press || jump,
                 },
                 gravity,
                 DT,
@@ -422,17 +884,33 @@ impl Survivors {
         }
     }
 
-    /// Follows the survivors after the arena's step at `tick`. A pod opens
-    /// once it has lain still a moment, and its spaceling climbs out. A
-    /// spaceling that has found its feet looks around, then waves. A
-    /// spaceling, or a pod with its spaceling still in it, that leaves the
-    /// view retires there.
-    pub fn observe(&mut self, world: &mut PhysicsWorld, layout: Layout, tick: u64) {
+    /// Follows the survivors after the arena's step at `tick`, with the
+    /// `winner` as it stands and the aftermath at the latest over by
+    /// `deadline`. A pod opens once it has lain still a moment, and its
+    /// spaceling climbs out. A spaceling that has found its feet looks
+    /// around, then waves for its beam. One that surrenders raises its white
+    /// flag instead, and once it has held it up a moment with the winner's
+    /// turret on it, the winner's beam takes it. A stowaway looks toward the
+    /// winner, then runs to it if it has a way and the time, and climbs onto
+    /// its roof. Without a winner, a way or the time, either waves for the
+    /// rescue beam. A spaceling, or a pod with its spaceling still in it,
+    /// that leaves the view retires there.
+    pub fn observe(
+        &mut self,
+        world: &mut PhysicsWorld,
+        layout: Layout,
+        tick: u64,
+        winner: Option<Winner>,
+        deadline: u64,
+    ) {
         let scale = self.scale;
         let outside =
             |point: Vec2| point.y < layout.bounds_min.y || point.x.abs() > layout.bounds_max.x;
         for index in 0..self.out.len() {
             let survivor = &mut self.out[index];
+            let mut run = false;
+            let mut climb = false;
+            let mut take = false;
             match survivor.phase {
                 Phase::Sealed | Phase::Opening => {
                     let pod = survivor.pod.expect("a sealed pod");
@@ -474,16 +952,29 @@ impl Survivors {
                         self.puffs.push(Puff { point: base, tick });
                     }
                 }
+                Phase::Climbing | Phase::Riding | Phase::Taken => {
+                    let spaceling = survivor.spaceling.as_ref().expect("a spaceling carried");
+                    survivor.position = world
+                        .motion(spaceling.body())
+                        .expect("a spaceling carried")
+                        .position;
+                    if survivor.phase == Phase::Climbing && tick - survivor.since >= CLIMB_TICKS {
+                        survivor.ride(tick);
+                    }
+                }
                 Phase::Flying
                 | Phase::GettingUp
                 | Phase::ClimbingOut
                 | Phase::LookingAround
-                | Phase::Waving => {
+                | Phase::Waving
+                | Phase::Running
+                | Phase::Surrendering => {
                     let spaceling = survivor.spaceling.as_ref().expect("a spaceling out");
                     let snapshot = spaceling.snapshot(world).expect("a survivor's spaceling");
-                    survivor.position = snapshot.motion.position;
+                    let at = snapshot.motion.position;
+                    survivor.position = at;
                     self.knockdowns[survivor.slot] = snapshot.knockdowns;
-                    if outside(snapshot.motion.position) {
+                    if outside(at) {
                         world.remove_entity(spaceling.body().entity);
                         survivor.spaceling = None;
                         survivor.enter(Phase::Lost, tick);
@@ -494,34 +985,104 @@ impl Survivors {
                         && !snapshot.needs_get_up()
                         && snapshot.relative_speed.abs() < REST_SPEED * scale
                         && snapshot.motion.angular_velocity.abs() < REST_SPIN;
+                    // A runner knocked about but not down rights itself as
+                    // it goes.
+                    let fallen = if survivor.ran {
+                        snapshot.balance != SpacelingBalance::Balanced
+                    } else {
+                        snapshot.needs_get_up()
+                    };
                     survivor.still = if standing { survivor.still + 1 } else { 0 };
-                    let still = survivor.still;
+                    let toward = winner.map(|winner| (winner.hull.position.x - at.x).signum());
                     match survivor.phase {
                         Phase::Flying | Phase::GettingUp | Phase::ClimbingOut
-                            if still >= STAND_TICKS =>
+                            if survivor.still >= STAND_TICKS =>
                         {
                             survivor.stood_up = true;
-                            survivor.enter(Phase::LookingAround, tick);
+                            if survivor.ending == Ending::Stowaway {
+                                // A stowaway eyes the winner, and once it has
+                                // set out, runs on.
+                                survivor.facing = toward.unwrap_or(survivor.facing);
+                                run = survivor.ran;
+                            }
+                            if !run {
+                                survivor.enter(Phase::LookingAround, tick);
+                            }
                         }
                         Phase::Flying if snapshot.contacts > 0 => {
                             survivor.enter(Phase::GettingUp, tick);
                         }
                         // Knocked over again, it gets up again.
-                        Phase::LookingAround | Phase::Waving if snapshot.needs_get_up() => {
+                        Phase::LookingAround
+                        | Phase::Waving
+                        | Phase::Running
+                        | Phase::Surrendering
+                            if fallen =>
+                        {
                             survivor.enter(Phase::GettingUp, tick);
                         }
                         Phase::LookingAround => {
                             let looked = tick - survivor.since;
-                            if looked >= LOOK_TICKS {
-                                survivor.enter(Phase::Waving, tick);
-                            } else if looked == LOOK_TICKS / 3 || looked == 2 * LOOK_TICKS / 3 {
-                                survivor.facing = -survivor.facing;
+                            match (survivor.ending, toward) {
+                                (Ending::Stowaway, _) => run = looked >= SPOT_TICKS,
+                                (Ending::Surrender, Some(toward)) if looked >= LOOK_TICKS => {
+                                    survivor.facing = toward;
+                                    if tick + FLAG_TICKS + WAVE_TICKS + TAKE_TICKS <= deadline {
+                                        survivor.enter(Phase::Surrendering, tick);
+                                    } else {
+                                        survivor.fall_back(Fallback::OutOfTime, tick);
+                                    }
+                                }
+                                (Ending::Surrender, None) if looked >= LOOK_TICKS => {
+                                    survivor.fall_back(Fallback::NoWay, tick);
+                                }
+                                _ if looked >= LOOK_TICKS => survivor.enter(Phase::Waving, tick),
+                                _ if looked == LOOK_TICKS / 3 || looked == 2 * LOOK_TICKS / 3 => {
+                                    survivor.facing = -survivor.facing;
+                                }
+                                _ => (),
                             }
                         }
+                        Phase::Running => match winner {
+                            None => survivor.fall_back(Fallback::NoWay, tick),
+                            Some(winner) => {
+                                let gap = winner.gap(at.x);
+                                if (at.x - survivor.headway.1).abs() >= HEADWAY * scale {
+                                    survivor.headway = (tick, at.x);
+                                }
+                                if gap <= REACH * scale {
+                                    climb = true;
+                                } else if tick - survivor.headway.0 >= STUCK_TICKS {
+                                    survivor.fall_back(Fallback::NoWay, tick);
+                                } else if !in_time(gap, scale, tick, deadline, 0) {
+                                    survivor.fall_back(Fallback::OutOfTime, tick);
+                                }
+                            }
+                        },
+                        // Its flag held up a moment with the winner's turret
+                        // on it, the winner's beam takes it, if there is
+                        // still time for it to.
+                        Phase::Surrendering => match winner {
+                            None => survivor.fall_back(Fallback::NoWay, tick),
+                            Some(_) if tick + TAKE_TICKS > deadline => {
+                                survivor.fall_back(Fallback::OutOfTime, tick);
+                            }
+                            Some(winner) => {
+                                take = tick - survivor.since >= FLAG_TICKS + WAVE_TICKS
+                                    && on_target(winner.barrel, at);
+                            }
+                        },
                         _ => (),
                     }
                 }
                 Phase::BeamedUp | Phase::Lost => (),
+            }
+            if run {
+                self.set_out(world, index, winner, tick, deadline);
+            } else if climb {
+                self.climb_on(world, index, winner.expect("a winner to climb"), tick);
+            } else if take {
+                self.take(world, index, winner.expect("a winner to take it"), tick);
             }
         }
     }
@@ -549,24 +1110,193 @@ impl Survivors {
         survivor.enter(Phase::ClimbingOut, tick);
     }
 
-    /// Whether every survivor has waved long enough for its beam at `tick`,
-    /// or is lost, so the aftermath can end. Without a survivor, it can.
+    /// The stowaway of survivor `index` sets out for the `winner` at `tick`,
+    /// at a run, if it has a way over the hills to it and the time to get
+    /// there before `deadline`, and waves for the rescue beam if it has not.
+    fn set_out(
+        &mut self,
+        world: &PhysicsWorld,
+        index: usize,
+        winner: Option<Winner>,
+        tick: u64,
+        deadline: u64,
+    ) {
+        let scale = self.scale;
+        let half_height = spec(scale).half_height();
+        let survivor = &mut self.out[index];
+        let spaceling = survivor.spaceling.as_mut().expect("a stowaway");
+        let at = survivor.position;
+        let clear = winner.is_some_and(|winner| {
+            // Only a winner standing on its wheels has a roof to ride.
+            if winner.hull.angle.cos() < 0.8 {
+                return false;
+            }
+            let near = if at.x < winner.hull.position.x {
+                winner.bounds[0].x - REACH * scale
+            } else {
+                winner.bounds[1].x + REACH * scale
+            };
+            way_clear(
+                world,
+                at - Vec2::Y * half_height,
+                near,
+                scale,
+                spaceling.body().entity,
+            )
+        });
+        if !clear {
+            survivor.fall_back(Fallback::NoWay, tick);
+        } else if winner.is_some_and(|winner| {
+            !in_time(winner.gap(at.x), scale, tick, deadline, SET_OUT_SPARE_TICKS)
+        }) {
+            survivor.fall_back(Fallback::OutOfTime, tick);
+        } else {
+            assert!(spaceling.set_spec(runner_spec(scale)), "a runner's spec");
+            survivor.ran = true;
+            survivor.headway = (tick, at.x);
+            survivor.enter(Phase::Running, tick);
+        }
+    }
+
+    /// The stowaway of survivor `index`, beside the `winner` at `tick`,
+    /// climbs onto its roof, behind the turret, clear of the barrel. One that
+    /// came up on the barrel's side climbs over the turret. From here the
+    /// hull carries it, and it pushes nothing.
+    fn climb_on(&mut self, world: &mut PhysicsWorld, index: usize, winner: Winner, tick: u64) {
+        let scale = self.scale;
+        let walker = spec(scale);
+        let survivor = &mut self.out[index];
+        let spaceling = survivor.spaceling.as_ref().expect("a stowaway");
+        let body = spaceling.body();
+        let at = world.motion(body).expect("a stowaway").position;
+        let local = |point: Vec2| (point - winner.hull.position).rotate_radians(-winner.hull.angle);
+        let side = (at.x - winner.hull.position.x).signum();
+        let [pivot, muzzle] = winner.barrel.map(local);
+        let aim = muzzle.x - pivot.x;
+        let back = if aim.abs() < 0.1 * scale {
+            side
+        } else {
+            -aim.signum()
+        };
+        let roof = winner.half.y + walker.half_height();
+        let edge = Vec2::new(
+            side * (winner.half.x + walker.radius + 0.05 * scale),
+            roof + 0.05 * scale,
+        );
+        let over = if back == side {
+            edge
+        } else {
+            Vec2::new(
+                pivot.x,
+                pivot.y + wreck::TURRET_RADIUS * scale + walker.half_height() + 0.1 * scale,
+            )
+        };
+        // On the roof between the turret and its back edge.
+        let deck = Vec2::new(back * (winner.half.x - 0.55 * scale), roof + 0.02 * scale);
+        world.set_body_kind(body, BodyKind::KinematicPosition, true);
+        world.set_collision_groups(spaceling.collider(), CollisionGroups::NONE);
+        survivor.climb = Some([local(at), edge, over, deck]);
+        survivor.facing = -side;
+        survivor.enter(Phase::Climbing, tick);
+    }
+
+    /// The `winner`'s beam takes the spaceling of survivor `index`, which
+    /// surrendered to it, at `tick`, to draw it to the winner's side. From
+    /// here the beam carries it, and it pushes nothing.
+    fn take(&mut self, world: &mut PhysicsWorld, index: usize, winner: Winner, tick: u64) {
+        let scale = self.scale;
+        let survivor = &mut self.out[index];
+        let spaceling = survivor
+            .spaceling
+            .as_ref()
+            .expect("a spaceling that surrendered");
+        let body = spaceling.body();
+        let from = world.motion(body).expect("a spaceling that surrendered");
+        let side = (from.position.x - winner.hull.position.x).signum();
+        world.set_body_kind(body, BodyKind::KinematicPosition, true);
+        world.set_collision_groups(spaceling.collider(), CollisionGroups::NONE);
+        let beside = Vec2::new(side * (winner.half.x + BESIDE.x * scale), BESIDE.y * scale);
+        let arc = take_arc(world, from.position, winner.hull.position + beside, scale);
+        survivor.taken = Some((from, beside, arc));
+        survivor.enter(Phase::Taken, tick);
+    }
+
+    /// Whether every survivor is ready to leave at `tick`, or lost, so the
+    /// aftermath can end: one has waved long enough for its beam, sat on
+    /// the winner's roof a moment, or been drawn to the winner's side.
+    /// Without a survivor, it can.
     pub fn ready(&self, tick: u64) -> bool {
         self.out.iter().all(|survivor| match survivor.phase {
             Phase::Lost | Phase::BeamedUp => true,
             Phase::Waving => tick - survivor.since >= WAVE_TICKS,
+            Phase::Riding => tick - survivor.since >= RIDE_TICKS,
+            Phase::Taken => tick - survivor.since >= TAKE_TICKS,
             _ => false,
         })
     }
 
-    /// Starts the beams that lift out the survivors still in view at `tick`,
-    /// each spaceling standing or as it lies, or in its pod if it never
-    /// climbed out. Answers whether there are any.
-    pub fn begin_rescue(&mut self, world: &mut PhysicsWorld, tick: u64) -> bool {
+    /// The longest the aftermath waits for the survivors: long enough for a
+    /// stowaway's run or a surrender, or for a spaceling that waves for the
+    /// rescue beam.
+    pub fn aftermath_ticks(&self) -> u64 {
+        if self
+            .out
+            .iter()
+            .all(|survivor| survivor.drawn == Ending::RescueBeam)
+        {
+            RESCUE_BY_TICKS
+        } else {
+            AFTERMATH_TICKS
+        }
+    }
+
+    /// The survivors the winner's beam carries up with its hull, with their
+    /// bodies as they stand: the stowaways on its roof, or still climbing
+    /// on, and those it has taken.
+    pub fn riders(&mut self, world: &PhysicsWorld, tick: u64) -> Vec<(BodyId, BodyMotion)> {
+        let mut riders = Vec::new();
+        for survivor in &mut self.out {
+            if !matches!(
+                survivor.phase,
+                Phase::Climbing | Phase::Riding | Phase::Taken
+            ) {
+                continue;
+            }
+            if survivor.phase == Phase::Climbing {
+                survivor.ride(tick);
+            }
+            let body = survivor.spaceling.as_ref().expect("a rider").body();
+            riders.push((body, world.motion(body).expect("a rider")));
+        }
+        riders
+    }
+
+    /// Starts the beams that lift out the survivors still in view at `tick`
+    /// that the winner's beam does not carry: each spaceling standing or as
+    /// it lies, or in its pod if it never climbed out. One whose own ending
+    /// had not finished falls back to the rescue beam: out of time, or with
+    /// no way once the `winner` has gone. Answers whether there are any.
+    pub fn begin_rescue(
+        &mut self,
+        world: &mut PhysicsWorld,
+        tick: u64,
+        winner: Option<Winner>,
+    ) -> bool {
         let mut any = false;
         for survivor in &mut self.out {
-            if matches!(survivor.phase, Phase::Lost | Phase::BeamedUp) {
+            if matches!(
+                survivor.phase,
+                Phase::Lost | Phase::BeamedUp | Phase::Climbing | Phase::Riding | Phase::Taken
+            ) {
                 continue;
+            }
+            if survivor.ending != Ending::RescueBeam {
+                survivor.ending = Ending::RescueBeam;
+                survivor.fallback = Some(if winner.is_some() {
+                    Fallback::OutOfTime
+                } else {
+                    Fallback::NoWay
+                });
             }
             let body = survivor
                 .spaceling
@@ -584,10 +1314,16 @@ impl Survivors {
     }
 
     /// Lifts each survivor `phase_tick` ticks into the beam-up, before the
-    /// arena's step: once its beam has come down, up and out.
+    /// arena's step: its own beam comes down on it, then lifts it up and
+    /// out. Those the winner's beam carries, it follows as they go.
     pub fn lift(&mut self, world: &mut PhysicsWorld, phase_tick: u64) {
         let rise = BEAM_UP_TICKS - RESCUE_DESCENT_TICKS;
         for survivor in &mut self.out {
+            if let (Phase::Riding | Phase::Taken, Some(spaceling)) =
+                (survivor.phase, &survivor.spaceling)
+            {
+                survivor.position = world.motion(spaceling.body()).expect("a rider").position;
+            }
             let Some((body, from)) = survivor.lifted else {
                 continue;
             };
@@ -599,15 +1335,32 @@ impl Survivors {
         }
     }
 
-    /// How far into the beam-up a survivor rises and fades, at `phase_tick`
-    /// ticks: none while its beam comes down, to gone.
+    /// How far into the beam-up a survivor its own beam lifts rises and
+    /// fades, at `phase_tick` ticks: none while its beam comes down, to
+    /// gone.
     pub fn rescued(phase_tick: u64) -> f32 {
         let rise = BEAM_UP_TICKS - RESCUE_DESCENT_TICKS;
         (phase_tick.saturating_sub(RESCUE_DESCENT_TICKS) as f32 / rise as f32).min(1.0)
     }
 
-    /// As the hills withdraw, the beamed-up survivors go. Answers the empty
-    /// pods, which go with the hills.
+    /// Where the winner's turret turns: onto a spaceling that surrenders,
+    /// from when its flag goes up, and as the winner's beam draws it in.
+    pub fn target(&self) -> Option<Vec2> {
+        self.out
+            .iter()
+            .find(|survivor| matches!(survivor.phase, Phase::Surrendering | Phase::Taken))
+            .map(|survivor| survivor.position)
+    }
+
+    /// The spaceling the winner's beam has taken, if any.
+    pub fn taken(&self) -> Option<&Survivor> {
+        self.out
+            .iter()
+            .find(|survivor| survivor.phase == Phase::Taken)
+    }
+
+    /// As the hills withdraw, the survivors have gone up the beams. Answers
+    /// the empty pods, which go with the hills.
     pub fn withdraw(&mut self, world: &mut PhysicsWorld) -> Vec<BodyId> {
         let mut pods = Vec::new();
         for survivor in &mut self.out {
@@ -651,7 +1404,9 @@ impl Survivors {
         let survivor = self.get(slot)?;
         Some(ClockTanksSurvivor {
             ejection: survivor.ejection,
-            ending: ClockTanksEnding::RescueBeam,
+            ending: survivor.ending,
+            drawn: survivor.drawn,
+            fallback: survivor.fallback,
             phase: survivor.phase,
             position_milli: [survivor.position.x, survivor.position.y]
                 .map(|v| (v * 1000.0).round() as i32),

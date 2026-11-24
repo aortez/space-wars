@@ -430,6 +430,15 @@ impl HostedDuel {
     pub fn impacts(&self) -> &[Impact] {
         &self.duel.impact_events
     }
+    /// Points a tank's barrel along `direction`, in the world as in the
+    /// duel, as a host's own choreography may once the duel is over. The
+    /// barrel turns about its pivot whichever way the hull lies, and it may
+    /// point below the level. A CPU sets it again whenever it aims.
+    pub fn point_barrel(&mut self, slot: usize, direction: Vec2) {
+        let tank = &mut self.duel.tanks[slot];
+        tank.facing = if direction.x < 0.0 { -1.0 } else { 1.0 };
+        tank.elevation = direction.y.atan2(direction.x.abs());
+    }
     pub fn reserved_grains(&self) -> usize {
         self.duel.placement.reserved_grains
     }

@@ -331,6 +331,17 @@ fn zoom(
     patch: (usize, usize),
     scale: usize,
 ) -> SharedPixelBuffer<Rgb8Pixel> {
+    let framed: Vec<_> = frames.iter().map(|&frame| (frame, centre)).collect();
+    follow(&framed, patch, scale)
+}
+
+/// The `patch` of each frame around its own centre, side by side and
+/// `scale` times larger.
+fn follow(
+    frames: &[(&SharedPixelBuffer<Rgb8Pixel>, [f32; 2])],
+    patch: (usize, usize),
+    scale: usize,
+) -> SharedPixelBuffer<Rgb8Pixel> {
     const GAP: usize = 8;
     let (width, height) = (patch.0 * scale, patch.1 * scale);
     let count = frames.len();
@@ -340,7 +351,7 @@ fn zoom(
     );
     let stride = zoomed.width() as usize;
     let pixels = zoomed.make_mut_slice();
-    for (side, frame) in frames.iter().enumerate() {
+    for (side, (frame, centre)) in frames.iter().enumerate() {
         let (frame_width, frame_height) = (frame.width() as usize, frame.height() as usize);
         let left = (centre[0].round() as usize).saturating_sub(patch.0 / 2);
         let top = (centre[1].round() as usize).saturating_sub(patch.1 / 2);
@@ -549,11 +560,12 @@ impl Camera {
 fn tanks_spacelings_get_out_and_are_beamed_up() {
     use engine_common::{ClockTanksEjection as Ejection, ClockTanksSurvivorPhase as Phase};
     let camera = Camera::new();
-    // Both sides of these fights roll the same way, so whichever tank loses,
-    // its spaceling is thrown clear, or gets out in a pod.
+    // Both sides of these fights roll the same way and draw the rescue beam,
+    // so whichever tank loses, its spaceling is thrown clear, or gets out in
+    // a pod, and waits for its beam.
     for (size, thrown, pod, patch, scale) in [
-        ((1024, 768), 102, 132, (112, 64), 5),
-        ((800, 480), 102, 305, (88, 48), 6),
+        ((1024, 768), 212, 2963, (112, 64), 5),
+        ((800, 480), 212, 2963, (88, 48), 6),
     ] {
         let viewport = Viewport::new(size.0 as f32, size.1 as f32);
         let name = format!("{}x{}", size.0, size.1);
@@ -640,6 +652,85 @@ fn tanks_spacelings_get_out_and_are_beamed_up() {
                     patch,
                     scale,
                 ),
+            );
+        }
+    }
+}
+
+#[test]
+fn tanks_spacelings_stow_away_or_surrender() {
+    use engine_common::{ClockTanksEnding as Ending, ClockTanksSurvivorPhase as Phase};
+    let camera = Camera::new();
+    // Both sides of these fights are thrown clear and draw the same ending,
+    // so whichever tank loses, its spaceling stows away on the winner, or
+    // surrenders to it.
+    for (size, patch, scale) in [((1024, 768), (112, 64), 5), ((800, 480), (88, 48), 6)] {
+        let viewport = Viewport::new(size.0 as f32, size.1 as f32);
+        let name = format!("{}x{}", size.0, size.1);
+        for (seed, ending) in [(102, Ending::Stowaway), (602, Ending::Surrender)] {
+            let readings = record_through(face_fight(viewport, seed), |tanks| {
+                tanks.survivors.into_iter().flatten().next()
+            });
+            let first = |phase: Phase| {
+                readings
+                    .iter()
+                    .position(|(_, survivor)| survivor.is_some_and(|s| s.phase == phase))
+                    .unwrap_or_else(|| panic!("{name} {seed}: {phase:?}"))
+            };
+            let beam_up = readings
+                .iter()
+                .position(|(phase, _)| *phase == Some("beam-up"))
+                .unwrap();
+            // Running for the winner, climbing over its turret, riding
+            // behind it, and riding it out in its beam. Or its white flag
+            // going up, the winner's beam coming down on it, drawing it to
+            // the winner's side, and the winner's beam, widened, taking
+            // them up together.
+            let (label, ticks, full): (_, _, &[(&str, usize)]) = match ending {
+                Ending::Stowaway => (
+                    "stowaway",
+                    [
+                        first(Phase::Running) + 45,
+                        first(Phase::Climbing) + 15,
+                        first(Phase::Riding) + 15,
+                        beam_up + 50,
+                    ],
+                    &[("", 3)],
+                ),
+                Ending::Surrender => (
+                    "surrender",
+                    [
+                        first(Phase::Surrendering) + 15,
+                        first(Phase::Taken) + 20,
+                        first(Phase::Taken) + 60,
+                        beam_up + 40,
+                    ],
+                    &[("-taken", 2), ("-beam", 3)],
+                ),
+                Ending::RescueBeam => unreachable!(),
+            };
+            let shots = camera.frames(size, seed, &ticks);
+            for (state, _) in &shots {
+                let survivor = state.survivors.into_iter().flatten().next().unwrap();
+                assert_eq!((survivor.drawn, survivor.ending), (ending, ending));
+                assert_eq!(survivor.fallback, None);
+            }
+            for (suffix, index) in full {
+                camera.keep(&format!("{name}-{label}{suffix}"), &shots[*index].1);
+            }
+            // Each frame around the spaceling, a little above it.
+            let state = face_fight(viewport, seed);
+            let framed: Vec<_> = shots
+                .iter()
+                .map(|(tanks, pixels)| {
+                    let survivor = tanks.survivors.into_iter().flatten().next().unwrap();
+                    let [x, y] = on_screen(&state, size, survivor.position_milli);
+                    (pixels, [x, y - patch.1 as f32 * 0.2])
+                })
+                .collect();
+            camera.keep(
+                &format!("{name}-{label}-zoom"),
+                &follow(&framed, patch, scale),
             );
         }
     }

@@ -1223,17 +1223,44 @@ impl ClockTanksEjection {
 }
 
 /// How a surviving spaceling leaves the battlefield.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ClockTanksEnding {
     /// A beam comes down on it and lifts it out.
+    #[default]
     RescueBeam,
+    /// It runs to the winner, climbs onto its roof and rides out with it.
+    Stowaway,
+    /// It raises a white flag, and the winner's beam takes it along.
+    Surrender,
 }
 
 impl ClockTanksEnding {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::RescueBeam => "rescue-beam",
+            Self::Stowaway => "stowaway",
+            Self::Surrender => "surrender",
+        }
+    }
+}
+
+/// Why a surviving spaceling's ending fell back to the rescue beam.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockTanksFallback {
+    /// No way over the hills to the winner: a step higher than it jumps, a
+    /// drop deeper than it lands from on its feet, or something in the way.
+    NoWay,
+    /// It could not finish before the aftermath ran out.
+    OutOfTime,
+}
+
+impl ClockTanksFallback {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::NoWay => "no-way",
+            Self::OutOfTime => "out-of-time",
         }
     }
 }
@@ -1256,7 +1283,17 @@ pub enum ClockTanksSurvivorPhase {
     LookingAround,
     /// Standing, waving.
     Waving,
-    /// Lifted out by its beam.
+    /// Running to the winner.
+    Running,
+    /// Climbing onto the winner's roof.
+    Climbing,
+    /// On the winner's roof, riding it out.
+    Riding,
+    /// Standing with a white flag raised.
+    Surrendering,
+    /// Drawn to the winner's side in the winner's beam, its flag still up.
+    Taken,
+    /// Lifted out by its beam, or by the winner's.
     BeamedUp,
     /// Gone out of view.
     Lost,
@@ -1272,6 +1309,11 @@ impl ClockTanksSurvivorPhase {
             Self::GettingUp => "getting-up",
             Self::LookingAround => "looking-around",
             Self::Waving => "waving",
+            Self::Running => "running",
+            Self::Climbing => "climbing",
+            Self::Riding => "riding",
+            Self::Surrendering => "surrendering",
+            Self::Taken => "taken",
             Self::BeamedUp => "beamed-up",
             Self::Lost => "lost",
         }
@@ -1282,7 +1324,15 @@ impl ClockTanksSurvivorPhase {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockTanksSurvivor {
     pub ejection: ClockTanksEjection,
+    /// The ending it is on: the one it drew, or the rescue beam once that
+    /// ending has fallen back.
     pub ending: ClockTanksEnding,
+    /// The ending its roll drew from those that fit the fight.
+    #[serde(default)]
+    pub drawn: ClockTanksEnding,
+    /// Why its ending fell back to the rescue beam, if it did.
+    #[serde(default)]
+    pub fallback: Option<ClockTanksFallback>,
     pub phase: ClockTanksSurvivorPhase,
     /// The spaceling, or its pod while it is sealed in, in world milli
     /// units.
