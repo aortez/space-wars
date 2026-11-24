@@ -21,7 +21,6 @@ pub const RAISE_TICKS: u64 = 2 * FIXED_HZ as u64;
 pub const BEAM_DOWN_TICKS: u64 = 2 * FIXED_HZ as u64;
 pub const SETTLE_TICKS: u64 = 2 * FIXED_HZ as u64;
 pub const COMBAT_TICKS: u64 = 60 * FIXED_HZ as u64;
-pub const CRUMBLE_TICKS: u64 = FIXED_HZ as u64;
 pub const BEAM_UP_TICKS: u64 = 2 * FIXED_HZ as u64;
 pub const WITHDRAW_TICKS: u64 = 3 * FIXED_HZ as u64;
 pub const MAX_TICKS: u64 = RAISE_TICKS
@@ -29,7 +28,7 @@ pub const MAX_TICKS: u64 = RAISE_TICKS
     + SETTLE_TICKS
     + COMBAT_TICKS
     + SHELL_LIFETIME_TICKS as u64
-    + CRUMBLE_TICKS
+    + BLOW_UP_TICKS
     + BEAM_UP_TICKS
     + WITHDRAW_TICKS;
 pub const REUSE_TICKS: u64 = 120 * FIXED_HZ as u64;
@@ -42,11 +41,11 @@ const BUDGET: Budget = Budget::for_terrain(
     true,
     scenario_scorched_earth::host::MAX_TERRAIN_WIDTH,
 );
-/// The duel's budget, the face's fixed body of boxes, and the cells the
-/// shells knock loose.
+/// The duel's budget, the face's fixed body of boxes, the cells the shells
+/// knock loose, and the pieces the losers blow apart into.
 pub const POPULATION: Population = Population {
-    bodies: BUDGET.bodies + 1 + MAX_LOOSE,
-    colliders: BUDGET.colliders + digits::MAX_CELLS + MAX_LOOSE,
+    bodies: BUDGET.bodies + 1 + MAX_LOOSE + MAX_PIECES,
+    colliders: BUDGET.colliders + digits::MAX_CELLS + MAX_LOOSE + MAX_PIECE_COLLIDERS,
     joints: BUDGET.joints,
 };
 
@@ -104,8 +103,10 @@ pub fn dodging(seed: u64) -> [bool; 2] {
 mod damage;
 mod digits;
 mod entry;
+pub mod wreck;
 pub use damage::MAX_LOOSE;
 pub use entry::placement;
+pub use wreck::{BLOW_UP_TICKS, MAX_PIECE_COLLIDERS, MAX_PIECES};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ResultKind {
@@ -149,7 +150,10 @@ pub struct TanksEvent {
     pub phase: EventPhase,
     pub phase_tick: u64,
     pub duel: HostedDuel,
+    /// The dirt the losers' pieces have turned into.
     pub converted: Vec<TerrainGrain>,
+    /// The losers, blown apart.
+    pub wreck: wreck::Wreck,
     pub result: Option<ResultKind>,
     combat_ticks: u64,
     /// The combat tick fire opened on.
@@ -168,7 +172,6 @@ pub struct TanksEvent {
     parts: [Vec<(BodyId, Vec2)>; 2],
     departure: Vec<(BodyId, BodyMotion)>,
     withdrawal: f32,
-    shape: GrainShape,
     final_health: Option<[f32; 2]>,
     retired_tank_mass: f32,
     entry_failure: Option<&'static str>,
@@ -244,6 +247,7 @@ impl TanksEvent {
             phase_tick: 0,
             duel,
             converted: Vec::new(),
+            wreck: wreck::Wreck::new(seed, scale, shape),
             result: None,
             combat_ticks: 0,
             fire_opened: None,
@@ -257,7 +261,6 @@ impl TanksEvent {
             parts,
             departure: Vec::new(),
             withdrawal: 0.0,
-            shape,
             final_health: None,
             retired_tank_mass: 0.0,
             entry_failure: None,
@@ -475,7 +478,15 @@ impl TanksEvent {
                 }
             }
             EventPhase::FinishingShots if self.duel.active_shells() == 0 => self.resolve(world),
-            EventPhase::Crumbling if self.phase_tick == CRUMBLE_TICKS => self.begin_beam_up(world),
+            EventPhase::BlowingUp => {
+                let ending = self.phase_tick == BLOW_UP_TICKS;
+                if !self
+                    .wreck
+                    .observe(world, self.layout, self.tick, ending, &mut self.converted)
+                {
+                    self.begin_beam_up(world);
+                }
+            }
             EventPhase::BeamUp if self.phase_tick == BEAM_UP_TICKS => self.begin_withdrawal(world),
             EventPhase::Withdrawing if self.phase_tick == WITHDRAW_TICKS => {
                 debug_assert!(self.damage.whole(), "every cell is home");
@@ -519,13 +530,17 @@ impl TanksEvent {
         self.final_health = Some(health);
         let winners = result.winners();
         let mut ids = self.duel.conversion_ids();
-        let scale = self.duel.placement().scale;
+        let gravity_scale = self.duel.gravity_scale(world);
         for (slot, tank) in tanks
             .into_iter()
             .enumerate()
             .filter(|(slot, _)| !winners[*slot])
         {
             self.retired_tank_mass += world.body_mass(tank.body).unwrap_or(0.0);
+            let gear = self
+                .duel
+                .running_gear(world, slot)
+                .expect("a loser's running gear");
             self.duel
                 .retire_tank(world, slot)
                 .expect("post-step retirement");
@@ -534,33 +549,14 @@ impl TanksEvent {
             {
                 continue;
             }
-            for cell in 0..DIRT_PER_TANK {
-                let grain = TerrainGrain::insert_with_shape(
-                    world,
-                    PhysicsId::new(ids.next().expect("reserved conversion IDs")),
-                    GrainSeed {
-                        cell: Cell {
-                            material: MaterialId(1),
-                            durability: 100,
-                        },
-                        cell_size: 0.5 * scale,
-                        parent_offset: Vec2::new((cell % 6) as f32 - 2.5, (cell / 6) as f32 - 1.5)
-                            * (0.5 * scale),
-                    },
-                    tank.motion,
-                    tank.motion.position,
-                    TerrainSpec::default(),
-                    self.shape,
-                )
-                .expect("reserved dirt conversion");
-                world.set_gravity_scale(grain.body(), 18.0 * scale / -world.gravity().y, true);
-                self.converted.push(grain);
-            }
+            let loser = wreck::Loser { slot, tank, gear };
+            self.wreck
+                .blow_up(world, loser, gravity_scale, self.tick, &mut ids);
         }
-        if self.converted.is_empty() {
+        if self.wreck.pieces.is_empty() {
             self.begin_beam_up(world);
         } else {
-            self.enter(EventPhase::Crumbling);
+            self.enter(EventPhase::BlowingUp);
         }
     }
 
@@ -572,6 +568,7 @@ impl TanksEvent {
     }
 
     fn begin_beam_up(&mut self, world: &mut PhysicsWorld) {
+        debug_assert!(self.wreck.pieces.is_empty(), "every piece is dirt");
         self.departure.clear();
         let winners = self.result.expect("result settled").winners();
         for (slot, tank) in self.duel.tanks(world).into_iter().enumerate() {
@@ -620,6 +617,7 @@ impl TanksEvent {
     pub fn release(&mut self, arena: &mut ClockArena) {
         if let Some(world) = arena.held_mut(OWNER) {
             self.damage.release(world);
+            self.wreck.release(world);
             self.duel.retire(world);
         }
         self.converted.clear();
@@ -665,7 +663,8 @@ impl TanksEvent {
             }),
             tank_ids: tanks.map(|t| t.body.entity.value()),
             terrain_ids: self.duel.terrain().iter().map(|f| f.id.value()).collect(),
-            bodies: self.duel.body_ids().count() as u32 + self.converted.len() as u32,
+            bodies: (self.duel.body_ids().count() + self.converted.len() + self.wreck.pieces.len())
+                as u32,
             terrain_cells: self
                 .duel
                 .terrain()
@@ -684,6 +683,7 @@ impl TanksEvent {
             shots: self.duel.shots(),
             result: self.result.map(|r| r.label().into()),
             converted_cells: self.converted.len() as u32,
+            pieces: self.wreck.pieces.len() as u32,
             retired_tank_mass_milli: (self.retired_tank_mass * 1000.0).round() as u32,
             conversion_area_milli: (1000.0
                 * self.converted.len() as f32
