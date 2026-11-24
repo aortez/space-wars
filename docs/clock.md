@@ -503,7 +503,7 @@ load, and without it the grains at the bottom read as knocked tick after
 tick.
 
 A look visits at most 512 bodies across the worlds; the arena holds at most
-281, or 364 under Tanks. On the development workstation (`--profile ci`), the
+281, or 368 under Tanks. On the development workstation (`--profile ci`), the
 ignored test `what_a_look_costs` timed a look at 512 moving bodies, all in
 view, at about 52 µs. In events the 99th percentile was about 10 µs for
 Tanks, with up to 92 bodies, 8 µs for Exploding digits and for Coins, and
@@ -1174,7 +1174,7 @@ the Off profile still disables every automatic event.
 | `explosion` | Individual digit/AM-PM blocks scatter and bounce | 0.6 s warning + 3.5 s burst + 1.5 s reform | 45 s |
 | `spider` | One visitor on a silk line, climbing and swinging on the digits in the run's arena | At most 30 s including departure, with up to 10 s more to finish leaving | 30 s after departure |
 | `coins` | Lit cells turn into coins that drop, roll and pile; a magpie carries three or four off, and the rest fly home | 0.6 s minting + 4 s cascade + 23 s gathering + 1.5 s reform | 45 s |
-| `tanks` | Two CPU tanks duel on destructible hills below the reading, whose lit cells stop their shells | At most 86 s, including entry, one transport retry and departure | 120 s |
+| `tanks` | Two CPU tanks duel on destructible hills below the reading, whose lit cells stop their shells | At most 92 s, including entry, one transport retry and departure | 120 s |
 
 ### Tanks
 
@@ -1246,7 +1246,8 @@ ones `interrupted`, as any event cut short does.
 | `fighting` | 60 s | Fire is held while the tanks drive to their range, for at most 12 s. Then shared CPU driving and dodging, swept shells that burst on the lit face and knock cells loose, craters, loose dirt and weak-bank collapse. |
 | `finishing-shots` | 10 s | No new driving or fire; existing shells finish before deciding the result. |
 | `blowing-up` | 3 s | Each in-view loser blows apart, and each piece turns to dirt where it comes to rest. |
-| `beam-up` | 2 s | Surviving winners depart. |
+| `aftermath` | 6 s | A spaceling that got out finds its feet, looks around and waves. Skipped when none got out, or once each has waved. |
+| `beam-up` | 2 s | Surviving winners depart, and a beam lifts out each spaceling still in view. |
 | `withdrawing` | 3 s | The remaining owned battlefield moves below the frame and is removed. |
 
 One living tank wins. If both remain alive at timeout, higher health wins and
@@ -1271,6 +1272,42 @@ then turns to dirt where it is, and the dirt keeps its speed. A piece that
 leaves the view retires there, and its share of the dirt with it, as an
 already off-screen loser retires without bringing its pile back into view.
 The arena keeps room for six pieces a loser, in 14 colliders for both.
+
+One loser in five gets its spaceling out. Each side rolls once as the fight
+starts, from the fight's seed but in a stream of its own, so neither the
+pairing, the dodgers nor the fight moves a roll. Half of those that get out
+are thrown clear, and half ride out in an escape pod. The spaceling is the
+physics crate's, shrunk to about a third of a tank's height, in its team's
+color with a dark visor, and it leaves from the turret toward the middle of
+the view:
+
+- Thrown clear, it tumbles up and away, spinning faster than it can keep its
+  feet, lands knocked down, and gets up as the physics crate's spaceling
+  does. Where the wreck's dirt lands on it and leaves no room to get up, it
+  crawls out from under, one way and then the other.
+- In a pod, it arcs out like a shell, trailing smoke, and lands on the pod's
+  weighted base or tips over. Once the pod has lain still for 0.4 s, or 2.5 s
+  after the blast if it is still moving, its hatch swings open and the
+  spaceling climbs out over the side it faces. The empty pod stays where it
+  lies until the hills withdraw, and goes with them.
+
+Once up, the spaceling looks the other way, then back, and waves. The
+`aftermath` phase waits until every spaceling has waved for a second, for at
+most 6 s after the blow-up; a fight without one skips it. In the beam-up, a
+narrow beam in the spaceling's team color comes down on it over half a second
+and lifts it out beside the winner's. A spaceling still down when the
+aftermath runs out is lifted out as it lies, and a pod still sealed would be
+lifted out whole. A spaceling, or a pod with its spaceling still in it, that
+leaves the view retires there, and nothing waits for it. The spacelings and
+pods meet the hills, the dirt, the floor and the winner, and pass the pieces,
+the face and one another. The arena keeps room for both sides' spacelings and
+pods, in four bodies and four colliders.
+
+Started with `--seed 102`, Clock's first event, if it is Tanks, throws its
+loser's spaceling clear whichever tank loses, and started with `--seed 132`,
+its loser's spaceling gets out in a pod. Both sides of those fights roll the
+same way. The tests force a spaceling out of the view and keep one down past
+its time, since no survey fight did either.
 
 Each loser has an authored conversion of 24 half-unit cells: six native
 area/mass units at dirt density one, scaled by the square of placement scale.
@@ -1309,14 +1346,51 @@ result. Loop CPU averaged 11.4 ms with the blow-up against 11.1 ms, with a
 against 16.9 ms. No loop ran over 16.7 ms, against one, and no display
 refresh was skipped either way.
 
+A local survey of the spacelings fought 60 seeds at each of the same five
+shapes with every loser's spaceling thrown clear, the same 60 with every one
+in a pod, and 120 seeds with the rolls as they fall:
+
+- All 324 thrown spacelings and all 324 in pods got up, waved and were
+  beamed up. None left the view, and none was still down when the aftermath
+  ran out. Thrown, a spaceling stood a median of 1.9–2.1 s after the blast,
+  and at most 4.7 s, after a median of one request to get up and at most
+  five. From a pod, it stood a median of 3.1–3.4 s after the blast, and at
+  most 4.7 s.
+- The pods opened a median of 1.9–2.1 s after the blast; 60 of the 324 were
+  still moving at 2.5 s and opened then. 44 had tipped more than 45° when
+  they opened, 32 of them onto their side or further and 4 upside down, and
+  each spaceling still climbed out.
+- The aftermath lasted a median of 1.0–1.6 s with a thrown spaceling and
+  2.3–2.8 s with a pod, and at most 4.2 s. The longest visit took 76.4 s.
+- With the rolls as they fall, 105 of the 641 losers in view, 16%, got
+  their spacelings out, 54 in pods and 51 thrown. The five shapes fought the
+  same 120 seeds, which rolled alike at each; over 240,000 seeds, the roll
+  gives one in five for each side, at every pairing and dodger.
+- No spaceling or pod came within 11.5 units of the face.
+- On the development workstation, five fights at a time, a tick while
+  blowing up or in the aftermath took a median of 0.13–0.24 ms, with a 99th
+  percentile of 0.22–0.40 ms.
+
+On sw-picade-2, at 1024×768 with the raster renderer at scale 1, the same
+eight seeds were fought twice, at different readings: once with a build that
+sent every loser's spaceling out, nine in all, four thrown and five in pods,
+and once with losers that only blow up. Each fight was traced for the 4 s from
+the blast and the 4 s after. In the 4 s from the blast, loop CPU averaged 11.5
+ms with the spacelings against 11.7 ms, with a 99th percentile of 13.4 ms
+against 13.8 ms and a slowest loop of 16.4 ms against 16.0 ms. In the next 4
+s, as the spacelings waved and were beamed up, it averaged 9.7 ms, with a
+slowest loop of 14.5 ms, against 7.5 ms while the hills withdrew and the event
+ended. No loop ran over 16.7 ms, and no display refresh was skipped either
+way.
+
 The run data stays local.
 
 Once the last shell resolves, the result is latched. Rapier continues to move
-the aftermath, while duel AI, damage and terrain topology stop changing. Pausing
-freezes all phases. Reading updates continue throughout, and both render adapters
-clip the battlefield below the face; shells and their bursts are drawn in front
-of it. Entry hulls and beams use the full-height clear lanes. Layout changes
-cancel through the normal owned cleanup path.
+the wreck and the dirt, while duel AI, damage and terrain topology stop
+changing. Pausing freezes all phases. Reading updates continue throughout, and
+both render adapters clip the battlefield below the face; shells and their
+bursts are drawn in front of it. Entry hulls and beams use the full-height
+clear lanes. Layout changes cancel through the normal owned cleanup path.
 
 How often the face stops shells depends on the screen. A local survey, with
 the rigid hulls Clock's tanks had then, ran 60 fights at each of 4:3, 5:3,
@@ -1482,11 +1556,31 @@ then the dirt they became at 3.1 s, as the winner beams up.
 `SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
 engine-client tanks_blow_apart_and_turn_to_dirt` regenerates all four.
 
+| | The rescue, as the winner beams up | Getting out, standing, waving and the rescue beam, five or six times larger |
+| --- | --- | --- |
+| 1024×768, thrown | ![The left tank in its wide beam, and the right tank's spaceling lifted in a narrow beam above the dirt](screenshots/clock/tanks-1024x768-thrown-rescue.png) | ![The spaceling thrown up beside the turret, lying where it landed, standing and waving, then lifted in its beam](screenshots/clock/tanks-1024x768-thrown-zoom.png) |
+| 1024×768, pod | ![The right tank in its wide beam, and the left tank's spaceling lifted in a narrow beam beside its open pod](screenshots/clock/tanks-1024x768-pod-rescue.png) | ![The pod arcing out on a trail of smoke, landed with its hatch swinging open, the spaceling climbing out, waving beside it, then lifted in its beam](screenshots/clock/tanks-1024x768-pod-zoom.png) |
+| 800×480, thrown | ![The left tank in its wide beam, and the right tank's spaceling lifted in a narrow beam](screenshots/clock/tanks-800x480-thrown-rescue.png) | ![The spaceling thrown up beside the turret, lying where it landed, standing and waving, then lifted in its beam](screenshots/clock/tanks-800x480-thrown-zoom.png) |
+| 800×480, pod | ![The right tank in its wide beam, and the left tank's spaceling lifted in a narrow beam beside its open pod](screenshots/clock/tanks-800x480-pod-rescue.png) | ![The pod arcing out on a trail of smoke, landed with its hatch open, the spaceling climbing out, waving beside it, then lifted in its beam](screenshots/clock/tanks-800x480-pod-zoom.png) |
+
+Seed 102 throws the loser's spaceling clear at both sizes; seed 132 at
+1024×768 and seed 305 at 800×480 send it out in a pod. A thrown strip shows
+the spaceling 0.4 s after the blast, tumbling beside the turret, then down
+where it landed, waving, and lifted out 1.25 s into the beam-up. A pod strip
+shows the pod in flight 0.5 s after the blast, landed with its hatch opening,
+the spaceling climbing out, waving beside the pod, and lifted out.
+`SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
+engine-client tanks_spacelings_get_out_and_are_beamed_up` regenerates all
+eight.
+
 `clock state` includes phase, support, world positions, hull and terrain IDs,
 health, the two CPUs (`cpu`), whether each is dodging a shell (`dodging`),
 shell/shot counts, the shells the face stopped (`face_hits`), the cells they
 knocked loose (`knocked_loose`), the losers' pieces not yet turned to dirt
-(`pieces`), conversion accounting and any settling failure in `tanks`.
+(`pieces`), how each side's spaceling gets out if its tank blows up
+(`ejections`), each spaceling that has got out with its phase, position and
+knockdowns (`survivors`), conversion accounting and any settling failure in
+`tanks`.
 Values with a `_milli` suffix use thousandths of their inspection
 unit (positions, area and mass use host units). The common damage-material migration
 and damage to resident plants remain follow-up work: this integration uses Scorched's current tank HP rule and does

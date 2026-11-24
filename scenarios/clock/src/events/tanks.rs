@@ -29,6 +29,7 @@ pub const MAX_TICKS: u64 = RAISE_TICKS
     + COMBAT_TICKS
     + SHELL_LIFETIME_TICKS as u64
     + BLOW_UP_TICKS
+    + AFTERMATH_TICKS
     + BEAM_UP_TICKS
     + WITHDRAW_TICKS;
 pub const REUSE_TICKS: u64 = 120 * FIXED_HZ as u64;
@@ -42,10 +43,15 @@ const BUDGET: Budget = Budget::for_terrain(
     scenario_scorched_earth::host::MAX_TERRAIN_WIDTH,
 );
 /// The duel's budget, the face's fixed body of boxes, the cells the shells
-/// knock loose, and the pieces the losers blow apart into.
+/// knock loose, the pieces the losers blow apart into, and the spacelings
+/// that get out and their pods.
 pub const POPULATION: Population = Population {
-    bodies: BUDGET.bodies + 1 + MAX_LOOSE + MAX_PIECES,
-    colliders: BUDGET.colliders + digits::MAX_CELLS + MAX_LOOSE + MAX_PIECE_COLLIDERS,
+    bodies: BUDGET.bodies + 1 + MAX_LOOSE + MAX_PIECES + MAX_SURVIVOR_BODIES,
+    colliders: BUDGET.colliders
+        + digits::MAX_CELLS
+        + MAX_LOOSE
+        + MAX_PIECE_COLLIDERS
+        + MAX_SURVIVOR_BODIES,
     joints: BUDGET.joints,
 };
 
@@ -103,9 +109,11 @@ pub fn dodging(seed: u64) -> [bool; 2] {
 mod damage;
 mod digits;
 mod entry;
+pub mod survivor;
 pub mod wreck;
 pub use damage::MAX_LOOSE;
 pub use entry::placement;
+pub use survivor::{AFTERMATH_TICKS, MAX_SURVIVOR_BODIES};
 pub use wreck::{BLOW_UP_TICKS, MAX_PIECE_COLLIDERS, MAX_PIECES};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -154,6 +162,8 @@ pub struct TanksEvent {
     pub converted: Vec<TerrainGrain>,
     /// The losers, blown apart.
     pub wreck: wreck::Wreck,
+    /// The losers' spacelings that get out.
+    pub survivors: survivor::Survivors,
     pub result: Option<ResultKind>,
     combat_ticks: u64,
     /// The combat tick fire opened on.
@@ -248,6 +258,7 @@ impl TanksEvent {
             duel,
             converted: Vec::new(),
             wreck: wreck::Wreck::new(seed, scale, shape),
+            survivors: survivor::Survivors::new(seed, scale),
             result: None,
             combat_ticks: 0,
             fire_opened: None,
@@ -385,6 +396,14 @@ impl TanksEvent {
             }
             _ => (),
         }
+        match self.phase {
+            EventPhase::BlowingUp | EventPhase::Aftermath => {
+                let gravity = world.gravity() * self.duel.gravity_scale(world);
+                self.survivors.control(world, gravity, self.tick);
+            }
+            EventPhase::BeamUp => self.survivors.lift(world, self.phase_tick),
+            _ => (),
+        }
         if self.simulates_duel() {
             let drives = self
                 .duel
@@ -480,10 +499,23 @@ impl TanksEvent {
             EventPhase::FinishingShots if self.duel.active_shells() == 0 => self.resolve(world),
             EventPhase::BlowingUp => {
                 let ending = self.phase_tick == BLOW_UP_TICKS;
+                self.survivors.observe(world, self.layout, self.tick);
                 if !self
                     .wreck
                     .observe(world, self.layout, self.tick, ending, &mut self.converted)
                 {
+                    // A survivor still getting up, looking around or waving
+                    // has the aftermath to finish in.
+                    if self.survivors.ready(self.tick) {
+                        self.begin_beam_up(world);
+                    } else {
+                        self.enter(EventPhase::Aftermath);
+                    }
+                }
+            }
+            EventPhase::Aftermath => {
+                self.survivors.observe(world, self.layout, self.tick);
+                if self.survivors.ready(self.tick) || self.phase_tick == AFTERMATH_TICKS {
                     self.begin_beam_up(world);
                 }
             }
@@ -552,6 +584,8 @@ impl TanksEvent {
             let loser = wreck::Loser { slot, tank, gear };
             self.wreck
                 .blow_up(world, loser, gravity_scale, self.tick, &mut ids);
+            self.survivors
+                .eject(world, slot, &tank, gravity_scale, self.tick);
         }
         if self.wreck.pieces.is_empty() {
             self.begin_beam_up(world);
@@ -581,7 +615,9 @@ impl TanksEvent {
                 }
             }
         }
-        if self.departure.is_empty() {
+        // The survivors' beams come down as the winner's lifts it.
+        let rescued = self.survivors.begin_rescue(world, self.tick);
+        if self.departure.is_empty() && !rescued {
             self.begin_withdrawal(world);
         } else {
             self.enter(EventPhase::BeamUp);
@@ -596,10 +632,14 @@ impl TanksEvent {
                 .retire_tank(world, slot)
                 .expect("post-step retirement");
         }
+        // The survivors have gone up their beams; their empty pods go with
+        // the hills.
+        let pods = self.survivors.withdraw(world);
         self.departure = self
             .duel
             .body_ids()
             .chain(self.converted.iter().map(|g| g.body()))
+            .chain(pods)
             .filter_map(|body| world.motion(body).map(|motion| (body, motion)))
             .collect();
         let highest = self
@@ -618,6 +658,7 @@ impl TanksEvent {
         if let Some(world) = arena.held_mut(OWNER) {
             self.damage.release(world);
             self.wreck.release(world);
+            self.survivors.release(world);
             self.duel.retire(world);
         }
         self.converted.clear();
@@ -663,8 +704,10 @@ impl TanksEvent {
             }),
             tank_ids: tanks.map(|t| t.body.entity.value()),
             terrain_ids: self.duel.terrain().iter().map(|f| f.id.value()).collect(),
-            bodies: (self.duel.body_ids().count() + self.converted.len() + self.wreck.pieces.len())
-                as u32,
+            bodies: (self.duel.body_ids().count()
+                + self.converted.len()
+                + self.wreck.pieces.len()
+                + self.survivors.bodies()) as u32,
             terrain_cells: self
                 .duel
                 .terrain()
@@ -694,6 +737,8 @@ impl TanksEvent {
             dodging: self.duel.dodging(),
             face_hits: self.face_hits,
             knocked_loose: self.damage.knocked_loose(),
+            ejections: self.survivors.rolls,
+            survivors: [0, 1].map(|slot| self.survivors.state(slot)),
         }
     }
 }

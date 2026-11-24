@@ -58,7 +58,7 @@ pub enum ClockCommand {
     Wait {
         #[arg(long, value_parser = ["idle", "active", "cooldown"])]
         lifecycle: Option<String>,
-        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing", "entering", "perched", "hopping", "flying", "leaving", "warning", "exploding", "filling", "swimming", "spinning", "descending", "crossing", "climbing", "crawling", "swinging", "recovering", "minting", "cascading", "gathering", "raising", "beam-down", "settling", "fighting", "finishing-shots", "blowing-up", "beam-up", "withdrawing"])]
+        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing", "entering", "perched", "hopping", "flying", "leaving", "warning", "exploding", "filling", "swimming", "spinning", "descending", "crossing", "climbing", "crawling", "swinging", "recovering", "minting", "cascading", "gathering", "raising", "beam-down", "settling", "fighting", "finishing-shots", "blowing-up", "aftermath", "beam-up", "withdrawing"])]
         phase: Option<String>,
         #[arg(long, value_parser = parse_event)]
         event: Option<ClockEventKind>,
@@ -305,6 +305,19 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
             );
             if let Some(reason) = &tanks.entry_failure {
                 println!("Tanks entry: {reason}");
+            }
+            for (side, survivor) in ["Left", "Right"].into_iter().zip(&tanks.survivors) {
+                if let Some(survivor) = survivor {
+                    println!(
+                        "{side} spaceling: {}, got out {}, ending {}, position={:?}, stood up={}, knockdowns={}",
+                        survivor.phase.as_str(),
+                        survivor.ejection.as_str(),
+                        survivor.ending.as_str(),
+                        survivor.position_milli,
+                        survivor.stood_up,
+                        survivor.knockdowns
+                    );
+                }
             }
         }
         if let Some(coins) = &state.coins {

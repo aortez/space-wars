@@ -200,7 +200,13 @@ impl Owner {
             Self::Event(ClockEventKind::Aquarium) => &[AQUARIUM_LINER, AQUARIUM_DIGITS],
             Self::Event(ClockEventKind::Explosion) => &[EXPLOSION_CELLS],
             Self::Event(ClockEventKind::Coins) => &[COIN_CELLS, MAGPIE],
-            Self::Event(ClockEventKind::Tanks) => &[TANKS, TANKS_CELLS, TANKS_DIGITS, TANKS_PIECES],
+            Self::Event(ClockEventKind::Tanks) => &[
+                TANKS,
+                TANKS_CELLS,
+                TANKS_DIGITS,
+                TANKS_PIECES,
+                TANKS_SURVIVORS,
+            ],
             Self::Event(ClockEventKind::Falling) => &[FALLING_SEGMENTS, FALLING_LETTERS],
             Self::Event(ClockEventKind::Meltdown) => &[MELTDOWN_CELLS],
             Self::Event(_) => &[],
@@ -1287,7 +1293,7 @@ pub(crate) mod ids {
                 duck::planner::MAX_SURFACES,
                 explosion::MAX_EXPLOSION_CELLS,
                 meltdown::MAX_MELTDOWN_CELLS,
-                tanks::{MAX_LOOSE, MAX_PIECES},
+                tanks::{MAX_LOOSE, MAX_PIECES, MAX_SURVIVOR_BODIES},
             },
         };
 
@@ -1338,6 +1344,9 @@ pub(crate) mod ids {
         pub(crate) const TANKS_CELLS: Range<u64> = 6201..6201 + MAX_LOOSE as u64;
         /// The pieces Tanks' losers blow apart into.
         pub(crate) const TANKS_PIECES: Range<u64> = 6300..6300 + MAX_PIECES as u64;
+        /// The losers' spacelings that get out, then their escape pods, by
+        /// side.
+        pub(crate) const TANKS_SURVIVORS: Range<u64> = 6320..6320 + MAX_SURVIVOR_BODIES as u64;
         /// The arena fixture's balls, `MAX_FIXTURE_BALLS` for each of its
         /// owners.
         pub(crate) const FIXTURE_BALLS: Range<u64> =
@@ -1441,6 +1450,7 @@ pub(crate) mod ids {
             ("TANKS_DIGITS", TANKS_DIGITS),
             ("TANKS_CELLS", TANKS_CELLS),
             ("TANKS_PIECES", TANKS_PIECES),
+            ("TANKS_SURVIVORS", TANKS_SURVIVORS),
             ("FIXTURE_BALLS", FIXTURE_BALLS),
             ("SPIDER", SPIDER),
             ("SPIDER_FRAME", SPIDER_FRAME),

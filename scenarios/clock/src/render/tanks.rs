@@ -4,12 +4,13 @@ use crate::{
         EventPhase, FIXED_HZ,
         tanks::{
             BEAM_DOWN_TICKS, BEAM_UP_TICKS, TanksEvent,
-            wreck::{BARREL_WIDTH, Blast, Shape, TURRET_RADIUS},
+            survivor::{self, Phase, Survivor, Survivors},
+            wreck::{BARREL_WIDTH, Blast, Puff, Shape, TURRET_RADIUS},
         },
     },
     presentation::Bounds,
 };
-use engine_rapier::world::PhysicsWorld;
+use engine_rapier::world::{BodyMotion, PhysicsWorld};
 use std::f32::consts::TAU;
 
 const EARTH: RenderColor = RenderColor::rgb(0.36, 0.27, 0.16);
@@ -38,6 +39,12 @@ const PLUME_EVERY: u64 = 9;
 const PLUME_LIFE: u64 = 150;
 /// How long the smoke a burning piece leaves behind it lasts.
 const TRAIL_LIFE: u64 = 60;
+/// A spaceling's helmet and legs, and the visor it looks out through.
+const SUIT: RenderColor = RenderColor::rgb(0.9, 0.93, 0.95);
+const VISOR: RenderColor = RenderColor::rgb(0.09, 0.16, 0.23);
+/// An escape pod's shell, and the dark inside its open hatch.
+const POD_SHELL: RenderColor = RenderColor::rgb(0.74, 0.77, 0.8);
+const POD_INSIDE: RenderColor = RenderColor::rgb(0.12, 0.13, 0.15);
 
 fn mix(a: RenderColor, b: RenderColor, t: f32) -> RenderColor {
     RenderColor::rgba(
@@ -203,22 +210,7 @@ fn wreck(
     for blast in &wreck.blasts {
         plume(frame, blast, event.tick, scale, bounds);
     }
-    for puff in &wreck.puffs {
-        let age = event.tick - puff.tick;
-        if age >= TRAIL_LIFE {
-            continue;
-        }
-        let t = age as f32 / TRAIL_LIFE as f32;
-        let seconds = age as f32 / FIXED_HZ as f32;
-        disc(
-            frame,
-            ARENA_LAYER,
-            puff.point + Vec2::Y * (0.8 * seconds * scale),
-            (0.25 + 0.6 * t) * scale,
-            bounds,
-            faded(SMOKE, 0.35 * (1.0 - t)),
-        );
-    }
+    trail(frame, &wreck.puffs, event.tick, scale, bounds);
     for piece in &wreck.pieces {
         let motion = world.motion(piece.body).expect("a piece of a tank");
         let heat = wreck.heat(piece.slot, event.tick);
@@ -256,6 +248,246 @@ fn wreck(
     for blast in &wreck.blasts {
         fireball(frame, blast, event.tick, scale, sky);
     }
+}
+
+/// The smoke a burning piece or a pod in flight left behind it, each puff
+/// rising and spreading as it thins.
+fn trail(frame: &mut RenderFrame, puffs: &[Puff], tick: u64, scale: f32, bounds: Bounds) {
+    for puff in puffs {
+        let age = tick - puff.tick;
+        if age >= TRAIL_LIFE {
+            continue;
+        }
+        let t = age as f32 / TRAIL_LIFE as f32;
+        let seconds = age as f32 / FIXED_HZ as f32;
+        disc(
+            frame,
+            ARENA_LAYER,
+            puff.point + Vec2::Y * (0.8 * seconds * scale),
+            (0.25 + 0.6 * t) * scale,
+            bounds,
+            faded(SMOKE, 0.35 * (1.0 - t)),
+        );
+    }
+}
+
+/// The losers' spacelings that got out: the smoke behind each pod in
+/// flight, the pods, the beams that come down for the spacelings, and the
+/// spacelings themselves, standing, tumbling or lying where they landed.
+fn survivors(frame: &mut RenderFrame, event: &TanksEvent, world: &PhysicsWorld, bounds: Bounds) {
+    let scale = event.duel.placement().scale;
+    let survivors = &event.survivors;
+    trail(frame, &survivors.puffs, event.tick, scale, bounds);
+    let beaming = event.phase == EventPhase::BeamUp;
+    for survivor in &survivors.out {
+        let color = TEAMS[survivor.slot];
+        let rescue = if beaming && survivor.phase == Phase::BeamedUp {
+            Survivors::rescued(event.phase_tick)
+        } else {
+            0.0
+        };
+        if let Some(pod) = survivor.pod {
+            let motion = world.motion(pod).expect("a survivor's pod");
+            // A pod the beam lifts out sealed fades as it goes.
+            let alpha = if survivor.pod_lifted() {
+                1.0 - rescue
+            } else {
+                1.0
+            };
+            escape_pod(
+                frame,
+                motion,
+                survivor.hatch(event.tick),
+                [color, faded(POD_SHELL, alpha)],
+                scale,
+                bounds,
+            );
+        }
+        if beaming && survivor.phase == Phase::BeamedUp {
+            rescue_beam(frame, survivor, event.phase_tick, scale, bounds);
+        }
+        let Some(spaceling) = &survivor.spaceling else {
+            continue;
+        };
+        let motion = world
+            .motion(spaceling.body())
+            .expect("a survivor's spaceling");
+        let wave = (survivor.phase == Phase::Waving
+            || (survivor.phase == Phase::BeamedUp && survivor.stood_up))
+            .then(|| (event.tick - survivor.since) as f32 / FIXED_HZ as f32);
+        pilot(
+            frame,
+            motion,
+            survivor.facing,
+            wave,
+            faded(color, 1.0 - rescue),
+            scale,
+            bounds,
+        );
+    }
+}
+
+/// The beam that comes down on `survivor`, `phase_tick` ticks into the
+/// beam-up, and lifts it out: narrower than a tank's, in its team's color.
+fn rescue_beam(
+    frame: &mut RenderFrame,
+    survivor: &Survivor,
+    phase_tick: u64,
+    scale: f32,
+    bounds: Bounds,
+) {
+    let Some((_, from)) = survivor.lifted else {
+        return;
+    };
+    let mut beam = TEAMS[survivor.slot];
+    beam.a = 0.16 + 0.06 * (phase_tick as f32 * 0.4).sin().abs();
+    let width = 0.75 * scale;
+    let feet = from.position.y - 0.6 * scale;
+    let descent = (phase_tick as f32 / survivor::RESCUE_DESCENT_TICKS as f32).min(1.0);
+    let bottom = bounds.max.y - (bounds.max.y - feet) * descent;
+    let x = survivor.position.x;
+    polygon(
+        frame,
+        ARENA_LAYER,
+        vec![
+            Vec2::new(x - width, bottom),
+            Vec2::new(x + width, bottom),
+            Vec2::new(x + width, bounds.max.y),
+            Vec2::new(x - width, bounds.max.y),
+        ],
+        bounds,
+        beam,
+    );
+}
+
+/// An escape pod at `motion`, its hatch `open` from shut to wide open: a
+/// shell with a band of its team's color and a porthole, and once open the
+/// dark inside and the hatch swung back on its hinge.
+fn escape_pod(
+    frame: &mut RenderFrame,
+    motion: BodyMotion,
+    open: f32,
+    [team, shell]: [RenderColor; 2],
+    scale: f32,
+    bounds: Bounds,
+) {
+    let at = |p: Vec2| motion.position + (p * scale).rotate_radians(motion.angle);
+    let hinge = survivor::HINGE;
+    let [body, hatch]: [Vec<Vec2>; 2] = {
+        let (low, high): (Vec<Vec2>, Vec<Vec2>) =
+            survivor::POD.iter().partition(|corner| corner.y <= hinge.y);
+        [low, high]
+    };
+    // The lower shell, closed across at the hinge's height.
+    polygon(
+        frame,
+        ARENA_LAYER,
+        body.iter().map(|&p| at(p)).collect(),
+        bounds,
+        shell,
+    );
+    polygon(
+        frame,
+        ARENA_LAYER,
+        [
+            Vec2::new(hinge.x, -0.22),
+            Vec2::new(-hinge.x, -0.22),
+            Vec2::new(-hinge.x, -0.08),
+            Vec2::new(hinge.x, -0.08),
+        ]
+        .map(at)
+        .to_vec(),
+        bounds,
+        faded(team, shell.a),
+    );
+    // The dome, with the hinge's corners, swung back about the hinge.
+    let mut dome = vec![Vec2::new(-hinge.x, hinge.y)];
+    dome.extend(hatch);
+    dome.push(hinge);
+    if open > 0.0 {
+        polygon(
+            frame,
+            ARENA_LAYER,
+            dome.iter().map(|&p| at(p)).collect(),
+            bounds,
+            POD_INSIDE,
+        );
+    }
+    let swing = open * 1.9;
+    let swung = |p: Vec2| hinge + (p - hinge).rotate_radians(swing);
+    polygon(
+        frame,
+        ARENA_LAYER,
+        dome.iter().map(|&p| at(swung(p))).collect(),
+        bounds,
+        shell,
+    );
+    disc(
+        frame,
+        ARENA_LAYER,
+        at(swung(Vec2::new(0.0, 0.24))),
+        0.11 * scale,
+        bounds,
+        faded(VISOR, shell.a),
+    );
+}
+
+/// A spaceling at `motion`, facing `facing`, in a suit of `color`: its legs,
+/// its arms, one of them waving `wave` seconds into a wave, its body, its
+/// helmet and its visor. It is drawn in the physics crate's spaceling's
+/// proportions, shrunk to Clock's.
+fn pilot(
+    frame: &mut RenderFrame,
+    motion: BodyMotion,
+    facing: f32,
+    wave: Option<f32>,
+    color: RenderColor,
+    scale: f32,
+    bounds: Bounds,
+) {
+    let size = survivor::PILOT_SCALE * scale;
+    let at =
+        |x: f32, y: f32| motion.position + (Vec2::new(x, y) * size).rotate_radians(motion.angle);
+    let legs = faded(SUIT, color.a);
+    for side in [-1.0, 1.0] {
+        strip(
+            frame,
+            at(side * 0.1, -0.15),
+            at(side * 0.12, -0.8),
+            0.14 * size,
+            bounds,
+            legs,
+        );
+        let shoulder = at(side * 0.2, 0.3);
+        let hand = match wave {
+            // The arm on the side it faces, raised and waving.
+            Some(seconds) if side == facing => {
+                let swing = 0.35 * (seconds * TAU * 2.0).sin();
+                let angle = std::f32::consts::FRAC_PI_2 - side * (0.45 + swing);
+                shoulder + Vec2::from_radians(angle + motion.angle) * (0.5 * size)
+            }
+            _ => at(side * 0.36, -0.12),
+        };
+        strip(frame, shoulder, hand, 0.13 * size, bounds, color);
+    }
+    polygon(
+        frame,
+        ARENA_LAYER,
+        [(-0.23, -0.2), (0.23, -0.2), (0.26, 0.4), (-0.26, 0.4)]
+            .map(|(x, y)| at(x, y))
+            .to_vec(),
+        bounds,
+        color,
+    );
+    disc(frame, ARENA_LAYER, at(0.0, 0.63), 0.25 * size, bounds, legs);
+    disc(
+        frame,
+        ARENA_LAYER,
+        at(facing * 0.1, 0.65),
+        0.14 * size,
+        bounds,
+        faded(VISOR, color.a),
+    );
 }
 
 /// The smoke a blast sends up from the wreck, each puff rising and spreading
@@ -522,6 +754,7 @@ pub(super) fn render(
         }
     }
     wreck(frame, event, world, [bounds, sky]);
+    survivors(frame, event, world, bounds);
     for shell in event.duel.shells() {
         disc(
             frame,
