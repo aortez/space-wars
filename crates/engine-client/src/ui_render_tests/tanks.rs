@@ -98,7 +98,7 @@ fn tanks_render_both_adapters_and_controls_without_covering_the_reading() {
             Duration::ZERO,
         );
         let mut saw_fight = false;
-        for tick in 0..=84 * 60 {
+        for tick in 0..=92 * 60 {
             let phase = state.event_phase().map(|p| p.as_str());
             let capture_tick = if phase == Some("beam-down") { 60 } else { 30 };
             if state.phase_tick() == capture_tick || phase.is_none() {
@@ -143,7 +143,7 @@ fn tanks_render_both_adapters_and_controls_without_covering_the_reading() {
             if phase.is_none() {
                 break;
             }
-            assert!(tick < 84 * 60, "bounded departure");
+            assert!(tick < 92 * 60, "bounded departure");
             ClockScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
         }
         assert!(saw_fight);
@@ -500,5 +500,147 @@ fn tanks_blow_apart_and_turn_to_dirt() {
             &format!("{name}-blow-up-zoom"),
             &zoom(&frames, [x, y - patch.1 as f32 * 0.2], patch, 3),
         );
+    }
+}
+
+/// The ticks of a fight until its event ends, with its phase and what `read`
+/// reads from each.
+fn record_through<T>(
+    mut state: scenario_clock::ClockState,
+    read: impl Fn(&engine_common::ClockTanksState) -> T,
+) -> Vec<(Option<&'static str>, T)> {
+    let mut readings = Vec::new();
+    while let Some(tanks) = state.tanks_state() {
+        readings.push((
+            state.event_phase().map(|phase| phase.as_str()),
+            read(&tanks),
+        ));
+        step(&mut state);
+    }
+    readings
+}
+
+impl Camera {
+    /// The frames at each of `ticks` of the fight at `seed` on a `width` by
+    /// `height` screen, with the fight's state at each.
+    fn frames(
+        &self,
+        (width, height): (u32, u32),
+        seed: u64,
+        ticks: &[usize],
+    ) -> Vec<(engine_common::ClockTanksState, SharedPixelBuffer<Rgb8Pixel>)> {
+        let viewport = Viewport::new(width as f32, height as f32);
+        self.window.set_size(PhysicalSize::new(width, height));
+        let mut state = face_fight(viewport, seed);
+        let mut frames = Vec::new();
+        for tick in 0..=*ticks.iter().max().unwrap() {
+            if ticks.contains(&tick) {
+                let frame = ClockScenario::render_frame(&state);
+                let pixels = draw(&self.ui, &self.window, &frame, viewport, false);
+                frames.push((state.tanks_state().unwrap(), pixels));
+            }
+            step(&mut state);
+        }
+        frames
+    }
+}
+
+#[test]
+fn tanks_spacelings_get_out_and_are_beamed_up() {
+    use engine_common::{ClockTanksEjection as Ejection, ClockTanksSurvivorPhase as Phase};
+    let camera = Camera::new();
+    // Both sides of these fights roll the same way, so whichever tank loses,
+    // its spaceling is thrown clear, or gets out in a pod.
+    for (size, thrown, pod, patch, scale) in [
+        ((1024, 768), 102, 132, (112, 64), 5),
+        ((800, 480), 102, 305, (88, 48), 6),
+    ] {
+        let viewport = Viewport::new(size.0 as f32, size.1 as f32);
+        let name = format!("{}x{}", size.0, size.1);
+        for (seed, ejection) in [(thrown, Ejection::Thrown), (pod, Ejection::Pod)] {
+            let readings = record_through(face_fight(viewport, seed), |tanks| {
+                (
+                    tanks.result.is_some(),
+                    tanks.survivors.into_iter().flatten().next(),
+                    tanks.ejections,
+                )
+            });
+            assert_eq!(readings[0].1.2, [Some(ejection); 2]);
+            let end = readings
+                .iter()
+                .position(|(_, (result, ..))| *result)
+                .unwrap();
+            let first = |phase: Phase| {
+                (end..readings.len())
+                    .find(|&i| readings[i].1.1.is_some_and(|s| s.phase == phase))
+                    .unwrap_or_else(|| panic!("{name} {seed}: {phase:?}"))
+            };
+            let out = readings[end].1.1.expect("a spaceling got out");
+            assert_eq!(out.ejection, ejection);
+            let (ticks, label) = match ejection {
+                // Mid-tumble, down where it landed, waving, and lifted out by
+                // its beam as the winner beams up.
+                Ejection::Thrown => (
+                    vec![
+                        end + 24,
+                        first(Phase::GettingUp) + 6,
+                        first(Phase::Waving) + 20,
+                        first(Phase::BeamedUp) + 75,
+                    ],
+                    "thrown",
+                ),
+                // In flight, down and opening, climbing out, waving, and
+                // lifted out by its beam, the empty pod left behind.
+                Ejection::Pod => (
+                    vec![
+                        end + 30,
+                        first(Phase::Opening) + 16,
+                        first(Phase::ClimbingOut) + 8,
+                        first(Phase::Waving) + 20,
+                        first(Phase::BeamedUp) + 75,
+                    ],
+                    "pod",
+                ),
+            };
+            let shots = camera.frames(size, seed, &ticks);
+            let waving = &shots[shots.len() - 2];
+            let survivor = waving.0.survivors.into_iter().flatten().next().unwrap();
+            assert_eq!(survivor.phase, Phase::Waving);
+            assert!(survivor.stood_up);
+            let rescue = shots.last().unwrap();
+            assert_eq!(readings[ticks[ticks.len() - 1]].0, Some("beam-up"));
+            assert_eq!(
+                rescue
+                    .0
+                    .survivors
+                    .into_iter()
+                    .flatten()
+                    .next()
+                    .unwrap()
+                    .phase,
+                Phase::BeamedUp
+            );
+            camera.keep(&format!("{name}-{label}-rescue"), &rescue.1);
+            // Between the blast and where it stood, but never so near the
+            // blast that its beam leaves the patch, and a little above, so
+            // the patch shows it in the air.
+            let state = face_fight(viewport, seed);
+            let [x, y] = on_screen(&state, size, survivor.position_milli);
+            let blast = on_screen(&state, size, out.position_milli);
+            let reach = 0.3 * patch.0 as f32;
+            let frames: Vec<_> = shots.iter().map(|(_, pixels)| pixels).collect();
+            camera.keep(
+                &format!("{name}-{label}-zoom"),
+                &zoom(
+                    &frames,
+                    [
+                        x + ((blast[0] - x) / 2.0).clamp(-reach, reach),
+                        y - patch.1 as f32 * 0.25,
+                    ],
+                    patch,
+                    scale,
+                ),
+            );
+        }
     }
 }

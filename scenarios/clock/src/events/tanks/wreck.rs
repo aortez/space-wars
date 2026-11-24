@@ -40,9 +40,10 @@ const TRAIL_TICKS: u64 = 6;
 pub const TURRET_RADIUS: f32 = 0.65;
 /// The width of the barrel, in the duel's units, as it is drawn.
 pub const BARREL_WIDTH: f32 = 0.45;
-/// The collision group of the pieces, which no piece meets.
+/// The collision group of the pieces, and of the spacelings and pods that
+/// get out, none of which meets another.
 const WRECK: u32 = 1 << 30;
-const GROUPS: CollisionGroups = CollisionGroups {
+pub(super) const GROUPS: CollisionGroups = CollisionGroups {
     memberships: WRECK,
     filter: !(SCENERY | WRECK),
 };

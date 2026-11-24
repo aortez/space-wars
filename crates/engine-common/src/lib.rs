@@ -1194,6 +1194,103 @@ pub struct ClockTanksState {
     /// Digit cells the shells have knocked loose.
     #[serde(default)]
     pub knocked_loose: u32,
+    /// How each side's spaceling gets out if its tank blows up, as the
+    /// fight's seed rolled it, or none for one that does not get out.
+    #[serde(default)]
+    pub ejections: [Option<ClockTanksEjection>; 2],
+    /// Each side's spaceling, once it has got out.
+    #[serde(default)]
+    pub survivors: [Option<ClockTanksSurvivor>; 2],
+}
+
+/// How a losing tank's spaceling gets out as the tank blows up.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockTanksEjection {
+    /// The blast throws it clear.
+    Thrown,
+    /// It rides out in an escape pod.
+    Pod,
+}
+
+impl ClockTanksEjection {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Thrown => "thrown",
+            Self::Pod => "pod",
+        }
+    }
+}
+
+/// How a surviving spaceling leaves the battlefield.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockTanksEnding {
+    /// A beam comes down on it and lifts it out.
+    RescueBeam,
+}
+
+impl ClockTanksEnding {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::RescueBeam => "rescue-beam",
+        }
+    }
+}
+
+/// Where a surviving spaceling is in getting out and away.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockTanksSurvivorPhase {
+    /// Sealed in its pod, in flight or where the pod came down.
+    Sealed,
+    /// Its pod opening.
+    Opening,
+    /// Out of its pod, and not yet standing.
+    ClimbingOut,
+    /// Thrown clear, and not yet down.
+    Flying,
+    /// Down where it landed, and not yet standing.
+    GettingUp,
+    /// Standing, looking around.
+    LookingAround,
+    /// Standing, waving.
+    Waving,
+    /// Lifted out by its beam.
+    BeamedUp,
+    /// Gone out of view.
+    Lost,
+}
+
+impl ClockTanksSurvivorPhase {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Sealed => "sealed",
+            Self::Opening => "opening",
+            Self::ClimbingOut => "climbing-out",
+            Self::Flying => "flying",
+            Self::GettingUp => "getting-up",
+            Self::LookingAround => "looking-around",
+            Self::Waving => "waving",
+            Self::BeamedUp => "beamed-up",
+            Self::Lost => "lost",
+        }
+    }
+}
+
+/// A losing tank's spaceling that got out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockTanksSurvivor {
+    pub ejection: ClockTanksEjection,
+    pub ending: ClockTanksEnding,
+    pub phase: ClockTanksSurvivorPhase,
+    /// The spaceling, or its pod while it is sealed in, in world milli
+    /// units.
+    pub position_milli: [i32; 2],
+    /// Whether it has stood up since it got out.
+    pub stood_up: bool,
+    /// The times the blast or a fall has knocked it down.
+    pub knockdowns: u32,
 }
 
 /// One of the two lamps in the upper corners of the Clock's frame.

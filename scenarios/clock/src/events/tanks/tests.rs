@@ -661,7 +661,7 @@ fn health_outcomes_and_periodic_registration_cover_every_result() {
         engine_common::ClockEventTrigger::Periodic
     );
     assert_eq!(definition.cooldown_ticks, REUSE_TICKS);
-    assert_eq!(MAX_TICKS, 86 * 60);
+    assert_eq!(MAX_TICKS, 92 * 60);
     for profile in [
         ClockEventProfile::Off,
         ClockEventProfile::Calm,
@@ -1304,5 +1304,364 @@ fn a_fight_cut_short_while_a_loser_blows_up_leaves_nothing_behind() {
         assert!(!pieces_remain(&state));
         assert_eq!((state.body_count(), state.collider_count()), (0, 0));
         assert!(state.arena.idle());
+    }
+}
+
+#[test]
+fn one_spaceling_in_five_gets_out_by_a_roll_of_its_own() {
+    // Each of a fight's seeds pairs its CPUs, orders their fire and picks
+    // its dodgers by the seed's remainder by 24. Each remainder's fights roll
+    // alike, one in five for each side, half of those in a pod.
+    let mut rolled = [[0u32; 3]; 24];
+    for seed in 0..240_000u64 {
+        let fight = seed.wrapping_add((ClockEventKind::Tanks as u64) << 32);
+        let rolls = survivor::rolls(fight);
+        assert_eq!(
+            rolls,
+            survivor::rolls(fight),
+            "a seed's roll stays the same"
+        );
+        let counts = &mut rolled[(fight % 24) as usize];
+        for roll in rolls {
+            counts[0] += 1;
+            counts[1] += u32::from(roll.is_some());
+            counts[2] += u32::from(roll == Some(survivor::Ejection::Pod));
+        }
+    }
+    for (remainder, [rolls, out, pods]) in rolled.into_iter().enumerate() {
+        let rate = out as f32 / rolls as f32;
+        assert!((rate - 0.2).abs() < 0.015, "{remainder}: {rate}");
+        let pods = pods as f32 / out as f32;
+        assert!((pods - 0.5).abs() < 0.04, "{remainder}: {pods}");
+    }
+    // The event rolls once, from its own seed, as it starts.
+    let mut state = ready(5.0 / 3.0, 42, ClockTimeFormat::TwentyFourHour);
+    state.preview_event(ClockEventKind::Tanks);
+    let event = tanks(&state);
+    assert_eq!(event.survivors.rolls, survivor::rolls(event.seed));
+    assert_eq!(
+        state.tanks_state().unwrap().ejections,
+        event.survivors.rolls
+    );
+}
+
+/// The fight at `seed` on an `aspect` screen, with every loser's spaceling
+/// getting out by `ejection`, stepped on to its result.
+fn survival(aspect: f32, seed: u64, ejection: survivor::Ejection) -> (ClockState, usize) {
+    let mut state = ready(aspect, seed, ClockTimeFormat::TwentyFourHour);
+    start_fighting(&mut state);
+    event(&mut state).survivors.rolls = [Some(ejection); 2];
+    to_the_result(&mut state);
+    let result = tanks(&state).result.unwrap();
+    assert!(matches!(result, ResultKind::Left | ResultKind::Right));
+    let loser = usize::from(result == ResultKind::Left);
+    (state, loser)
+}
+
+fn survivor(state: &ClockState, slot: usize) -> &survivor::Survivor {
+    tanks(state).survivors.get(slot).expect("a survivor")
+}
+
+/// Steps on until the survivor from `slot` enters `phase`, at most `limit`
+/// ticks, and answers the ticks it took.
+fn until_phase(state: &mut ClockState, slot: usize, phase: survivor::Phase, limit: u64) -> u64 {
+    let mut ticks = 0;
+    while survivor(state, slot).phase != phase {
+        assert!(
+            ticks < limit,
+            "{:?} in place of {phase:?}",
+            survivor(state, slot).phase
+        );
+        tick(state);
+        ticks += 1;
+    }
+    ticks
+}
+
+fn survivors_remain(state: &ClockState) -> bool {
+    state.arena.world().is_some_and(|world| {
+        world
+            .entity_ids()
+            .any(|id| canonical::TANKS_SURVIVORS.contains(&id.value()))
+    })
+}
+
+#[test]
+fn a_thrown_spaceling_tumbles_clear_gets_up_waves_and_is_beamed_up() {
+    use survivor::Phase;
+    let (mut state, loser) = survival(4.0 / 3.0, 43, survivor::Ejection::Thrown);
+    let scale = tanks(&state).duel.placement().scale;
+    let spec = survivor::spec(scale);
+    // A third of the tank's height, thrown up and toward the middle,
+    // tumbling faster than it can keep its feet.
+    assert!((2.0 * spec.half_height() / scale - 1.0).abs() < 0.05);
+    let motion = {
+        let body = survivor(&state, loser).spaceling.as_ref().unwrap().body();
+        state.arena.world().unwrap().motion(body).unwrap()
+    };
+    assert!(motion.linear_velocity.y > 5.0 * scale);
+    assert!(motion.linear_velocity.x * motion.position.x < 0.0);
+    assert!(motion.angular_velocity.abs() > spec.balance.knockdown_angular_speed);
+    let block = state.tanks_state().unwrap().survivors[loser].unwrap();
+    assert_eq!(
+        (block.ejection, block.ending, block.phase),
+        (
+            survivor::Ejection::Thrown,
+            engine_common::ClockTanksEnding::RescueBeam,
+            Phase::Flying
+        )
+    );
+    assert!(state.tanks_state().unwrap().survivors[1 - loser].is_none());
+    tick(&mut state);
+    {
+        let world = state.arena.world().unwrap();
+        let snapshot = survivor(&state, loser)
+            .spaceling
+            .as_ref()
+            .unwrap()
+            .snapshot(world)
+            .unwrap();
+        assert_eq!(
+            snapshot.balance,
+            engine_rapier::spaceling::SpacelingBalance::KnockedDown
+        );
+    }
+    // It lands knocked down and gets up within 4 s of the blast.
+    let flying = until_phase(&mut state, loser, Phase::GettingUp, 2 * 60);
+    let down = until_phase(&mut state, loser, Phase::LookingAround, 4 * 60);
+    assert!(flying + down < 4 * 60, "{flying} + {down}");
+    let survivor_state = state.tanks_state().unwrap().survivors[loser].unwrap();
+    assert!(survivor_state.stood_up && survivor_state.knockdowns >= 1);
+    // It looks the other way, then back.
+    let facing = survivor(&state, loser).facing;
+    let (mut looked, mut away) = (0, 0);
+    while survivor(&state, loser).phase == Phase::LookingAround {
+        tick(&mut state);
+        looked += 1;
+        away += u64::from(survivor(&state, loser).facing != facing);
+    }
+    assert_eq!(looked, survivor::LOOK_TICKS);
+    assert_eq!(away, survivor::LOOK_TICKS / 3);
+    assert_eq!(survivor(&state, loser).facing, facing);
+    assert_eq!(survivor(&state, loser).phase, Phase::Waving);
+    // Once it has waved and the blow-up is over, a beam comes down on it as
+    // the winner beams up.
+    let waved = until_phase(
+        &mut state,
+        loser,
+        Phase::BeamedUp,
+        survivor::WAVE_TICKS + 3 * 60,
+    );
+    assert!(waved >= survivor::WAVE_TICKS);
+    assert_eq!(state.event_phase(), Some(EventPhase::BeamUp));
+    let body = survivor(&state, loser).spaceling.as_ref().unwrap().body();
+    let from = state.arena.world().unwrap().motion(body).unwrap().position;
+    assert_eq!(
+        state.arena.world().unwrap().body_kind(body),
+        Some(BodyKind::KinematicPosition)
+    );
+    while state.event_phase() == Some(EventPhase::BeamUp) {
+        tick(&mut state);
+    }
+    // The beam has lifted it out, and it leaves with the winner.
+    assert_eq!(state.event_phase(), Some(EventPhase::Withdrawing));
+    assert!(!survivors_remain(&state));
+    let block = state.tanks_state().unwrap().survivors[loser].unwrap();
+    assert_eq!(block.phase, Phase::BeamedUp);
+    assert!(block.position_milli[1] as f32 / 1000.0 > from.y + 9.0 * scale);
+    while state.event_kind().is_some() {
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+#[test]
+fn a_pod_arcs_out_lands_and_opens_and_its_spaceling_climbs_out() {
+    use survivor::Phase;
+    let (mut state, loser) = survival(5.0 / 3.0, 42, survivor::Ejection::Pod);
+    let scale = tanks(&state).duel.placement().scale;
+    let pod = survivor(&state, loser).pod.unwrap();
+    assert!(survivor(&state, loser).spaceling.is_none());
+    let motion = state.arena.world().unwrap().motion(pod).unwrap();
+    assert!(motion.linear_velocity.y > 8.0 * scale);
+    assert!(motion.linear_velocity.x * motion.position.x < 0.0);
+    assert_eq!(
+        state.tanks_state().unwrap().survivors[loser].unwrap().phase,
+        Phase::Sealed
+    );
+    // It comes down and opens once it has lain still a moment, by 2.5 s
+    // after the blast at the latest.
+    let sealed = until_phase(&mut state, loser, Phase::Opening, 150);
+    let landed = state.arena.world().unwrap().motion(pod).unwrap();
+    assert!(landed.linear_velocity.length() < 0.5 * scale || sealed == 150);
+    assert!(landed.position.y < motion.position.y + scale);
+    assert!(!tanks(&state).survivors.puffs.is_empty(), "smoke behind it");
+    let mut hatch = 0.0;
+    while survivor(&state, loser).phase == Phase::Opening {
+        let open = survivor(&state, loser).hatch(tanks(&state).tick);
+        assert!(open >= hatch);
+        hatch = open;
+        tick(&mut state);
+    }
+    assert!(hatch > 0.9);
+    // Its spaceling climbs out over the side it faces, stands, looks around
+    // and waves.
+    assert_eq!(survivor(&state, loser).phase, Phase::ClimbingOut);
+    let out = {
+        let body = survivor(&state, loser).spaceling.as_ref().unwrap().body();
+        state.arena.world().unwrap().motion(body).unwrap()
+    };
+    assert!(out.position.distance_to(landed.position) < 2.0 * scale);
+    until_phase(&mut state, loser, Phase::LookingAround, 2 * 60);
+    until_phase(&mut state, loser, Phase::BeamedUp, 5 * 60);
+    assert!(survivor(&state, loser).stood_up);
+    // The empty pod stays where it lies while the beam takes the spaceling,
+    // then goes with the hills.
+    let lying = state.arena.world().unwrap().motion(pod).unwrap().position;
+    while state.event_phase() == Some(EventPhase::BeamUp) {
+        tick(&mut state);
+    }
+    assert_eq!(state.event_phase(), Some(EventPhase::Withdrawing));
+    assert!(survivor(&state, loser).spaceling.is_none());
+    let world = state.arena.world().unwrap();
+    assert!(world.motion(pod).unwrap().position.distance_to(lying) < 0.5 * scale);
+    assert_eq!(world.body_kind(pod), Some(BodyKind::KinematicPosition));
+    assert!(tanks(&state).departure.iter().any(|(body, _)| *body == pod));
+    // It goes open, as it was left.
+    assert_eq!(survivor(&state, loser).hatch(tanks(&state).tick), 1.0);
+    while state.event_kind().is_some() {
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+#[test]
+fn a_spaceling_or_pod_that_leaves_the_view_retires_there() {
+    use survivor::Phase;
+    for ejection in [survivor::Ejection::Thrown, survivor::Ejection::Pod] {
+        let (mut state, loser) = survival(5.0 / 3.0, 42, ejection);
+        let layout = tanks(&state).layout;
+        let body = match ejection {
+            survivor::Ejection::Thrown => {
+                survivor(&state, loser).spaceling.as_ref().unwrap().body()
+            }
+            survivor::Ejection::Pod => survivor(&state, loser).pod.unwrap(),
+        };
+        state.arena.held_mut(OWNER).unwrap().set_pose(
+            body,
+            Vec2::new(0.0, layout.bounds_min.y - 1.0),
+            0.0,
+            true,
+        );
+        tick(&mut state);
+        assert_eq!(survivor(&state, loser).phase, Phase::Lost);
+        assert!(!survivors_remain(&state));
+        assert_eq!(
+            state.tanks_state().unwrap().survivors[loser].unwrap().phase,
+            Phase::Lost
+        );
+        // Nothing waits for it: the winner beams up once the pieces are dirt.
+        while state.event_phase() == Some(EventPhase::BlowingUp) {
+            tick(&mut state);
+        }
+        assert_eq!(state.event_phase(), Some(EventPhase::BeamUp));
+        assert!(survivor(&state, loser).lifted.is_none());
+        while state.event_kind().is_some() {
+            tick(&mut state);
+        }
+        assert!(state.arena.idle());
+    }
+}
+
+#[test]
+fn a_spaceling_still_down_when_its_time_runs_out_is_lifted_out_as_it_lies() {
+    use survivor::Phase;
+    let (mut state, loser) = survival(4.0 / 3.0, 43, survivor::Ejection::Thrown);
+    let body = survivor(&state, loser).spaceling.as_ref().unwrap().body();
+    // It lands, and something keeps it on its back.
+    until_phase(&mut state, loser, Phase::GettingUp, 2 * 60);
+    let mut aftermath = 0;
+    while matches!(
+        state.event_phase(),
+        Some(EventPhase::BlowingUp | EventPhase::Aftermath)
+    ) {
+        aftermath += u64::from(state.event_phase() == Some(EventPhase::Aftermath));
+        let world = state.arena.held_mut(OWNER).unwrap();
+        let motion = world.motion(body).unwrap();
+        world.set_pose(body, motion.position, std::f32::consts::FRAC_PI_2, true);
+        world.set_velocity(body, Vec2::ZERO, 0.0, true);
+        tick(&mut state);
+    }
+    // The aftermath waits for it as long as it may, then the beam takes it
+    // as it lies.
+    assert_eq!(aftermath, AFTERMATH_TICKS);
+    assert_eq!(state.event_phase(), Some(EventPhase::BeamUp));
+    let survivor = survivor(&state, loser);
+    assert_eq!(survivor.phase, Phase::BeamedUp);
+    assert!(!survivor.stood_up);
+    assert!(survivor.lifted.unwrap().1.angle.cos().abs() < 0.2);
+    while state.event_kind().is_some() {
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+#[test]
+fn a_fight_cut_short_at_any_stage_of_a_survivor_leaves_nothing_behind() {
+    use survivor::{Ejection, Phase};
+    let stages: [(Ejection, &[Phase]); 2] = [
+        (
+            Ejection::Thrown,
+            &[
+                Phase::Flying,
+                Phase::GettingUp,
+                Phase::LookingAround,
+                Phase::Waving,
+                Phase::BeamedUp,
+            ],
+        ),
+        (
+            Ejection::Pod,
+            &[
+                Phase::Sealed,
+                Phase::Opening,
+                Phase::ClimbingOut,
+                Phase::LookingAround,
+                Phase::Waving,
+                Phase::BeamedUp,
+            ],
+        ),
+    ];
+    for (ejection, phases) in stages {
+        // Each stage, then the empty pod going with the hills.
+        for stage in 0..=phases.len() {
+            let (mut state, loser) = survival(5.0 / 3.0, 42, ejection);
+            if let Some(&phase) = phases.get(stage) {
+                until_phase(&mut state, loser, phase, 10 * 60);
+                for _ in 0..5 {
+                    if survivor(&state, loser).phase == phase {
+                        tick(&mut state);
+                    }
+                }
+            } else {
+                while state.event_phase() != Some(EventPhase::Withdrawing) {
+                    tick(&mut state);
+                }
+                tick(&mut state);
+            }
+            assert!(
+                survivors_remain(&state) || stage == phases.len() && ejection == Ejection::Thrown
+            );
+            if stage % 2 == 0 {
+                state.set_aspect_ratio(4.0 / 3.0);
+            } else {
+                state.finish_event();
+            }
+            ClockScenario::step(&mut state, &[], Duration::ZERO);
+            assert!(state.event_kind().is_none(), "{ejection:?} {stage}");
+            assert!(!survivors_remain(&state));
+            assert_eq!((state.body_count(), state.collider_count()), (0, 0));
+            assert!(state.arena.idle());
+        }
     }
 }
