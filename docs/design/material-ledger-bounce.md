@@ -40,12 +40,11 @@ sources and its records are on the owner's workstation in
   ground, where today they have none.
 - **It is cheap.** Pricing and setting the bounce took a median of 8 µs a step
   in Spacewars and 13 µs in Scorched's duels.
-- **Capture has a bug.** After a CCD substep it takes each body's center of
-  mass from where the body was one substep earlier. Charges price Spacewars'
-  impacts in later substeps at half their energy.
+- **Capture had a bug, now fixed (#707).** After a CCD substep it took each
+  body's center of mass from where the body was one substep earlier. Charges
+  priced Spacewars' impacts in later substeps at half their energy.
 
-The recommendation, at the end, is to fix that bug now and not to build the
-cheap route yet.
+The recommendation, at the end, is not to build the cheap route yet.
 
 ## Two routes
 
@@ -263,13 +262,13 @@ have no restitution of their own needs only the new impacts set.
 
 ## A stale center of mass in capture
 
-Capture reads each body's center of mass from Rapier's `RigidBody`. Rapier
+Capture read each body's center of mass from Rapier's `RigidBody`. Rapier
 refreshes it when a solve begins, after the batch hook. So in a CCD substep
-after the first, the center capture records is where the body was when the
-previous substep began, one substep behind its pose.
+after the first, the center capture recorded was where the body was when the
+previous substep began, one substep behind its pose. It is fixed (#707).
 
-- **Effect.** A body's lever arms in a later substep are off by as far as it
-  moved in the substep before. Its point velocity is off too, though only by
+- **Effect.** A body's lever arms in a later substep were off by as far as it
+  moved in the substep before. Its point velocity was off too, though only by
   its spin times that offset.
 - **Spacewars.** 11% of the impacts came in a later substep. Charges' budgets
   gave 92% of those an energy more than 10% off, and two thirds one more
@@ -277,14 +276,15 @@ previous substep began, one substep behind its pose.
   Spacewars' impacts at 95.5%. One fragment striking the sun at 336 u/s was
   given an available energy of 480 instead of 218,000.
 - **Scorched.** No impact came in a later substep, so nothing changed.
-- **The native response** reads the same center. It refuses any world with a
-  CCD body, so it never sees a later substep.
+- **The native response** reads Rapier's center too. It refuses any world
+  with a CCD body, so it never sees a later substep.
 - **Tests.** Step 1's and step 2's CCD tests did not catch it. Their bullets
   strike head on without spin, and moving the center along the normal changes
-  no lever arm.
-- **The fix.** The probe took the center from the body's pose,
-  `local_mprops.world_com(position)`, and the point velocity about it. Every
-  figure in this note uses that.
+  no lever arm. The CCD-split charges test now also moves its ball along the
+  walls, and fails with the stale center.
+- **The fix.** Capture takes the center from the body's pose,
+  `local_mprops.world_com(position)`, and the point velocity about it. The
+  probe made the same change, and every figure in this note uses it.
 
 ## Surfaces known before the step
 
@@ -326,9 +326,8 @@ their own, and most of their energy arrives in strikes the ledger never
 prices. The exact route admits no game impact. So I recommend not building
 the cheap route as an opt-in yet:
 
-1. **Fix the stale center of mass now.** It is a bug in what has shipped, and
-   it needs its own issue. One PR: capture takes the center from the body's
-   pose, and a test strikes obliquely in a later CCD substep.
+1. **Fix the stale center of mass.** Done (#707): capture takes the center
+   from the body's pose, and a test strikes obliquely in a later CCD substep.
 2. **Decide whether the games want the ledger's bounce.** As declared,
    Spacewars' materials leave almost nothing to bounce, and Scorched's armor
    would bounce. That is a choice about the materials in #330 and #331,

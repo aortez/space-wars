@@ -884,13 +884,15 @@ fn a_step_that_ccd_splits_prices_each_substeps_impacts_on_their_own_motion() {
     // and strikes each within one step. Rapier splits the step into substeps,
     // so the strikes are in different substeps' batches, priced in turn. Each
     // has its own budget, priced on the motion its substep brings: half the
-    // ball's mass times 400 squared.
+    // ball's mass times 400 squared. The ball also moves at 200 along the
+    // walls. A later strike priced about where the ball's center was a
+    // substep earlier would gain a lever arm and be priced too low.
     let mut world = world_with(Vec2::ZERO, 4);
     let mut host = Host::default();
     let mut bouncing = ball(1, 0.5, 1.0);
     bouncing.restitution = 1.0;
     let flying = BodySpec {
-        linear_velocity: Vec2::X * 400.0,
+        linear_velocity: Vec2::new(400.0, 200.0),
         ccd_enabled: true,
         can_sleep: false,
         ..Default::default()

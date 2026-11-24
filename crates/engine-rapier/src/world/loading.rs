@@ -649,6 +649,12 @@ impl LoadingState {
 
 fn body_state(body: &RigidBody, point: Vector, id: BodyId) -> ContactBodyState {
     let dynamic = body.is_dynamic();
+    // Rapier refreshes `center_of_mass()` in the solve, after this hook, so
+    // after a CCD substep it is still where the body was a substep earlier.
+    let center = body
+        .mass_properties()
+        .local_mprops
+        .world_com(body.position());
     ContactBodyState {
         body: id,
         kind: match body.body_type() {
@@ -657,8 +663,8 @@ fn body_state(body: &RigidBody, point: Vector, id: BodyId) -> ContactBodyState {
             RigidBodyType::KinematicPositionBased => BodyKind::KinematicPosition,
             RigidBodyType::KinematicVelocityBased => BodyKind::KinematicVelocity,
         },
-        center_of_mass: from_rapier(body.center_of_mass()),
-        point_velocity: from_rapier(body.velocity_at_point(point)),
+        center_of_mass: from_rapier(center),
+        point_velocity: from_rapier(body.vels().velocity_at_point(point, center)),
         angular_velocity: body.angvel(),
         inverse_mass: if dynamic {
             from_rapier(body.mass_properties().effective_inv_mass)
