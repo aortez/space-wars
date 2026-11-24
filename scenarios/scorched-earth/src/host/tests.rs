@@ -453,6 +453,32 @@ fn admission_refuses_before_mutating_and_reservations_bound_material_work() {
 }
 
 #[test]
+fn a_host_points_a_tanks_barrel_either_way_and_below_the_level() {
+    let config = config(GrainShape::Round);
+    let mut world = world();
+    let mut place = Placement::new(1000..100_000, Budget::required(config));
+    place.scale = 2.0;
+    let mut duel = HostedDuel::attach(&mut world, config, 42, place).unwrap();
+    for direction in [
+        Vec2::new(1.0, 0.5),
+        Vec2::new(-1.0, -0.3),
+        Vec2::new(-0.2, 1.0),
+        Vec2::new(0.6, -0.8),
+    ] {
+        duel.point_barrel(1, direction);
+        let [pivot, muzzle] = duel.tanks(&world)[1].barrel;
+        let barrel = muzzle - pivot;
+        assert!((barrel.length() - 2.8 * 2.0).abs() < 1e-4);
+        assert!(
+            (barrel.normalized() - direction.normalized()).length() < 1e-5,
+            "{barrel:?} along {direction:?}"
+        );
+    }
+    duel.retire(&mut world);
+    assert_eq!(world.entity_ids().count(), 0);
+}
+
+#[test]
 fn host_gravity_and_step_order_keep_controls_and_material_in_the_shared_world() {
     let config = config(GrainShape::Round);
     let mut world = world();

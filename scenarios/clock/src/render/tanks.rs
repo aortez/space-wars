@@ -4,14 +4,14 @@ use crate::{
         EventPhase, FIXED_HZ,
         tanks::{
             BEAM_DOWN_TICKS, BEAM_UP_TICKS, TanksEvent,
-            survivor::{self, Phase, Survivor, Survivors},
+            survivor::{self, Phase, Survivor},
             wreck::{BARREL_WIDTH, Blast, Puff, Shape, TURRET_RADIUS},
         },
     },
     presentation::Bounds,
 };
 use engine_rapier::world::{BodyMotion, PhysicsWorld};
-use std::f32::consts::TAU;
+use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
 const EARTH: RenderColor = RenderColor::rgb(0.36, 0.27, 0.16);
 const GRAIN: RenderColor = RenderColor::rgb(0.69, 0.48, 0.25);
@@ -45,6 +45,11 @@ const VISOR: RenderColor = RenderColor::rgb(0.09, 0.16, 0.23);
 /// An escape pod's shell, and the dark inside its open hatch.
 const POD_SHELL: RenderColor = RenderColor::rgb(0.74, 0.77, 0.8);
 const POD_INSIDE: RenderColor = RenderColor::rgb(0.12, 0.13, 0.15);
+/// A white flag, and the stick it flies from.
+const FLAG: RenderColor = RenderColor::rgb(0.98, 0.98, 0.95);
+const STICK: RenderColor = RenderColor::rgb(0.6, 0.5, 0.36);
+/// A running spaceling's strides a second.
+const STRIDE_HZ: f32 = 3.5;
 
 fn mix(a: RenderColor, b: RenderColor, t: f32) -> RenderColor {
     RenderColor::rgba(
@@ -281,8 +286,8 @@ fn survivors(frame: &mut RenderFrame, event: &TanksEvent, world: &PhysicsWorld, 
     let beaming = event.phase == EventPhase::BeamUp;
     for survivor in &survivors.out {
         let color = TEAMS[survivor.slot];
-        let rescue = if beaming && survivor.phase == Phase::BeamedUp {
-            Survivors::rescued(event.phase_tick)
+        let fade = if beaming {
+            survivor.fade(event.phase_tick)
         } else {
             0.0
         };
@@ -290,7 +295,7 @@ fn survivors(frame: &mut RenderFrame, event: &TanksEvent, world: &PhysicsWorld, 
             let motion = world.motion(pod).expect("a survivor's pod");
             // A pod the beam lifts out sealed fades as it goes.
             let alpha = if survivor.pod_lifted() {
-                1.0 - rescue
+                1.0 - fade
             } else {
                 1.0
             };
@@ -306,21 +311,41 @@ fn survivors(frame: &mut RenderFrame, event: &TanksEvent, world: &PhysicsWorld, 
         if beaming && survivor.phase == Phase::BeamedUp {
             rescue_beam(frame, survivor, event.phase_tick, scale, bounds);
         }
+        // The winner's beam comes down on a spaceling that surrendered and
+        // draws it in, until the winner's own beam takes them up together.
+        if !beaming && survivor.phase == Phase::Taken {
+            let mut team = TEAMS[1 - survivor.slot];
+            team.a = 0.16 + 0.06 * (event.tick as f32 * 0.4).sin().abs();
+            narrow_beam(
+                frame,
+                survivor.position - Vec2::Y * (0.6 * scale),
+                (event.tick - survivor.since) as f32 / survivor::TAKE_DESCENT_TICKS as f32,
+                team,
+                scale,
+                bounds,
+            );
+        }
         let Some(spaceling) = &survivor.spaceling else {
             continue;
         };
         let motion = world
             .motion(spaceling.body())
             .expect("a survivor's spaceling");
-        let wave = (survivor.phase == Phase::Waving
-            || (survivor.phase == Phase::BeamedUp && survivor.stood_up))
-            .then(|| (event.tick - survivor.since) as f32 / FIXED_HZ as f32);
+        let seconds = (event.tick - survivor.since) as f32 / FIXED_HZ as f32;
+        let flag = survivor.flag(event.tick);
+        let pose = Pose {
+            wave: (survivor.phase == Phase::Waving
+                || (survivor.phase == Phase::BeamedUp && survivor.stood_up && flag == 0.0))
+                .then_some(seconds),
+            flag: (flag > 0.0).then(|| (flag, event.tick as f32 / FIXED_HZ as f32)),
+            stride: matches!(survivor.phase, Phase::Running | Phase::Climbing).then_some(seconds),
+        };
         pilot(
             frame,
             motion,
             survivor.facing,
-            wave,
-            faded(color, 1.0 - rescue),
+            pose,
+            faded(color, 1.0 - fade),
             scale,
             bounds,
         );
@@ -328,7 +353,7 @@ fn survivors(frame: &mut RenderFrame, event: &TanksEvent, world: &PhysicsWorld, 
 }
 
 /// The beam that comes down on `survivor`, `phase_tick` ticks into the
-/// beam-up, and lifts it out: narrower than a tank's, in its team's color.
+/// beam-up, and lifts it out, in its team's color.
 fn rescue_beam(
     frame: &mut RenderFrame,
     survivor: &Survivor,
@@ -341,19 +366,36 @@ fn rescue_beam(
     };
     let mut beam = TEAMS[survivor.slot];
     beam.a = 0.16 + 0.06 * (phase_tick as f32 * 0.4).sin().abs();
+    narrow_beam(
+        frame,
+        Vec2::new(survivor.position.x, from.position.y - 0.6 * scale),
+        phase_tick as f32 / survivor::RESCUE_DESCENT_TICKS as f32,
+        beam,
+        scale,
+        bounds,
+    );
+}
+
+/// A beam narrower than a tank's, `descent` of the way down from the top of
+/// the view to a spaceling's `feet`.
+fn narrow_beam(
+    frame: &mut RenderFrame,
+    feet: Vec2,
+    descent: f32,
+    beam: RenderColor,
+    scale: f32,
+    bounds: Bounds,
+) {
     let width = 0.75 * scale;
-    let feet = from.position.y - 0.6 * scale;
-    let descent = (phase_tick as f32 / survivor::RESCUE_DESCENT_TICKS as f32).min(1.0);
-    let bottom = bounds.max.y - (bounds.max.y - feet) * descent;
-    let x = survivor.position.x;
+    let bottom = bounds.max.y - (bounds.max.y - feet.y) * descent.min(1.0);
     polygon(
         frame,
         ARENA_LAYER,
         vec![
-            Vec2::new(x - width, bottom),
-            Vec2::new(x + width, bottom),
-            Vec2::new(x + width, bounds.max.y),
-            Vec2::new(x - width, bounds.max.y),
+            Vec2::new(feet.x - width, bottom),
+            Vec2::new(feet.x + width, bottom),
+            Vec2::new(feet.x + width, bounds.max.y),
+            Vec2::new(feet.x - width, bounds.max.y),
         ],
         bounds,
         beam,
@@ -432,15 +474,25 @@ fn escape_pod(
     );
 }
 
-/// A spaceling at `motion`, facing `facing`, in a suit of `color`: its legs,
-/// its arms, one of them waving `wave` seconds into a wave, its body, its
-/// helmet and its visor. It is drawn in the physics crate's spaceling's
-/// proportions, shrunk to Clock's.
+/// What a spaceling does with its arms and legs: waves, `wave` seconds into
+/// a wave; holds up a white flag, from down to all the way up, `flag`
+/// seconds into the event; or runs, `stride` seconds into its run.
+#[derive(Clone, Copy, Default)]
+struct Pose {
+    wave: Option<f32>,
+    flag: Option<(f32, f32)>,
+    stride: Option<f32>,
+}
+
+/// A spaceling at `motion`, facing `facing`, in a suit of `color`, posed
+/// as `pose` says: its legs, its arms, its body, its helmet and its visor,
+/// and the flag it may hold up. It is drawn in the physics crate's
+/// spaceling's proportions, shrunk to Clock's.
 fn pilot(
     frame: &mut RenderFrame,
     motion: BodyMotion,
     facing: f32,
-    wave: Option<f32>,
+    pose: Pose,
     color: RenderColor,
     scale: f32,
     bounds: Bounds,
@@ -450,25 +502,64 @@ fn pilot(
         |x: f32, y: f32| motion.position + (Vec2::new(x, y) * size).rotate_radians(motion.angle);
     let legs = faded(SUIT, color.a);
     for side in [-1.0, 1.0] {
+        // Running, each leg swings forward and back, half a stride behind
+        // the other, and lifts its foot as it comes forward.
+        let foot = match pose.stride {
+            Some(seconds) => {
+                let swing = (seconds * TAU * STRIDE_HZ + (side + 1.0) * FRAC_PI_2).sin();
+                at(
+                    side * 0.06 + facing * 0.3 * swing,
+                    -0.8 + 0.15 * swing.max(0.0),
+                )
+            }
+            None => at(side * 0.12, -0.8),
+        };
         strip(
             frame,
             at(side * 0.1, -0.15),
-            at(side * 0.12, -0.8),
+            foot,
             0.14 * size,
             bounds,
             legs,
         );
         let shoulder = at(side * 0.2, 0.3);
-        let hand = match wave {
+        // An arm's angle from the body's side, out across the way it faces
+        // on this side and up from straight down.
+        let arm = |lift: f32| {
+            let angle = if side > 0.0 { lift } else { PI - lift };
+            shoulder + Vec2::from_radians(angle + motion.angle) * (0.5 * size)
+        };
+        let hand = match (pose.flag, pose.wave, pose.stride) {
+            // The arm on the side it faces holds the flag, rising from its
+            // side to high over its head.
+            (Some((raised, _)), _, _) if side == facing => arm(-1.2 + 2.5 * raised),
             // The arm on the side it faces, raised and waving.
-            Some(seconds) if side == facing => {
+            (_, Some(seconds), _) if side == facing => {
                 let swing = 0.35 * (seconds * TAU * 2.0).sin();
-                let angle = std::f32::consts::FRAC_PI_2 - side * (0.45 + swing);
-                shoulder + Vec2::from_radians(angle + motion.angle) * (0.5 * size)
+                arm(FRAC_PI_2 - 0.45 - swing)
+            }
+            // Running, the arms swing against the legs.
+            (_, _, Some(seconds)) => {
+                let swing = (seconds * TAU * STRIDE_HZ + (side + 1.0) * FRAC_PI_2).sin();
+                arm(-FRAC_PI_2 - side * facing * 0.6 * swing)
             }
             _ => at(side * 0.36, -0.12),
         };
         strip(frame, shoulder, hand, 0.13 * size, bounds, color);
+        if let Some((_, seconds)) = pose.flag
+            && side == facing
+        {
+            white_flag(
+                frame,
+                hand,
+                motion.angle,
+                facing,
+                seconds,
+                size,
+                bounds,
+                color.a,
+            );
+        }
     }
     polygon(
         frame,
@@ -487,6 +578,46 @@ fn pilot(
         0.14 * size,
         bounds,
         faded(VISOR, color.a),
+    );
+}
+
+/// A white flag held up in a spaceling's `hand`, its stick upright with the
+/// spaceling's body at `angle`, and its cloth out the way the spaceling
+/// faces, fluttering `seconds` into the event.
+#[allow(clippy::too_many_arguments)]
+fn white_flag(
+    frame: &mut RenderFrame,
+    hand: Vec2,
+    angle: f32,
+    facing: f32,
+    seconds: f32,
+    size: f32,
+    bounds: Bounds,
+    alpha: f32,
+) {
+    let up = Vec2::Y.rotate_radians(angle) * size;
+    let out = Vec2::X.rotate_radians(angle) * (facing * size);
+    let top = hand + up * 1.35;
+    strip(
+        frame,
+        hand - up * 0.25,
+        top,
+        0.09 * size,
+        bounds,
+        faded(STICK, alpha),
+    );
+    let flutter = |phase: f32| up * (0.08 * (seconds * TAU * 2.5 + phase).sin());
+    polygon(
+        frame,
+        ARENA_LAYER,
+        vec![
+            top,
+            top + out * 0.8 + flutter(0.0),
+            top - up * 0.5 + out * 0.8 + flutter(0.9),
+            top - up * 0.5,
+        ],
+        bounds,
+        faded(FLAG, alpha),
     );
 }
 
@@ -683,14 +814,28 @@ pub(super) fn render(
                 } else {
                     tank.motion.position.y
                 };
+                // The winner's beam widens to take up a spaceling it has
+                // drawn to its side.
+                let (mut left, mut right) = (x - width, x + width);
+                if event.phase == EventPhase::BeamUp
+                    && let Some(taken) = event.survivors.taken()
+                    && taken.slot != slot
+                {
+                    let reach = (taken.position.x - x).abs() + 0.75 * scale;
+                    if taken.position.x < x {
+                        left = left.min(x - reach);
+                    } else {
+                        right = right.max(x + reach);
+                    }
+                }
                 polygon(
                     frame,
                     ARENA_LAYER,
                     vec![
-                        Vec2::new(x - width, bottom),
-                        Vec2::new(x + width, bottom),
-                        Vec2::new(x + width, tank_bounds.max.y),
-                        Vec2::new(x - width, tank_bounds.max.y),
+                        Vec2::new(left, bottom),
+                        Vec2::new(right, bottom),
+                        Vec2::new(right, tank_bounds.max.y),
+                        Vec2::new(left, tank_bounds.max.y),
                     ],
                     tank_bounds,
                     beam,

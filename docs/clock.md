@@ -1174,7 +1174,7 @@ the Off profile still disables every automatic event.
 | `explosion` | Individual digit/AM-PM blocks scatter and bounce | 0.6 s warning + 3.5 s burst + 1.5 s reform | 45 s |
 | `spider` | One visitor on a silk line, climbing and swinging on the digits in the run's arena | At most 30 s including departure, with up to 10 s more to finish leaving | 30 s after departure |
 | `coins` | Lit cells turn into coins that drop, roll and pile; a magpie carries three or four off, and the rest fly home | 0.6 s minting + 4 s cascade + 23 s gathering + 1.5 s reform | 45 s |
-| `tanks` | Two CPU tanks duel on destructible hills below the reading, whose lit cells stop their shells | At most 92 s, including entry, one transport retry and departure | 120 s |
+| `tanks` | Two CPU tanks duel on destructible hills below the reading, whose lit cells stop their shells | At most 94 s, including entry, one transport retry and departure | 120 s |
 
 ### Tanks
 
@@ -1246,8 +1246,8 @@ ones `interrupted`, as any event cut short does.
 | `fighting` | 60 s | Fire is held while the tanks drive to their range, for at most 12 s. Then shared CPU driving and dodging, swept shells that burst on the lit face and knock cells loose, craters, loose dirt and weak-bank collapse. |
 | `finishing-shots` | 10 s | No new driving or fire; existing shells finish before deciding the result. |
 | `blowing-up` | 3 s | Each in-view loser blows apart, and each piece turns to dirt where it comes to rest. |
-| `aftermath` | 6 s | A spaceling that got out finds its feet, looks around and waves. Skipped when none got out, or once each has waved. |
-| `beam-up` | 2 s | Surviving winners depart, and a beam lifts out each spaceling still in view. |
+| `aftermath` | 6 s, or 8 s with a stowaway or a surrender | A spaceling that got out finds its feet, then waves for the rescue beam, runs to the winner and climbs onto its roof, or raises a white flag and is drawn to the winner's side. Skipped when none got out, or once each is ready to leave. |
+| `beam-up` | 2 s | Surviving winners depart with a stowaway on the roof or a spaceling that surrendered beside them, and a beam lifts out each other spaceling still in view. |
 | `withdrawing` | 3 s | The remaining owned battlefield moves below the frame and is removed. |
 
 One living tank wins. If both remain alive at timeout, higher health wins and
@@ -1291,23 +1291,58 @@ the view:
   spaceling climbs out over the side it faces. The empty pod stays where it
   lies until the hills withdraw, and goes with them.
 
-Once up, the spaceling looks the other way, then back, and waves. The
-`aftermath` phase waits until every spaceling has waved for a second, for at
-most 6 s after the blow-up; a fight without one skips it. In the beam-up, a
-narrow beam in the spaceling's team color comes down on it over half a second
-and lifts it out beside the winner's. A spaceling still down when the
-aftermath runs out is lifted out as it lies, and a pod still sealed would be
-lifted out whole. A spaceling, or a pod with its spaceling still in it, that
-leaves the view retires there, and nothing waits for it. The spacelings and
-pods meet the hills, the dirt, the floor and the winner, and pass the pieces,
-the face and one another. The arena keeps room for both sides' spacelings and
-pods, in four bodies and four colliders.
+Each spaceling draws how it leaves as it gets out, evenly from the endings
+that fit the fight, by a roll from a third stream of its own. The rescue beam
+always fits. Stowing away and surrendering need the winner in view, so a
+fight that leaves none, in a draw or with no tank standing, gives every
+spaceling the rescue beam.
 
-Started with `--seed 102`, Clock's first event, if it is Tanks, throws its
-loser's spaceling clear whichever tank loses, and started with `--seed 132`,
-its loser's spaceling gets out in a pod. Both sides of those fights roll the
-same way. The tests force a spaceling out of the view and keep one down past
-its time, since no survey fight did either.
+- **Rescue beam.** Once up, the spaceling looks the other way, then back, and
+  waves. In the beam-up, a narrow beam in its team's color comes down on it
+  over half a second and lifts it out beside the winner's.
+- **Stowaway.** Once up, the spaceling looks toward the winner for half a
+  second, then runs to it at three times its walk, jumping the steps on its
+  way, and slows as it comes up to it. It climbs onto the winner's roof, over
+  the turret if it came up on the barrel's side, and sits behind the turret,
+  facing it. Half a second later the winner may leave, and the spaceling
+  rides out on the hull through the winner's beam-up. At a run every bump in
+  the dirt knocks it about, so a running spaceling rights itself faster, and
+  only a knock three times as hard as one that fells a walker knocks it down.
+- **Surrender.** Once up, the spaceling looks around, then turns to the
+  winner and raises a small white flag, and the winner's turret turns onto
+  it, over the top, at 2 radians a second. Once its flag has been up for a
+  second and the turret is on it, a narrow beam in the winner's color comes
+  down on it over half a second, then draws it over 1.5 s to the winner's
+  side, its flag still up and the turret following it. The beam lifts it in
+  an arc high enough to clear the hills and the dirt between, up to 5 units.
+  In the beam-up, the winner's beam widens to take it, and it rises beside
+  the winner.
+
+The rescue beam is every ending's fallback. A stowaway with no way to the
+winner, past a drop deeper than it lands from on its feet, a step higher than
+it jumps or something in its way, waves for the rescue beam where it stands.
+So does one without the time to reach the winner and climb on, and one that
+makes no headway for 1.5 s. A spaceling that surrenders waves for it too when
+there is no time left to draw it in.
+
+The `aftermath` phase waits until every spaceling is ready to leave: it has
+waved for a second, sat on the winner's roof for half a second, or been drawn
+to the winner's side. It waits at most 6 s after the blow-up, or 8 s when a
+spaceling drew a stowaway or a surrender; a fight without one skips it. A
+spaceling still down when the aftermath runs out is lifted out as it lies,
+and a pod still sealed would be lifted out whole. A spaceling, or a pod with
+its spaceling still in it, that leaves the view retires there, and nothing
+waits for it. The spacelings and pods meet the hills, the dirt, the floor and
+the winner, and pass the pieces, the face and one another. Climbing onto the
+winner, or drawn to it, a spaceling pushes nothing. The arena keeps room for
+both sides' spacelings and pods, in four bodies and four colliders.
+
+Started with `--seed 212`, Clock's first event, if it is Tanks, throws its
+loser's spaceling clear whichever tank loses, and it waits for the rescue
+beam. Started with `--seed 2963`, the spaceling gets out in a pod and waits
+for the rescue beam; with `--seed 102`, it is thrown clear and stows away;
+and with `--seed 602`, it is thrown clear and surrenders. Both sides of those
+fights roll the same way.
 
 Each loser has an authored conversion of 24 half-unit cells: six native
 area/mass units at dirt density one, scaled by the square of placement scale.
@@ -1382,6 +1417,68 @@ s, as the spacelings waved and were beamed up, it averaged 9.7 ms, with a
 slowest loop of 14.5 ms, against 7.5 ms while the hills withdrew and the event
 ended. No loop ran over 16.7 ms, and no display refresh was skipped either
 way.
+
+A local survey of the endings fought 24 seeds at each of the same five
+shapes for each ending, once with every loser's spaceling thrown clear and
+once with every one in a pod, each spaceling with a winner in view drawing
+that ending, and 300 seeds at each shape with the rolls as they fall:
+
+- Of 112 thrown stowaways, 106 rode out on the winner's roof. Three found no
+  way to the winner, all in portrait, and three were out of time. Of 112 from
+  pods, which stand later, 101 rode out; three found no way and eight were
+  out of time. A stowaway set out a median of 67 units from the winner and
+  at most 85, ran for a median of 5.1 s and at most 7.1 s, jumped on 129 of
+  the 207 runs that reached the winner, and reached it a median of 7.8 s
+  after the blast when thrown and 8.8 s from a pod, and at most 10.1 s.
+- All 224 spacelings that surrendered were drawn to the winner's side with
+  its turret on them. The winner's beam came down on them a median of 4.5 s
+  after the blast when thrown and 5.7 s from a pod, and at most 7.1 s.
+- All 256 that drew the rescue beam were beamed up, among them both
+  spacelings of each fight that left no winner.
+- The aftermath lasted a median of 1.4 s with a thrown spaceling waiting for
+  the rescue beam and 2.5 s with one from a pod, and at most 3.9 s. With a
+  surrender it lasted 3.8 s and 4.8 s, and at most 6.3 s; with a stowaway,
+  5.9 s and 7.0 s, and seven fights ran to the 8 s limit, each stowaway
+  already on the winner's roof.
+- With the rolls as they fall, 239 spacelings got out in the 1,500 fights,
+  135 in pods and 104 thrown. The 40 without a winner in view all took the
+  rescue beam. Of the 199 with one, 70 drew the rescue beam, 67 stowed away
+  and 62 surrendered. Of the stowaways, 61 rode out, two pods in portrait
+  found no way and four pods were out of time. Of the surrenders, 61 were
+  drawn in; in the other fight, the winner slid out of view after the
+  blast, and the spaceling waved for the rescue beam.
+- Every fight came back to idle with nothing left behind, and the longest
+  visit took 80.9 s.
+- On the development workstation, five fights at a time, a tick while
+  blowing up or in the aftermath took a median of 0.15–0.35 ms, with a 99th
+  percentile of 0.25–0.55 ms, about the same for each ending. The tick a
+  stowaway sets out on, which looks over its whole way to the winner, took
+  a median of 0.44 ms, 0.23 ms over its fight's median tick. The tick a
+  surrender is taken on, which looks over the hills between, took a median
+  of 0.39 ms, 0.17 ms over.
+
+On sw-picade-2, at 1024×768 with the raster renderer at scale 1, the same
+eight seeds were fought with a build that sent every loser's spaceling out,
+once with every spaceling waiting for the rescue beam and once with four
+stowing away and four surrendering, two of each thrown and two from pods.
+Each fight was traced for 4 s from the blast and for 4 s from 5.2 s and from
+10.5 s after it. From the blast, loop CPU averaged 11.7 ms with the new
+endings against 11.6 ms, with a 99th percentile of 13.8 ms against 13.5 ms
+and a slowest loop of 16.3 ms against 16.0 ms. From 5.2 s it averaged 11.3
+ms against 9.8 ms, and from 10.5 s 8.4 ms against 6.1 ms: the stowaways were
+still running or riding out and the spacelings that surrendered were being
+drawn in or taken up, while those waiting for the rescue beam had been
+beamed up. One loop, 0.2 s into a beam-up that took a spaceling that had
+surrendered, took 17.5 ms, the extra time spent drawing. No other loop after
+the blast ran over 16.7 ms, and no display refresh was skipped either way.
+Traced again with the host's step timed, from 1.6 s to 5.6 s after the
+blast, loop CPU averaged 11.7 ms either way, with a slowest loop of 16.3 ms
+against 16.6 ms. Where the once-a-second state placed each stowaway's
+set-out, the slowest step took 1.5–2.0 ms, 0.5–0.9 ms over its fight's
+median step, and where it placed each thrown spaceling's take, 1.6 and 1.9
+ms, 0.8 ms over; the two from pods were taken after that trace.
+In both runs with the new endings, one of the two stowaways from pods ran out
+of time on its way and was beamed up.
 
 The run data stays local.
 
@@ -1558,29 +1655,50 @@ engine-client tanks_blow_apart_and_turn_to_dirt` regenerates all four.
 
 | | The rescue, as the winner beams up | Getting out, standing, waving and the rescue beam, five or six times larger |
 | --- | --- | --- |
-| 1024×768, thrown | ![The left tank in its wide beam, and the right tank's spaceling lifted in a narrow beam above the dirt](screenshots/clock/tanks-1024x768-thrown-rescue.png) | ![The spaceling thrown up beside the turret, lying where it landed, standing and waving, then lifted in its beam](screenshots/clock/tanks-1024x768-thrown-zoom.png) |
-| 1024×768, pod | ![The right tank in its wide beam, and the left tank's spaceling lifted in a narrow beam beside its open pod](screenshots/clock/tanks-1024x768-pod-rescue.png) | ![The pod arcing out on a trail of smoke, landed with its hatch swinging open, the spaceling climbing out, waving beside it, then lifted in its beam](screenshots/clock/tanks-1024x768-pod-zoom.png) |
-| 800×480, thrown | ![The left tank in its wide beam, and the right tank's spaceling lifted in a narrow beam](screenshots/clock/tanks-800x480-thrown-rescue.png) | ![The spaceling thrown up beside the turret, lying where it landed, standing and waving, then lifted in its beam](screenshots/clock/tanks-800x480-thrown-zoom.png) |
-| 800×480, pod | ![The right tank in its wide beam, and the left tank's spaceling lifted in a narrow beam beside its open pod](screenshots/clock/tanks-800x480-pod-rescue.png) | ![The pod arcing out on a trail of smoke, landed with its hatch open, the spaceling climbing out, waving beside it, then lifted in its beam](screenshots/clock/tanks-800x480-pod-zoom.png) |
+| 1024×768, thrown | ![The right tank in its wide beam, and the left tank's spaceling lifted in a narrow beam](screenshots/clock/tanks-1024x768-thrown-rescue.png) | ![The spaceling thrown up out of the fireball, down where it landed, waving, then lifted in its beam](screenshots/clock/tanks-1024x768-thrown-zoom.png) |
+| 1024×768, pod | ![The right tank in its wide beam, and the left tank's spaceling lifted in a narrow beam beside its open pod](screenshots/clock/tanks-1024x768-pod-rescue.png) | ![The pod thrown out of the fireball, landed with its hatch opening, the spaceling climbing out, waving beside it, then lifted in its beam](screenshots/clock/tanks-1024x768-pod-zoom.png) |
+| 800×480, thrown | ![The right tank in its wide beam, and the left tank's spaceling lifted in a narrow beam](screenshots/clock/tanks-800x480-thrown-rescue.png) | ![The spaceling thrown up out of the fireball, down where it landed, waving, then lifted in its beam](screenshots/clock/tanks-800x480-thrown-zoom.png) |
+| 800×480, pod | ![The right tank in its wide beam, and the left tank's spaceling lifted in a narrow beam beside its open pod](screenshots/clock/tanks-800x480-pod-rescue.png) | ![The pod thrown out of the fireball, landed with its hatch opening, the spaceling climbing out, waving beside it, then lifted in its beam](screenshots/clock/tanks-800x480-pod-zoom.png) |
 
-Seed 102 throws the loser's spaceling clear at both sizes; seed 132 at
-1024×768 and seed 305 at 800×480 send it out in a pod. A thrown strip shows
-the spaceling 0.4 s after the blast, tumbling beside the turret, then down
-where it landed, waving, and lifted out 1.25 s into the beam-up. A pod strip
-shows the pod in flight 0.5 s after the blast, landed with its hatch opening,
-the spaceling climbing out, waving beside the pod, and lifted out.
+Seed 212 throws the loser's spaceling clear, and seed 2963 sends it out in a
+pod, at both sizes. A thrown strip shows the spaceling 0.4 s after the blast,
+tumbling clear of the fireball, then down where it landed, waving, and lifted
+out 1.25 s into the beam-up. A pod strip shows the pod in flight 0.5 s after
+the blast, landed with its hatch opening, the spaceling climbing out, waving
+beside the pod, and lifted out.
 `SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
 engine-client tanks_spacelings_get_out_and_are_beamed_up` regenerates all
 eight.
+
+| | Riding out on the winner's roof, as it beams up | Running for the winner, climbing over its turret, sitting behind it and riding out, five or six times larger |
+| --- | --- | --- |
+| 1024×768 | ![The left tank rising in its beam, the right tank's spaceling riding on its roof behind the turret](screenshots/clock/tanks-1024x768-stowaway.png) | ![The spaceling in the air on its run, climbing over the winner's turret, sitting behind it, then riding the hull up in the winner's beam](screenshots/clock/tanks-1024x768-stowaway-zoom.png) |
+| 800×480 | ![The left tank rising in its beam, the right tank's spaceling riding on its roof behind the turret](screenshots/clock/tanks-800x480-stowaway.png) | ![The spaceling in the air on its run, climbing over the winner's turret, sitting behind it, then riding the hull up in the winner's beam](screenshots/clock/tanks-800x480-stowaway-zoom.png) |
+
+| | Drawn to the winner's side, a second into the take | Taken up beside the winner, as it beams up | The flag going up, the winner's beam coming down, drawn up in it, and taken up, five or six times larger |
+| --- | --- | --- | --- |
+| 1024×768 | ![The left tank's spaceling, its white flag up, lifted in a narrow beam in the right tank's color, the right tank's turret turned toward it](screenshots/clock/tanks-1024x768-surrender-taken.png) | ![The right tank rising in its beam, widened to take the left tank's spaceling up beside it, its flag still up](screenshots/clock/tanks-1024x768-surrender-beam.png) | ![The spaceling raising its white flag, the winner's beam coming down on it, drawn up in that beam, then rising beside the winner in its widened beam](screenshots/clock/tanks-1024x768-surrender-zoom.png) |
+| 800×480 | ![The left tank's spaceling, its white flag up, lifted in a narrow beam in the right tank's color, the right tank's turret turned toward it](screenshots/clock/tanks-800x480-surrender-taken.png) | ![The right tank rising in its beam, widened to take the left tank's spaceling up beside it, its flag still up](screenshots/clock/tanks-800x480-surrender-beam.png) | ![The spaceling raising its white flag, the winner's beam coming down on it, drawn up in that beam, then rising beside the winner in its widened beam](screenshots/clock/tanks-800x480-surrender-zoom.png) |
+
+Seed 102 throws the loser's spaceling clear to stow away, and seed 602 to
+surrender, at both sizes. The stowaway strip shows it 0.75 s into its run,
+a quarter of a second into its climb, a quarter of a second after it sat
+down behind the turret, and 0.83 s into the beam-up. The surrender strip
+shows its flag going up a quarter of a second after it turned to the
+winner, the winner's beam two-thirds of the way down to it, the spaceling a
+second into the take, and the two 0.67 s into the beam-up. Each frame of
+these strips is centered on the spaceling.
+`SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
+engine-client tanks_spacelings_stow_away_or_surrender` regenerates all ten.
 
 `clock state` includes phase, support, world positions, hull and terrain IDs,
 health, the two CPUs (`cpu`), whether each is dodging a shell (`dodging`),
 shell/shot counts, the shells the face stopped (`face_hits`), the cells they
 knocked loose (`knocked_loose`), the losers' pieces not yet turned to dirt
 (`pieces`), how each side's spaceling gets out if its tank blows up
-(`ejections`), each spaceling that has got out with its phase, position and
-knockdowns (`survivors`), conversion accounting and any settling failure in
-`tanks`.
+(`ejections`), each spaceling that has got out with the ending it drew, the
+one it is on and why it fell back, its phase, position and knockdowns
+(`survivors`), conversion accounting and any settling failure in `tanks`.
 Values with a `_milli` suffix use thousandths of their inspection
 unit (positions, area and mass use host units). The common damage-material migration
 and damage to resident plants remain follow-up work: this integration uses Scorched's current tank HP rule and does

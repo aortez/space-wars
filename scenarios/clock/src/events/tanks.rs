@@ -22,6 +22,8 @@ pub const BEAM_DOWN_TICKS: u64 = 2 * FIXED_HZ as u64;
 pub const SETTLE_TICKS: u64 = 2 * FIXED_HZ as u64;
 pub const COMBAT_TICKS: u64 = 60 * FIXED_HZ as u64;
 pub const BEAM_UP_TICKS: u64 = 2 * FIXED_HZ as u64;
+/// How far the winner's beam lifts it, in the duel's units.
+pub const BEAM_UP_RISE: f32 = 12.0;
 pub const WITHDRAW_TICKS: u64 = 3 * FIXED_HZ as u64;
 pub const MAX_TICKS: u64 = RAISE_TICKS
     + 2 * BEAM_DOWN_TICKS
@@ -381,7 +383,7 @@ impl TanksEvent {
             }
             EventPhase::BeamUp | EventPhase::Withdrawing => {
                 let (duration, direction, distance) = if self.phase == EventPhase::BeamUp {
-                    (BEAM_UP_TICKS, 1.0, 12.0 * scale)
+                    (BEAM_UP_TICKS, 1.0, BEAM_UP_RISE * scale)
                 } else {
                     (WITHDRAW_TICKS, -1.0, self.withdrawal)
                 };
@@ -399,7 +401,16 @@ impl TanksEvent {
         match self.phase {
             EventPhase::BlowingUp | EventPhase::Aftermath => {
                 let gravity = world.gravity() * self.duel.gravity_scale(world);
-                self.survivors.control(world, gravity, self.tick);
+                let winner = self.winner(world);
+                self.survivors.control(world, gravity, self.tick, winner);
+                // The winner's turret turns onto a spaceling that
+                // surrenders, and keeps it covered as its beam draws it in.
+                if let Some(target) = self.survivors.target()
+                    && let Some(winner) = winner
+                {
+                    self.duel
+                        .point_barrel(winner.slot, survivor::turn_barrel(winner.barrel, target));
+                }
             }
             EventPhase::BeamUp => self.survivors.lift(world, self.phase_tick),
             _ => (),
@@ -499,13 +510,18 @@ impl TanksEvent {
             EventPhase::FinishingShots if self.duel.active_shells() == 0 => self.resolve(world),
             EventPhase::BlowingUp => {
                 let ending = self.phase_tick == BLOW_UP_TICKS;
-                self.survivors.observe(world, self.layout, self.tick);
+                let winner = self.winner(world);
+                // Were the wreck done now, the aftermath would end this long
+                // from now at the latest.
+                let deadline = self.tick + self.survivors.aftermath_ticks();
+                self.survivors
+                    .observe(world, self.layout, self.tick, winner, deadline);
                 if !self
                     .wreck
                     .observe(world, self.layout, self.tick, ending, &mut self.converted)
                 {
-                    // A survivor still getting up, looking around or waving
-                    // has the aftermath to finish in.
+                    // A survivor still getting up, looking around, waving,
+                    // running or surrendering has the aftermath to finish in.
                     if self.survivors.ready(self.tick) {
                         self.begin_beam_up(world);
                     } else {
@@ -514,8 +530,12 @@ impl TanksEvent {
                 }
             }
             EventPhase::Aftermath => {
-                self.survivors.observe(world, self.layout, self.tick);
-                if self.survivors.ready(self.tick) || self.phase_tick == AFTERMATH_TICKS {
+                let winner = self.winner(world);
+                let longest = self.survivors.aftermath_ticks();
+                let deadline = self.tick - self.phase_tick + longest;
+                self.survivors
+                    .observe(world, self.layout, self.tick, winner, deadline);
+                if self.survivors.ready(self.tick) || self.phase_tick >= longest {
                     self.begin_beam_up(world);
                 }
             }
@@ -561,6 +581,7 @@ impl TanksEvent {
         self.result = Some(result);
         self.final_health = Some(health);
         let winners = result.winners();
+        let winner_in_view = self.winner(world).is_some();
         let mut ids = self.duel.conversion_ids();
         let gravity_scale = self.duel.gravity_scale(world);
         for (slot, tank) in tanks
@@ -585,7 +606,7 @@ impl TanksEvent {
             self.wreck
                 .blow_up(world, loser, gravity_scale, self.tick, &mut ids);
             self.survivors
-                .eject(world, slot, &tank, gravity_scale, self.tick);
+                .eject(world, slot, &tank, winner_in_view, gravity_scale, self.tick);
         }
         if self.wreck.pieces.is_empty() {
             self.begin_beam_up(world);
@@ -599,6 +620,33 @@ impl TanksEvent {
     // or create bodies outside the withdrawal's captured population.
     fn simulates_duel(&self) -> bool {
         self.result.is_none() && self.phase != EventPhase::Withdrawing
+    }
+
+    /// The winner, once the fight is over, while it stands in view: none
+    /// after a draw or a fight without one.
+    fn winner(&self, world: &PhysicsWorld) -> Option<survivor::Winner> {
+        let slot = match self.result? {
+            ResultKind::Left => 0,
+            ResultKind::Right => 1,
+            ResultKind::Draw | ResultKind::Neither => return None,
+        };
+        let tank = self.duel.tanks(world)[slot];
+        let position = tank.motion.position;
+        if !tank.present
+            || position.y < self.layout.bounds_min.y
+            || position.x.abs() > self.layout.bounds_max.x
+        {
+            return None;
+        }
+        let bounds = tank.bounds?;
+        let gear = self.duel.running_gear(world, slot)?;
+        Some(survivor::Winner {
+            slot,
+            hull: tank.motion,
+            half: gear.hull_half_extents,
+            bounds: [bounds.min, bounds.max],
+            barrel: tank.barrel,
+        })
     }
 
     fn begin_beam_up(&mut self, world: &mut PhysicsWorld) {
@@ -615,8 +663,13 @@ impl TanksEvent {
                 }
             }
         }
-        // The survivors' beams come down as the winner's lifts it.
-        let rescued = self.survivors.begin_rescue(world, self.tick);
+        // A stowaway on the winner's roof, or a spaceling its beam has taken,
+        // goes up with the winner, and the other survivors' beams come down
+        // as the winner's lifts it.
+        let riders = self.survivors.riders(world, self.tick);
+        self.departure.extend(riders);
+        let winner = self.winner(world);
+        let rescued = self.survivors.begin_rescue(world, self.tick, winner);
         if self.departure.is_empty() && !rescued {
             self.begin_withdrawal(world);
         } else {
