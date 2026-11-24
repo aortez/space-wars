@@ -187,6 +187,16 @@ after the impacts' charges:
   the support twice as hard, for half as long. The figures below are at
   Scorched's 60 Hz.
 - Supports are priced for their normal load alone, not for friction.
+- Where a seam between one side's pieces lies on a seam between the other's,
+  each piece there meets the piece across the seam at a corner as well as
+  along its face. Once a body drifts a hair across the seam, Rapier pushes
+  those corners apart sideways, and the support counts the pushes as load,
+  though they cancel across the seam. A box of four pieces resting on a floor
+  of two or four, their middle seams together, drifted under a millionth
+  across it and was charged up to 2.3% more work over its first second than a
+  box of one, and up to 0.5% more over five. A box of two on the same floors
+  stayed on the seam and was charged alike, as are seams apart. #694 tracks a
+  fix.
 - No plastic displacement is measured, so an overload follows the law's
   fallback progression. The solve still holds the body up, so a crushed
   support does not give way.
@@ -209,12 +219,22 @@ after the impacts' charges:
   are only ill-conditioned, but not all of them.
 - A batch that capture refuses is not priced.
 - Records come before the substep's gravity, so a falling body's approach
-  lacks one substep of it.
+  lacks one substep of the speed the solve stops. Without CCD, capture
+  first sees a falling body in the step after the one that carries it into
+  its support, or to within Rapier's prediction distance of it, at the
+  speed it ended that step with. That is within a step of gravity of its
+  free fall's, so the step rate moves a drop's price. A ball dropped 1.3 at
+  120 Hz is priced at 5.167, against the 5.099 of its free fall.
 - Rapier's restitution sets the bounce. The ledger's recoverable energy is not
   applied.
 - Capture's bounds still refuse a whole batch on overflow, and every
   contacting pair counts toward its visits, bound or not. Neither game comes
   near them, as the next section shows.
+- A refused batch ends none of the episodes it would have ended. Once a scene
+  fills capture's room for episodes, each batch that opens more episodes than
+  it ends is refused, and pairs that have parted keep their room while the
+  scene goes on meeting new ones. With room for 48, the busy scene under
+  Evidence had 984 of its 1,200 steps refused.
 
 ## Game worlds
 
@@ -485,4 +505,82 @@ and supports that move, turn, split or hang together:
   since joints aren't in an impact's budget. Settled, its wheels' supports
   carry the whole rover's weight through its sprung slots.
 
+`crates/engine-rapier/src/world/loading/charges/tests/invariance.rs` covers
+what charges must not depend on, and the state they keep:
+
+- **Partitions and order:** a box crushing soft tissue for a second, the box
+  in one, two or four pieces and the tissue in one or five, is charged the
+  same work to within a part in ten thousand, and its support carries its
+  weight for the second. Neither which body is added first, nor the order of
+  their pieces, nor which source sorts first changes it. The seams lie apart.
+  Limits says what seams that meet cost.
+- **Step rate:** a ball dropped 0.5 to 3.7 onto rock at 30, 60, 120 and
+  240 Hz is priced at the speed it had when capture first saw it, within a
+  step of gravity of its free fall's. Capture first sees those drops inside
+  the rock. A drop that ends a step a thousandth above the rock is first seen
+  there, within Rapier's prediction distance, and is priced as closely.
+- **Pauses:** four balls bouncing on rock beside a resting box, with steps of
+  zero, a negative length, NaN and infinity after every step, price nothing
+  in those steps. The run prices the same charges and leaves the same
+  surfaces as without them.
+- **Stale IDs:** the host replaces a struck ball with a new actor under the
+  same IDs, half a unit beyond it, before pricing the step. The strike is
+  reported as retired, with its energy, and charges nothing, although the
+  host still keeps the old surface. The new actor's region has a new token,
+  and when the first ball reaches it, the strike is a new episode on that
+  token.
+- **Busy scene:** sixty balls are thrown about between rock walls for ten
+  seconds. At the default bounds, capture refuses nothing: its episodes
+  peaked at 147 and its records at 152 a step, against 1,024 and 8,192. With
+  room for 48 episodes the cap holds, and capture refuses the batches that
+  would exceed it, in 984 of the 1,200 steps. Each step reports each impact
+  of the batches capture admitted, once, and a step with a refused batch
+  prices no supports. Removing the balls retires every episode they kept.
+- **Refused batch:** with room for one episode, a strike between two balls
+  takes it, and capture refuses the batch in which a CCD bullet strikes a
+  wall later in the same step. The bullet's strike is missing from the
+  charges, and the balls' strike is priced. With room for two, both are.
+- **Replay:** the bouncing scene, saved 100 steps in with the host's
+  surfaces and restored in the same build, prices its last 140 steps as the
+  run did and leaves the same surfaces.
+
 Run `RUST_MIN_STACK=16777216 cargo test -p engine-rapier --lib world::loading::charges`.
+
+## Acceptance
+
+Each item of #327's acceptance list rests on these tests:
+
+- **#326's reference cases on real physics:** `reference.rs`, all but the
+  cases its Evidence names as not run.
+- **Common velocity:** `motion.rs`'s common velocity.
+- **Moving and rotating supports:** `motion.rs`'s turning, moving and
+  tilting supports, and `tests.rs`'s kinematic slab.
+- **Angular contacts:** `tests.rs`'s spinning bar, `reference.rs`'s angular
+  strikes and `motion.rs`'s turning paddle.
+- **CCD:** `tests.rs`'s CCD wall and substeps, `supports.rs`'s split step,
+  and `motion.rs`'s shell into a free box.
+- **Static walls:** `tests.rs`'s fixed wall and `motion.rs`'s fragment.
+- **A dynamic fragment:** `motion.rs`'s fragment.
+- **Repeated bounces:** `motion.rs`'s bounces, and `reference.rs`'s safe
+  bumps and progressive hits.
+- **Multi-collider actors:** bodies of several colliders in `tests.rs`'s
+  partitions and many colliders, `reference.rs`'s seam and `invariance.rs`'s
+  partitions, and `motion.rs`'s rover, an actor of three bodies with a region
+  each.
+- **Sustained support:** `supports.rs`, `reference.rs`'s resting support and
+  fixed step, and `motion.rs`'s stack and cart.
+- **Partitions and contact order:** met for impacts, by `tests.rs`'s and
+  `reference.rs`'s partitions, and for supports whose seams lie apart, by
+  `invariance.rs`'s, each to within a part in ten thousand of the work. It is
+  open for supports whose seams meet, which Limits describes and #694 tracks.
+- **Pauses and zero-time steps:** `invariance.rs`'s pauses, and `tests.rs`'s
+  host rules.
+- **Stale IDs:** `invariance.rs`'s stale IDs, `supports.rs`'s removed body,
+  and capture's retirement and handle-reuse test.
+- **Bounded state and work:** `invariance.rs`'s busy scene and refused
+  batch, capture's limit and refused-batch tests, and the game worlds above.
+  Limits says what a scene that fills capture's room loses.
+- **Same-build replay:** `invariance.rs`'s replay, and capture's snapshot
+  tests. This is not a cross-machine lockstep claim.
+
+Capture's tests are in `crates/engine-rapier/src/world/loading/tests.rs`.

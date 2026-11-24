@@ -9,9 +9,7 @@ use engine_material::WOOD;
 /// Steps once, and prices the step's impacts and then its supports.
 fn step(world: &mut PhysicsWorld, host: &mut Host) -> (Vec<ContactCharge>, Vec<SupportCharge>) {
     world.step(DT);
-    let impacts = world.charge_contact_impacts(host).unwrap();
-    let supports = world.charge_contact_supports(host).unwrap();
-    (impacts, supports)
+    charges(world, host)
 }
 
 /// The force of a step's one support.
