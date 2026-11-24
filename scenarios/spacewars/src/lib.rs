@@ -4,6 +4,7 @@
 //! collision response, damage, debris, asteroids, weapons, exhaust trails, and
 //! escape pods. Sounds, scoring, and final HUD polish land in later slices.
 
+mod contact_charges;
 pub mod integrity;
 mod lasers;
 mod physics;
@@ -19,6 +20,7 @@ mod terrain;
 pub mod terrain_art;
 pub mod thrusters;
 pub mod weapons;
+pub use contact_charges::{ContactDiagnostics, ContactHit};
 pub use terrain::{
     TerrainDiagnostics, TerrainMotionAnomaly, TerrainMotionBody, TerrainMotionFrame,
     TerrainMotionPeaks, TerrainMotionStage, fixture_controls as terrain_fixture_controls,
@@ -392,6 +394,9 @@ pub struct SpacewarsState {
     pub debris_body_collisions: Vec<DebrisBodyCollision>,
     pub body_collisions: Vec<BodyCollision>,
     pub body_impacts: Vec<BodyImpact>,
+    /// Each new impact contact charges priced in this step, once a world
+    /// turns them on with [`SpacewarsState::enable_contact_charges`].
+    pub contact_hits: Vec<ContactHit>,
     pub spaceport_contacts: Vec<SpaceportContact>,
     pub player_view_heights: [f32; 2],
     pub last_step_metrics: SpacewarsStepMetrics,
@@ -1316,6 +1321,7 @@ impl Scenario for SpacewarsScenario {
             debris_body_collisions: Vec::new(),
             body_collisions: Vec::new(),
             body_impacts: Vec::new(),
+            contact_hits: Vec::new(),
             spaceport_contacts: Vec::new(),
             player_view_heights,
             last_step_metrics: SpacewarsStepMetrics::default(),
@@ -1496,6 +1502,7 @@ impl SpacewarsScenario {
 
         terrain::loose::capture_impacts(state, dt);
         let shots = shots::prepare(state, dt);
+        contact_charges::bind(&mut state.physics);
         let rapier = state.physics.step(dt);
         terrain::loose::sample_impacts(state);
         motion_diagnostics_time += terrain::capture_motion(state, TerrainMotionStage::AfterPhysics);
@@ -1514,6 +1521,7 @@ impl SpacewarsScenario {
         }
 
         let collision_started = Instant::now();
+        contact_charges::price(state, surface_pilots);
         update_ship_lasers(state, dt);
         state.laser_hits = resolve_laser_hits(state, surface_pilots);
         surface_sortie::match_rules::apply_lasers(state, surface_pilots);

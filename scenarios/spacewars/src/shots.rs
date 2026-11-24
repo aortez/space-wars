@@ -231,11 +231,24 @@ impl<'a> Bodies<'a> {
                 (!rover.dead).then(|| (rover.health_map(), rover.life))
             }
             MechanicalEntity::Debris(id) => {
-                let item = self.debris.get(*self.index.get(&id)?)?;
+                let item = self.debris(id)?;
                 (!item.dead).then(|| (item.health_map(), item.life))
             }
             _ => None,
         }
+    }
+
+    /// The piece of debris whose physics id is `id`.
+    pub(super) fn debris(&self, id: u64) -> Option<&DebrisState> {
+        self.debris.get(*self.index.get(&id)?)
+    }
+
+    /// Whether ejection protection covers the body `key` stands for.
+    pub(super) fn shielded(&self, key: u64) -> bool {
+        let entity = physics::classify_entity(PhysicsId::new(key));
+        self.exposed
+            .iter()
+            .any(|body| Some(body.entity) == entity && body.protected)
     }
 }
 
@@ -265,10 +278,7 @@ impl Recipients for Bodies<'_> {
         let Recipient::Body { entity, .. } = recipient else {
             return false;
         };
-        let entity = physics::classify_entity(entity);
-        self.exposed
-            .iter()
-            .any(|body| Some(body.entity) == entity && body.protected)
+        self.shielded(entity.value())
     }
 }
 
