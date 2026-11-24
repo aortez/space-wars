@@ -77,7 +77,7 @@ pub enum EventPhase {
     Settling,
     Fighting,
     FinishingShots,
-    Crumbling,
+    BlowingUp,
     BeamUp,
     Withdrawing,
 }
@@ -113,7 +113,7 @@ impl EventPhase {
             Self::Settling => "settling",
             Self::Fighting => "fighting",
             Self::FinishingShots => "finishing-shots",
-            Self::Crumbling => "crumbling",
+            Self::BlowingUp => "blowing-up",
             Self::BeamUp => "beam-up",
             Self::Withdrawing => "withdrawing",
         }

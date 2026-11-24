@@ -1175,6 +1175,9 @@ pub struct ClockTanksState {
     pub shots: u64,
     pub result: Option<String>,
     pub converted_cells: u32,
+    /// Pieces of the losers still whole, not yet turned to dirt.
+    #[serde(default)]
+    pub pieces: u32,
     pub retired_tank_mass_milli: u32,
     pub conversion_area_milli: u32,
     pub entry_failure: Option<String>,

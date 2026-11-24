@@ -616,25 +616,29 @@ fn timeout_waits_for_a_real_final_hit_then_converts_the_living_loser() {
             snapshot.health_milli[0], snapshot.health_milli[1],
             "final hit changes an otherwise drawn cutoff"
         );
-        assert_eq!(snapshot.converted_cells, DIRT_PER_TANK as u32);
-        assert!(snapshot.loose_cells + snapshot.converted_cells <= MAX_GRAINS as u32);
+        // The living loser blows up as a dead one does.
+        assert_eq!(state.event_phase(), Some(EventPhase::BlowingUp));
+        assert!(
+            (5..=wreck::PIECES_PER_TANK as u32).contains(&snapshot.pieces),
+            "{snapshot:?}"
+        );
         assert!(
             state.arena.world().unwrap().motion(body).is_none(),
             "living loser actually retired"
         );
+        while state.event_phase() == Some(EventPhase::BlowingUp) {
+            tick(&mut state);
+        }
+        let after = state.tanks_state().unwrap();
+        assert_eq!(after.converted_cells, DIRT_PER_TANK as u32);
+        assert!(after.loose_cells + after.converted_cells <= MAX_GRAINS as u32);
         let grain = event(&mut state).converted[0].body();
-        let pose = state.arena.world().unwrap().motion(grain).unwrap();
-        tick(&mut state);
-        assert_ne!(
-            state.arena.world().unwrap().motion(grain).unwrap(),
-            pose,
+        assert_eq!(
+            state.arena.world().unwrap().body_kind(grain),
+            Some(BodyKind::Dynamic),
             "converted dirt participates in physics"
         );
-        assert_eq!(
-            state.tanks_state().unwrap().health_milli,
-            snapshot.health_milli,
-            "latched outcome"
-        );
+        assert_eq!(after.health_milli, snapshot.health_milli, "latched outcome");
         state.finish_event();
         assert!(state.arena.idle());
     }
@@ -657,7 +661,7 @@ fn health_outcomes_and_periodic_registration_cover_every_result() {
         engine_common::ClockEventTrigger::Periodic
     );
     assert_eq!(definition.cooldown_ticks, REUSE_TICKS);
-    assert_eq!(MAX_TICKS, 84 * 60);
+    assert_eq!(MAX_TICKS, 86 * 60);
     for profile in [
         ClockEventProfile::Off,
         ClockEventProfile::Calm,
@@ -996,4 +1000,309 @@ fn a_fight_cut_short_keeps_what_stands_and_retires_what_lies_loose() {
             .entity_ids()
             .any(|id| canonical::TANKS_CELLS.contains(&id.value()))
     }));
+}
+
+/// Steps a fight on to its latched result.
+fn to_the_result(state: &mut ClockState) {
+    while tanks(state).result.is_none() {
+        tick(state);
+    }
+}
+
+/// Whether any of the losers' pieces is still in the arena.
+fn pieces_remain(state: &ClockState) -> bool {
+    state.arena.world().is_some_and(|world| {
+        world
+            .entity_ids()
+            .any(|id| canonical::TANKS_PIECES.contains(&id.value()))
+    })
+}
+
+#[test]
+fn a_loser_blows_apart_and_each_piece_turns_to_dirt_where_it_comes_to_rest() {
+    for (aspect, seed) in [(4.0 / 3.0, 43), (5.0 / 3.0, 42), (16.0 / 9.0, 7), (4.0, 43)] {
+        let mut state = ready(aspect, seed, ClockTimeFormat::TwentyFourHour);
+        start_fighting(&mut state);
+        to_the_result(&mut state);
+        assert_eq!(state.event_phase(), Some(EventPhase::BlowingUp));
+        let event = tanks(&state);
+        let scale = event.duel.placement().scale;
+        let losers: Vec<usize> = (0..2)
+            .filter(|slot| !event.result.unwrap().winners()[*slot])
+            .collect();
+        assert!(!losers.is_empty(), "{aspect}: a fight with a winner");
+        // Each loser is gone, in its turret, both wheels and two or three
+        // pieces of hull, all thrown up by the blast.
+        let world = state.arena.world().unwrap();
+        for &slot in &losers {
+            assert!(event.duel.tank_bodies(slot).next().is_none());
+            let pieces: Vec<_> = event
+                .wreck
+                .pieces
+                .iter()
+                .filter(|p| p.slot == slot)
+                .collect();
+            let count = |kind: fn(&wreck::Shape) -> bool| {
+                pieces.iter().filter(|piece| kind(&piece.shape)).count()
+            };
+            assert_eq!(
+                count(|shape| matches!(shape, wreck::Shape::Turret { .. })),
+                1
+            );
+            assert_eq!(
+                count(|shape| matches!(shape, wreck::Shape::Wheel { .. })),
+                2
+            );
+            assert!((2..=3).contains(&count(|shape| matches!(shape, wreck::Shape::Hull { .. }))));
+            assert_eq!(
+                pieces.iter().map(|piece| piece.cells()).sum::<usize>(),
+                DIRT_PER_TANK
+            );
+            for piece in &pieces {
+                let motion = world.motion(piece.body).unwrap();
+                assert!(
+                    motion.linear_velocity.y > 2.0 * scale,
+                    "{aspect}: {piece:?}"
+                );
+            }
+        }
+        assert_eq!(state.tanks_state().unwrap().converted_cells, 0);
+        // Each piece turns into its share of the dirt where it lies, and
+        // most come to rest first.
+        let mut last = std::collections::HashMap::new();
+        let (mut ticks, mut rested) = (0, 0);
+        while state.event_phase() == Some(EventPhase::BlowingUp) {
+            let before = tanks(&state).converted.len();
+            {
+                let world = state.arena.world().unwrap();
+                for piece in &tanks(&state).wreck.pieces {
+                    last.insert(piece.body, world.motion(piece.body).unwrap());
+                }
+            }
+            tick(&mut state);
+            ticks += 1;
+            let event = tanks(&state);
+            let world = state.arena.world().unwrap();
+            let gone: Vec<_> = last
+                .keys()
+                .filter(|body| !event.wreck.pieces.iter().any(|piece| piece.body == **body))
+                .copied()
+                .collect();
+            for grain in &event.converted[before..] {
+                let at = world.motion(grain.body()).unwrap().position;
+                assert!(
+                    gone.iter()
+                        .any(|body| last[body].position.distance_to(at) < 2.0 * scale),
+                    "{aspect}: dirt at {at:?} where no piece lay"
+                );
+            }
+            for body in gone {
+                let motion = last.remove(&body).unwrap();
+                rested += usize::from(motion.linear_velocity.length() < 0.5 * scale);
+                assert!(world.motion(body).is_none());
+            }
+        }
+        assert!(ticks <= BLOW_UP_TICKS, "{aspect}: {ticks}");
+        let snapshot = state.tanks_state().unwrap();
+        assert_eq!(snapshot.pieces, 0);
+        assert_eq!(
+            snapshot.converted_cells as usize,
+            DIRT_PER_TANK * losers.len(),
+            "{aspect}: no piece left the view"
+        );
+        assert!(
+            rested >= 4 * losers.len(),
+            "{aspect}: {rested} came to rest"
+        );
+        assert!(!pieces_remain(&state));
+        assert_eq!(state.event_phase(), Some(EventPhase::BeamUp));
+        while state.event_kind().is_some() {
+            tick(&mut state);
+        }
+        assert!(state.arena.idle());
+    }
+}
+
+#[test]
+fn a_fight_with_no_survivors_blows_up_both_tanks_then_withdraws() {
+    let mut state = ready(4.0 / 3.0, 69, ClockTimeFormat::TwentyFourHour);
+    start_fighting(&mut state);
+    to_the_result(&mut state);
+    assert_eq!(tanks(&state).result, Some(ResultKind::Neither));
+    assert_eq!(state.event_phase(), Some(EventPhase::BlowingUp));
+    // Both tanks blow apart, each into six pieces here, which fill the room
+    // the arena keeps for them.
+    let event = tanks(&state);
+    assert_eq!(event.wreck.blasts.len(), 2);
+    assert_eq!(event.wreck.pieces.len(), wreck::MAX_PIECES);
+    for slot in 0..2 {
+        assert!(event.duel.tank_bodies(slot).next().is_none());
+        assert_eq!(
+            event
+                .wreck
+                .pieces
+                .iter()
+                .filter(|piece| piece.slot == slot)
+                .map(|piece| piece.cells())
+                .sum::<usize>(),
+            DIRT_PER_TANK
+        );
+    }
+    let mut ticks = 0;
+    while state.event_phase() == Some(EventPhase::BlowingUp) {
+        tick(&mut state);
+        ticks += 1;
+    }
+    assert!(ticks <= BLOW_UP_TICKS, "{ticks}");
+    let snapshot = state.tanks_state().unwrap();
+    assert_eq!(snapshot.pieces, 0);
+    assert_eq!(snapshot.converted_cells as usize, 2 * DIRT_PER_TANK);
+    assert!(!pieces_remain(&state));
+    // No winner beams up, so the hills withdraw at once.
+    assert_eq!(state.event_phase(), Some(EventPhase::Withdrawing));
+    while state.event_kind().is_some() {
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+#[test]
+fn the_fire_over_a_blast_stays_below_the_face() {
+    let mut state = ready(5.0 / 3.0, 42, ClockTimeFormat::TwentyFourHour);
+    start_fighting(&mut state);
+    to_the_result(&mut state);
+    let layout = tanks(&state).layout;
+    let mut fire = 0;
+    for _ in 0..BLOW_UP_TICKS {
+        let frame = ClockScenario::render_frame(&state);
+        for drawn in frame
+            .layers
+            .iter()
+            .filter(|drawn| drawn.z == crate::render::SHOT_LAYER)
+        {
+            for primitive in &drawn.primitives {
+                if let engine_common::RenderPrimitive::Polygon(polygon) = primitive {
+                    fire += 1;
+                    assert!(
+                        polygon
+                            .points
+                            .iter()
+                            .all(|p| p.y < layout.face_origin.y - 4.0)
+                    );
+                }
+            }
+        }
+        tick(&mut state);
+    }
+    assert!(fire > 0, "the blast drew its fire");
+}
+
+#[test]
+fn a_piece_that_leaves_the_view_retires_without_its_dirt() {
+    let mut state = ready(5.0 / 3.0, 42, ClockTimeFormat::TwentyFourHour);
+    start_fighting(&mut state);
+    to_the_result(&mut state);
+    let layout = tanks(&state).layout;
+    let turret = tanks(&state)
+        .wreck
+        .pieces
+        .iter()
+        .find(|piece| matches!(piece.shape, wreck::Shape::Turret { .. }))
+        .unwrap();
+    let (body, cells) = (turret.body, turret.cells());
+    state.arena.held_mut(OWNER).unwrap().set_pose(
+        body,
+        Vec2::new(0.0, layout.bounds_min.y - 1.0),
+        0.0,
+        true,
+    );
+    tick(&mut state);
+    assert!(state.arena.world().unwrap().motion(body).is_none());
+    assert!(
+        tanks(&state)
+            .wreck
+            .pieces
+            .iter()
+            .all(|piece| piece.body != body)
+    );
+    while state.event_phase() == Some(EventPhase::BlowingUp) {
+        tick(&mut state);
+    }
+    assert_eq!(
+        state.tanks_state().unwrap().converted_cells as usize,
+        DIRT_PER_TANK - cells
+    );
+}
+
+#[test]
+fn a_loser_out_of_view_retires_without_blowing_up() {
+    let mut state = ready(5.0 / 3.0, 42, ClockTimeFormat::TwentyFourHour);
+    start_fighting(&mut state);
+    // Once a hit has parted the tanks' health and no shell is in flight, the
+    // fight times out, so the weaker tank loses.
+    let health = loop {
+        let snapshot = state.tanks_state().unwrap();
+        assert!(snapshot.result.is_none());
+        let health = snapshot.health_milli;
+        if health[0] != health[1] && tanks(&state).duel.shells().next().is_none() {
+            break health;
+        }
+        tick(&mut state);
+    };
+    let slot = usize::from(health[1] < health[0]);
+    event(&mut state).duel.set_firing(false);
+    event(&mut state).combat_ticks = COMBAT_TICKS - 1;
+    // The loser falls out of view before the result is latched.
+    let layout = tanks(&state).layout;
+    let parts: Vec<_> = {
+        let world = state.arena.world().unwrap();
+        tanks(&state)
+            .duel
+            .tank_bodies(slot)
+            .map(|part| (part, world.motion(part).unwrap()))
+            .collect()
+    };
+    let drop = Vec2::new(0.0, layout.bounds_min.y - 10.0 - parts[0].1.position.y);
+    let world = state.arena.held_mut(OWNER).unwrap();
+    for (part, motion) in &parts {
+        world.set_pose(*part, motion.position + drop, motion.angle, true);
+    }
+    to_the_result(&mut state);
+    let event = tanks(&state);
+    assert!(!event.result.unwrap().winners()[slot]);
+    assert!(
+        event.duel.tank_bodies(slot).next().is_none(),
+        "the loser retired"
+    );
+    assert!(event.wreck.blasts.is_empty() && event.wreck.pieces.is_empty());
+    assert_eq!(state.tanks_state().unwrap().converted_cells, 0);
+    assert!(!pieces_remain(&state));
+    assert_eq!(state.event_phase(), Some(EventPhase::BeamUp));
+    while state.event_kind().is_some() {
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+#[test]
+fn a_fight_cut_short_while_a_loser_blows_up_leaves_nothing_behind() {
+    for resize in [false, true] {
+        let mut state = ready(5.0 / 3.0, 42, ClockTimeFormat::TwentyFourHour);
+        start_fighting(&mut state);
+        to_the_result(&mut state);
+        for _ in 0..20 {
+            tick(&mut state);
+        }
+        assert!(!tanks(&state).wreck.pieces.is_empty());
+        if resize {
+            state.set_aspect_ratio(4.0 / 3.0);
+        } else {
+            state.finish_event();
+        }
+        ClockScenario::step(&mut state, &[], Duration::ZERO);
+        assert!(state.event_kind().is_none());
+        assert!(!pieces_remain(&state));
+        assert_eq!((state.body_count(), state.collider_count()), (0, 0));
+        assert!(state.arena.idle());
+    }
 }

@@ -503,7 +503,7 @@ load, and without it the grains at the bottom read as knocked tick after
 tick.
 
 A look visits at most 512 bodies across the worlds; the arena holds at most
-255, or 352 under Tanks. On the development workstation (`--profile ci`), the
+281, or 364 under Tanks. On the development workstation (`--profile ci`), the
 ignored test `what_a_look_costs` timed a look at 512 moving bodies, all in
 view, at about 52 µs. In events the 99th percentile was about 10 µs for
 Tanks, with up to 92 bodies, 8 µs for Exploding digits and for Coins, and
@@ -1174,7 +1174,7 @@ the Off profile still disables every automatic event.
 | `explosion` | Individual digit/AM-PM blocks scatter and bounce | 0.6 s warning + 3.5 s burst + 1.5 s reform | 45 s |
 | `spider` | One visitor on a silk line, climbing and swinging on the digits in the run's arena | At most 30 s including departure, with up to 10 s more to finish leaving | 30 s after departure |
 | `coins` | Lit cells turn into coins that drop, roll and pile; a magpie carries three or four off, and the rest fly home | 0.6 s minting + 4 s cascade + 23 s gathering + 1.5 s reform | 45 s |
-| `tanks` | Two CPU tanks duel on destructible hills below the reading, whose lit cells stop their shells | At most 84 s, including entry, one transport retry and departure | 120 s |
+| `tanks` | Two CPU tanks duel on destructible hills below the reading, whose lit cells stop their shells | At most 86 s, including entry, one transport retry and departure | 120 s |
 
 ### Tanks
 
@@ -1232,7 +1232,7 @@ heavy as the dirt: the burst throws it onto the hills, where it comes to rest,
 and the tanks and shells pass through it. A block that falls out of view stops
 there. Each block carries its cell's digit surface. A damaged digit re-forms
 when its reading changes, and every cell still loose flies home over the 1.5 s
-after the result is latched, while the loser crumbles and the winners beam up.
+after the result is latched, while the loser blows up and the winners beam up.
 Both follow Exploding digits' return: each cell starts from where it lies or
 stands, and none appears in its place. A fight cut short, by a resize or a
 cancel, gives the face back the cells that still stand and retires the loose
@@ -1245,19 +1245,71 @@ ones `interrupted`, as any event cut short does.
 | `settling` | 2 s | Both hulls must actually be upright and supported before driving or firing. Failure withdraws the hills. |
 | `fighting` | 60 s | Fire is held while the tanks drive to their range, for at most 12 s. Then shared CPU driving and dodging, swept shells that burst on the lit face and knock cells loose, craters, loose dirt and weak-bank collapse. |
 | `finishing-shots` | 10 s | No new driving or fire; existing shells finish before deciding the result. |
-| `crumbling` | 1 s | Each in-view loser becomes physical dirt at its actual pose. |
+| `blowing-up` | 3 s | Each in-view loser blows apart, and each piece turns to dirt where it comes to rest. |
 | `beam-up` | 2 s | Surviving winners depart. |
 | `withdrawing` | 3 s | The remaining owned battlefield moves below the frame and is removed. |
 
 One living tank wins. If both remain alive at timeout, higher health wins and
 exact equality is a draw; if neither survives, neither wins. A living timeout
-loser converts too. Each loser has an authored conversion of 24 half-unit cells:
-six native area/mass units at dirt density one, scaled by the square of placement
-scale. This is a declared material substitution, not conservation of metal hull
-mass. Inspection records the removed hull mass and emitted dirt area separately
-from the hill's conserved material balance. The two conversions reserve 48 of
-the existing 192 grain slots before combat, leaving 144 for battle debris. An
+loser blows up too.
+
+Each loser in view blows apart where it stands. A flash and a fireball burst
+from its hull, and the blast throws its turret up, spinning, its wheels off
+their springs and away to either side, and its hull, torn across in two or
+three pieces, up and outward. Each piece is a body of its own that lands on
+the hills, the dirt and the floor, and can strike the winner. The pieces pass
+one another. They pass the loose digit cells, as the tanks do, and the face,
+as the dirt and the tanks do, though none flies near it. Each piece cools from
+white-hot through orange and red to char over 1.5 s, trailing smoke, while a
+plume rises from the wreck, leaning with the wind, and spreads and thins over
+about 4.5 s. Once a piece has cooled and lain still for a quarter of a second,
+it turns into its share of the tank's dirt where it lies: four cells for the
+turret and for each wheel, and four or six for each piece of hull, in a block
+square to the piece and raised clear of what it lies on. The blow-up ends once
+every piece is dirt, and at most 3 s after the blast; a piece still moving
+then turns to dirt where it is, and the dirt keeps its speed. A piece that
+leaves the view retires there, and its share of the dirt with it, as an
 already off-screen loser retires without bringing its pile back into view.
+The arena keeps room for six pieces a loser, in 14 colliders for both.
+
+Each loser has an authored conversion of 24 half-unit cells: six native
+area/mass units at dirt density one, scaled by the square of placement scale.
+This is a declared material substitution, not conservation of metal hull
+mass. Inspection records the removed hull mass and emitted dirt area
+separately from the hill's conserved material balance. The two conversions
+reserve 48 of the existing 192 grain slots before combat, leaving 144 for
+battle debris.
+
+A local survey of the blow-up fought 120 seeds at each of 4:3, 5:3, 16:9,
+portrait (0.6) and 4:1, and found:
+
+- No piece stuck, and none was left when the hills withdrew. At every shape
+  but portrait, each loser's 24 cells all became dirt. In portrait, where the
+  tanks stand close to the sides, 45 of 681 pieces flew off a side, in 22 of
+  107 fights, and took 174 of 2,976 cells with them. In 12 more portrait
+  fights, the loser had already left the view when the result was latched,
+  so nothing blew up.
+- The blow-up lasted a median of 2.6 s at 4:1, 2.7 s at 4:3, 2.85 s in
+  portrait, 2.9 s at 5:3 and 2.95 s at 16:9. A piece that comes to rest turns
+  to dirt a median of 1.8–1.9 s after the blast, but a wheel often rolls on:
+  16–58 of the fights at each shape ran to the 3 s cap, and the pieces still
+  whole then were moving at a median of 0.5–1.0 units/s.
+- The turret rose a median of 4.6–6.0 units above the blast, and at most 9.3;
+  the other pieces rose a median of 1.2–1.3. No piece came within 5.7 units
+  of the face, and no fire within 8.6.
+- On the development workstation, five fights at a time, a tick while
+  blowing up took a median of 0.11–0.23 ms, with a 99th percentile of
+  0.16–0.32 ms, against 0.9–1.8 ms for fighting.
+
+On sw-picade-2, a Pi 4 Picade at 1024×768 with the raster renderer at scale
+1, the same eight seeds were fought once with losers that blow up and once
+with losers that crumble, at different readings, tracing the 4 s from each
+result. Loop CPU averaged 11.4 ms with the blow-up against 11.1 ms, with a
+95th percentile of 12.6 ms against 12.7 ms and a slowest loop of 16.0 ms
+against 16.9 ms. No loop ran over 16.7 ms, against one, and no display
+refresh was skipped either way.
+
+The run data stays local.
 
 Once the last shell resolves, the result is latched. Rapier continues to move
 the aftermath, while duel AI, damage and terrain topology stop changing. Pausing
@@ -1417,11 +1469,24 @@ keeps every shell fired since the hit as a trail.
 `SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
 engine-client tanks_dodge_the_next_shell` regenerates all four.
 
+| | A quarter of a second after the blast | The blast, the pieces flying, landing and turned to dirt, three times larger |
+| --- | --- | --- |
+| 1024×768 | ![The left tank's turret thrown straight up from the fireball](screenshots/clock/tanks-1024x768-blow-up.png) | ![The left tank blowing apart, its turret highest, its pieces burning on the hills, then dirt under a plume of smoke](screenshots/clock/tanks-1024x768-blow-up-zoom.png) |
+| 800×480 | ![The left tank's turret thrown up at a slant from the fireball](screenshots/clock/tanks-800x480-blow-up.png) | ![The left tank blowing apart, its turret falling, its pieces burning on the hills, then dirt under a plume of smoke](screenshots/clock/tanks-800x480-blow-up-zoom.png) |
+
+At 4:3, the left tank comes apart in six pieces, its turret, both wheels and
+three pieces of hull, and the blast throws its turret straight up. At 5:3, it
+comes apart in five, with two pieces of hull. Each strip shows the blast at
+0.05 s, the pieces flying at 0.25 s and landing, still burning, at 0.67 s,
+then the dirt they became at 3.1 s, as the winner beams up.
+`SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
+engine-client tanks_blow_apart_and_turn_to_dirt` regenerates all four.
+
 `clock state` includes phase, support, world positions, hull and terrain IDs,
 health, the two CPUs (`cpu`), whether each is dodging a shell (`dodging`),
 shell/shot counts, the shells the face stopped (`face_hits`), the cells they
-knocked loose (`knocked_loose`), conversion accounting and any settling
-failure in `tanks`.
+knocked loose (`knocked_loose`), the losers' pieces not yet turned to dirt
+(`pieces`), conversion accounting and any settling failure in `tanks`.
 Values with a `_milli` suffix use thousandths of their inspection
 unit (positions, area and mass use host units). The common damage-material migration
 and damage to resident plants remain follow-up work: this integration uses Scorched's current tank HP rule and does

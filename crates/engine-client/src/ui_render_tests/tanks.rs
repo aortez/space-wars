@@ -323,27 +323,31 @@ fn on_screen(
     ]
 }
 
-/// The patch of each frame around `centre`, side by side and four times
+/// The `patch` of each frame around `centre`, side by side and `scale` times
 /// larger.
 fn zoom(
-    frames: [&SharedPixelBuffer<Rgb8Pixel>; 2],
+    frames: &[&SharedPixelBuffer<Rgb8Pixel>],
     centre: [f32; 2],
+    patch: (usize, usize),
+    scale: usize,
 ) -> SharedPixelBuffer<Rgb8Pixel> {
-    const PATCH: (usize, usize) = (100, 40);
-    const SCALE: usize = 4;
     const GAP: usize = 8;
-    let (width, height) = (PATCH.0 * SCALE, PATCH.1 * SCALE);
-    let mut zoomed = SharedPixelBuffer::<Rgb8Pixel>::new((2 * width + GAP) as u32, height as u32);
+    let (width, height) = (patch.0 * scale, patch.1 * scale);
+    let count = frames.len();
+    let mut zoomed = SharedPixelBuffer::<Rgb8Pixel>::new(
+        (count * width + (count - 1) * GAP) as u32,
+        height as u32,
+    );
     let stride = zoomed.width() as usize;
     let pixels = zoomed.make_mut_slice();
-    for (side, frame) in frames.into_iter().enumerate() {
+    for (side, frame) in frames.iter().enumerate() {
         let (frame_width, frame_height) = (frame.width() as usize, frame.height() as usize);
-        let left = (centre[0].round() as usize).saturating_sub(PATCH.0 / 2);
-        let top = (centre[1].round() as usize).saturating_sub(PATCH.1 / 2);
+        let left = (centre[0].round() as usize).saturating_sub(patch.0 / 2);
+        let top = (centre[1].round() as usize).saturating_sub(patch.1 / 2);
         for y in 0..height {
             for x in 0..width {
-                let source_x = (left + x / SCALE).min(frame_width - 1);
-                let source_y = (top + y / SCALE).min(frame_height - 1);
+                let source_x = (left + x / scale).min(frame_width - 1);
+                let source_y = (top + y / scale).min(frame_height - 1);
                 pixels[y * stride + side * (width + GAP) + x] =
                     frame.as_slice()[source_y * frame_width + source_x];
             }
@@ -458,7 +462,43 @@ fn tanks_dodge_the_next_shell_after_a_hit() {
         camera.keep(&format!("{name}-dodged"), &bursting);
         camera.keep(
             &format!("{name}-dodge-zoom"),
-            &zoom([&setting_off, &bursting], middle),
+            &zoom(&[&setting_off, &bursting], middle, (100, 40), 4),
+        );
+    }
+}
+
+#[test]
+fn tanks_blow_apart_and_turn_to_dirt() {
+    let camera = Camera::new();
+    // On the Picade's 4:3, the left tank comes apart in six pieces: its
+    // turret, both wheels and three pieces of hull. On the HyperPixel's 5:3,
+    // in five, with two of hull.
+    for (size, seed, patch, pieces) in
+        [((1024, 768), 3, (96, 72), 6), ((800, 480), 21, (64, 48), 5)]
+    {
+        let viewport = Viewport::new(size.0 as f32, size.1 as f32);
+        let end = record(face_fight(viewport, seed), |_| ()).len();
+        // As the tank blows up, as its pieces fly, as they land burning, and
+        // once they have turned to dirt and the winner beams up.
+        let shots: Vec<_> = [3, 15, 40, 185]
+            .into_iter()
+            .map(|after| camera.frame(size, seed, end + after, end + after))
+            .collect();
+        let phase = |i: usize| shots[i].0.event_phase().map(|phase| phase.as_str());
+        let blast = shots[0].0.tanks_state().unwrap();
+        assert_eq!(phase(0), Some("blowing-up"));
+        assert_eq!(blast.result.as_deref(), Some("right wins"));
+        assert_eq!((blast.pieces, blast.converted_cells), (pieces, 0));
+        let [x, y] = on_screen(&shots[0].0, size, blast.positions_milli[0]);
+        let dirt = shots[3].0.tanks_state().unwrap();
+        assert_eq!(phase(3), Some("beam-up"));
+        assert_eq!((dirt.pieces, dirt.converted_cells), (0, 24));
+        let name = format!("{}x{}", size.0, size.1);
+        camera.keep(&format!("{name}-blow-up"), &shots[1].1);
+        let frames: Vec<_> = shots.iter().map(|(_, pixels)| pixels).collect();
+        camera.keep(
+            &format!("{name}-blow-up-zoom"),
+            &zoom(&frames, [x, y - patch.1 as f32 * 0.2], patch, 3),
         );
     }
 }
