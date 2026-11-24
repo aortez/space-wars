@@ -3,6 +3,7 @@ use engine_material::{
     ContactBody, HULL, Material, ROCK, SOFT_TISSUE, effective_mass, shared_impact,
 };
 
+mod invariance;
 mod motion;
 mod reference;
 mod supports;
@@ -125,6 +126,13 @@ fn bind(
         },
     );
     source
+}
+
+/// Prices a step's impacts and then its supports.
+fn charges(world: &mut PhysicsWorld, host: &mut Host) -> (Vec<ContactCharge>, Vec<SupportCharge>) {
+    let impacts = world.charge_contact_impacts(host).unwrap();
+    let supports = world.charge_contact_supports(host).unwrap();
+    (impacts, supports)
 }
 
 /// Steps until a step prices something, and returns what it priced.
