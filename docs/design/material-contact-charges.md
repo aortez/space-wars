@@ -6,7 +6,8 @@ against the surfaces the host keeps. `PhysicsWorld::charge_contact_supports`
 then prices the load each steady support carried in the step, as a sustained
 load. The host absorbs what each consumed. The physics is unchanged: Rapier's
 restitution still sets the bounce, and having the work ledger set the bounce
-is a later part of #327.
+is a later part of #327. [Ledger-set bounce](material-ledger-bounce.md)
+reports how far that can go.
 
 The [native response](material-native-response.md) prices and responds inside
 the solve, so it admits only restricted worlds. Charges admit any world:
@@ -226,7 +227,8 @@ after the impacts' charges:
   free fall's, so the step rate moves a drop's price. A ball dropped 1.3 at
   120 Hz is priced at 5.167, against the 5.099 of its free fall.
 - Rapier's restitution sets the bounce. The ledger's recoverable energy is not
-  applied.
+  applied. [Ledger-set bounce](material-ledger-bounce.md) measures what
+  setting it would change.
 - Capture's bounds still refuse a whole batch on overflow, and every
   contacting pair counts toward its visits, bound or not. Neither game comes
   near them, as the next section shows.
