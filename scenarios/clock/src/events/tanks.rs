@@ -39,7 +39,7 @@ pub const DIRT_PER_TANK: usize = 24;
 const OWNER: Owner = Owner::Event(ClockEventKind::Tanks);
 const BUDGET: Budget = Budget::for_terrain(
     MAX_GRAINS,
-    false,
+    true,
     scenario_scorched_earth::host::MAX_TERRAIN_WIDTH,
 );
 /// The duel's budget, the face's fixed body of boxes, and the cells the
@@ -79,6 +79,7 @@ pub fn config(shape: GrainShape, seed: u64) -> ScorchedConfig {
         first_to_fire: (seed / 3 % 2) as usize,
         slumping: true,
         cohesion: BankStrength::Weak,
+        suspension: true,
         ..Default::default()
     }
 }
@@ -162,6 +163,9 @@ pub struct TanksEvent {
     cpu: [&'static str; 2],
     ground: BodyId,
     spawn: [(BodyId, BodyMotion); 2],
+    /// Each tank's bodies with their offsets from its hull, which the beam
+    /// carries together: the hull and its two sprung wheels.
+    parts: [Vec<(BodyId, Vec2)>; 2],
     departure: Vec<(BodyId, BodyMotion)>,
     withdrawal: f32,
     shape: GrainShape,
@@ -204,6 +208,15 @@ impl TanksEvent {
         let scale = duel.placement().scale;
         let ground = duel.terrain()[0].assembly.body();
         let spawn = duel.tanks(world).map(|tank| (tank.body, tank.motion));
+        let parts: [Vec<(BodyId, Vec2)>; 2] = std::array::from_fn(|slot| {
+            let hull = spawn[slot].1.position;
+            duel.tank_bodies(slot)
+                .map(|body| {
+                    let motion = world.motion(body).expect("a tank's body");
+                    (body, motion.position - hull)
+                })
+                .collect()
+        });
         world.set_body_kind(ground, BodyKind::KinematicPosition, false);
         world.set_pose(
             ground,
@@ -211,15 +224,15 @@ impl TanksEvent {
             0.0,
             false,
         );
-        for (body, motion) in spawn {
-            world.set_body_enabled(body, false);
-            world.set_body_kind(body, BodyKind::KinematicPosition, false);
-            world.set_pose(
-                body,
-                Vec2::new(motion.position.x, layout.bounds_max.y + 3.0 * scale),
-                motion.angle,
-                false,
-            );
+        // The tanks wait above the view, still enabled. The next step joins
+        // each wheel's new spring to its hull's island, and Rapier asserts
+        // that neither body is disabled when it does.
+        for (slot, (_, motion)) in spawn.into_iter().enumerate() {
+            let hull = Vec2::new(motion.position.x, layout.bounds_max.y + 3.0 * scale);
+            for &(body, offset) in &parts[slot] {
+                world.set_body_kind(body, BodyKind::KinematicPosition, false);
+                world.set_pose(body, hull + offset, motion.angle, false);
+            }
         }
         let damage = damage::Damage::new(seed);
         let mut digits = digits::Solids::default();
@@ -241,6 +254,7 @@ impl TanksEvent {
             cpu,
             ground,
             spawn,
+            parts,
             departure: Vec::new(),
             withdrawal: 0.0,
             shape,
@@ -309,9 +323,11 @@ impl TanksEvent {
         place.spawn_x = lanes.unwrap().map(|x| x / scale);
         for (slot, position) in place.landing_positions(self.seed).into_iter().enumerate() {
             self.spawn[slot].1.position = position;
-            let body = self.spawn[slot].0;
-            world.set_pose(body, Vec2::new(position.x, self.entry_top()), 0.0, false);
-            world.set_velocity(body, Vec2::ZERO, 0.0, false);
+            let hull = Vec2::new(position.x, self.entry_top());
+            for &(body, offset) in &self.parts[slot] {
+                world.set_pose(body, hull + offset, 0.0, false);
+                world.set_velocity(body, Vec2::ZERO, 0.0, false);
+            }
         }
         if self.phase == EventPhase::BeamDown {
             self.entry_restarts += 1;
@@ -339,15 +355,14 @@ impl TanksEvent {
             }
             EventPhase::BeamDown => {
                 let t = (self.phase_tick + 1) as f32 / BEAM_DOWN_TICKS as f32;
-                for (body, motion) in self.spawn {
-                    world.set_next_kinematic_pose(
-                        body,
-                        Vec2::new(
-                            motion.position.x,
-                            self.entry_top() * (1.0 - t) + motion.position.y * t,
-                        ),
-                        motion.angle,
+                for (slot, (_, motion)) in self.spawn.into_iter().enumerate() {
+                    let hull = Vec2::new(
+                        motion.position.x,
+                        self.entry_top() * (1.0 - t) + motion.position.y * t,
                     );
+                    for &(body, offset) in &self.parts[slot] {
+                        world.set_next_kinematic_pose(body, hull + offset, motion.angle);
+                    }
                 }
             }
             EventPhase::BeamUp | EventPhase::Withdrawing => {
@@ -414,14 +429,10 @@ impl TanksEvent {
             EventPhase::Raising if self.phase_tick == RAISE_TICKS => {
                 world.set_body_kind(self.ground, BodyKind::Fixed, false);
                 world.set_velocity(self.ground, Vec2::ZERO, 0.0, false);
-                for (body, _) in self.spawn {
-                    world.set_body_enabled(body, true);
-                }
                 self.enter(EventPhase::BeamDown);
             }
             EventPhase::BeamDown if self.phase_tick == BEAM_DOWN_TICKS => {
-                for (body, _) in self.spawn {
-                    world.set_body_enabled(body, true);
+                for &(body, _) in self.parts.iter().flatten() {
                     world.set_body_kind(body, BodyKind::Dynamic, true);
                     world.set_velocity(body, Vec2::ZERO, 0.0, true);
                 }
@@ -565,8 +576,12 @@ impl TanksEvent {
         let winners = self.result.expect("result settled").winners();
         for (slot, tank) in self.duel.tanks(world).into_iter().enumerate() {
             if winners[slot] && tank.present {
-                world.set_body_kind(tank.body, BodyKind::KinematicPosition, true);
-                self.departure.push((tank.body, tank.motion));
+                for body in self.duel.tank_bodies(slot) {
+                    if let Some(motion) = world.motion(body) {
+                        world.set_body_kind(body, BodyKind::KinematicPosition, true);
+                        self.departure.push((body, motion));
+                    }
+                }
             }
         }
         if self.departure.is_empty() {

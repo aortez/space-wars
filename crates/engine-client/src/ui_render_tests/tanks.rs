@@ -409,7 +409,7 @@ fn tanks_dodge_the_next_shell_after_a_hit() {
     // On the Picade's 4:3, a plotting tank that dodges against one that moves
     // after hits. On the HyperPixel's 5:3, two plotting tanks that dodge.
     for (size, seed, cpu) in [
-        ((1024, 768), 33, ["Plotting + dodge", "Plotting + move"]),
+        ((1024, 768), 201, ["Plotting + dodge", "Plotting + move"]),
         ((800, 480), 234, ["Plotting + dodge", "Plotting + dodge"]),
     ] {
         let viewport = Viewport::new(size.0 as f32, size.1 as f32);

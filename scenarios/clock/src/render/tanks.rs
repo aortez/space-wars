@@ -7,7 +7,6 @@ use crate::{
     presentation::Bounds,
 };
 use engine_rapier::world::PhysicsWorld;
-use scenario_scorched_earth::RIGID_TANK_HULL;
 
 const EARTH: RenderColor = RenderColor::rgb(0.36, 0.27, 0.16);
 const GRAIN: RenderColor = RenderColor::rgb(0.69, 0.48, 0.25);
@@ -235,23 +234,58 @@ pub(super) fn render(
             }
             let local =
                 |p: Vec2| tank.motion.position + (p * scale).rotate_radians(tank.motion.angle);
+            // Clock's tanks run on sprung wheels: the hull's box, and each
+            // wheel where its spring holds it, its spokes turning as it rolls.
+            let gear = event
+                .duel
+                .running_gear(world, slot)
+                .expect("a present tank's running gear");
+            let half = gear.hull_half_extents;
             polygon(
                 frame,
                 ARENA_LAYER,
-                RIGID_TANK_HULL.map(local).to_vec(),
+                [
+                    Vec2::new(-half.x, -half.y),
+                    Vec2::new(half.x, -half.y),
+                    half,
+                    Vec2::new(-half.x, half.y),
+                ]
+                .map(|p| tank.motion.position + p.rotate_radians(tank.motion.angle))
+                .to_vec(),
                 tank_bounds,
                 color,
             );
-            for x in [-1.0, 0.0, 1.0] {
-                let mut track = RenderColor::rgb(0.08, 0.11, 0.12);
-                track.a = color.a;
+            let mut tire = RenderColor::rgb(0.08, 0.11, 0.12);
+            tire.a = color.a;
+            for wheel in gear.wheels {
                 disc(
                     frame,
                     ARENA_LAYER,
-                    local(Vec2::new(x, -0.45)),
-                    0.28 * scale,
+                    wheel.position,
+                    gear.wheel_radius,
                     tank_bounds,
-                    track,
+                    tire,
+                );
+                for spoke in 0..3 {
+                    let direction = Vec2::from_radians(
+                        wheel.angle + spoke as f32 * std::f32::consts::TAU / 3.0,
+                    );
+                    strip(
+                        frame,
+                        wheel.position,
+                        wheel.position + direction * 0.8 * gear.wheel_radius,
+                        0.2 * gear.wheel_radius,
+                        tank_bounds,
+                        color,
+                    );
+                }
+                disc(
+                    frame,
+                    ARENA_LAYER,
+                    wheel.position,
+                    0.3 * gear.wheel_radius,
+                    tank_bounds,
+                    color,
                 );
             }
             let barrel = if event.phase == EventPhase::BeamDown {

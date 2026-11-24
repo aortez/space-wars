@@ -215,6 +215,15 @@ pub struct TankState {
     pub supported: bool,
 }
 
+/// A sprung tank's running gear in host units, for presentation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RunningGear {
+    /// Half the width and height of the hull's box, centered on its body.
+    pub hull_half_extents: Vec2,
+    pub wheel_radius: f32,
+    pub wheels: [BodyMotion; 2],
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ShellState {
     pub source: ShotSource,
@@ -511,6 +520,31 @@ impl HostedDuel {
 
     pub fn body_ids(&self) -> impl Iterator<Item = BodyId> + '_ {
         self.duel.body_ids()
+    }
+
+    /// One tank's bodies, the hull first: the hull alone, or with sprung
+    /// wheels the hull and both wheels, and none once the tank retires.
+    pub fn tank_bodies(&self, slot: usize) -> impl Iterator<Item = BodyId> + '_ {
+        self.duel.tank_bodies(slot)
+    }
+
+    /// One tank's hull box and sprung wheels, or None for a rigid or retired
+    /// tank.
+    pub fn running_gear(&self, world: &PhysicsWorld, slot: usize) -> Option<RunningGear> {
+        if self.duel.retired[slot].is_some() {
+            return None;
+        }
+        let [_, left, right] = self.duel.running_gear[slot].as_ref()?.bodies();
+        let spec = suspension::spec(self.duel.config.wheel_tuning);
+        let scale = self.duel.placement.scale;
+        Some(RunningGear {
+            hull_half_extents: Vec2::new(
+                spec.chassis_half_width * scale,
+                spec.chassis_half_height * scale,
+            ),
+            wheel_radius: spec.wheel_radius * scale,
+            wheels: [world.motion(left)?, world.motion(right)?],
+        })
     }
 
     /// Retire a tank while keeping its final pose and source identity for shots

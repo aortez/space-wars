@@ -503,7 +503,7 @@ load, and without it the grains at the bottom read as knocked tick after
 tick.
 
 A look visits at most 512 bodies across the worlds; the arena holds at most
-255, or 336 under Tanks. On the development workstation (`--profile ci`), the
+255, or 352 under Tanks. On the development workstation (`--profile ci`), the
 ignored test `what_a_look_costs` timed a look at 512 moving bodies, all in
 view, at about 52 µs. In events the 99th percentile was about 10 µs for
 Tanks, with up to 92 bodies, 8 µs for Exploding digits and for Coins, and
@@ -1178,7 +1178,8 @@ the Off profile still disables every automatic event.
 
 ### Tanks
 
-Tanks uses the shared Scorched duel in Clock's existing physics world. Enable
+Tanks uses the shared Scorched duel in Clock's existing physics world, and its
+tanks ride sprung wheels, as Scorched Earth's own duels do. Enable
 **Tanks** in scenario settings or Clock Controls; press its **Play** in Clock
 Controls, or run `spacewars-cli clock trigger tanks`. It participates in Calm and Demo's
 ordinary periodic selection. Off permits manual requests only. Completion and
@@ -1265,9 +1266,10 @@ clip the battlefield below the face; shells and their bursts are drawn in front
 of it. Entry hulls and beams use the full-height clear lanes. Layout changes
 cancel through the normal owned cleanup path.
 
-How often the face stops shells depends on the screen. A local survey ran 60
-fights at each of 4:3, 5:3, 16:9, portrait (0.6) and 4:1, at readings that
-vary with the seed, and 60 more at 5:3 in 12-hour time:
+How often the face stops shells depends on the screen. A local survey, with
+the rigid hulls Clock's tanks had then, ran 60 fights at each of 4:3, 5:3,
+16:9, portrait (0.6) and 4:1, at readings that vary with the seed, and 60
+more at 5:3 in 12-hour time:
 
 - At the HyperPixel's 5:3, the tanks land about 105 units apart, in the gaps
   beside the outer digits, and close to about 87 before fire opens, at a
@@ -1296,7 +1298,7 @@ vary with the seed, and 60 more at 5:3 in 12-hour time:
 - On the development workstation (`--profile ci`), the 99th-percentile Clock
   tick during a fight, as a median over each shape's fights, was 0.9–1.2 ms
   at 4:3, 5:3 and 16:9, 1.4 ms in portrait and 1.8 ms at 4:1. The slowest
-  tick was 8.2 ms, at 4:1. It has not been timed on a Pi.
+  tick was 8.2 ms, at 4:1.
 
 The same survey, run again with cells coming loose, found:
 
@@ -1319,42 +1321,66 @@ The same survey, run again with cells coming loose, found:
   0.90 ms at 5:3.
 
 The survey, run again over 120 seeds at each shape, once with each seed's
-dodgers and once with none, found:
+dodgers and once with none, found that with rigid hulls most dodges fell short
+except in portrait. Dodging tanks drove a median of 1.3 units at 4:3, 1.5 at
+5:3 and 2.4 at 16:9, a third of the dodges they drove stopped at a step the
+drive check finds too high, and a Plotting shell that a tank dodged still did
+a median of 24–26 damage, against 26.5–33 for Plotting's hits on tanks that
+don't dodge. With sprung wheels, the same survey found:
 
-- Except in portrait, most dodges fall short. Dodging tanks drove a median
-  of 1.3 units at 4:3, 1.5 at 5:3, 2.4 at 16:9 and 2.3 at 4:1, and 3.9 in
-  portrait. At 4:3, 5:3 and 16:9, of the 705 shells that dodging tanks waited
-  for, they let 18 fly and found no room or no support for 207; of the 480
-  dodges they drove, 157 stopped at a step the drive check finds too high and
-  61 at a drop. In Scorched Earth's own duels, where the tanks ride sprung
-  wheels, dodges drove a median of 2.7 units and 22% found no room or no
-  support; Clock's tanks have rigid hulls.
-- A Plotting shell that a tank dodged did a median of 24–26 damage at 4:3,
-  5:3, 16:9 and 4:1, against 26.5–33 for Plotting's hits on tanks that don't
-  dodge, and 4.4 in portrait, against 32. Where the tank drove 2 units or
-  more, the shell did a median of 4.0–5.4 at every shape.
-- Fights ran a little longer. The first kill came at a median of 20.4 s at
-  4:3, 23.7 s at 5:3, 25.9 s at 16:9, 22.9 s in portrait and 22.5 s at 4:1,
-  against 18.3, 22.9, 25.2, 19.9 and 18.8 s with no dodgers. Five fights with
-  dodgers ran the full minute, four of them at 16:9, against none with no
-  dodgers; in each, a dodging Learning tank held out against Plotting. A
-  sixth, at 4:3, is a draw at full health that runs the full minute either
-  way.
-- In plotting mirrors at 4:3, 5:3 and 16:9, a lone dodger won 28 of the 44
-  fights that had a winner. Plotting won 234 of the 235 fights there against
-  Learning that had a winner, whoever dodged. In portrait and at 4:1, Learning
-  won 5 of 33 when it alone dodged, against 2 of 34 with no dodgers.
+- Dodging tanks drove a median of 3.1 units at 4:3 and 5:3, 3.6 at 16:9, 3.9
+  at 4:1 and 4.1 in portrait. At 4:3, 5:3 and 16:9, of the 850 shells that
+  dodging tanks waited for, they let 22 fly and found no room or no support
+  for 149, 18% against 29% with rigid hulls. Of the 679 dodges they drove,
+  480 were still under way when the shell landed, 78 stopped at a step and 79
+  at a drop; with rigid hulls, 157 of 480 stopped at a step and 61 at a drop.
+- A Plotting shell that a tank dodged did a median of 4.2–5.1 damage at every
+  shape, against 28.6–32.7 for Plotting's hits on tanks that don't dodge.
+- The first dodge driven in each fight fares worse. At 4:3, 5:3 and 16:9, 89
+  of those 198 dodges stopped at a step or a drop, against 67 of the 473 that
+  came later, and their shells did a median of 24–28 damage, against 4.1–4.5.
+- Fights with dodgers ran longer. The first kill came at a median of 18.2 s
+  at 4:3, 23.3 s at 5:3, 25.7 s at 16:9, 21.4 s in portrait and 21.5 s at
+  4:1, against 18.2, 22.3, 23.9, 19.1 and 17.8 s with no dodgers. Twenty
+  fights with dodgers ran the full minute, 3 at 4:3, 7 at 5:3 and 10 at 16:9,
+  against five with rigid hulls and none with no dodgers. In each, a dodging
+  Learning tank held out against Plotting; in two, it ended ahead on health
+  and won.
+- In plotting mirrors at 4:3, 5:3 and 16:9, a lone dodger won 36 of the 51
+  fights that had a winner, against 28 of 44 with rigid hulls. Plotting won
+  234 of the 238 fights there against Learning that had a winner; Learning
+  won 3 of the 60 in which it alone dodged, against none with rigid hulls. In
+  portrait and at 4:1, Learning won 3 of 34 when it alone dodged, against 2
+  of 36 with no dodgers.
 - A shell that bursts on the ground instead of a tank throws more dirt loose.
-  At the busiest moment of a fight, a median of 29–65 grains lay loose,
-  depending on the screen, against 26–51 with no dodgers, and at most 143,
-  against 112. Battle debris may use 144.
-- On the development workstation, two fights at a time, the 99th-percentile
-  tick, as a median over each shape's fights, was 1.2–1.3 ms at 4:3, 5:3 and
-  16:9 with dodgers, against 1.1–1.3 ms with none, 1.7 ms in portrait against
-  1.4 ms, and 2.0 ms at 4:1 against 1.9 ms. With dodgers, 14 of the 600
-  fights had a 99th-percentile tick over 4 ms, against none with no dodgers,
-  and the slowest tick was 9.2 ms, at 16:9, against 7.1 ms. It has not been
-  timed on a Pi.
+  At the busiest moment of a fight, a median of 26–60 grains lay loose,
+  depending on the screen, against 20–50 with no dodgers. Twelve fights with
+  dodgers reached 140 grains or more, some of them the 144 that battle debris
+  may use, against none with no dodgers.
+- With no dodgers, sprung wheels change little else. The face stopped 262
+  shells at 4:3, 283 at 5:3 and 249 at 16:9, against 256, 276 and 248 with
+  rigid hulls. The tanks reach their range sooner: fire opened at a median of
+  4.3 s at 5:3 and at most 4.9 s, against 4.6 and 6.3 s, and at 6.2 and
+  8.2 s at 16:9, against 7.7 and 10.6 s. The first kill came 0.1–1.3 s
+  sooner. The draw at full health at 4:3 now ends in a kill, and so do the
+  two fights at 4:3 whose rigid tanks never settled. One fight in portrait
+  now fails to settle instead: its right tank lands on a slope that steepens
+  past 35° and keeps moving down it, braked, for the whole 2 s, so the hills
+  withdraw.
+- On the development workstation, two fights at a time, rigid and sprung
+  surveys ran back to back, twice each. Sprung wheels cost nothing per tick:
+  the median tick was 84–94 µs, against 94–105 µs with rigid hulls. The
+  99th-percentile tick, as a median over each shape's fights, was 0.9–1.2 ms
+  at 4:3, 5:3 and 16:9, against 1.0–1.2 ms; 1.3–1.5 ms in portrait, against
+  1.4–1.6 ms; and 1.7–2.0 ms at 4:1, against 1.8–1.9 ms. With dodgers, 18–20
+  of the 600 fights had a 99th-percentile tick over 4 ms, against 13 with
+  rigid hulls, and the slowest tick was 8.2 ms, against 8.4 ms.
+- On sw-picade-2, a Pi 4 Picade at 1024×768 with the raster renderer at scale
+  1, each build fought the same 12 seeds, half of them with a left dodger,
+  traced back to back from start to finish. Fighting, loop CPU averaged
+  11.0 ms both ways, with a 99th percentile of 16.1 ms against 16.2 ms with
+  rigid hulls, and 12 of 15,137 display refreshes were skipped, against 22 of
+  14,933, never two in a row. Idle, loop CPU averaged 5.8 ms against 5.7 ms.
 
 The run data stays local.
 
@@ -1380,13 +1406,13 @@ engine-client tanks_shells_burst_on_the_face` regenerates all ten.
 
 | | The dodged shell bursts | Setting off, then the burst, four times larger |
 | --- | --- | --- |
-| 1024×768 | ![The left tank up the slope, with the shell it dodged bursting where it stood](screenshots/clock/tanks-1024x768-dodged.png) | ![The left tank on the slope, then higher up it, with the burst where it stood](screenshots/clock/tanks-1024x768-dodge-zoom.png) |
-| 800×480 | ![The right tank moved left, with the shell it dodged bursting where it stood](screenshots/clock/tanks-800x480-dodged.png) | ![The right tank, then 4 units to the left, with the burst where it stood](screenshots/clock/tanks-800x480-dodge-zoom.png) |
+| 1024×768 | ![The left tank moved right, with the shell it dodged bursting where it stood](screenshots/clock/tanks-1024x768-dodged.png) | ![The left tank, then 2.5 units to the right, with the burst where it stood](screenshots/clock/tanks-1024x768-dodge-zoom.png) |
+| 800×480 | ![The left tank moved right, with the shell it dodged bursting where it stood](screenshots/clock/tanks-800x480-dodged.png) | ![The left tank, then 3.7 units to the right, with the burst where it stood](screenshots/clock/tanks-800x480-dodge-zoom.png) |
 
-At 4:3, a 29-damage hit sends the left tank, Plotting + dodge, 3.3 units up
-the slope toward the shooter, and the next shell bursts where it stood, for 4
-damage. At 5:3, the right tank, also Plotting + dodge, drives 4.0 units toward
-the shooter after a 33-damage hit, and the next shell does 4. Each picture
+At 4:3, a 27-damage hit sends the left tank, Plotting + dodge, 2.5 units
+toward the shooter, and the next shell bursts where it stood, for 5 damage.
+At 5:3, the left tank, also Plotting + dodge, drives 3.7 units toward the
+shooter after a 28-damage hit, and the next shell does 4. Each picture
 keeps every shell fired since the hit as a trail.
 `SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
 engine-client tanks_dodge_the_next_shell` regenerates all four.
