@@ -452,4 +452,37 @@ cases, which are a host's choices of where a failure's excess goes, or
 `resting_support`'s press with a measured plastic displacement, which charges
 never measure.
 
+`crates/engine-rapier/src/world/loading/charges/tests/motion.rs` covers bodies
+and supports that move, turn, split or hang together:
+
+- **Common velocity:** a head-on strike moving with its whole scene at
+  (37, -12) or (-300, 140) is priced exactly as at rest. A box carried on a
+  platform at those velocities is priced at its weight to within f32 rounding
+  at their speeds, 3.2e-5 of it at 39 and 7.6e-4 at 331.
+- **Turning support:** a kinematic paddle turning at 3 strikes a ball 1.5 from
+  its center at 4.5, priced on the ball's whole mass. A paddle turned by its
+  velocity and one moved by its pose strike alike, in a whole step and in one
+  that a CCD bullet elsewhere splits.
+- **Moving support:** a platform that rises at 1, then speeds up and slows
+  down at 5, carries the box on it at its mass times gravity and the
+  platform's acceleration. The step the platform jumps to 1 isn't priced. A
+  plank tilting at 0.5 carries the share of the box's weight along its
+  normal, less what swings the box about the plank's center.
+- **CCD into a free body:** without CCD a shell at 400 passes through a free
+  box. With CCD it strikes it, priced on their reduced mass.
+- **Bounces:** each bounce of a heavy ball on a wooden floor is its own
+  impact, priced on the floor as the bounces before it left it. The third
+  bounce takes only what the first two left, and the floor fails.
+- **Fragment:** a bar that the host breaks in two in flight, each half with
+  half the bar's region, costs nothing at the cut. Its front half strikes a
+  wall on its own mass, as the budget's limit above says of a body pushed
+  through a contact already open.
+- **Stack and cart:** once settled, each support in a stack of three carries
+  the weight of the boxes above it. A box riding a cart that speeds up is
+  priced at its weight, and the cart's own support isn't priced once it
+  slides along the floor.
+- **Rover:** each wheel of the rover dropped onto rock lands on its own mass,
+  since joints aren't in an impact's budget. Settled, its wheels' supports
+  carry the whole rover's weight through its sprung slots.
+
 Run `RUST_MIN_STACK=16777216 cargo test -p engine-rapier --lib world::loading::charges`.

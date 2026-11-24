@@ -1,8 +1,6 @@
 use super::*;
 use engine_material::{ARMOR, Beam, Connection, SOFT_TISSUE, SustainedLoad, sustained};
 
-const GRAVITY: f32 = 10.0;
-
 /// The sustained law's outcome for `force` on `surface`, across a patch
 /// `width` wide.
 fn held(surface: &ContactSurface, force: f32, width: f32, duration: f32) -> Outcome {
@@ -101,16 +99,7 @@ fn a_step_that_ccd_splits_prices_no_supports() {
     // last substep's impulse could carry a hit delivered in a small part of
     // the step, so the step's supports are left out. The steps around it price
     // the box at its weight.
-    let mut world = PhysicsWorld::new(PhysicsWorldConfig {
-        gravity: -Vec2::Y * GRAVITY,
-        collect_events: false,
-        max_ccd_substeps: 4,
-        ..Default::default()
-    });
-    world
-        .enable_loading_capture(CaptureConfig::default())
-        .unwrap();
-    world.enable_speculative_arrivals().unwrap();
+    let mut world = world_with(-Vec2::Y * GRAVITY, 4);
     let mut host = Host::default();
     floor(&mut world, &mut host, ROCK, Depth::Fixed(SECTION.depth));
     resting_box(&mut world, &mut host, 2, 1.0, false);
