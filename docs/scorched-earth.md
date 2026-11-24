@@ -2281,6 +2281,7 @@ with it, and a driving CPU drives on instead of stopping to aim, so a host can
 let the tanks take their range before the first shot.
 `ScorchedConfig::first_to_fire` names the tank whose first shot is due at once;
 the other's comes five seconds later. Tank motion, real hull/wheel bounds,
+each tank's bodies (`tank_bodies`), a sprung tank's wheels (`running_gear`),
 support, health,
 barrels, terrain ownership, grains and world-space shells are readable without
 advancing the simulation. `retire_tank` preserves the final hull pose and source

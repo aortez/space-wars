@@ -556,6 +556,28 @@ fn scaled_duels_drive_deform_and_replay_with_native_mass_accounting() {
         }
         assert!(duel.shots() > 0, "scale={scale}, sprung={suspension}");
         assert!(duel.duel.impacts > 0);
+        // Each tank's bodies, and a sprung tank's running gear in host units.
+        for slot in 0..2 {
+            let hull = duel.tanks(&world)[slot].body;
+            let bodies: Vec<_> = duel.tank_bodies(slot).collect();
+            assert_eq!(bodies[0], hull);
+            let Some(gear) = duel.running_gear(&world, slot) else {
+                assert!(!suspension);
+                assert_eq!(bodies.len(), 1);
+                continue;
+            };
+            assert!(suspension);
+            assert_eq!(bodies.len(), 3);
+            assert_eq!(gear.hull_half_extents, Vec2::new(1.6, 0.45) * scale);
+            assert_eq!(gear.wheel_radius, WheelTuning::default().radius * scale);
+            // In the hull's frame, a wheel hangs below each end.
+            let hull = world.motion(hull).unwrap();
+            let [left, right] = gear
+                .wheels
+                .map(|wheel| (wheel.position - hull.position).rotate_radians(-hull.angle));
+            assert!(left.x < 0.0 && right.x > 0.0, "{left:?} {right:?}");
+            assert!(left.y < 0.0 && right.y < 0.0, "{left:?} {right:?}");
+        }
         assert!(
             duel.duel
                 .driving_diagnostics()

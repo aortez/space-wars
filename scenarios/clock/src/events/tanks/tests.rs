@@ -557,18 +557,26 @@ fn timeout_waits_for_a_real_final_hit_then_converts_the_living_loser() {
         tick(&mut state);
         assert_eq!(state.event_phase(), Some(EventPhase::FinishingShots));
         assert!(state.tanks_state().unwrap().result.is_none());
-        let (body, original) = {
+        // The target's hull and wheels move together, so the springs between
+        // them hold.
+        let (body, parts) = {
             let event = match state.active_event.as_ref().unwrap() {
                 ActiveEvent::Tanks(event) => event,
                 _ => unreachable!(),
             };
-            let target = event
+            let world = state.arena.world().unwrap();
+            let slot = event
                 .duel
-                .tanks(state.arena.world().unwrap())
-                .into_iter()
-                .find(|tank| tank.body.entity != shell.source.owner)
+                .tanks(world)
+                .iter()
+                .position(|tank| tank.body.entity != shell.source.owner)
                 .unwrap();
-            (target.body, target.motion)
+            let parts: Vec<_> = event
+                .duel
+                .tank_bodies(slot)
+                .map(|part| (part, world.motion(part).unwrap()))
+                .collect();
+            (parts[0].0, parts)
         };
         let shell = event(&mut state)
             .duel
@@ -576,16 +584,22 @@ fn timeout_waits_for_a_real_final_hit_then_converts_the_living_loser() {
             .find(|s| s.source == shell.source)
             .unwrap();
         let world = state.arena.held_mut(OWNER).unwrap();
-        world.set_pose(body, shell.position, 0.0, true);
-        world.set_velocity(body, shell.velocity, 0.0, true);
-        tick(&mut state);
-        if state.arena.world().unwrap().motion(body).is_some() {
-            state.arena.held_mut(OWNER).unwrap().set_pose(
-                body,
-                original.position,
-                original.angle,
+        let hull = parts[0].1.position;
+        for &(part, motion) in &parts {
+            world.set_pose(
+                part,
+                shell.position + (motion.position - hull),
+                motion.angle,
                 true,
             );
+            world.set_velocity(part, shell.velocity, 0.0, true);
+        }
+        tick(&mut state);
+        if state.arena.world().unwrap().motion(body).is_some() {
+            let world = state.arena.held_mut(OWNER).unwrap();
+            for &(part, motion) in &parts {
+                world.set_pose(part, motion.position, motion.angle, true);
+            }
         }
         for _ in 0..SHELL_LIFETIME_TICKS {
             if state.tanks_state().unwrap().result.is_some() {
