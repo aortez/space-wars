@@ -11,7 +11,6 @@ const STEP: Duration = Duration::from_nanos(16_666_667);
 fn drop(on_foot: bool, protected: bool) -> (ContactHit, usize) {
     let mut state = round();
     weightless(&mut state);
-    state.world.enable_contact_charges().unwrap();
     if protected {
         state.pilots[1]
             .vitals
@@ -84,7 +83,6 @@ fn a_match_prices_pods_and_pilots_and_protection_shields_them() {
 #[test]
 fn a_wing_sweep_in_a_match_keeps_the_ship_region() {
     let mut state = round();
-    state.world.enable_contact_charges().unwrap();
     let region = |state: &SurfaceSortieState| {
         let world = &state.world.physics.world;
         world
@@ -104,4 +102,59 @@ fn a_wing_sweep_in_a_match_keeps_the_ship_region() {
     // stayed.
     assert_ne!(state.world.ships[0].wing_theta, start);
     assert_eq!(region(&state), before);
+}
+
+#[test]
+fn a_pilot_on_foot_leaves_an_asteroid_it_meets_unworn() {
+    let mut state = round();
+    weightless(&mut state);
+    let planet = state.world.planets[0];
+    let away = -Vec2::from_radians(planet.wrapper_angle);
+    let across = Vec2::new(-away.y, away.x);
+    let at = planet.position + away * (planet.radius + 80.0);
+    // Both vehicles wait out of the way.
+    for (seat, side) in [(0, 1.0), (1, -1.0)] {
+        let ship = &mut state.world.ships[seat];
+        ship.position = at + across * side * 150.0 - SHIP_PIVOT;
+        ship.velocity = Vec2::ZERO;
+        ship.omega = 0.0;
+    }
+    external(&mut state, 1, at);
+    let pilot = pilot_physics_id(PlayerId::from_index(1).unwrap()).value();
+    // A pilot barely dents rock, so only a fast asteroid prices its own side.
+    state.world.debris.push(DebrisState::new(
+        DebrisKind::Asteroid,
+        at + across * 12.0,
+        -across * 300.0,
+        2.0,
+        ASTEROID_DAMAGE_SCALAR,
+        Color::DIM_GREY,
+    ));
+    for _ in 0..120 {
+        SurfaceSortieScenario::step(&mut state, &[], STEP);
+        let world = &state.world;
+        let Some(hit) = world
+            .contact_hits
+            .iter()
+            .find(|hit| hit.entities.contains(&pilot))
+        else {
+            continue;
+        };
+        let rock = world
+            .debris
+            .iter()
+            .find(|item| hit.entities.contains(&item.physics_id))
+            .expect("the pilot met the asteroid");
+        let side = hit
+            .entities
+            .iter()
+            .position(|&entity| entity == rock.physics_id)
+            .unwrap();
+        // Charges priced the asteroid's side, and still nothing wore it.
+        assert_eq!(hit.unpriced, None, "{hit:?}");
+        assert!(hit.health[side] > 0.0, "{hit:?}");
+        assert_eq!(rock.life, rock.life_max, "{hit:?}");
+        return;
+    }
+    panic!("the asteroid never met the pilot");
 }

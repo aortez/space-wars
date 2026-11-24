@@ -7,7 +7,7 @@ use physics::classify_entity;
 const STEP: Duration = Duration::from_nanos(16_666_667);
 
 /// The plain game without random asteroids, its sun and planets still and
-/// weightless, with contact charges on.
+/// weightless.
 fn plain() -> SpacewarsState {
     let config = SpacewarsConfig {
         asteroid_probability_per_sec: 0.0,
@@ -22,7 +22,6 @@ fn plain() -> SpacewarsState {
     if let Some(sun) = &mut state.sun {
         sun.mass = 0.0;
     }
-    state.enable_contact_charges().unwrap();
     state
 }
 
@@ -102,10 +101,13 @@ fn first_hit(
     panic!("no hit on {entity}");
 }
 
-/// The first hit between an asteroid of `radius`, held at `speed` straight
-/// down onto the far side of a planet from its port, and the planet, with
-/// the asteroid's full health.
-fn asteroid_onto_planet(radius: f32, speed: f32) -> (ContactHit, usize, f32) {
+/// An asteroid of `radius` held at `speed` straight down onto the far side of
+/// a planet from its port, stepped until its first hit with the planet. The
+/// state, the hit, the asteroid's side, and the asteroid before the hit.
+fn asteroid_onto_planet(
+    radius: f32,
+    speed: f32,
+) -> (SpacewarsState, ContactHit, usize, DebrisState) {
     let mut state = plain();
     let planet = state.planets[0];
     let away = -Vec2::from_radians(planet.wrapper_angle);
@@ -121,7 +123,7 @@ fn asteroid_onto_planet(radius: f32, speed: f32) -> (ContactHit, usize, f32) {
         classify_entity(planet),
         Some(MechanicalEntity::Body(BodyId::Planet(0)))
     );
-    (hit, at, rock.life_max)
+    (state, hit, at, rock)
 }
 
 #[test]
@@ -294,21 +296,141 @@ fn a_rebuilt_ship_holding_a_planet_strikes_it_only_once() {
 #[test]
 fn asteroids_break_on_rock_planets_from_a_few_tens_of_units_a_second() {
     // A fifth of its health breaks an asteroid.
-    let (slow, slow_at, full) = asteroid_onto_planet(2.0, 10.0);
+    let (state, slow, slow_at, rock) = asteroid_onto_planet(2.0, 10.0);
+    let full = rock.life_max;
     assert!(
         slow.health[slow_at] > 0.0 && slow.health[slow_at] < 0.2 * full,
         "{slow:?}"
     );
-    let (fast, fast_at, full) = asteroid_onto_planet(2.0, 100.0);
+    // The impact's price is all it costs.
+    let worn = state.debris[0];
+    assert!(!worn.dead);
+    assert!(
+        (worn.life - (full - slow.health[slow_at])).abs() < 1.0e-4,
+        "{} of {full} after {slow:?}",
+        worn.life
+    );
+    let (state, fast, fast_at, _) = asteroid_onto_planet(2.0, 100.0);
     assert!(fast.health[fast_at] >= 0.2 * full, "{fast:?}");
     assert!(fast.closing_speed > 90.0, "{fast:?}");
+    // It broke in the step it struck, into pieces.
+    assert!(!state.debris.is_empty());
+    assert!(
+        state
+            .debris
+            .iter()
+            .all(|item| item.kind == DebrisKind::Fragment)
+    );
+    let down = (state.planets[0].position - rock.position).normalized();
     for (hit, at) in [(slow, slow_at), (fast, fast_at)] {
         assert_eq!(hit.unpriced, None);
         assert!(!hit.shielded[at], "{hit:?}");
         // The planet is shielded rock with no health to lose.
         assert!(hit.shielded[1 - at], "{hit:?}");
         assert_eq!(hit.health[1 - at], 0.0);
+        // The normal points from the first body to the second.
+        let into_planet = if at == 0 { hit.normal } else { -hit.normal };
+        assert!(into_planet.dot(down) > 0.9, "{hit:?}");
     }
+}
+
+#[test]
+fn an_asteroid_pressed_against_a_planet_wears_only_on_impact() {
+    // The harder presses chip it, and each chip rebuilds its body, which
+    // then closes the gap the chip left.
+    let mut chips = Vec::new();
+    for speed in [10.0, 14.0, 18.0, 22.0] {
+        let (mut state, hit, at, rock) = asteroid_onto_planet(2.0, speed);
+        let find = |state: &SpacewarsState| {
+            state
+                .debris
+                .iter()
+                .position(|item| item.physics_id == rock.physics_id)
+                .expect("the asteroid is whole")
+        };
+        let worn = state.debris[find(&state)];
+        assert!(worn.life < rock.life_max, "{speed}: {hit:?}");
+        chips.push(worn.chip_count);
+        let planet = state.planets[0];
+        for _ in 0..60 {
+            let index = find(&state);
+            let into = (planet.position - state.debris[index].position).normalized();
+            state.debris[index].velocity = into * speed;
+            step(&mut state);
+            assert!(
+                state
+                    .contact_hits
+                    .iter()
+                    .all(|hit| !hit.entities.contains(&rock.physics_id)),
+                "{speed}: {:?}",
+                state.contact_hits
+            );
+        }
+        assert_eq!(
+            state.debris[find(&state)].life,
+            worn.life,
+            "{speed}: {hit:?} {at}"
+        );
+    }
+    assert!(chips.iter().any(|&count| count > 1), "{chips:?}");
+}
+
+#[test]
+fn a_ship_crash_wears_the_asteroid_by_its_price_and_the_ship_as_before() {
+    // Ship 0 sits beside an asteroid, and ship 1 waits out of the way.
+    // Today's rules wear the asteroid when charges have no regions.
+    let crash = |today: bool| {
+        let mut state = plain();
+        if today {
+            state.physics.contacts = None;
+        }
+        let point = open_point(&state, 150.0);
+        state.debris.push(asteroid(point, Vec2::ZERO, 5.0));
+        let ship = &mut state.ships[0];
+        ship.position = point - Vec2::X * 16.0 - SHIP_PIVOT;
+        ship.velocity = Vec2::ZERO;
+        ship.omega = 0.0;
+        let parking = open_point(&state, 200.0);
+        let other = &mut state.ships[1];
+        other.position = parking;
+        other.velocity = Vec2::ZERO;
+        step(&mut state);
+        state
+    };
+    let ram = |state: &mut SpacewarsState| {
+        state.ships[0].velocity = Vec2::X * 40.0;
+        state.ships[0].omega = 0.0;
+    };
+    let mut state = crash(false);
+    let rock = state.debris[0];
+    let mut steps = 0;
+    let (hit, at) = first_hit(&mut state, rock.physics_id, |state| {
+        steps += 1;
+        ram(state);
+    });
+    assert_eq!(hit.entities[1 - at], 10_000, "{hit:?}");
+    assert!(hit.health[at] > 0.0 && hit.health[at] < 0.2 * rock.life_max);
+    let worn = state.debris[0];
+    let chips = state
+        .debris
+        .iter()
+        .filter(|item| item.kind == DebrisKind::Fragment)
+        .count();
+    assert!(
+        (worn.life - (rock.life_max - hit.health[at])).abs() < 1.0e-3,
+        "{} of {} after {hit:?}",
+        worn.life,
+        rock.life_max
+    );
+    assert_eq!(chips, usize::from(worn.chip_count));
+    // The ship takes the contact rules' damage, as it does today.
+    let mut today = crash(true);
+    for _ in 0..steps {
+        ram(&mut today);
+        step(&mut today);
+    }
+    assert!(state.ships[0].life < state.ships[0].life_max);
+    assert_eq!(state.ships[0].life, today.ships[0].life);
 }
 
 #[test]
@@ -339,62 +461,55 @@ fn a_pod_outside_a_match_is_priced_and_shielded() {
     assert!(hit.health[1 - at] > 0.0, "{hit:?}");
 }
 
-/// Every ship's and piece of debris's position, velocity and life, as bits.
-fn fingerprint(state: &SpacewarsState) -> Vec<u32> {
-    let ships = state.ships.iter().map(|ship| {
-        [
-            ship.position.x,
-            ship.position.y,
-            ship.velocity.x,
-            ship.velocity.y,
-            ship.life,
-        ]
-    });
-    let debris = state.debris.iter().map(|item| {
-        [
-            item.position.x,
-            item.position.y,
-            item.velocity.x,
-            item.velocity.y,
-            item.life,
-        ]
-    });
-    ships.chain(debris).flatten().map(f32::to_bits).collect()
+/// The asteroid census's game: the default universe and asteroid rate, with
+/// each player's health at 500 so that idle ships last.
+fn busy() -> SpacewarsState {
+    let mut config = SpacewarsConfig {
+        universe_radius: 1_200,
+        asteroid_probability_per_sec: 20.0,
+        ..SpacewarsConfig::default()
+    };
+    for player in &mut config.players {
+        player.health_percent = 500;
+    }
+    SpacewarsScenario::init(config, 7)
 }
 
 #[test]
-fn a_busy_game_moves_as_it_does_without_charges_and_misses_nothing() {
-    let run = |charges: bool| {
-        let mut config = SpacewarsConfig {
-            universe_radius: 1_200,
-            asteroid_probability_per_sec: 20.0,
-            ..SpacewarsConfig::default()
-        };
-        for player in &mut config.players {
-            player.health_percent = 500;
-        }
-        let mut state = SpacewarsScenario::init(config, 7);
-        if charges {
-            state.enable_contact_charges().unwrap();
-        }
-        let mut prints = Vec::new();
-        let mut hits = Vec::new();
-        for _ in 0..900 {
-            step(&mut state);
-            prints.push(fingerprint(&state));
-            hits.extend(state.contact_hits.iter().copied());
-        }
-        assert_eq!(state.winner, None, "the game ended");
-        (prints, hits, state.contact_diagnostics())
-    };
-    let (without, none, off) = run(false);
-    let (with, hits, diagnostics) = run(true);
-    assert!(none.is_empty());
-    assert_eq!(off, None);
-    let diverged = without.iter().zip(&with).position(|(a, b)| a != b);
-    assert_eq!(diverged, None, "charges changed the step");
-    assert_eq!(diagnostics, Some(ContactDiagnostics::default()));
+fn a_busy_game_misses_nothing() {
+    let mut state = busy();
+    let mut hits = Vec::new();
+    for _ in 0..900 {
+        step(&mut state);
+        hits.extend(state.contact_hits.iter().copied());
+    }
+    assert_eq!(state.winner, None, "the game ended");
+    assert_eq!(
+        state.contact_diagnostics(),
+        Some(ContactDiagnostics::default())
+    );
     let unpriced: Vec<_> = hits.iter().filter(|hit| hit.unpriced.is_some()).collect();
     assert!(unpriced.is_empty(), "{unpriced:?}");
     assert!(hits.len() >= 20, "{} hits", hits.len());
+}
+
+#[test]
+fn a_cloned_game_steps_and_charges_as_its_original_does() {
+    // A world with capture clones through a snapshot of itself.
+    let mut state = busy();
+    for _ in 0..300 {
+        step(&mut state);
+    }
+    let mut copy = state.clone();
+    let mut hits = 0;
+    for tick in 0..120 {
+        step(&mut state);
+        step(&mut copy);
+        assert_eq!(copy.contact_hits, state.contact_hits, "tick {tick}");
+        hits += state.contact_hits.len();
+    }
+    assert!(hits > 0);
+    assert_eq!(copy.ships, state.ships);
+    assert_eq!(copy.debris, state.debris);
+    assert_eq!(copy.contact_diagnostics(), state.contact_diagnostics());
 }
