@@ -3,10 +3,12 @@ use engine_material::{
     ContactBody, HULL, Material, ROCK, SOFT_TISSUE, effective_mass, shared_impact,
 };
 
+mod motion;
 mod reference;
 mod supports;
 
 const DT: f32 = 1.0 / 120.0;
+const GRAVITY: f32 = 10.0;
 const SECTION: Section = Section::new(1.0, 0.5);
 
 fn body(n: u64) -> BodyId {
@@ -56,9 +58,16 @@ impl ContactSurfaces for Host {
 
 /// A world whose capture admits speculative arrivals.
 fn world(gravity: Vec2) -> PhysicsWorld {
+    world_with(gravity, 1)
+}
+
+/// A world whose capture admits speculative arrivals, in which CCD splits a
+/// step into at most `substeps`.
+fn world_with(gravity: Vec2, substeps: usize) -> PhysicsWorld {
     let mut world = PhysicsWorld::new(PhysicsWorldConfig {
         gravity,
         collect_events: false,
+        max_ccd_substeps: substeps,
         ..Default::default()
     });
     world
@@ -80,16 +89,31 @@ fn add(
     radius: Option<f32>,
 ) -> ContactSource {
     assert!(world.insert_body(body(n), spec, colliders));
-    let id = RegionId {
+    let region = RegionId {
         entity: PhysicsId::new(n),
         part: 0,
     };
+    let ids = colliders.iter().map(|collider| collider.id);
+    bind(world, host, region, body(n), ids, material, radius)
+}
+
+/// Binds body `id`'s `colliders` to one source on `region`, with the host
+/// keeping a unit volume of `material` behind it.
+fn bind(
+    world: &mut PhysicsWorld,
+    host: &mut Host,
+    region: RegionId,
+    id: BodyId,
+    colliders: impl IntoIterator<Item = ColliderId>,
+    material: Material,
+    radius: Option<f32>,
+) -> ContactSource {
     let source = ContactSource {
-        region: world.create_loading_region(id, body(n)).unwrap(),
+        region: world.create_loading_region(region, id).unwrap(),
         patch: 0,
     };
     for collider in colliders {
-        world.bind_loading_collider(collider.id, source).unwrap();
+        world.bind_loading_collider(collider, source).unwrap();
     }
     host.surfaces.insert(
         source,
@@ -853,16 +877,7 @@ fn a_step_that_ccd_splits_prices_each_substeps_impacts_on_their_own_motion() {
     // so the strikes are in different substeps' batches, priced in turn. Each
     // has its own budget, priced on the motion its substep brings: half the
     // ball's mass times 400 squared.
-    let mut world = PhysicsWorld::new(PhysicsWorldConfig {
-        gravity: Vec2::ZERO,
-        collect_events: false,
-        max_ccd_substeps: 4,
-        ..Default::default()
-    });
-    world
-        .enable_loading_capture(CaptureConfig::default())
-        .unwrap();
-    world.enable_speculative_arrivals().unwrap();
+    let mut world = world_with(Vec2::ZERO, 4);
     let mut host = Host::default();
     let mut bouncing = ball(1, 0.5, 1.0);
     bouncing.restitution = 1.0;
