@@ -2430,7 +2430,7 @@ cost it at scale 1. Clock supplies none yet, and `finish_step` supplies none.
 The tanks' [contacts](#armor-and-contacts) are priced in a world where
 `host::capture_contacts` has turned on contact capture and speculative
 arrivals. Neither changes the physics. In a world without them, contacts cost
-nothing.
+nothing. Clock turns them on for its Tanks fights.
 
 - The duel binds its tanks and its terrain before each step, and makes the
   step's one call to the engine's contact charges in `finish_step`. A host

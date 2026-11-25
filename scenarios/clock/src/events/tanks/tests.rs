@@ -253,6 +253,50 @@ fn entry_combat_and_departure_share_the_arena_and_keep_the_current_reading() {
 }
 
 #[test]
+fn the_tanks_contacts_are_priced_and_cost_them_nothing_in_a_fight() {
+    for (aspect, seed) in [(16.0 / 9.0, 6), (4.0 / 3.0, 13)] {
+        let mut state = ready(aspect, seed, ClockTimeFormat::TwentyFourHour);
+        state.preview_event(ClockEventKind::Tanks);
+        let mut landings = 0;
+        let mut fighting = 0;
+        let mut stepped = 0;
+        for _ in 0..MAX_TICKS {
+            if state.event_kind().is_none() {
+                break;
+            }
+            let phase = state.event_phase();
+            tick(&mut state);
+            let Some(ActiveEvent::Tanks(event)) = state.active_event.as_ref() else {
+                break;
+            };
+            let world = state.arena.world().unwrap();
+            assert!(world.admits_speculative_arrivals());
+            // The list is the duel's last step's, so it counts once.
+            if event.duel.tick() == stepped {
+                continue;
+            }
+            stepped = event.duel.tick();
+            for contact in event.duel.contacts() {
+                // Rock takes the work of a sprung tank's landings and driving.
+                assert_eq!(contact.absorbed, [0.0; 2], "{aspect}: {contact:?}");
+                match phase {
+                    Some(EventPhase::Settling) => landings += 1,
+                    Some(EventPhase::Fighting) => fighting += 1,
+                    _ => (),
+                }
+            }
+            let diagnostics = event.duel.contact_diagnostics();
+            assert_eq!(diagnostics.rejected_batches, 0);
+            assert_eq!(diagnostics.refused_bindings, 0);
+        }
+        assert!(landings >= 2, "aspect={aspect}: {landings} landings");
+        assert!(fighting > 0, "aspect={aspect}");
+        assert!(state.event_kind().is_none(), "bounded exit");
+        assert_eq!((state.body_count(), state.collider_count()), (0, 0));
+    }
+}
+
+#[test]
 fn fights_pair_plotting_with_plotting_or_with_learning_and_open_from_either_side() {
     // Every 24 seeds, each pairing opens from either side with each mix of
     // dodgers: neither, either one, or both.
