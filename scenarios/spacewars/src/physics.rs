@@ -281,8 +281,8 @@ pub(super) struct SpacewarsPhysics {
     next_debris_entity: u64,
     /// The cannon shells' shots and the lasers' beams (#330).
     weapons: Weapons,
-    /// The regions contact charges keep for the bodies, once a world enables
-    /// them (#330).
+    /// The regions contact charges keep for the bodies (#330). Every world
+    /// `new` makes has them, and a forecast's world has none.
     pub(super) contacts: Option<super::contact_charges::Regions>,
 }
 
@@ -321,6 +321,7 @@ impl SpacewarsPhysics {
             let _ = physics.insert_ship(index, ship, false, false, false);
         }
         super::lasers::arm(&mut physics, ships.len());
+        super::contact_charges::enable(&mut physics);
         physics
     }
 

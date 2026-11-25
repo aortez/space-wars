@@ -345,12 +345,12 @@ those of the rule above in
 
 ## Spacewars host (#330)
 
-`scenarios/spacewars/src/contact_charges.rs` is Spacewars' host. It is off
-unless a world calls `SpacewarsState::enable_contact_charges`, which only
-tests do so far, and it charges nothing: it lists each step's impacts, as
-priced, in `SpacewarsState::contact_hits`, and today's contact rules still
-deal all contact damage. #330's next steps apply what it prices, asteroids
-first.
+`scenarios/spacewars/src/contact_charges.rs` is Spacewars' host, and every
+game world has it on. It lists each step's impacts, as priced, in
+`SpacewarsState::contact_hits`, and it charges asteroids for theirs. Every
+other body keeps today's contact damage: what charges price for ships, pods,
+pilots and rovers is listed and not charged. That is a gameplay policy, and
+the probe below gives its reasons.
 
 - **Regions.** Each body a crash can harm, or that a crash strikes, has a
   region: a ship or a pod, a pilot on foot, each of a rover's three bodies, an
@@ -384,11 +384,37 @@ first.
 - **Supports** go unpriced. The host never calls `charge_contact_supports`,
   so the steady load of a ship, pod, pilot or rover resting on a planet costs
   nothing, and only impacts are listed.
+- **Asteroid wear.** An asteroid loses the health its impacts consumed, and
+  today's contact rules no longer wear it. It chips and breaks by its health
+  as before, but what a strike costs it has changed. Today's rules took no
+  more health from a big asteroid than from a small one struck as fast, so a
+  big one survived faster strikes; charges break asteroids of every size
+  from about the same speed. Against another of its size, one strike breaks
+  an asteroid of radius 2, 5 or 10 from 40 u/s, where today's rules need 80,
+  200 and 240 u/s. A radius-5 asteroid striking a ship breaks from 40 u/s,
+  where it needed 200, and against a planet both rules break it from 40 u/s.
+  In play, about as many asteroids break as today, since most strikes are
+  fast and charges no longer wear asteroids in lasting contact.
+- **When wear lands.** The wear lands just after today's rules, which size a
+  ship's or a rover's damage by the asteroid's mass, so no contact's wear
+  shrinks the asteroid first. They still charge a ship or a rover for each
+  contact, but an asteroid that now breaks on its first strike can't strike
+  again. Dropped on a parked rover at 80 u/s, a radius-5 asteroid cost it
+  6.06 in two strikes under today's rules and 1.20 in one under charges.
+- **What wears.** Only an impact wears an asteroid: one left pressing on a
+  planet, which today's rules wore by each step's impulse, wears no more
+  once it has struck. Its chips fly from the side away from what struck it,
+  as they did from every strike but another asteroid's. A pilot on foot
+  leaves it unworn, as before. What a pilot's impact prices on the asteroid
+  still counts against it for the step's later impacts, but that is nothing
+  up to 200 u/s and about a thousandth of a radius-2 asteroid's health at
+  300 u/s. A shot still charges it, and an impact charges leave unpriced
+  wears nothing.
 - **Capture's bounds** are 4,096 regions, 16,384 bindings, 4,096 episodes,
   65,536 visits and 8,192 contacts a batch, and 32,768 records a step, to
   hold `MAX_ASTEROIDS` asteroids beside the rest. In 15 seconds at the
-  census's settings, the host's test finds no batch refused, every impact
-  priced and the same trajectory as without charges.
+  census's settings, the host's test finds no batch or binding refused and
+  every impact priced.
 
 The contact-half probe of 2026-11-23 bound the same bodies, with loose terrain,
 the boundary and all rock debris besides, and set charges beside today's rules
@@ -396,16 +422,28 @@ in the census, the AI games and the matches, on the workstation and the Pi.
 Its records are in
 `/home/data2/space-wars3-artifacts/contact-half-probe-20261123`.
 
-- On rock planets, asteroids wear as they do today. Every asteroid that hits
-  a planet or the sun breaks under both. One that hits a ship breaks 97% of
-  the time today and 98 to 100% under charges.
-- Ships take 30 to 130 times today's damage from planets and the sun, and
-  pods and pilots far less than today's match rule. No planet material suits
-  both ships and asteroids, so ships, pods, pilots and rovers wait on a
-  decision about their materials.
+- On rock planets, asteroids in play wear as they do today. Every asteroid
+  that hits a planet or the sun breaks under both. One that hits a ship
+  breaks 97% of the time today and 98 to 100% under charges.
+- Ships take 30 to 130 times today's damage from planets and the sun, and 7
+  to 40 times from asteroids. A ship that hits a rock planet at 100 u/s
+  fails, where today it loses 1. A radius-2 asteroid at 100 u/s kills a
+  rover, where today it costs 3.5 of 25.
+- Pods and pilots take far less than today's match rule. A pod loses 18 at
+  100 u/s, where today it dies from 62 u/s. A pilot at 37 u/s, where today
+  it dies, would lose about 6 even if it took the crash's whole energy.
+- No planet material suits both ships and asteroids. Charges grow with the
+  square of the speed, where today's rules grow linearly, so one factor for
+  each class would match today's rules at only one speed.
 - Capture added 2 to 17% to a step on the workstation and up to 15% on the
   Pi, and charges 0.03 to 0.5 ms a step on the Pi. With everything bound,
   Deathmatch peaked at 1,577 regions.
+
+So ships, pods, pilots and rovers keep today's contact rules, as a gameplay
+policy rather than a weaker material. Their materials hold weapon fire as
+#330 calibrated them, and the same materials can't also give today's crashes.
+Charging those crashes would take new materials, which would move weapon
+balance too, or a factor for each class.
 
 ## Evidence
 

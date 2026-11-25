@@ -2,13 +2,14 @@
 //! harm, or that a crash strikes, has a material region: ships and pods,
 //! pilots on foot, rovers, asteroids, the sun and the planets. After each
 //! step, charges price every new impact between two of them against the
-//! surfaces here. Pricing moves nothing, so Rapier's restitution still sets
-//! the bounce.
+//! surfaces here, and the step lists them in
+//! [`SpacewarsState::contact_hits`]. Pricing moves nothing, so Rapier's
+//! restitution still sets the bounce.
 //!
-//! For now the game only lists what charges price, in
-//! [`SpacewarsState::contact_hits`], once a world turns them on with
-//! [`SpacewarsState::enable_contact_charges`]. Today's contact rules still
-//! deal all contact damage. See `docs/design/material-contact-charges.md`.
+//! Charges wear asteroids. Just after the contact rules deal damage, each
+//! asteroid loses the health its impacts consumed, and the rules no longer
+//! wear it. Every other body takes the contact rules' damage as before. See
+//! `docs/design/material-contact-charges.md`.
 
 use super::*;
 use engine_material::{ROCK, Region};
@@ -16,7 +17,7 @@ use engine_rapier::world::loading::charges::{
     ContactCharge, ContactSurface, ContactSurfaces, Depth, Unpriced,
 };
 use engine_rapier::world::loading::{
-    CaptureConfig, ContactSource, EpisodeTransition, LoadingError, RegionId, RegionToken,
+    CaptureConfig, ContactSource, EpisodeId, EpisodeTransition, RegionId, RegionToken,
 };
 use engine_rapier::world::{BodyId as PhysicsBodyId, ColliderId, PhysicsId, PhysicsWorld};
 use integrity::{HealthMap, THICKNESS};
@@ -44,6 +45,9 @@ pub struct ContactHit {
     pub entities: [u64; 2],
     /// The fastest approach that started the impact, `wu / s`.
     pub closing_speed: f32,
+    /// The normal where the bodies met, from the first toward the second.
+    /// Zero if capture kept no point of the impact.
+    pub normal: Vec2,
     /// The health each side's work stands for. The sun and the planets have
     /// no health, so their side shows none.
     pub health: [f32; 2],
@@ -58,7 +62,7 @@ pub struct ContactHit {
     pub unpriced: Option<Unpriced>,
 }
 
-/// What contact charges missed since a world turned them on.
+/// What contact charges missed since the world was made.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ContactDiagnostics {
     /// Contact batches capture rejected. Their impacts are missing from
@@ -69,7 +73,7 @@ pub struct ContactDiagnostics {
     pub refused_bindings: usize,
 }
 
-/// The regions contact charges keep, once a world turns them on.
+/// The regions contact charges keep.
 #[derive(Debug, Clone, Default)]
 pub(super) struct Regions {
     /// Each bound body's region. A removed body's token stays until a prune.
@@ -149,27 +153,25 @@ impl Regions {
 }
 
 impl SpacewarsState {
-    /// Turns on contact charges (#330). From the next step, each new impact
-    /// between bodies with regions is priced after the step and listed in
-    /// [`Self::contact_hits`]. Nothing is charged, so play is unchanged.
-    /// Charges stay on for the world's life.
-    pub fn enable_contact_charges(&mut self) -> Result<(), LoadingError> {
-        let physics = &mut self.physics;
-        if physics.contacts.is_none() {
-            physics.world.enable_loading_capture(capture())?;
-            physics.world.enable_speculative_arrivals()?;
-            physics.contacts = Some(Regions::default());
-        }
-        Ok(())
-    }
-
-    /// What contact charges missed since they were turned on, or `None`
-    /// while they are off.
+    /// What contact charges missed since the world was made, or `None` if
+    /// they are off.
     pub fn contact_diagnostics(&self) -> Option<ContactDiagnostics> {
         self.physics
             .contacts
             .as_ref()
             .map(|regions| regions.diagnostics)
+    }
+}
+
+/// Turns contact charges on for a new world.
+pub(super) fn enable(physics: &mut SpacewarsPhysics) {
+    let enabled = physics
+        .world
+        .enable_loading_capture(capture())
+        .and_then(|()| physics.world.enable_speculative_arrivals());
+    debug_assert!(enabled.is_ok(), "contact charges: {enabled:?}");
+    if enabled.is_ok() {
+        physics.contacts = Some(Regions::default());
     }
 }
 
@@ -263,7 +265,6 @@ fn priced(physics: &SpacewarsPhysics, entity: PhysicsId) -> bool {
 /// Prices the step's new impacts between bodies with regions, and lists
 /// them in `contact_hits`. Runs after each step, before any rule changes
 /// health, so each body is priced at the health it brought into the step.
-/// Nothing is charged.
 ///
 /// A body the game rebuilds, as it does a ship whose shape changes or an
 /// asteroid that chips, gets a new region, and its contacts start anew.
@@ -297,6 +298,19 @@ pub(super) fn price(state: &mut SpacewarsState, pilots: &[SurfacePilot]) {
         contact_hits,
         ..
     } = state;
+    // The normal of the first contact record capture kept for each impact.
+    let batches = physics.world.loading_batches();
+    let mut normals: BTreeMap<EpisodeId, Option<(ContactSource, Vec2)>> = batches
+        .iter()
+        .flat_map(|batch| &batch.events)
+        .filter(|event| event.transition == EpisodeTransition::Impact)
+        .map(|event| (event.id, None))
+        .collect();
+    for record in batches.iter().flat_map(|batch| &batch.contacts) {
+        if let Some(slot @ None) = record.episode.and_then(|id| normals.get_mut(&id)) {
+            *slot = Some((record.sources[0], record.normal));
+        }
+    }
     let mut surfaces = Surfaces {
         bodies: Bodies::new(ships, debris, rovers, exposed),
         ships,
@@ -311,7 +325,7 @@ pub(super) fn price(state: &mut SpacewarsState, pilots: &[SurfacePilot]) {
     };
     for charge in charges.unwrap_or_default() {
         if !regions.holds(&charge) {
-            contact_hits.push(surfaces.hit(charge));
+            contact_hits.push(surfaces.hit(charge, &normals));
         }
     }
 }
@@ -392,41 +406,61 @@ impl Surfaces<'_> {
         }
     }
 
-    /// What `charge` priced, for the list.
-    fn hit(&self, charge: ContactCharge) -> ContactHit {
+    /// What `charge` priced, for the list, with the normal from `normals`:
+    /// each impact's first source and its normal from that source.
+    fn hit(
+        &self,
+        charge: ContactCharge,
+        normals: &BTreeMap<EpisodeId, Option<(ContactSource, Vec2)>>,
+    ) -> ContactHit {
+        let (ContactCharge::Charged {
+            episode,
+            sources,
+            closing_speed,
+            ..
+        }
+        | ContactCharge::Unpriced {
+            episode,
+            sources,
+            closing_speed,
+            ..
+        }) = &charge;
+        let (sources, closing_speed) = (*sources, *closing_speed);
+        let normal =
+            normals
+                .get(episode)
+                .copied()
+                .flatten()
+                .map_or(Vec2::ZERO, |(first, normal)| {
+                    if first == sources[0] { normal } else { -normal }
+                });
+        let mut hit = ContactHit {
+            entities: sources.map(entity),
+            closing_speed,
+            normal,
+            health: [0.0; 2],
+            shielded: [false; 2],
+            failed: [false; 2],
+            unpriced: None,
+        };
         match charge {
             ContactCharge::Charged {
-                sources,
-                closing_speed,
-                outcome,
-                protected,
-                ..
-            } => ContactHit {
-                entities: sources.map(entity),
-                closing_speed,
-                health: [0, 1].map(|at| {
+                outcome, protected, ..
+            } => {
+                hit.health = [0, 1].map(|at| {
                     self.side(entity(sources[at]))
                         .and_then(|side| side.health)
                         .map_or(0.0, |(map, _)| map.health(outcome.consumed[at]))
-                }),
-                shielded: protected,
-                failed: outcome.failed,
-                unpriced: None,
-            },
-            ContactCharge::Unpriced {
-                sources,
-                closing_speed,
-                reason,
-                ..
-            } => ContactHit {
-                entities: sources.map(entity),
-                closing_speed,
-                health: [0.0; 2],
-                shielded: sources.map(|source| self.protected(source)),
-                failed: [false; 2],
-                unpriced: Some(reason),
-            },
+                });
+                hit.shielded = protected;
+                hit.failed = outcome.failed;
+            }
+            ContactCharge::Unpriced { reason, .. } => {
+                hit.shielded = sources.map(|source| self.protected(source));
+                hit.unpriced = Some(reason);
+            }
         }
+        hit
     }
 }
 
@@ -459,6 +493,50 @@ impl ContactSurfaces for Surfaces<'_> {
     fn protected(&self, source: ContactSource) -> bool {
         self.side(entity(source)).is_some_and(|side| side.shielded)
     }
+}
+
+/// Whether charges wear `debris`, so that the contact rules leave it be. A
+/// shot still charges it.
+pub(super) fn wears(state: &SpacewarsState, debris: &DebrisState) -> bool {
+    state.physics.contacts.is_some() && debris.kind == DebrisKind::Asteroid
+}
+
+/// Wears each asteroid by the health its impacts consumed in the step,
+/// chipping and breaking it as the contact rules did. Runs just after those
+/// rules, before broken debris breaks up. A pilot on foot leaves an asteroid
+/// as it found it, as the rules did.
+pub(super) fn wear_asteroids(state: &mut SpacewarsState) {
+    if state.contact_hits.is_empty() {
+        return;
+    }
+    let index: BTreeMap<u64, usize> = state
+        .debris
+        .iter()
+        .enumerate()
+        .filter(|(_, item)| item.physics_id != 0)
+        .map(|(at, item)| (item.physics_id, at))
+        .collect();
+    let hits = std::mem::take(&mut state.contact_hits);
+    for hit in hits.iter().filter(|hit| hit.unpriced.is_none()) {
+        for side in 0..2 {
+            let (rock, striker) = (hit.entities[side], hit.entities[1 - side]);
+            let Some(&at) = index.get(&rock) else {
+                continue;
+            };
+            let on_foot = matches!(
+                physics::classify_entity(PhysicsId::new(striker)),
+                Some(MechanicalEntity::Spaceling(_))
+            );
+            if on_foot || !wears(state, &state.debris[at]) {
+                continue;
+            }
+            // Chips fly away from the striker.
+            let away = if side == 1 { hit.normal } else { -hit.normal };
+            let salt = 0xC0A7_AC70 ^ rock ^ striker.rotate_left(24);
+            damage_debris(state, at, hit.health[side], away, salt);
+        }
+    }
+    state.contact_hits = hits;
 }
 
 /// The entity value of the body behind `source`.
