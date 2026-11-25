@@ -1,6 +1,6 @@
 //! Charges where bodies and their supports move, turn, split or hang
-//! together: a common velocity, moving and turning supports, a CCD shell, a
-//! fragment, bounces, a stack, a cart and the rover.
+//! together: a common velocity, turn or spin, moving and turning supports, a
+//! CCD shell, a fragment, bounces, a stack, a cart and the rover.
 
 use super::*;
 use crate::rover::{RoverAssembly, RoverSpawnPose, RoverSpec};
@@ -89,6 +89,79 @@ fn a_common_velocity_changes_no_charge() {
             assert!(
                 close(carried, weight, tolerance),
                 "{shift:?}, tick {tick}: {carried} vs {weight}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_common_turn_or_spin_changes_no_charge() {
+    // A box turned on its corner strikes another's face off its middle, the
+    // whole scene turned through an angle, spinning as one about the point
+    // they meet at, or both. A common spin moves both bodies' points there
+    // alike, so it changes neither the approach there nor the mass each side
+    // brings, which the struck box's turning lowers.
+    let mut first = None;
+    for (turn, spin) in [(0.0, 0.0), (0.7, 0.0), (0.0, 3.0), (2.1, -5.0)] {
+        let mut world = world(Vec2::ZERO);
+        let mut host = Host::default();
+        let corner = 0.5 * core::f32::consts::SQRT_2;
+        let meeting = Vec2::new(-0.5005, 0.3);
+        let place = |position: Vec2, angle: f32, velocity: Vec2| {
+            let offset = (position - meeting).rotate_radians(turn);
+            BodySpec {
+                position: meeting + offset,
+                angle: angle + turn,
+                linear_velocity: velocity.rotate_radians(turn)
+                    + Vec2::new(-offset.y, offset.x) * spin,
+                angular_velocity: spin,
+                can_sleep: false,
+                ..Default::default()
+            }
+        };
+        let striking = place(
+            Vec2::new(-0.501 - corner, 0.3),
+            core::f32::consts::FRAC_PI_4,
+            Vec2::X * 10.0,
+        );
+        let struck = place(Vec2::ZERO, 0.0, Vec2::ZERO);
+        add(
+            &mut world,
+            &mut host,
+            1,
+            striking,
+            &[cuboid(1, 0, 0.5, 0.5)],
+            HULL,
+            Some(0.05),
+        );
+        add(
+            &mut world,
+            &mut host,
+            2,
+            struck,
+            &[cuboid(2, 0, 0.5, 0.5)],
+            HULL,
+            None,
+        );
+        let charges = first_charges(&mut world, &mut host);
+        assert_eq!(charges.len(), 1, "{turn} {spin}: {charges:?}");
+        let (speed, outcome) = charged(&charges[0]);
+        let (first_speed, first_outcome) = *first.get_or_insert((speed, outcome));
+        // Two unit masses meeting head on would make 25 available.
+        assert!(first_outcome.ledger.available < 24.0, "{first_outcome:?}");
+        assert!(first_outcome.consumed[0] > 0.0, "{first_outcome:?}");
+        let label = format!("{turn} {spin}: {outcome:?} against {first_outcome:?}");
+        assert!(close(speed, first_speed, 1.0e-5), "{label}");
+        let available = outcome.ledger.available;
+        assert!(
+            close(available, first_outcome.ledger.available, 1.0e-5),
+            "{label}"
+        );
+        for side in 0..2 {
+            let consumed = outcome.consumed[side];
+            assert!(
+                close(consumed, first_outcome.consumed[side], 1.0e-5),
+                "{label}"
             );
         }
     }

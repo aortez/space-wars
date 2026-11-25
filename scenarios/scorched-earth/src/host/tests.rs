@@ -1,7 +1,7 @@
 use super::*;
 use engine_material::{SOFT_TISSUE, Section, WOOD};
 use engine_rapier::world::loading::charges::{ContactSurface, Depth};
-use engine_rapier::world::loading::{ContactSource, RegionId, RegionToken};
+use engine_rapier::world::loading::{CaptureConfig, ContactSource, RegionId, RegionToken};
 use engine_rapier::world::physics_activity;
 use engine_rapier::world::weapon::{Reachable, Recipient};
 use std::collections::BTreeMap;
@@ -1120,9 +1120,8 @@ fn quiet_gear(scale: f32, suspension: bool, capture: bool) -> (HostedDuel, Physi
 }
 
 /// Lifts tank 1 above and beside tank 0 and throws it at tank 0 at 8 u/s, in
-/// the duel's units, then steps until they have met and settled. Returns the
-/// contacts the steps listed.
-fn knock(duel: &mut HostedDuel, world: &mut PhysicsWorld) -> Vec<Contact> {
+/// the duel's units.
+fn throw(duel: &HostedDuel, world: &mut PhysicsWorld) {
     let scale = duel.placement().scale;
     let by = (tank_at(duel, world, 0) + Vec2::new(8.0, 2.5) - tank_at(duel, world, 1)) * scale;
     let bodies: Vec<BodyId> = duel.tank_bodies(1).collect();
@@ -1131,6 +1130,12 @@ fn knock(duel: &mut HostedDuel, world: &mut PhysicsWorld) -> Vec<Contact> {
         assert!(world.set_pose(body, motion.position + by, motion.angle, true));
         assert!(world.set_velocity(body, Vec2::new(-8.0, 2.0) * scale, 0.0, true));
     }
+}
+
+/// Throws tank 1 at tank 0, then steps until they have met and settled.
+/// Returns the contacts the steps listed.
+fn knock(duel: &mut HostedDuel, world: &mut PhysicsWorld) -> Vec<Contact> {
+    throw(duel, world);
     let mut contacts = Vec::new();
     for _ in 0..150 {
         step(duel, world);
@@ -1538,5 +1543,78 @@ fn a_rebuilt_tank_is_bound_afresh_and_its_contacts_charge_its_armor() {
         }
         assert_eq!(duel.contact_diagnostics().refused_bindings, 0);
         assert_eq!(duel.contact_diagnostics().rejected_batches, 0);
+    }
+}
+
+#[test]
+fn a_duel_past_captures_bounds_counts_each_batch_it_refuses() {
+    // The tanks settle, then tank 1 is thrown at tank 0, in a world with the
+    // duel's own capture or with room for two contacts open at once. Returns
+    // the batches the world refused, the contacts listed, and the health each
+    // tank lost.
+    let knock_in = |suspension: bool, room: Option<CaptureConfig>| {
+        let mut config = config(GrainShape::Hexagon);
+        config.cpu_driving = false;
+        config.suspension = suspension;
+        let mut world = world();
+        if let Some(room) = room {
+            world.enable_loading_capture(room).unwrap();
+        }
+        // The duel keeps a capture the world already has.
+        assert!(capture_contacts(&mut world));
+        let placement = Placement::new(1000..100_000, Budget::required(config));
+        let mut duel = HostedDuel::attach(&mut world, config, 42, placement).unwrap();
+        for tank in &mut duel.duel.tanks {
+            tank.next_shot = u64::MAX;
+        }
+        let mut refused = 0;
+        let mut contacts = Vec::new();
+        for at in 0..240 {
+            if at == 90 {
+                throw(&duel, &mut world);
+            }
+            step(&mut duel, &mut world);
+            refused += world.loading_diagnostics().rejected_batches;
+            contacts.extend_from_slice(duel.contacts());
+        }
+        // Each batch the world refused is counted.
+        let diagnostics = duel.contact_diagnostics();
+        assert_eq!(diagnostics.rejected_batches, refused);
+        assert_eq!(diagnostics.refused_bindings, 0);
+        // Each tank lost only the work listed against it.
+        let lost = duel.tanks(&world).map(|tank| 100.0 - tank.health);
+        let work = listed_work(&contacts);
+        for slot in 0..2 {
+            let listed = 100.0 * work[slot] / armor::armor().capacity();
+            assert!((lost[slot] - listed).abs() < 1.0e-3, "{lost:?} {work:?}");
+        }
+        (refused, contacts, lost)
+    };
+    let blows = |contacts: &[Contact]| {
+        contacts
+            .iter()
+            .filter(|contact| contact.tanks.iter().all(Option::is_some))
+            .count()
+    };
+    let tight = CaptureConfig {
+        max_episodes: 2,
+        ..CaptureConfig::default()
+    };
+    for suspension in [false, true] {
+        let (none, roomy, whole) = knock_in(suspension, None);
+        assert_eq!(none, 0, "sprung={suspension}");
+        assert_eq!(blows(&roomy), 2, "sprung={suspension}: {roomy:?}");
+        assert!(whole[0] > 0.0, "sprung={suspension}: {whole:?}");
+        // Past the room, one of the two blows is in a refused batch and
+        // missing. The rigid tanks' missing blow is one that cost nothing, and
+        // the sprung tanks' is the one that cost them, so only the rigid tanks
+        // lose health.
+        let (refused, contacts, lost) = knock_in(suspension, Some(tight));
+        assert!(refused > 0, "sprung={suspension}");
+        assert_eq!(blows(&contacts), 1, "sprung={suspension}: {contacts:?}");
+        for slot in 0..2 {
+            let expected = if suspension { 0.0 } else { whole[slot] };
+            assert!((lost[slot] - expected).abs() < 1.0e-4, "{lost:?} {whole:?}");
+        }
     }
 }

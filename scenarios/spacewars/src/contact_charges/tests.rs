@@ -2,6 +2,7 @@
 //! charges price when they crash.
 
 use super::*;
+use engine_rapier::world::physics_activity;
 use physics::classify_entity;
 
 const STEP: Duration = Duration::from_nanos(16_666_667);
@@ -512,4 +513,231 @@ fn a_cloned_game_steps_and_charges_as_its_original_does() {
     assert_eq!(copy.ships, state.ships);
     assert_eq!(copy.debris, state.debris);
     assert_eq!(copy.contact_diagnostics(), state.contact_diagnostics());
+}
+
+#[test]
+fn steps_of_no_length_change_nothing_and_the_crash_after_them_is_priced_alike() {
+    // An asteroid held onto a planet. The second run pauses for steps of no
+    // length just before it strikes.
+    let crash = |pause_at: Option<usize>| {
+        let mut state = plain();
+        let planet = state.planets[0];
+        let away = -Vec2::from_radians(planet.wrapper_angle);
+        let start = planet.position + away * (planet.radius + 8.0);
+        state.debris.push(asteroid(start, -away * 10.0, 2.0));
+        step(&mut state);
+        let rock = state.debris[0].physics_id;
+        for at in 0..600 {
+            if Some(at) == pause_at {
+                let before = (
+                    state.ships.clone(),
+                    state.debris.clone(),
+                    state.contact_diagnostics(),
+                    state.tick,
+                );
+                let steps = physics_activity().steps;
+                for _ in 0..30 {
+                    SpacewarsScenario::step(&mut state, &[], Duration::ZERO);
+                }
+                assert_eq!(physics_activity().steps, steps);
+                let after = (
+                    state.ships.clone(),
+                    state.debris.clone(),
+                    state.contact_diagnostics(),
+                    state.tick,
+                );
+                assert_eq!(after, before);
+            }
+            state.debris[0].velocity = -away * 10.0;
+            step(&mut state);
+            if let Some(hit) = state
+                .contact_hits
+                .iter()
+                .find(|hit| hit.entities.contains(&rock))
+            {
+                return (at, *hit, state.debris[0]);
+            }
+        }
+        panic!("no hit");
+    };
+    let (at, hit, worn) = crash(None);
+    assert!(worn.life < worn.life_max, "{hit:?}");
+    assert_eq!(crash(Some(at)), (at, hit, worn));
+}
+
+#[test]
+fn a_shell_charges_its_target_alike_after_the_ship_that_fired_it_is_lost() {
+    // Ship 0 holds a planet, so that it plays on as a pod. Its shell flies at
+    // ship 1, and in the second run ship 0 is lost while the shell flies.
+    let fire = |lost: bool| {
+        let mut state = plain();
+        give_planet(&mut state, 0);
+        let target = open_point(&state, 200.0);
+        let ship = &mut state.ships[1];
+        ship.position = target;
+        ship.velocity = Vec2::ZERO;
+        ship.omega = 0.0;
+        let muzzle = target + SHIP_PIVOT - Vec2::X * 150.0;
+        let mut shell = DebrisState::new_shell(0, state.tick, muzzle, Vec2::X * 300.0, 0.0);
+        shell.inertial_mass = Some(weapons::ROUND_MASS);
+        state.debris.push(shell);
+        step(&mut state);
+        assert!(state.debris[0].shot);
+        if lost {
+            state.ships[0].change_to_escape_pod();
+        }
+        let before = state.ships[1].life;
+        for _ in 0..60 {
+            step(&mut state);
+            if let Some(hit) = state.shot_hits.values().next() {
+                assert_eq!(state.winner, None);
+                return (*hit, before - state.ships[1].life, state.ships[0].form);
+            }
+        }
+        panic!("the shell hit nothing");
+    };
+    let (kept, _, form) = fire(false);
+    assert_eq!(form, ShipForm::Ship);
+    let (hit, cost, form) = fire(true);
+    assert_eq!(form, ShipForm::EscapePod);
+    assert_eq!(hit.target, MechanicalEntity::Ship(1));
+    assert!(hit.health > 0.0, "{hit:?}");
+    assert!(
+        (hit.health - kept.health).abs() < 1.0e-4,
+        "{hit:?} {kept:?}"
+    );
+    // Ship 1 loses the shot's charge, once.
+    assert!((cost - hit.health).abs() < 1.0e-4, "{cost} for {hit:?}");
+}
+
+#[test]
+fn a_swarm_too_big_for_one_budget_goes_unpriced_and_is_counted() {
+    // Forty small asteroids close on a large one from every side and strike
+    // it in one step: more points on one body at once than a budget takes.
+    let mut state = plain();
+    let hub = open_point(&state, 150.0);
+    state.debris.push(asteroid(hub, Vec2::ZERO, 10.0));
+    for k in 0..40 {
+        let out = Vec2::from_radians(k as f32 * core::f32::consts::TAU / 40.0);
+        state
+            .debris
+            .push(asteroid(hub + out * 10.7, -out * 20.0, 0.5));
+    }
+    let mut hits = Vec::new();
+    for _ in 0..10 {
+        step(&mut state);
+        hits = state.contact_hits.clone();
+        if !hits.is_empty() {
+            break;
+        }
+    }
+    assert_eq!(hits.len(), 40, "{hits:?}");
+    for hit in &hits {
+        assert!(matches!(hit.unpriced, Some(Unpriced::Budget(_))), "{hit:?}");
+        assert_eq!(hit.health, [0.0; 2]);
+    }
+    assert_eq!(
+        state.contact_diagnostics(),
+        Some(ContactDiagnostics {
+            unpriced: 40,
+            ..ContactDiagnostics::default()
+        })
+    );
+    // An unpriced impact wears no asteroid.
+    assert!(state.debris.iter().all(|rock| rock.life == rock.life_max));
+}
+
+#[test]
+fn a_game_past_captures_bounds_counts_each_batch_it_refuses_and_plays_on() {
+    // The busy game, with capture's room for two contacts open at once. It
+    // refuses about 250 batches and still prices over 100 impacts.
+    let mut state = busy();
+    state.physics = SpacewarsPhysics::with_capture(
+        state.config.universe_radius as f32,
+        &state.ships,
+        state.sun,
+        &state.planets,
+        CaptureConfig {
+            max_episodes: 2,
+            ..capture()
+        },
+    );
+    let mut refused = 0;
+    let mut priced = 0;
+    for _ in 0..900 {
+        step(&mut state);
+        refused += state.physics.world.loading_diagnostics().rejected_batches;
+        priced += state
+            .contact_hits
+            .iter()
+            .filter(|hit| hit.unpriced.is_none())
+            .count();
+    }
+    assert_eq!(state.winner, None, "the game ended");
+    assert!(
+        refused > 0 && priced > 0,
+        "{refused} refused, {priced} priced"
+    );
+    // The refused batches' impacts are missing, and each batch is counted.
+    assert_eq!(
+        state.contact_diagnostics(),
+        Some(ContactDiagnostics {
+            rejected_batches: refused,
+            ..ContactDiagnostics::default()
+        })
+    );
+}
+
+#[test]
+fn a_crash_costs_the_asteroid_alike_in_a_moving_frame_and_at_twice_the_step_rate() {
+    // Ship 0 rams an asteroid at 40 wu/s, at 60 Hz, with the whole crash
+    // drifting through space, and at 120 Hz.
+    let crash = |drift: Vec2, rate: u32| {
+        let mut state = plain();
+        let point = open_point(&state, 150.0);
+        state.debris.push(asteroid(point, drift, 5.0));
+        let ship = &mut state.ships[0];
+        ship.position = point - Vec2::X * 16.0 - SHIP_PIVOT;
+        ship.velocity = drift;
+        ship.omega = 0.0;
+        let parking = open_point(&state, 200.0);
+        let other = &mut state.ships[1];
+        other.position = parking;
+        other.velocity = Vec2::ZERO;
+        let dt = Duration::from_secs_f64(1.0 / f64::from(rate));
+        SpacewarsScenario::step(&mut state, &[], dt);
+        let rock = state.debris[0].physics_id;
+        for _ in 0..rate {
+            state.ships[0].velocity = Vec2::X * 40.0 + drift;
+            state.ships[0].omega = 0.0;
+            state.debris[0].velocity = drift;
+            SpacewarsScenario::step(&mut state, &[], dt);
+            if let Some(hit) = state
+                .contact_hits
+                .iter()
+                .find(|hit| hit.entities.contains(&rock))
+            {
+                let at = hit.entities.iter().position(|&side| side == rock).unwrap();
+                return (hit.closing_speed, hit.health[at]);
+            }
+        }
+        panic!("no crash");
+    };
+    // Drifting, the crash is priced as it is at rest, here to the last bit.
+    // At 120 Hz the asteroid loses 2.481 against 2.478.
+    let (speed, health) = crash(Vec2::ZERO, 60);
+    assert!(health > 0.0);
+    for (drift, rate, tolerance) in [
+        (Vec2::new(60.0, -25.0), 60, 1.0e-4),
+        (Vec2::new(-150.0, 90.0), 60, 1.0e-4),
+        (Vec2::ZERO, 120, 0.01),
+    ] {
+        let (other_speed, other_health) = crash(drift, rate);
+        let label = format!("{drift:?} at {rate} Hz: {other_speed} {other_health}");
+        assert!((other_speed - speed).abs() < tolerance * speed, "{label}");
+        assert!(
+            (other_health - health).abs() < tolerance * health,
+            "{label}"
+        );
+    }
 }

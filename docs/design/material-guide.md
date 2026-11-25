@@ -131,9 +131,9 @@ measures. Spacewars and Scorched are the two worked hosts:
    - Replay repeats within one build.
 6. **Diagnostics.** `loading_diagnostics()` covers the last step, so add up
    its `rejected_batches` after each one, and count the bindings the world
-   refuses, as both games' hosts do. Scorched's host also counts the
-   `Unpriced` charges. A rejected batch's impacts are missing from the
-   charges, and may start later on whatever approach the solver left.
+   refuses and the `Unpriced` charges, as both games' hosts do. A rejected
+   batch's impacts are missing from the charges, and may start later on
+   whatever approach the solver left.
 
 ## What is on the model
 

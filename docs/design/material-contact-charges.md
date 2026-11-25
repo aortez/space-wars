@@ -423,7 +423,12 @@ the probe below gives its reasons.
   65,536 visits and 8,192 contacts a batch, and 32,768 records a step, to
   hold `MAX_ASTEROIDS` asteroids beside the rest. In 15 seconds at the
   census's settings, the host's test finds no batch or binding refused and
-  every impact priced.
+  every impact priced. With room for only two contacts open at once, the same
+  game refuses about 250 batches and still prices over 100 impacts.
+- **Diagnostics.** `contact_diagnostics()` counts the batches and bindings
+  the world refused and the impacts left unpriced. Forty small asteroids that
+  strike a large one in the same step have more points than a budget takes,
+  so all forty go unpriced and wear nothing.
 
 The contact-half probe of 2026-11-23 bound the same bodies, with loose terrain,
 the boundary and all rock debris besides, and set charges beside today's rules
@@ -537,7 +542,9 @@ contacts cost in play.
   episodes, 65,536 visits and 8,192 contacts a batch, and 32,768 records a
   step. A world that already captures keeps its own. In 96 CPU duels no batch
   or binding was refused, and 30 of the 3,511 tank impacts were unpriced, each
-  a sprung tank's whose budget did not converge.
+  a sprung tank's whose budget did not converge. In a world with room for
+  only two contacts open at once, a knock between the tanks loses one of its
+  two blows to a refused batch, and the duel counts every batch refused.
 
 #331's probe of 2026-11-24 priced every tank impact against soil, rock,
 packed earth and a floor that never gives, on both running gears, in 96 duels
