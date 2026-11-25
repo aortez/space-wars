@@ -85,9 +85,8 @@ kinetic part, its mass of 7 at its launch speed, and a payload of 28,000.
 - Craters, pushes, arming after eight ticks, the shell limits, self-damage, the
   out-of-world rule and a host's retirement work as before.
 
-Contacts don't damage a tank yet: a tank that falls or rams something is
-unharmed, as before. That half of #331 waits on an experiment with measured
-contacts.
+A tank's contacts charge the same armor, as
+[Armor and contacts](#armor-and-contacts) describes.
 
 The calibration keeps the old cost of a direct hit, about a third of a tank, so
 a tank falls to the third or fourth. Damage now depends on where and how hard a
@@ -148,6 +147,132 @@ seeds across that range.
   destination move. Two checkpoints come earlier, three appear only with the
   armor, and eleven searches find none either way. Damage totals differ, as
   expected.
+
+## Armor and contacts
+
+A tank's contacts charge its armor through the engine's
+[contact charges](design/material-contact-charges.md#scorched-host-331). After
+each step they price every new impact between two bound surfaces, from the
+motion the bodies brought into it, and each tank's armor absorbs the work the
+law consumed there. Pricing moves nothing, so Rapier still decides the bounce.
+
+- **Surfaces.** A tank's hull and wheels are its armor, plate 0.2 deep. A hull
+  meets others with a corner of radius 0.5, about that of the rigid hull's
+  chamfered ends, and a wheel with its own radius, 0.65. Terrain, attached or
+  fallen, is rock as a half-space, which no impact wears.
+- **The ground gives first.** Rock yields at half the armor's stress, so it
+  takes the work of settling, resting, driving and a landing on a hull's face
+  or on a sprung tank's wheels. A wheel, of mass 2.9, strikes rock for
+  nothing up to 21 u/s, which is a 12-unit drop.
+- **What costs a tank.**
+  - A surface as strong as its armor, which is the other tank's. Nothing
+    softer yields first there, so two hulls that meet corner to corner are
+    charged from a closing speed of about 1 u/s.
+  - A blow on one corner of a rigid hull with the tank's weight behind it. A
+    corner's patch on flat rock is 0.25 wide, a twelfth of the hull's face.
+    The rock there takes 390 of energy before the plate yields, which is the
+    rigid tank's whole mass, 38.8, at 4.5 u/s.
+- **What isn't priced.**
+  - Supports, the steady loads of resting and driving.
+  - Loose dirt, which has no region. A grain's mass is 0.25, and as rock it
+    would have to strike a hull at 56 u/s to cost it anything. A burst throws
+    dirt at 16 u/s at most, and in the probe, which bound every grain, dirt
+    cost no tank anything in 96 duels and 48 of Clock's fights. With every
+    grain bound, capture added about 15% to a duel's step, against about 3%
+    without.
+  - Shells. They are rays, not bodies, and charge armor as sources, so no hit
+    is counted twice. A burst's push is not taken from its payload, though,
+    so what a pushed tank then strikes is priced on top of the burst.
+- **Listing.** `contacts()` lists the tanks' new impacts in the step just
+  taken: the two entities, which is a tank, the closing speed, the energy and
+  the work each armor took. `contact_diagnostics()` counts the batches and
+  bindings the world refused and the impacts left unpriced.
+
+These are the seed-42 tanks on the flat course, in health lost:
+
+| Contact | Rigid tracks | Sprung wheels |
+| --- | --- | --- |
+| Settling from spawn, then resting 10 s | 0 | 0 |
+| Driving any of the five courses to its flag | 0 | 0 |
+| Ten drops of half a unit | 0 | 0 |
+| Dropped level from 1 to 10 units | 0 | 0 |
+| Dropped level from 15 to 30 units | 0 | 0 to 0.3 |
+| Tilted 17° and dropped 2.5 units onto one corner | 0.7 | |
+| Thrown into the other at 8 u/s, each | 1.2 | 0.1 |
+| Nose to nose at a closing 1.6 / 3.3 / 5.2 u/s, each | 0.01 / 0.09 / 0.24 | |
+| A trunk of mass 3.6 dropped on the roof from 2 to 20 units | 0 | 0 |
+
+- A level hull spreads its landing over the rock under its face, and loses
+  nothing from any height tried, wherever it comes down.
+- A sprung tank's wheels land on their own mass, for nothing from up to 12
+  units. From higher, a wheel's landing is priced by how many of the
+  terrain's pieces its points reach within the step, and that goes by where
+  it comes down and how fast. Dropped from 15 units at ten places a twentieth
+  of a unit apart, the tank lost 0, 0.2 or 0.3. From 20 and from 30 units it
+  lost nothing at any of them.
+- What a harder fall costs can also come after the bounce. Dropped from 30
+  units, the sprung tank came down again on a corner 1.5 s later and lost
+  1.1.
+- How hard a thrown tank hits depends on how the hulls meet. Thrown at 12 and
+  16 u/s, the same tank lands a glancing blow that costs each 0.2 to 0.4.
+- The trunk is a host's wood: it yields from 2 units and breaks from 10, and
+  a sprung tank dips up to 0.11 on its springs under it.
+
+The law's price for the rigid tank's whole mass on one corner is the most a
+landing can cost it:
+
+| Landing at, u/s | 4 | 5 | 6 | 8 | 12 | 13.5 | 19.2 | 27 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Health | 0 | 0.2 | 0.6 | 1.5 | 4.2 | 5.6 | 11.9 | 24 |
+
+Drops of 5, 10 and 20 units land at about 13.5, 19 and 27 u/s. Few landings
+cost that much. A hull that lands level, or tilted so that more of it arrives
+within the step, is priced across what arrives, and the rock under the wider
+patch takes the work.
+
+### Contact review, 2026-11-25
+
+The runs are kept locally in `contact-probe-331-20261124`, with the probe that
+priced the same contacts against other grounds.
+
+- **Duels.** 96 CPU duels to the first kill: 24 seeds each of the sweep and
+  of Clock's fights at Scorched's range, whose CPUs plot or learn, drive and
+  dodge, on both gears.
+  - Sprung tanks lost nothing to their 2,729 contacts.
+  - Rigid tanks lost 0.1 health to their 782, all of it one tank's in one
+    impact: a hull corner on the terrain at 5.1 u/s with the tank's weight
+    behind it.
+  - 30 of the sprung tanks' impacts went unpriced because their budget did
+    not converge, the fastest at 6 u/s. No batch or binding was refused.
+  - Each duel but that one ends tick for tick as it does in a world that
+    captures no contacts.
+- **Cost.** On the Pi (`sw-picade`, kiosk running, load 2 to 3), over 6 duels
+  of each kind on each gear, a step of 2.3 to 3.4 ms gains 0.09 to 0.10 ms, 3
+  to 4%. Capture takes 62 to 82 µs of that, binding 10 to 13 and pricing 4 to
+  7. Capture visits every pair of colliders in contact, bound or not. On the
+  workstation, with other jobs loading it, the three add 1 to 5% to a step.
+- **The ground.** The probe priced every tank impact against four grounds. A
+  ground strong enough to make falls cost charges routine bumps more:
+
+  | Ground, by its strength against the armor's | Rigid, 24 dodging duels | Rigid, 10-unit drop | Sprung, 24 dodging duels |
+  | --- | --- | --- | --- |
+  | Soil, a twentieth | 0 | 0 | 0 |
+  | Rock, half | 1.3 | 0 | 0 |
+  | Packed earth, the same | 16.1 | 0.7 | 0.2 |
+  | A floor that never gives | 92 | 18.5 | 2.4 |
+
+  Those are health lost in all with a hull corner of radius 0.2. The floor
+  also charged a rigid tank 3.9 for settling from spawn. So the ground stays
+  rock, and the rigid hull's corner is 0.5, which takes rock's 1.3 to 0.1.
+- **Speeds.** Of the 6,828 tank impacts in the probe's own 96 duels, loose
+  dirt's included, one closed faster than 12 u/s. In Clock's fights the
+  fastest was 10.5 u/s with loose dirt and Clock's own bodies bound, and
+  6.6 u/s on the terrain.
+- **Falls.** A fall costs only what its landing's impacts do: nothing on a
+  hull's face, and little or nothing on a sprung tank's wheels. A sprung
+  tank's springs take up to a 2-unit drop and bottom out from 5, but only its
+  wheels meet the ground, a sixth of its mass. Pricing falls would take a
+  rule of its own on the hull's whole mass, and none is in place.
 
 ## CPU aiming and hit reaction
 
@@ -2236,8 +2361,9 @@ Each fixed tick has three parts:
 1. `prepare_step` prepares CPU commands, surface drives and impact-motion capture.
 2. The host combines those drives with its other actors and advances the
    canonical world once at `1 / FIXED_HZ` seconds.
-3. `finish_step` resolves swept shells, craters, collapse and deposition.
-   The host then consumes `impacts()` before the next preparation clears it.
+3. `finish_step` prices the tanks' contacts, then resolves swept shells,
+   craters, collapse and deposition. The host then consumes `impacts()` and
+   `contacts()` before the next preparation clears them.
 
 The host reserves an exclusive ID range and `Budget::required(config)` before
 attachment. Budget counts cover the existing grain and fragment limits, both
@@ -2301,6 +2427,34 @@ charged through, and bodies that stop a burst's energy. The duel sees them at
 its own scale, so each loses the share of its capacity the same shell would
 cost it at scale 1. Clock supplies none yet, and `finish_step` supplies none.
 
+The tanks' [contacts](#armor-and-contacts) are priced in a world where
+`host::capture_contacts` has turned on contact capture and speculative
+arrivals. Neither changes the physics. In a world without them, contacts cost
+nothing.
+
+- The duel binds its tanks and its terrain before each step, and makes the
+  step's one call to the engine's contact charges in `finish_step`. A host
+  doesn't call them itself.
+- `contacts()` lists the tanks' new impacts, and `contact_diagnostics()`
+  counts what was refused or left unpriced.
+- A host with surfaces of its own binds their colliders to loading regions
+  and declares them through `finish_step_among`, as the engine's
+  `ContactSurfaces`: each one's region, thickness, depth and radius, in world
+  units. The duel sees them at its own scale, as it does recipients, so each
+  loses the share of its capacity the same contact would cost it at scale 1.
+  That holds for every impact the call prices, those between two of the
+  host's surfaces too. The host learns of its charges through `absorb` alone.
+- A duel takes the same knock at any scale. Its own surfaces are its
+  materials at the placement's scale: stiffness, strength and toughness times
+  the scale, and volumes times its cube. A tank the law fails is dead at any
+  scale: a charge that takes all the scaled armor has left takes all the
+  armor has left.
+- In a world set up as Clock's is, with its gravity, its solver's settings
+  and a length unit several times the scale, the same knock costs the same
+  to within a few percent.
+- Capture can't be turned off again, and with it a world clones through a
+  snapshot of itself, as Spacewars' worlds do.
+
 A host can share the duel's world with scenery: bodies that rest on the hills
 and the dirt but stay out of the fight. A collider whose only membership is
 `host::SCENERY` rests on the terrain and the grains, and pushes them as any
@@ -2319,7 +2473,9 @@ including driving, damage, cratering and deposition. They also exercise foreign
 shot obstacles and supports, scenery that the tanks and shells pass through,
 repeated rigid/sprung cleanup, capacity refusal, reserved conversion IDs,
 host-gravity changes, phase ordering and replay after removing a firing tank
-with a shell airborne.
+with a shell airborne. For contacts they throw one tank into the other at
+scales 1 and 3, drop a host's trunk on a tank at both, run a world without
+capture and retire tanks and duels with their regions.
 
 ## Repeatable development
 

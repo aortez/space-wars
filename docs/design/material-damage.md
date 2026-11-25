@@ -31,7 +31,7 @@ fixed amount, after the solver has already resolved the motion.
 | Solar heat | none | percent of `life_max` per second | as for ships | stays: heat | `scenarios/spacewars/src/surface_sortie/solar.rs` |
 | Material-match pilot and pod | the vehicle's rigid body | vehicle life is hull health; lasers and rounds charge the pod's hull or the pilot's tissue, and impacts charge pilot health with an exposure factor | ejection grants a protection window; a pod's hull shields its occupant through the whole damage step | #330: weapons done, impacts stay by policy | `scenarios/spacewars/src/surface_sortie/match_rules.rs`, `recovery.rs` |
 | Pizza balls | Rapier contact; clashes rewrite velocities | `hp -= impulse / mass * DAMAGE_SCALAR`, and clash velocity change times `DAMAGE_SCALAR` | invincible balls take none | stays, #59 | `scenarios/pizza/src/lib.rs` |
-| Scorched tanks | radial impulse within 6 wu and a `BLAST_RADIUS` crater | shells are weapon sources: the hit charges the struck tank's armor region, and `blast_reach` divides the payload among tanks within 5 wu of their surface; contacts charge nothing | health zero below the floor | #331: shells done, contacts next | `scenarios/scorched-earth/src/armor.rs`, `duel.rs`, `material.rs` |
+| Scorched tanks | radial impulse within 6 wu and a `BLAST_RADIUS` crater | shells are weapon sources: the hit charges the struck tank's armor region, and `blast_reach` divides the payload among tanks within 5 wu of their surface; [contact charges](material-contact-charges.md#scorched-host-331) price each new impact of a tank on the terrain, the other tank or a host's surface, and its armor absorbs its share | health zero below the floor | #331: done | `scenarios/scorched-earth/src/armor.rs`, `armor/contacts.rs`, `duel.rs`, `material.rs` |
 | Terrain cells | chipping and collapse release loose fragments | `durability: u8` against hardness, saturating; chipping gated by `yield_speed`; cantilever resistance `strength * h^2 / 6` | the cell turns void at zero durability | stays, #333 and #16 | `crates/engine-terrain`, `crates/engine-rapier/src/terrain` |
 | Plant tissue | none | `health: u16` on 0 to 100 with a per-tick rate and an external `damage` call | dies at zero health | biological upkeep stays | `crates/engine-core/src/plants` |
 
@@ -40,8 +40,9 @@ double allocation this model's ledger rules out; contact charges now price the
 asteroid's side. First-wave migrations are Spacewars
 actors and weapons (#330), with weapon sources under #329, and Scorched tanks
 and artillery (#331). Scorched's shells have moved onto
-[weapon sources](material-sources.md#scorched-tanks); its contacts wait on an
-experiment with measured contacts. Spacewars's lasers and cannon shells have
+[weapon sources](material-sources.md#scorched-tanks), and its tanks' contacts
+onto [contact charges](material-contact-charges.md#scorched-host-331).
+Spacewars's lasers and cannon shells have
 moved onto weapon sources too, with the
 [calibration](material-sources.md#spacewars-bodies) there. Contact charges wear
 its asteroids. Its ships, pods, pilots and rovers keep today's contact rules as

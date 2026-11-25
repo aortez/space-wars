@@ -1,5 +1,7 @@
 use super::*;
-use engine_material::{SOFT_TISSUE, Section};
+use engine_material::{SOFT_TISSUE, Section, WOOD};
+use engine_rapier::world::loading::charges::{ContactSurface, Depth};
+use engine_rapier::world::loading::{ContactSource, RegionId, RegionToken};
 use engine_rapier::world::physics_activity;
 use engine_rapier::world::weapon::{Reachable, Recipient};
 use std::collections::BTreeMap;
@@ -995,4 +997,386 @@ fn a_retired_tank_takes_no_share_and_its_airborne_shell_still_counts() {
     duel.duel.explode(&mut world, at + Vec2::Y);
     assert_eq!(duel.duel.tanks[0].armor.integrity(), 1.0);
     assert_eq!(duel.duel.tanks[0].health, 0.0);
+}
+
+/// A hosted duel at `scale` whose tanks have settled and hold their fire, in
+/// a world that captures contacts if `capture` says so.
+fn quiet_gear(scale: f32, suspension: bool, capture: bool) -> (HostedDuel, PhysicsWorld) {
+    let mut config = config(GrainShape::Hexagon);
+    config.cpu_driving = false;
+    config.suspension = suspension;
+    let mut world = world();
+    world.set_gravity(Vec2::new(0.0, -GRAVITY * scale));
+    world.set_length_unit(scale);
+    assert_eq!(capture && capture_contacts(&mut world), capture);
+    let mut placement = Placement::new(1000..100_000, Budget::required(config));
+    placement.scale = scale;
+    let mut duel = HostedDuel::attach(&mut world, config, 42, placement).unwrap();
+    for tank in &mut duel.duel.tanks {
+        tank.next_shot = u64::MAX;
+    }
+    for _ in 0..90 {
+        step(&mut duel, &mut world);
+    }
+    (duel, world)
+}
+
+/// Lifts tank 1 above and beside tank 0 and throws it at tank 0 at 8 u/s, in
+/// the duel's units, then steps until they have met and settled. Returns the
+/// contacts the steps listed.
+fn knock(duel: &mut HostedDuel, world: &mut PhysicsWorld) -> Vec<Contact> {
+    let scale = duel.placement().scale;
+    let by = (tank_at(duel, world, 0) + Vec2::new(8.0, 2.5) - tank_at(duel, world, 1)) * scale;
+    let bodies: Vec<BodyId> = duel.tank_bodies(1).collect();
+    for body in bodies {
+        let motion = world.motion(body).unwrap();
+        assert!(world.set_pose(body, motion.position + by, motion.angle, true));
+        assert!(world.set_velocity(body, Vec2::new(-8.0, 2.0) * scale, 0.0, true));
+    }
+    let mut contacts = Vec::new();
+    for _ in 0..150 {
+        step(duel, world);
+        contacts.extend_from_slice(duel.contacts());
+    }
+    contacts
+}
+
+#[test]
+fn a_hosted_duel_prices_a_knock_as_a_standalone_one_does() {
+    for suspension in [false, true] {
+        let mut config = config(GrainShape::Hexagon);
+        config.cpu_driving = false;
+        config.suspension = suspension;
+        let mut standalone = ScorchedState::new(config, 42);
+        let mut world = world();
+        assert!(capture_contacts(&mut world));
+        let place = Placement::new(0..1_000_000, Budget::required(config));
+        let mut duel = HostedDuel::attach(&mut world, config, 42, place).unwrap();
+        // Standalone has always performed this one initial physics step.
+        world.step(DT);
+        let tanks = standalone.duel.tanks.iter_mut();
+        for tank in tanks.chain(&mut duel.duel.tanks) {
+            tank.next_shot = u64::MAX;
+        }
+        let mut listed = [Vec::new(), Vec::new()];
+        for tick in 0..240 {
+            if tick == 90 {
+                // Tank 1 is lifted above and beside tank 0 and thrown at it,
+                // alike in both worlds.
+                let by =
+                    tank_at(&duel, &world, 0) + Vec2::new(8.0, 2.5) - tank_at(&duel, &world, 1);
+                let bodies: Vec<BodyId> = duel.tank_bodies(1).collect();
+                for physics in [&mut standalone.physics, &mut world] {
+                    for &body in &bodies {
+                        let motion = physics.motion(body).unwrap();
+                        assert!(physics.set_pose(body, motion.position + by, motion.angle, true));
+                        assert!(physics.set_velocity(body, Vec2::new(-8.0, 2.0), 0.0, true));
+                    }
+                }
+            }
+            standalone.advance(0.0);
+            step(&mut duel, &mut world);
+            listed[0].extend_from_slice(standalone.contacts());
+            listed[1].extend_from_slice(duel.contacts());
+            assert_eq!(
+                duel.observe(&world).payload,
+                ScorchedScenario::observe(&standalone).payload,
+                "sprung={suspension} tick {tick}"
+            );
+        }
+        // The same impacts, the same work and the same health, to the bit.
+        assert_eq!(listed[0], listed[1]);
+        assert!(listed[0].iter().any(|contact| {
+            contact.tanks.iter().all(Option::is_some) && contact.absorbed[0] > 0.0
+        }));
+        assert_eq!(
+            duel.tanks(&world).map(|tank| tank.health),
+            standalone.tanks.map(|tank| tank.health)
+        );
+        assert!(standalone.tanks.iter().all(|tank| tank.health < 100.0));
+    }
+}
+
+/// The work the tanks' armor took in `contacts`, by slot.
+fn listed_work(contacts: &[Contact]) -> [f32; 2] {
+    let mut work = [0.0; 2];
+    for contact in contacts {
+        for side in 0..2 {
+            if let Some(slot) = contact.tanks[side] {
+                work[slot] += contact.absorbed[side];
+            }
+        }
+    }
+    work
+}
+
+/// The tanks' first impact on each other in `contacts`.
+fn blow(contacts: &[Contact]) -> Contact {
+    *contacts
+        .iter()
+        .find(|contact| contact.tanks.iter().all(Option::is_some))
+        .expect("the thrown tank strikes the other")
+}
+
+#[test]
+fn a_duel_in_a_world_like_clocks_takes_about_the_same_knock() {
+    for suspension in [false, true] {
+        let (mut duel, mut world) = quiet_gear(1.0, suspension, true);
+        let plain = blow(&knock(&mut duel, &mut world));
+        // Clock's gravity, its solver's defaults and two CCD substeps, with
+        // a length unit several times the duel's scale.
+        let scale = 3.37;
+        let mut config = config(GrainShape::Hexagon);
+        config.cpu_driving = false;
+        config.suspension = suspension;
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+            gravity: Vec2::new(0.0, -400.0),
+            length_unit: 24.0,
+            max_ccd_substeps: 2,
+            collect_events: false,
+            ..Default::default()
+        });
+        assert!(capture_contacts(&mut world));
+        let mut placement = Placement::new(1000..100_000, Budget::required(config));
+        placement.scale = scale;
+        let mut duel = HostedDuel::attach(&mut world, config, 42, placement).unwrap();
+        for tank in &mut duel.duel.tanks {
+            tank.next_shot = u64::MAX;
+        }
+        for _ in 0..90 {
+            step(&mut duel, &mut world);
+        }
+        let contacts = knock(&mut duel, &mut world);
+        let hosted = blow(&contacts);
+        // The same blow to within the two solvers' difference.
+        for (plain, hosted) in [
+            (plain.closing_speed, hosted.closing_speed / scale),
+            (plain.energy, hosted.energy),
+            (plain.absorbed[0], hosted.absorbed[0]),
+        ] {
+            assert!(plain > 0.0);
+            assert!(
+                (plain - hosted).abs() < 0.04 * plain,
+                "sprung={suspension}: {plain} against {hosted}"
+            );
+        }
+        let lost = duel.tanks(&world).map(|tank| 100.0 - tank.health);
+        let work = listed_work(&contacts);
+        for slot in 0..2 {
+            let listed = 100.0 * work[slot] / armor::armor().capacity();
+            assert!((lost[slot] - listed).abs() < 1.0e-3, "{lost:?} {work:?}");
+        }
+    }
+}
+
+#[test]
+fn scaled_duels_take_the_same_damage_from_the_same_knock() {
+    for suspension in [false, true] {
+        let mut blows = Vec::new();
+        for scale in [1.0, 3.0] {
+            let (mut duel, mut world) = quiet_gear(scale, suspension, true);
+            let contacts = knock(&mut duel, &mut world);
+            // The blow itself: the tanks' first impact on each other.
+            let blow = blow(&contacts);
+            assert!(blow.absorbed[0] > 0.0 && blow.absorbed[0] == blow.absorbed[1]);
+            // Each tank's health fell by the work listed against it, whatever
+            // the scale: the armor was charged in Scorched's own units.
+            let lost = duel.tanks(&world).map(|tank| 100.0 - tank.health);
+            let work = listed_work(&contacts);
+            for slot in 0..2 {
+                let listed = 100.0 * work[slot] / armor::armor().capacity();
+                assert!((lost[slot] - listed).abs() < 1.0e-3, "{lost:?} {work:?}");
+                assert!(lost[slot] > 0.05, "{lost:?}");
+            }
+            // Speeds are the world's. Energy and work are Scorched's own.
+            blows.push((blow.closing_speed / scale, blow.energy, blow.absorbed[0]));
+            assert_eq!(duel.contact_diagnostics().rejected_batches, 0);
+            assert_eq!(duel.contact_diagnostics().refused_bindings, 0);
+        }
+        let [small, large] = blows[..] else {
+            unreachable!()
+        };
+        for (small, large) in [(small.0, large.0), (small.1, large.1), (small.2, large.2)] {
+            assert!((small - large).abs() < 1.0e-3 * small, "{blows:?}");
+        }
+    }
+}
+
+#[test]
+fn a_world_that_captures_no_contacts_charges_none() {
+    let (mut duel, mut world) = quiet_gear(1.0, false, false);
+    assert!(!world.admits_speculative_arrivals());
+    let contacts = knock(&mut duel, &mut world);
+    assert!(contacts.is_empty());
+    assert_eq!(duel.tanks(&world).map(|tank| tank.health), [100.0; 2]);
+    assert_eq!(duel.contact_diagnostics(), ContactDiagnostics::default());
+
+    // Capture can start under a duel already in the world. The contacts
+    // its tanks rest on cost nothing, and the next knock is priced.
+    let (mut duel, mut world) = quiet_gear(1.0, false, false);
+    assert!(capture_contacts(&mut world));
+    assert!(
+        capture_contacts(&mut world),
+        "a second call changes nothing"
+    );
+    for _ in 0..30 {
+        step(&mut duel, &mut world);
+    }
+    assert_eq!(duel.tanks(&world).map(|tank| tank.health), [100.0; 2]);
+    let contacts = knock(&mut duel, &mut world);
+    assert!(blow(&contacts).absorbed[0] > 0.0);
+    assert!(duel.tanks(&world).iter().all(|tank| tank.health < 100.0));
+}
+
+/// Wood the host keeps, in world units at `scale`: each piece's region and
+/// its depth into the screen.
+struct Woods {
+    scale: f32,
+    pieces: BTreeMap<RegionToken, (Region, f32)>,
+}
+
+impl Woods {
+    /// A trunk 6 by 1, and 1 into the screen, in the duel's units, with its
+    /// middle `height` above tank 0's roof, bound as the host's own.
+    fn trunk(duel: &HostedDuel, world: &mut PhysicsWorld, height: f32) -> Self {
+        let scale = duel.placement().scale;
+        let entity = PhysicsId::new(500);
+        let body = BodyId::new(entity, BodyRole::PRIMARY);
+        let collider = ColliderId::new(entity, ColliderRole::PRIMARY, 0);
+        let mut spec = ColliderSpec::cuboid(collider, 3.0 * scale, 0.5 * scale);
+        spec.density = WOOD.density;
+        let center = tank_at(duel, world, 0) + Vec2::Y * (1.5 + height);
+        assert!(world.insert_body(
+            body,
+            BodySpec {
+                position: duel.placement().point_to_world(center),
+                ccd_enabled: true,
+                ..Default::default()
+            },
+            &[spec],
+        ));
+        // The world's gravity is the duel's at every scale here.
+        let region = world
+            .create_loading_region(RegionId { entity, part: 0 }, body)
+            .unwrap();
+        world
+            .bind_loading_collider(collider, ContactSource { region, patch: 0 })
+            .unwrap();
+        let wood = Region::new(WOOD, 6.0 * scale.powi(3)).unwrap();
+        Self {
+            scale,
+            pieces: [(region, (wood, scale))].into(),
+        }
+    }
+}
+
+impl ContactSurfaces for Woods {
+    fn surface(&self, source: ContactSource) -> Option<ContactSurface> {
+        let (region, depth) = *self.pieces.get(&source.region)?;
+        Some(ContactSurface {
+            region,
+            thickness: depth,
+            depth: Depth::Patch(Some(depth)),
+            radius: None,
+        })
+    }
+
+    fn absorb(&mut self, source: ContactSource, work: f32) {
+        let (region, _) = self.pieces.get_mut(&source.region).unwrap();
+        // What the duel charges back is in the wood's own units.
+        assert!(work > 0.0 && work <= region.capacity(), "{}", self.scale);
+        region.absorb(work).unwrap();
+    }
+}
+
+#[test]
+fn the_hosts_wood_loses_the_same_share_of_its_capacity_at_any_scale() {
+    for suspension in [false, true] {
+        let mut left = Vec::new();
+        for scale in [1.0, 3.0] {
+            let (mut duel, mut world) = quiet_gear(scale, suspension, true);
+            let mut woods = Woods::trunk(&duel, &mut world, 2.0);
+            // Until the trunk first lands on the tank.
+            let mut struck = false;
+            for _ in 0..240 {
+                let drives = duel.prepare_step(&mut world).unwrap();
+                world.step_with_surface_drives(DT, &drives);
+                duel.finish_step_among(&mut world, &mut armor::NoRecipients, &mut woods)
+                    .unwrap();
+                struck = duel.contacts().iter().any(|contact| {
+                    contact.entities.contains(&PhysicsId::new(500))
+                        && contact.tanks.contains(&Some(0))
+                });
+                if struck {
+                    break;
+                }
+            }
+            assert!(struck, "scale={scale}, sprung={suspension}");
+            assert_eq!(duel.tanks(&world)[0].health, 100.0);
+            let (wood, _) = woods.pieces.values().next().unwrap();
+            left.push(wood.integrity());
+        }
+        // The trunk yields without breaking, alike at both scales.
+        assert!((0.2..0.9).contains(&left[0]), "{left:?}");
+        assert!((left[0] - left[1]).abs() < 1.0e-3, "{left:?}");
+    }
+}
+
+#[test]
+fn retired_tanks_and_duels_leave_no_region_behind() {
+    let (mut duel, mut world) = quiet_gear(1.0, true, true);
+    let bound = |world: &PhysicsWorld, body: BodyId| {
+        world
+            .collider_ids()
+            .filter(|&collider| world.collider_body(collider) == Some(body))
+            .filter(|&collider| world.loading_binding(collider).is_some())
+            .count()
+    };
+    // A sprung tank's hull and wheels are bound, and the ground's chunks.
+    let bodies: Vec<BodyId> = duel.tank_bodies(0).collect();
+    assert_eq!(bodies.len(), 3);
+    assert!(bodies.iter().all(|&body| bound(&world, body) == 1));
+    let ground = duel.terrain()[0].assembly.body();
+    assert!(bound(&world, ground) > 1);
+    let hull = world.loading_binding(
+        world
+            .collider_ids()
+            .find(|&collider| world.collider_body(collider) == Some(bodies[0]))
+            .unwrap(),
+    );
+    duel.retire_tank(&mut world, 0).unwrap();
+    assert!(!world.loading_region_is_live(hull.unwrap().region));
+    // The other tank's landings are still priced, and list only it.
+    let bodies: Vec<BodyId> = duel.tank_bodies(1).collect();
+    for body in bodies {
+        let motion = world.motion(body).unwrap();
+        assert!(world.set_pose(body, motion.position + Vec2::Y, motion.angle, true));
+    }
+    let mut landings = Vec::new();
+    for _ in 0..90 {
+        step(&mut duel, &mut world);
+        landings.extend_from_slice(duel.contacts());
+    }
+    assert!(!landings.is_empty());
+    assert!(
+        landings.iter().all(|contact| {
+            contact.tanks.contains(&Some(1)) && !contact.tanks.contains(&Some(0))
+        })
+    );
+    duel.retire(&mut world);
+    assert_eq!(world.body_count(), 0);
+    assert!(duel.contacts().is_empty());
+    // A new duel under the same ids binds afresh.
+    let config = duel.duel.config;
+    let mut placement = Placement::new(1000..100_000, Budget::required(config));
+    placement.scale = 1.0;
+    let mut duel = HostedDuel::attach(&mut world, config, 42, placement).unwrap();
+    let mut landings = 0;
+    for _ in 0..90 {
+        step(&mut duel, &mut world);
+        landings += duel.contacts().len();
+    }
+    assert!(landings > 0);
+    assert_eq!(duel.contact_diagnostics().refused_bindings, 0);
+    assert_eq!(duel.contact_diagnostics().rejected_batches, 0);
 }
