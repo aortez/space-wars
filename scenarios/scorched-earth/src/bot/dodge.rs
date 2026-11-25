@@ -233,11 +233,22 @@ impl Duel {
     /// expires first.
     fn landing(&self, physics: &PhysicsWorld, player: usize, shell: &Shell) -> Option<Vec2> {
         // The shell is past the age at which it passes through its shooter.
-        let hull = Some(self.tanks[player].body.entity);
+        self.burst_through(physics, Some(self.tanks[player].body.entity), shell)
+    }
+
+    /// Where `shell` will burst, flown on from where it is as fired shells
+    /// fly but passing through `through`. There is none if the shell leaves
+    /// the field or expires first.
+    pub(crate) fn burst_through(
+        &self,
+        physics: &PhysicsWorld,
+        through: Option<PhysicsId>,
+        shell: &Shell,
+    ) -> Option<Vec2> {
         let (mut position, mut velocity, mut age) = (shell.position, shell.velocity, shell.age);
         loop {
             let (movement, hit) =
-                shell_ray_through(physics, &self.placement, hull, position, velocity);
+                shell_ray_through(physics, &self.placement, through, position, velocity);
             if let Some(hit) = hit {
                 return Some(self.placement.point_from_world(hit.point));
             }

@@ -564,8 +564,8 @@ fn tanks_spacelings_get_out_and_are_beamed_up() {
     // so whichever tank loses, its spaceling is thrown clear, or gets out in
     // a pod, and waits for its beam.
     for (size, thrown, pod, patch, scale) in [
-        ((1024, 768), 212, 2963, (112, 64), 5),
-        ((800, 480), 212, 2963, (88, 48), 6),
+        ((1024, 768), 838, 3587, (112, 64), 5),
+        ((800, 480), 838, 3587, (88, 48), 6),
     ] {
         let viewport = Viewport::new(size.0 as f32, size.1 as f32);
         let name = format!("{}x{}", size.0, size.1);
@@ -667,7 +667,7 @@ fn tanks_spacelings_stow_away_or_surrender() {
     for (size, patch, scale) in [((1024, 768), (112, 64), 5), ((800, 480), (88, 48), 6)] {
         let viewport = Viewport::new(size.0 as f32, size.1 as f32);
         let name = format!("{}x{}", size.0, size.1);
-        for (seed, ending) in [(102, Ending::Stowaway), (602, Ending::Surrender)] {
+        for (seed, ending) in [(455, Ending::Stowaway), (228, Ending::Surrender)] {
             let readings = record_through(face_fight(viewport, seed), |tanks| {
                 tanks.survivors.into_iter().flatten().next()
             });
@@ -707,7 +707,7 @@ fn tanks_spacelings_stow_away_or_surrender() {
                     ],
                     &[("-taken", 2), ("-beam", 3)],
                 ),
-                Ending::RescueBeam => unreachable!(),
+                Ending::RescueBeam | Ending::PartingShot => unreachable!(),
             };
             let shots = camera.frames(size, seed, &ticks);
             for (state, _) in &shots {
@@ -733,5 +733,105 @@ fn tanks_spacelings_stow_away_or_surrender() {
                 &follow(&framed, patch, scale),
             );
         }
+    }
+}
+
+#[test]
+fn tanks_the_winner_takes_a_parting_shot_and_the_spaceling_flees() {
+    use engine_common::{ClockTanksEnding as Ending, ClockTanksSurvivorPhase as Phase};
+    let camera = Camera::new();
+    let seed = 2728;
+    // Both sides of this fight are thrown clear and draw the parting shot,
+    // so whichever tank loses, the winner fires one last shell at its
+    // spaceling, which dodges it, then runs off the side of the battlefield
+    // at 4:3, and rises out of view on its jetpack at 5:3.
+    for (size, patch, scale, escape) in [
+        ((1024, 768), (112, 64), 5, Phase::Fleeing),
+        ((800, 480), (88, 48), 6, Phase::Hopping),
+    ] {
+        let viewport = Viewport::new(size.0 as f32, size.1 as f32);
+        let name = format!("{}x{}", size.0, size.1);
+        let readings = record_through(face_fight(viewport, seed), |tanks| {
+            (
+                tanks.result.is_some(),
+                tanks.shells,
+                tanks.survivors.into_iter().flatten().next(),
+            )
+        });
+        let first = |phase: Phase| {
+            readings
+                .iter()
+                .position(|(_, (.., survivor))| survivor.is_some_and(|s| s.phase == phase))
+                .unwrap_or_else(|| panic!("{name} {seed}: {phase:?}"))
+        };
+        let end = readings
+            .iter()
+            .position(|(_, (result, ..))| *result)
+            .unwrap();
+        // The parting shell is in the air from the tick it is fired until
+        // the tick it lands.
+        let fired = (end..readings.len())
+            .find(|&i| readings[i].1.1 > 0)
+            .expect("a parting shot");
+        let landed = (fired..readings.len())
+            .find(|&i| readings[i].1.1 == 0)
+            .unwrap();
+        // Covered as the winner fires, running clear, the shell coming down
+        // where it stood and bursting there, half a second into its escape,
+        // and about to leave the view.
+        let ticks = [
+            fired,
+            first(Phase::Dodging) + 15,
+            landed - 4,
+            landed + 4,
+            first(escape) + 30,
+            first(Phase::Fled) - 12,
+        ];
+        let mut shots = camera.frames(size, seed, &ticks);
+        for (state, _) in &shots {
+            let survivor = state.survivors.into_iter().flatten().next().unwrap();
+            assert_eq!(
+                (survivor.drawn, survivor.ending, survivor.fallback),
+                (Ending::PartingShot, Ending::PartingShot, None)
+            );
+        }
+        // The shell's whole flight, left as a trail, as it bursts.
+        camera.picture(size, "parting-shot", seed, fired, landed + 4);
+        let (leaving, pixels) = shots.pop().unwrap();
+        assert_eq!(
+            leaving
+                .survivors
+                .into_iter()
+                .flatten()
+                .next()
+                .unwrap()
+                .phase,
+            escape
+        );
+        camera.keep(&format!("{name}-parting-escape"), &pixels);
+        // Each frame around the spaceling, a little above it, but the two
+        // at the burst halfway to where it stood as the winner fired.
+        let state = face_fight(viewport, seed);
+        let spaceling = |tanks: &engine_common::ClockTanksState| {
+            let survivor = tanks.survivors.into_iter().flatten().next().unwrap();
+            on_screen(&state, size, survivor.position_milli)
+        };
+        let stood = spaceling(&shots[0].0);
+        let framed: Vec<_> = shots
+            .iter()
+            .enumerate()
+            .map(|(index, (tanks, pixels))| {
+                let [mut x, mut y] = spaceling(tanks);
+                if matches!(index, 2 | 3) {
+                    x = (x + stood[0]) / 2.0;
+                    y = (y + stood[1]) / 2.0;
+                }
+                (pixels, [x, y - patch.1 as f32 * 0.2])
+            })
+            .collect();
+        camera.keep(
+            &format!("{name}-parting-zoom"),
+            &follow(&framed, patch, scale),
+        );
     }
 }

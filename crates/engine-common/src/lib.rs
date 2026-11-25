@@ -1233,6 +1233,9 @@ pub enum ClockTanksEnding {
     Stowaway,
     /// It raises a white flag, and the winner's beam takes it along.
     Surrender,
+    /// The winner fires one last shell at it, and it dodges and flees out of
+    /// view.
+    PartingShot,
 }
 
 impl ClockTanksEnding {
@@ -1241,6 +1244,7 @@ impl ClockTanksEnding {
             Self::RescueBeam => "rescue-beam",
             Self::Stowaway => "stowaway",
             Self::Surrender => "surrender",
+            Self::PartingShot => "parting-shot",
         }
     }
 }
@@ -1249,11 +1253,15 @@ impl ClockTanksEnding {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ClockTanksFallback {
-    /// No way over the hills to the winner: a step higher than it jumps, a
-    /// drop deeper than it lands from on its feet, or something in the way.
+    /// No way over the hills, to the winner or out of view: a step higher
+    /// than it jumps, a drop deeper than it lands from on its feet, or
+    /// something in the way.
     NoWay,
     /// It could not finish before the aftermath ran out.
     OutOfTime,
+    /// The winner had no shot at it: too near the winner, with no arc that
+    /// reaches it, or with the winner off its wheels or out of view.
+    NoShot,
 }
 
 impl ClockTanksFallback {
@@ -1261,6 +1269,7 @@ impl ClockTanksFallback {
         match self {
             Self::NoWay => "no-way",
             Self::OutOfTime => "out-of-time",
+            Self::NoShot => "no-shot",
         }
     }
 }
@@ -1293,8 +1302,20 @@ pub enum ClockTanksSurvivorPhase {
     Surrendering,
     /// Drawn to the winner's side in the winner's beam, its flag still up.
     Taken,
+    /// Standing, facing the winner, as the winner's turret turns onto it and
+    /// fires.
+    Covered,
+    /// Running clear of where the winner's shell will burst, or waiting
+    /// there for it to land.
+    Dodging,
+    /// Running off the side of the battlefield, once the shell has landed.
+    Fleeing,
+    /// Rising up and out of view on a jetpack, once the shell has landed.
+    Hopping,
     /// Lifted out by its beam, or by the winner's.
     BeamedUp,
+    /// Gone out of view the way it fled.
+    Fled,
     /// Gone out of view.
     Lost,
 }
@@ -1314,7 +1335,12 @@ impl ClockTanksSurvivorPhase {
             Self::Riding => "riding",
             Self::Surrendering => "surrendering",
             Self::Taken => "taken",
+            Self::Covered => "covered",
+            Self::Dodging => "dodging",
+            Self::Fleeing => "fleeing",
+            Self::Hopping => "hopping",
             Self::BeamedUp => "beamed-up",
+            Self::Fled => "fled",
             Self::Lost => "lost",
         }
     }

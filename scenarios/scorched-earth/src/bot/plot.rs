@@ -25,7 +25,7 @@ const RETRY_TICKS: u64 = 60;
 
 /// One traced arc: its elevation and power, and where its shell stopped.
 #[derive(Debug, Clone, Copy, Serialize)]
-pub(super) struct TracedArc {
+pub(crate) struct TracedArc {
     pub elevation: f32,
     pub power: f32,
     pub end: Vec2,
@@ -63,7 +63,7 @@ struct Pose {
 }
 
 #[derive(Clone, Serialize)]
-pub(super) struct Plot {
+pub(crate) struct Plot {
     shooter: Pose,
     target: Vec2,
     facing: f32,
@@ -88,11 +88,17 @@ pub(super) struct Plot {
 
 impl Plot {
     fn new(state: &Duel, physics: &PhysicsWorld, player: usize) -> Self {
-        let motion = state.motion(physics, state.tanks[player].body).unwrap();
         let target = state
             .motion(physics, state.tanks[1 - player].body)
             .unwrap()
             .position;
+        Self::at(state, physics, player, target)
+    }
+
+    /// A plot from `player`'s tank as it stands at `target`, in the duel's
+    /// units.
+    pub(crate) fn at(state: &Duel, physics: &PhysicsWorld, player: usize, target: Vec2) -> Self {
+        let motion = state.motion(physics, state.tanks[player].body).unwrap();
         Self {
             shooter: Pose {
                 position: motion.position,
@@ -122,7 +128,7 @@ impl Plot {
     }
 
     /// Traces arcs until this tick's rays are spent or every arc is traced.
-    fn advance(&mut self, state: &Duel, physics: &PhysicsWorld, player: usize) {
+    pub(crate) fn advance(&mut self, state: &Duel, physics: &PhysicsWorld, player: usize) {
         let entities = state.tanks.map(|tank| tank.body.entity);
         let mut casts = 0;
         while casts < CASTS_PER_TICK {
@@ -239,6 +245,32 @@ impl Plot {
         self.finished = Some(tick);
         self.reaching = self.arcs.iter().filter(|arc| arc.reaches()).count() as u16;
         self.chosen = choose(&self.arcs);
+    }
+
+    /// The chosen arc, once every arc is traced, if it reaches the target.
+    fn reaching(&self) -> Option<TracedArc> {
+        self.finished?;
+        self.chosen.filter(|arc| arc.reaches())
+    }
+
+    /// The direction the reaching arc leaves the barrel in.
+    pub(crate) fn direction(&self) -> Option<Vec2> {
+        let arc = self.reaching()?;
+        Some(barrel(self.shooter, self.facing, arc.elevation).2)
+    }
+
+    /// How long the reaching arc's shell flies until it bursts, in ticks.
+    /// Its speed across is constant, so it reaches where it bursts then.
+    pub(crate) fn flight_ticks(&self) -> Option<u32> {
+        let arc = self.reaching()?;
+        let (_, muzzle, direction) = barrel(self.shooter, self.facing, arc.elevation);
+        let across = direction.x * arc.power + self.shooter.velocity.x;
+        let ticks = ((arc.end.x - muzzle.x) / across / DT).ceil();
+        Some(if ticks.is_finite() {
+            ticks.max(0.0) as u32
+        } else {
+            SHELL_LIFETIME_TICKS
+        })
     }
 
     pub fn mode(&self) -> &'static str {
@@ -397,6 +429,42 @@ impl Duel {
             .map_or(arc.power, |power| {
                 power.clamp(12.0, self.placement.max_power())
             });
+    }
+}
+
+impl Duel {
+    /// Fires one shell from `player`'s tank along `plot`'s reaching arc, as a
+    /// host's own choreography may once the duel is over: the barrel turns
+    /// onto the arc, and the shell leaves at the power that reaches the
+    /// plot's target from where the tank stands now. The CPUs record nothing
+    /// of it. Answers the shell's id, or none without a reaching arc, with
+    /// the tank retired, or with too many shells in flight.
+    pub(crate) fn fire_plot(
+        &mut self,
+        physics: &mut PhysicsWorld,
+        player: usize,
+        plot: &Plot,
+    ) -> Option<u64> {
+        let arc = plot.reaching()?;
+        if self.retired[player].is_some() || self.shells.len() >= MAX_SHELLS {
+            return None;
+        }
+        let motion = self.motion(physics, self.tanks[player].body)?;
+        let pose = Pose {
+            position: motion.position,
+            angle: motion.angle,
+            velocity: motion.linear_velocity,
+        };
+        let (_, muzzle, direction) = barrel(pose, plot.facing, arc.elevation);
+        let speed = firing_power(muzzle, direction, pose.velocity, plot.target)
+            .map_or(arc.power, |power| {
+                power.clamp(12.0, self.placement.max_power())
+            });
+        let tank = &mut self.tanks[player];
+        tank.facing = plot.facing;
+        tank.elevation = arc.elevation;
+        tank.speed = speed;
+        Some(self.launch(physics, player, false))
     }
 }
 

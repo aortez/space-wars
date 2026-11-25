@@ -8,7 +8,7 @@ mod plot;
 mod position;
 mod priority;
 use aim::{Aim, Geometry};
-use plot::Plot;
+pub(crate) use plot::Plot;
 #[cfg(test)]
 mod tests;
 

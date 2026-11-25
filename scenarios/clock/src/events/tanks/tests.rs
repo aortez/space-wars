@@ -663,7 +663,7 @@ fn health_outcomes_and_periodic_registration_cover_every_result() {
         engine_common::ClockEventTrigger::Periodic
     );
     assert_eq!(definition.cooldown_ticks, REUSE_TICKS);
-    assert_eq!(MAX_TICKS, 94 * 60);
+    assert_eq!(MAX_TICKS, 96 * 60);
     for profile in [
         ClockEventProfile::Off,
         ClockEventProfile::Calm,
@@ -1351,9 +1351,10 @@ fn one_spaceling_in_five_gets_out_by_a_roll_of_its_own() {
 /// winner in view.
 fn drawing(ending: survivor::Ending) -> f64 {
     match ending {
-        survivor::Ending::RescueBeam => 0.0,
-        survivor::Ending::Stowaway => 0.5,
-        survivor::Ending::Surrender => 0.9,
+        survivor::Ending::RescueBeam => 0.1,
+        survivor::Ending::Stowaway => 0.4,
+        survivor::Ending::Surrender => 0.6,
+        survivor::Ending::PartingShot => 0.9,
     }
 }
 
@@ -1605,10 +1606,11 @@ fn a_spaceling_or_pod_that_leaves_the_view_retires_there() {
 #[test]
 fn a_spaceling_still_down_when_its_time_runs_out_is_lifted_out_as_it_lies() {
     use survivor::{Ending, Fallback, Phase};
-    // A stowaway has longer, for its run.
+    // A stowaway has longer, for its run, and a parting shot longer still.
     for (ending, longest) in [
         (Ending::RescueBeam, survivor::RESCUE_BY_TICKS),
-        (Ending::Stowaway, AFTERMATH_TICKS),
+        (Ending::Stowaway, survivor::AFTERMATH_TICKS),
+        (Ending::PartingShot, survivor::PARTING_TICKS),
     ] {
         let (mut state, loser) = survival(4.0 / 3.0, 43, survivor::Ejection::Thrown, ending);
         assert_eq!(survivor(&state, loser).drawn, ending);
@@ -1648,7 +1650,7 @@ fn a_spaceling_still_down_when_its_time_runs_out_is_lifted_out_as_it_lies() {
 #[test]
 fn a_fight_cut_short_at_any_stage_of_a_survivor_leaves_nothing_behind() {
     use survivor::{Ejection, Ending, Phase};
-    let stages: [(Ejection, Ending, &[Phase]); 4] = [
+    let stages: [(Ejection, Ending, &[Phase]); 5] = [
         (
             Ejection::Thrown,
             Ending::RescueBeam,
@@ -1681,6 +1683,11 @@ fn a_fight_cut_short_at_any_stage_of_a_survivor_leaves_nothing_behind() {
             Ejection::Thrown,
             Ending::Surrender,
             &[Phase::Surrendering, Phase::Taken],
+        ),
+        (
+            Ejection::Thrown,
+            Ending::PartingShot,
+            &[Phase::Covered, Phase::Dodging, Phase::Hopping],
         ),
     ];
     for (ejection, ending, phases) in stages {
@@ -1731,16 +1738,21 @@ fn winner(state: &ClockState) -> survivor::Winner {
 /// between `at` and the winner, which meets only the spacelings and the
 /// pods. Answers the wall and the top of it.
 fn wall_between(state: &mut ClockState, at: Vec2, height: f32) -> (BodyId, Vec2) {
-    let scale = tanks(state).duel.placement().scale;
-    let wall = BodyId::new(
-        PhysicsId::new(crate::arena::ids::canonical::TEST_OBSTACLES.start),
-        BodyRole::PRIMARY,
-    );
     let x = (at.x + winner(state).hull.position.x) / 2.0;
-    let world = state.arena.held_mut(OWNER).unwrap();
-    let ground = world
+    wall(state, 0, Vec2::new(x, at.y), height)
+}
+
+/// A thin wall `height` of the duel's units high, from the ground under
+/// `over`, which meets only the spacelings and the pods: the test's
+/// `index`th obstacle. Answers the wall and the top of it.
+fn wall(state: &mut ClockState, index: u64, over: Vec2, height: f32) -> (BodyId, Vec2) {
+    let scale = tanks(state).duel.placement().scale;
+    let ground = state
+        .arena
+        .world()
+        .unwrap()
         .cast_ray(
-            Vec2::new(x, at.y + 5.0 * scale),
+            over + Vec2::Y * (5.0 * scale),
             Vec2::new(0.0, -1.0),
             RayCastOptions {
                 collision_groups: wreck::GROUPS,
@@ -1752,8 +1764,23 @@ fn wall_between(state: &mut ClockState, at: Vec2, height: f32) -> (BodyId, Vec2)
         .y;
     // Sunk a unit into the ground.
     let half = Vec2::new(0.25, (height + 1.0) / 2.0) * scale;
+    let middle = Vec2::new(over.x, ground + height * scale - half.y);
+    (
+        obstacle(state, index, middle, half),
+        middle + Vec2::Y * half.y,
+    )
+}
+
+/// A fixed box with its middle at `middle` and half its width and height
+/// `half`, which meets only the spacelings and the pods: the test's
+/// `index`th obstacle.
+fn obstacle(state: &mut ClockState, index: u64, middle: Vec2, half: Vec2) -> BodyId {
+    let body = BodyId::new(
+        PhysicsId::new(crate::arena::ids::canonical::TEST_OBSTACLES.start + index),
+        BodyRole::PRIMARY,
+    );
     let mut stone = ColliderSpec::cuboid(
-        ColliderId::new(wall.entity, ColliderRole::PRIMARY, 0),
+        ColliderId::new(body.entity, ColliderRole::PRIMARY, 0),
         half.x,
         half.y,
     );
@@ -1761,9 +1788,9 @@ fn wall_between(state: &mut ClockState, at: Vec2, height: f32) -> (BodyId, Vec2)
         memberships: 1 << 20,
         filter: wreck::GROUPS.memberships,
     };
-    let middle = Vec2::new(x, ground + height * scale - half.y);
+    let world = state.arena.held_mut(OWNER).unwrap();
     assert!(world.insert_body(
-        wall,
+        body,
         BodySpec {
             kind: BodyKind::Fixed,
             position: middle,
@@ -1771,18 +1798,18 @@ fn wall_between(state: &mut ClockState, at: Vec2, height: f32) -> (BodyId, Vec2)
         },
         &[stone],
     ));
-    (wall, middle + Vec2::Y * half.y)
+    body
 }
 
 #[test]
 fn a_survivor_draws_its_ending_evenly_from_those_that_fit_the_fight() {
     use survivor::{Ejection, Ending};
     // Without a winner in view only the rescue beam fits. With one, each of
-    // the three takes a third of the rolls.
+    // the four takes a quarter of the rolls.
     for roll in [0.0, 0.2, 0.4, 0.6, 0.8, 0.999] {
         assert_eq!(survivor::ending(roll, false), Ending::RescueBeam);
     }
-    let mut drawn = [0u32; 3];
+    let mut drawn = [0u32; 4];
     for seed in 0..60_000u64 {
         let fight = seed.wrapping_add((ClockEventKind::Tanks as u64) << 32);
         let rolls = survivor::ending_rolls(fight);
@@ -1797,12 +1824,13 @@ fn a_survivor_draws_its_ending_evenly_from_those_that_fit_the_fight() {
                 Ending::RescueBeam => 0,
                 Ending::Stowaway => 1,
                 Ending::Surrender => 2,
+                Ending::PartingShot => 3,
             }] += 1;
         }
     }
     for count in drawn {
         let share = count as f32 / 120_000.0;
-        assert!((share - 1.0 / 3.0).abs() < 0.01, "{drawn:?}");
+        assert!((share - 1.0 / 4.0).abs() < 0.01, "{drawn:?}");
     }
     // The event rolls once, from its own seed, as it starts.
     let mut state = ready(5.0 / 3.0, 42, ClockTimeFormat::TwentyFourHour);
@@ -1867,7 +1895,10 @@ fn a_stowaway_runs_to_the_winner_climbs_onto_its_roof_and_rides_it_out() {
     let scale = tanks(&state).duel.placement().scale;
     assert_eq!(survivor(&state, loser).drawn, Ending::Stowaway);
     // A stowaway's fight waits longer for it.
-    assert_eq!(tanks(&state).survivors.aftermath_ticks(), AFTERMATH_TICKS);
+    assert_eq!(
+        tanks(&state).survivors.aftermath_ticks(),
+        survivor::AFTERMATH_TICKS
+    );
     until_phase(&mut state, loser, Phase::LookingAround, 5 * 60);
     // It eyes the winner a moment, then runs, three times as fast as it
     // walks.
@@ -2005,7 +2036,7 @@ fn a_stowaway_with_no_way_to_the_winner_waves_for_the_rescue_beam() {
         &mut state,
         loser,
         Phase::BeamedUp,
-        survivor::WAVE_TICKS + AFTERMATH_TICKS,
+        survivor::WAVE_TICKS + survivor::AFTERMATH_TICKS,
     );
     // Its own beam takes it, not the winner's.
     let rescued = survivor(&state, loser);
@@ -2026,7 +2057,10 @@ fn a_spaceling_that_surrenders_raises_a_white_flag_and_goes_up_beside_the_winner
     use survivor::{Ending, Phase};
     let (mut state, loser) = survival(5.0 / 3.0, 42, survivor::Ejection::Thrown, Ending::Surrender);
     let scale = tanks(&state).duel.placement().scale;
-    assert_eq!(tanks(&state).survivors.aftermath_ticks(), AFTERMATH_TICKS);
+    assert_eq!(
+        tanks(&state).survivors.aftermath_ticks(),
+        survivor::AFTERMATH_TICKS
+    );
     // It looks around, as one waiting for its beam does, then turns to the
     // winner and raises a white flag.
     until_phase(&mut state, loser, Phase::LookingAround, 5 * 60);
@@ -2176,6 +2210,419 @@ fn the_winners_beam_lifts_a_spaceling_it_takes_over_what_stands_between() {
         .held_mut(OWNER)
         .unwrap()
         .remove_entity(wall.entity);
+    while state.event_kind().is_some() {
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+/// The parting shot at the survivor from `slot`.
+fn parting_shot(state: &ClockState, slot: usize) -> &survivor::Shot {
+    survivor(state, slot).shot.as_ref().expect("a parting shot")
+}
+
+/// How often the survivor from `slot` has been knocked down.
+fn knockdowns(state: &ClockState, slot: usize) -> u32 {
+    state.tanks_state().unwrap().survivors[slot]
+        .unwrap()
+        .knockdowns
+}
+
+#[test]
+fn the_winner_takes_a_parting_shot_and_the_spaceling_dodges_it_and_runs_off_the_side() {
+    use survivor::{Ending, Phase};
+    let (mut state, loser) = survival(
+        4.0 / 3.0,
+        42,
+        survivor::Ejection::Thrown,
+        Ending::PartingShot,
+    );
+    let scale = tanks(&state).duel.placement().scale;
+    let walker = survivor::spec(scale);
+    assert_eq!(survivor(&state, loser).drawn, Ending::PartingShot);
+    // A parting shot's fight waits longer still.
+    assert_eq!(
+        tanks(&state).survivors.aftermath_ticks(),
+        survivor::PARTING_TICKS
+    );
+    // Up again, it looks around a moment, then faces the winner as the
+    // winner covers it.
+    until_phase(&mut state, loser, Phase::LookingAround, 5 * 60);
+    assert_eq!(
+        until_phase(&mut state, loser, Phase::Covered, survivor::SPOT_TICKS + 1),
+        survivor::SPOT_TICKS
+    );
+    let toward = (winner(&state).hull.position.x - survivor(&state, loser).position.x).signum();
+    assert_eq!(survivor(&state, loser).facing, toward);
+    let stood = survivor(&state, loser).position;
+    // The winner plots a shot at where it stands, its turret turning at a
+    // turret's pace, and fires once the barrel lies along the arc it chose.
+    // The duel stands still until then.
+    let barrel = |state: &ClockState| {
+        let [pivot, muzzle] = winner(state).barrel;
+        (muzzle - pivot).normalized()
+    };
+    let most = survivor::TURRET_SPEED / FIXED_HZ as f32;
+    let held = tanks(&state).duel.tick();
+    let mut aim = barrel(&state);
+    while parting_shot(&state, loser).fired.is_none() {
+        assert_eq!(survivor(&state, loser).phase, Phase::Covered);
+        assert_eq!(tanks(&state).duel.active_shells(), 0);
+        assert_eq!(tanks(&state).duel.tick(), held);
+        tick(&mut state);
+        let turned = barrel(&state);
+        // Firing sets the barrel on the arc.
+        if parting_shot(&state, loser).fired.is_none() {
+            assert!(aim.dot(turned) >= most.cos() - 1e-4);
+        }
+        aim = turned;
+    }
+    let fired = tanks(&state).tick;
+    let direction = parting_shot(&state, loser).aim.direction().unwrap();
+    assert!(barrel(&state).dot(direction) > 0.05_f32.cos());
+    assert_eq!(tanks(&state).duel.active_shells(), 1);
+    let shots = tanks(&state).duel.shots();
+    // A moment later it sees the shell coming and traces where it bursts,
+    // passing through it, beside where it stands. It runs clear at a
+    // runner's pace, away from the winner, the way it will flee.
+    assert_eq!(
+        until_phase(
+            &mut state,
+            loser,
+            Phase::Dodging,
+            survivor::REACTION_TICKS + 1
+        ),
+        survivor::REACTION_TICKS
+    );
+    let burst = parting_shot(&state, loser).burst.expect("a traced burst");
+    assert!(
+        burst.distance_to(stood) < 3.0 * scale,
+        "{burst:?} {stood:?}"
+    );
+    let dodge = parting_shot(&state, loser).dodge.expect("a dodge");
+    assert_eq!(dodge.direction, -toward);
+    let spec = |state: &ClockState| survivor(state, loser).spaceling.as_ref().unwrap().spec();
+    assert_eq!(spec(&state).walk_speed, 3.0 * walker.walk_speed);
+    // The duel steps while the shell flies, and its CPUs fire nothing.
+    while parting_shot(&state, loser).landed.is_none() {
+        assert_eq!(tanks(&state).duel.tick() - held, tanks(&state).tick - fired);
+        assert_eq!(tanks(&state).duel.shots(), shots);
+        tick(&mut state);
+    }
+    let (point, landed) = parting_shot(&state, loser).landed.unwrap();
+    assert_eq!(tanks(&state).duel.tick() - held, landed - fired);
+    // The shell bursts where it traced, and it ran clear, out of the
+    // burst's reach. It takes the blast at a walk.
+    let at = survivor(&state, loser).position;
+    assert!((at.x - dodge.from) * dodge.direction >= dodge.needed);
+    let point = point.expect("a burst");
+    assert!(
+        point.distance_to(burst) < 0.05 * scale,
+        "{point:?} {burst:?}"
+    );
+    assert!(
+        at.distance_to(point) > survivor::BLAST_REACH * scale,
+        "{}",
+        at.distance_to(point) / scale
+    );
+    assert_eq!(spec(&state).walk_speed, walker.walk_speed);
+    // It watches the shell burst a moment, then runs for the side of the
+    // battlefield away from the winner, which lies near enough, and is gone
+    // once it is out of view. The duel stands still again.
+    assert_eq!(
+        until_phase(
+            &mut state,
+            loser,
+            Phase::Fleeing,
+            survivor::REACTION_TICKS + 1
+        ),
+        survivor::REACTION_TICKS
+    );
+    assert_eq!(survivor(&state, loser).facing, -toward);
+    assert_eq!(spec(&state).walk_speed, 3.0 * walker.walk_speed);
+    let held = tanks(&state).duel.tick();
+    while survivor(&state, loser).phase == Phase::Fleeing {
+        assert_eq!(tanks(&state).duel.tick(), held);
+        tick(&mut state);
+    }
+    assert_eq!(survivor(&state, loser).phase, Phase::Fled);
+    let layout = tanks(&state).layout;
+    let edge = layout.bounds_max.x - layout.frame_width;
+    assert!(survivor(&state, loser).position.x * -toward > edge);
+    assert!(!survivors_remain(&state));
+    // The winner goes up alone, at once.
+    assert_eq!(state.event_phase(), Some(EventPhase::BeamUp));
+    let block = state.tanks_state().unwrap().survivors[loser].unwrap();
+    assert_eq!(
+        (block.drawn, block.ending, block.fallback, block.phase),
+        (Ending::PartingShot, Ending::PartingShot, None, Phase::Fled)
+    );
+    while state.event_kind().is_some() {
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+#[test]
+fn a_spaceling_the_parting_shell_knocks_over_gets_up_and_rises_out_of_view_on_its_jetpack() {
+    use survivor::{Ending, Phase};
+    let (mut state, loser) = survival(
+        16.0 / 9.0,
+        42,
+        survivor::Ejection::Thrown,
+        Ending::PartingShot,
+    );
+    let scale = tanks(&state).duel.placement().scale;
+    until_phase(&mut state, loser, Phase::Dodging, 6 * 60);
+    while parting_shot(&state, loser).landed.is_none() {
+        tick(&mut state);
+    }
+    // Out of the burst's reach, its blast still knocks the spaceling over,
+    // and it gets up.
+    let (point, _) = parting_shot(&state, loser).landed.unwrap();
+    let at = survivor(&state, loser).position;
+    assert!(at.distance_to(point.expect("a burst")) > survivor::BLAST_REACH * scale);
+    let down = knockdowns(&state, loser);
+    until_phase(&mut state, loser, Phase::GettingUp, 10);
+    assert_eq!(knockdowns(&state, loser), down + 1);
+    // Back on its feet, with the side too far to run for, it rises out of
+    // view on its jetpack, faster and faster, drifting away from the winner
+    // and leaving smoke behind it. It meets nothing on the way.
+    until_phase(&mut state, loser, Phase::Hopping, 4 * 60);
+    let away = parting_shot(&state, loser).away;
+    let toward = (winner(&state).hull.position.x - survivor(&state, loser).position.x).signum();
+    assert_eq!(away, -toward);
+    assert_eq!(survivor(&state, loser).facing, away);
+    let body = survivor(&state, loser).spaceling.as_ref().unwrap().body();
+    assert_eq!(
+        state.arena.world().unwrap().body_kind(body),
+        Some(BodyKind::KinematicPosition)
+    );
+    let puffs = tanks(&state).survivors.puffs.len();
+    let mut was = survivor(&state, loser)
+        .hop
+        .expect("where it took off")
+        .position;
+    let mut rise = 0.0;
+    while survivor(&state, loser).phase == Phase::Hopping {
+        tick(&mut state);
+        let at = survivor(&state, loser).position;
+        assert!(at.y - was.y > rise && (at.x - was.x) * away > 0.0);
+        (was, rise) = (at, at.y - was.y);
+    }
+    assert!(tanks(&state).survivors.puffs.len() > puffs);
+    // It is gone once it has risen out of view.
+    assert_eq!(survivor(&state, loser).phase, Phase::Fled);
+    let layout = tanks(&state).layout;
+    assert!(was.y - survivor::spec(scale).half_height() > layout.canopy_y);
+    assert!(!survivors_remain(&state));
+    let block = state.tanks_state().unwrap().survivors[loser].unwrap();
+    assert_eq!(
+        (block.drawn, block.ending, block.fallback, block.phase),
+        (Ending::PartingShot, Ending::PartingShot, None, Phase::Fled)
+    );
+    while state.event_kind().is_some() {
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+#[test]
+fn a_spaceling_too_near_the_winner_for_a_parting_shot_waves_for_the_rescue_beam() {
+    use survivor::{Ending, Fallback, Phase};
+    let (mut state, loser) = survival(
+        4.0 / 3.0,
+        42,
+        survivor::Ejection::Thrown,
+        Ending::PartingShot,
+    );
+    let scale = tanks(&state).duel.placement().scale;
+    let shots = tanks(&state).duel.shots();
+    until_phase(&mut state, loser, Phase::LookingAround, 5 * 60);
+    // Set down ten units from the winner's middle, its shell's burst would
+    // reach the winner.
+    let hull = winner(&state).hull.position;
+    let side = (survivor(&state, loser).position.x - hull.x).signum();
+    let x = hull.x + side * 10.0 * scale;
+    let body = survivor(&state, loser).spaceling.as_ref().unwrap().body();
+    let world = state.arena.held_mut(OWNER).unwrap();
+    let ground = world
+        .cast_ray(
+            Vec2::new(x, hull.y + 8.0 * scale),
+            Vec2::new(0.0, -1.0),
+            RayCastOptions {
+                collision_groups: wreck::GROUPS,
+                exclude_entity: Some(body.entity),
+                ..Default::default()
+            },
+        )
+        .unwrap()
+        .point
+        .y;
+    let feet = survivor::spec(scale).half_height() + 0.05 * scale;
+    world.set_pose(body, Vec2::new(x, ground + feet), 0.0, true);
+    world.set_velocity(body, Vec2::ZERO, 0.0, true);
+    // The winner holds its fire, and the spaceling waves for the rescue
+    // beam.
+    until_phase(&mut state, loser, Phase::Waving, 4 * 60);
+    let waving = survivor(&state, loser);
+    assert_eq!(
+        (waving.drawn, waving.ending, waving.fallback),
+        (
+            Ending::PartingShot,
+            Ending::RescueBeam,
+            Some(Fallback::NoShot)
+        )
+    );
+    assert!(waving.shot.is_none());
+    until_phase(
+        &mut state,
+        loser,
+        Phase::BeamedUp,
+        survivor::WAVE_TICKS + survivor::PARTING_TICKS,
+    );
+    assert_eq!(tanks(&state).duel.shots(), shots);
+    while state.event_kind().is_some() {
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+#[test]
+fn a_spaceling_up_too_late_for_a_parting_shot_waves_for_the_rescue_beam() {
+    use survivor::{Ending, Fallback, Phase};
+    let (mut state, loser) = survival(
+        4.0 / 3.0,
+        42,
+        survivor::Ejection::Thrown,
+        Ending::PartingShot,
+    );
+    let body = survivor(&state, loser).spaceling.as_ref().unwrap().body();
+    // It lands, and something keeps it on its back until four seconds are
+    // left.
+    until_phase(&mut state, loser, Phase::GettingUp, 2 * 60);
+    let mut aftermath = 0;
+    while aftermath < survivor::PARTING_TICKS - 4 * 60 {
+        aftermath += u64::from(state.event_phase() == Some(EventPhase::Aftermath));
+        let world = state.arena.held_mut(OWNER).unwrap();
+        let motion = world.motion(body).unwrap();
+        world.set_pose(body, motion.position, std::f32::consts::FRAC_PI_2, true);
+        world.set_velocity(body, Vec2::ZERO, 0.0, true);
+        tick(&mut state);
+    }
+    // Up at last, it is covered, but the winner finds no time for the
+    // shell's flight and the spaceling's escape, and the spaceling waves for
+    // the rescue beam.
+    until_phase(&mut state, loser, Phase::Covered, 3 * 60);
+    until_phase(&mut state, loser, Phase::Waving, 60);
+    let waving = survivor(&state, loser);
+    assert_eq!(
+        (waving.drawn, waving.ending, waving.fallback),
+        (
+            Ending::PartingShot,
+            Ending::RescueBeam,
+            Some(Fallback::OutOfTime)
+        )
+    );
+    assert!(waving.shot.as_ref().unwrap().fired.is_none());
+    until_phase(&mut state, loser, Phase::BeamedUp, 4 * 60);
+    assert_eq!(tanks(&state).duel.active_shells(), 0);
+    while state.event_kind().is_some() {
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+#[test]
+fn a_spaceling_with_no_way_out_after_a_parting_shot_waves_for_the_rescue_beam() {
+    use survivor::{Ending, Fallback, Phase};
+    let (mut state, loser) = survival(
+        4.0 / 3.0,
+        42,
+        survivor::Ejection::Thrown,
+        Ending::PartingShot,
+    );
+    let scale = tanks(&state).duel.placement().scale;
+    until_phase(&mut state, loser, Phase::Dodging, 6 * 60);
+    while parting_shot(&state, loser).landed.is_none() {
+        tick(&mut state);
+    }
+    // As the shell bursts, a wall higher than it jumps comes up between it
+    // and the side, and a roof over it.
+    let at = survivor(&state, loser).position;
+    let away = parting_shot(&state, loser).away;
+    let (wall, _) = wall(&mut state, 0, at + Vec2::X * (away * 4.0 * scale), 3.5);
+    let roof = obstacle(
+        &mut state,
+        1,
+        at + Vec2::Y * (3.0 * scale),
+        Vec2::new(8.0, 0.25) * scale,
+    );
+    // It finds it has no way out, and waves for the rescue beam.
+    until_phase(
+        &mut state,
+        loser,
+        Phase::Waving,
+        survivor::REACTION_TICKS + 1,
+    );
+    let waving = survivor(&state, loser);
+    assert_eq!(
+        (waving.drawn, waving.ending, waving.fallback),
+        (
+            Ending::PartingShot,
+            Ending::RescueBeam,
+            Some(Fallback::NoWay)
+        )
+    );
+    let world = state.arena.held_mut(OWNER).unwrap();
+    world.remove_entity(wall.entity);
+    world.remove_entity(roof.entity);
+    until_phase(
+        &mut state,
+        loser,
+        Phase::BeamedUp,
+        survivor::WAVE_TICKS + survivor::PARTING_TICKS,
+    );
+    let rescued = survivor(&state, loser);
+    assert!(rescued.taken.is_none() && rescued.lifted.is_some());
+    while state.event_kind().is_some() {
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+#[test]
+fn a_parting_shell_still_in_the_air_holds_the_aftermath_until_it_lands() {
+    use survivor::{Ending, Phase};
+    let (mut state, loser) = survival(
+        4.0 / 3.0,
+        42,
+        survivor::Ejection::Thrown,
+        Ending::PartingShot,
+    );
+    let scale = tanks(&state).duel.placement().scale;
+    until_phase(&mut state, loser, Phase::Dodging, 6 * 60);
+    // Carried out of view as it dodges, the spaceling has fled before its
+    // shell lands.
+    let layout = tanks(&state).layout;
+    let away = parting_shot(&state, loser).away;
+    let at = survivor(&state, loser).position;
+    let body = survivor(&state, loser).spaceling.as_ref().unwrap().body();
+    let world = state.arena.held_mut(OWNER).unwrap();
+    let side = away * (layout.bounds_max.x - layout.frame_width + 2.0 * scale);
+    world.set_pose(body, Vec2::new(side, at.y), 0.0, true);
+    tick(&mut state);
+    assert_eq!(survivor(&state, loser).phase, Phase::Fled);
+    assert!(!survivors_remain(&state));
+    // The aftermath waits for the shell, and the duel steps it on, until it
+    // lands. Then the winner goes up.
+    while parting_shot(&state, loser).landed.is_none() {
+        assert_eq!(state.event_phase(), Some(EventPhase::Aftermath));
+        assert_eq!(tanks(&state).duel.active_shells(), 1);
+        tick(&mut state);
+    }
+    assert_eq!(tanks(&state).duel.active_shells(), 0);
+    assert_eq!(state.event_phase(), Some(EventPhase::BeamUp));
     while state.event_kind().is_some() {
         tick(&mut state);
     }
