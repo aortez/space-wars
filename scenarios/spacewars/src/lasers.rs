@@ -281,6 +281,59 @@ mod tests {
     }
 
     #[test]
+    fn an_asteroid_a_beam_breaks_strikes_a_ship_as_hard_as_a_whole_one() {
+        let mut state = space();
+        state.ships[0].set_laser(false);
+        let rock = DebrisState::new(
+            DebrisKind::Asteroid,
+            ship_mount_center(&state.ships[0]) + Vec2::X * 15.0,
+            Vec2::X * 100.0,
+            5.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::WHITE,
+        );
+        state.debris.push(rock);
+        // The rock flies down the beam's line at ship 1. Stop a step before it
+        // strikes.
+        let mut steps = 0;
+        loop {
+            let mut next = state.clone();
+            step(&mut next);
+            if next.ships[1].life < state.ships[1].life {
+                break;
+            }
+            state = next;
+            steps += 1;
+            assert!(steps < 60, "the rock never struck ship 1");
+        }
+        // Ship 0's beam ends on the rock in the step it strikes, before the
+        // contact rules run.
+        let strike = |state: &SpacewarsState| {
+            let mut state = state.clone();
+            state.ships[0].set_laser(true);
+            step(&mut state);
+            let [hit] = state.laser_hits[..] else {
+                panic!("{:?}", state.laser_hits);
+            };
+            assert_eq!(hit.target, LaserTarget::Debris(0));
+            (state.ships[1].life, hit.damage)
+        };
+        let rock = state.debris[0];
+        let breaks_below = rock.life_max * DEBRIS_DEATH_LIFE_FACTOR;
+        let (whole, pulse) = strike(&state);
+        assert!(rock.life - pulse >= breaks_below);
+        assert!(whole < state.ships[1].life);
+        // Less than that pulse above the life it breaks below, so the pulse
+        // breaks it.
+        state.debris[0].life = breaks_below + pulse * 0.5;
+        let (life, pulse) = strike(&state);
+        assert!(state.debris[0].life - pulse < breaks_below);
+        // The physics step struck with the whole rock, and the ship pays for
+        // that rather than for what the beam left of it.
+        assert_eq!(life, whole);
+    }
+
+    #[test]
     fn a_beam_wears_a_rover_by_its_hull_and_destroys_it() {
         let config = SpacewarsConfig {
             asteroid_probability_per_sec: 0.0,
