@@ -1520,6 +1520,7 @@ impl SpacewarsScenario {
         }
 
         let collision_started = Instant::now();
+        let debris_masses = DebrisMasses::before_damage(&state.debris);
         contact_charges::price(state, surface_pilots);
         update_ship_lasers(state, dt);
         state.laser_hits = resolve_laser_hits(state, surface_pilots);
@@ -1540,8 +1541,7 @@ impl SpacewarsScenario {
             pressure.record_contacts(state, &contacts);
         }
         surface_sortie::match_rules::apply_contacts(state, surface_pilots, &contacts);
-        resolve_physics_collisions(state, &contacts, &accepted_ports);
-        // After the rules, which size a ship's damage by the asteroid's mass.
+        resolve_physics_collisions(state, &contacts, &accepted_ports, &debris_masses);
         contact_charges::wear_asteroids(state);
         surface_sortie::solar::apply_damage(state, surface_pilots, dt);
         surface_sortie::match_rules::apply_heat(state, surface_pilots, dt);
@@ -2956,10 +2956,37 @@ fn resolve_physics_spaceport_contacts(
     accepted
 }
 
+/// Each debris body's mass as the step's physics had it, by its place in
+/// `state.debris`. The contact rules size a contact by its impulse, which the
+/// physics step made with these masses, but lasers and the rules themselves
+/// can break or chip debris first.
+struct DebrisMasses(Vec<(u64, f32)>);
+
+impl DebrisMasses {
+    fn before_damage(debris: &[DebrisState]) -> Self {
+        Self(
+            debris
+                .iter()
+                .map(|debris| (debris.physics_id, debris.mass()))
+                .collect(),
+        )
+    }
+
+    /// The mass of `debris`, at `index` in `state.debris`, as the physics step
+    /// had it, or its mass now if it wasn't there then.
+    fn of(&self, index: usize, debris: &DebrisState) -> f32 {
+        match self.0.get(index) {
+            Some(&(id, mass)) if id == debris.physics_id => mass,
+            _ => debris.mass(),
+        }
+    }
+}
+
 fn resolve_physics_collisions(
     state: &mut SpacewarsState,
     contacts: &[MechanicalContact],
     accepted_ports: &BTreeSet<(usize, usize)>,
+    masses: &DebrisMasses,
 ) {
     state.ship_collisions.clear();
     state.ship_debris_collisions.clear();
@@ -3059,7 +3086,7 @@ fn resolve_physics_collisions(
                 let speed = impact_speed(
                     contact.impulse_magnitude,
                     state.ships[ship].mass(),
-                    Some(state.debris[debris_index].mass()),
+                    Some(masses.of(debris_index, &state.debris[debris_index])),
                 );
                 // A shell's hit is its shot's, and counts only on the body the
                 // shot stopped on. Its sparks keep the old shell's size.
@@ -3120,8 +3147,11 @@ fn resolve_physics_collisions(
                 let Some(rover_mass) = state.physics.rover_total_mass(&rover) else {
                     continue;
                 };
-                let speed =
-                    impact_speed(contact.impulse_magnitude, rover_mass, Some(debris.mass()));
+                let speed = impact_speed(
+                    contact.impulse_magnitude,
+                    rover_mass,
+                    Some(masses.of(debris_index, &debris)),
+                );
                 // A shell's hit is its shot's, and its sparks keep the old
                 // shell's size.
                 let (damage, sparks) = if debris.kind == DebrisKind::Shell {
@@ -3173,7 +3203,11 @@ fn resolve_physics_collisions(
                 let Some(debris) = state.debris.get(debris_index).copied() else {
                     continue;
                 };
-                let speed = impact_speed(contact.impulse_magnitude, debris.mass(), None);
+                let speed = impact_speed(
+                    contact.impulse_magnitude,
+                    masses.of(debris_index, &debris),
+                    None,
+                );
                 let impact_damage = speed * DEBRIS_BODY_DAMAGE_SCALAR;
                 let body_damage = speed * PLANET_DAMAGE_SCALAR;
                 let damage = impact_damage + body_damage;
@@ -3225,8 +3259,8 @@ fn resolve_physics_collisions(
                 let b_state = state.debris[b];
                 let speed = impact_speed(
                     contact.impulse_magnitude,
-                    a_state.mass(),
-                    Some(b_state.mass()),
+                    masses.of(a, &a_state),
+                    Some(masses.of(b, &b_state)),
                 );
                 // A shell's hit is its shot's, and its sparks keep the old
                 // shell's size.
@@ -11893,6 +11927,7 @@ mod tests {
             closing_speed: 100.0,
             started: true,
         };
+        let masses = DebrisMasses::before_damage(&state.debris);
 
         resolve_physics_collisions(
             &mut state,
@@ -11901,6 +11936,7 @@ mod tests {
                 contact(MechanicalEntity::Ship(0)),
             ],
             &BTreeSet::new(),
+            &masses,
         );
 
         // A shell's hit is its shot's, so however hard the contact pushes, it
@@ -11940,6 +11976,7 @@ mod tests {
         let speed = impact_speed(impulse, state.ships[1].mass(), Some(state.debris[0].mass()));
         let life = state.ships[1].life;
         let particles = state.particles.len();
+        let masses = DebrisMasses::before_damage(&state.debris);
 
         resolve_physics_collisions(
             &mut state,
@@ -11953,6 +11990,7 @@ mod tests {
                 started: true,
             }],
             &BTreeSet::new(),
+            &masses,
         );
 
         // The hit costs nothing and still counts, and its sparks are the old
@@ -11963,6 +12001,59 @@ mod tests {
             state.particles.len() - particles,
             (speed * 0.1 * 10.0).ceil() as usize
         );
+    }
+
+    #[test]
+    fn an_asteroid_broken_earlier_in_the_step_strikes_a_rover_as_hard_as_a_whole_one() {
+        let mut state = init_rover_world(123);
+        let planet = largest_rover_planet(&state);
+        deploy_rover_on_next_step(&mut state, planet, 0);
+        let rover = state.rovers[0];
+        let rover_position = state
+            .physics
+            .rover_snapshot(&rover)
+            .expect("deployed rover should have physics")
+            .chassis
+            .position;
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            rover_position + Vec2::X * 20.0,
+            -Vec2::X * 100.0,
+            5.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        ));
+        let _ = reconcile_physics(&mut state, 1.0 / 60.0);
+        let rock = state.debris[0].physics_id;
+        let rover_mass = state.physics.rover_total_mass(&rover).unwrap();
+        let rock_mass = state.debris[0].mass();
+        // About what a 100 u/s strike that bounces straight back gives.
+        let impulse = 2.0 * 100.0 * rover_mass * rock_mass / (rover_mass + rock_mass);
+        let masses = DebrisMasses::before_damage(&state.debris);
+        let strike = |mut state: SpacewarsState| {
+            resolve_physics_collisions(
+                &mut state,
+                &[MechanicalContact {
+                    a: MechanicalEntity::Rover(rover.id),
+                    b: MechanicalEntity::Debris(rock),
+                    point: Some(rover_position),
+                    normal: Vec2::X,
+                    impulse_magnitude: impulse,
+                    closing_speed: 100.0,
+                    started: true,
+                }],
+                &BTreeSet::new(),
+                &masses,
+            );
+            state.rovers[0].life
+        };
+        let whole = strike(state.clone());
+        assert!(whole < rover.life);
+        // As a beam that breaks the rock earlier in the step would.
+        let fatal = state.debris[0].life_max;
+        damage_debris(&mut state, 0, fatal, -Vec2::X, 0x1A5E_0000);
+        assert!(state.debris[0].dead);
+        assert_eq!(strike(state), whole);
     }
 
     #[test]

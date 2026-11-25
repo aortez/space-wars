@@ -595,7 +595,8 @@ mod tests {
             touch(MechanicalEntity::Rover(rover.id)),
             touch(MechanicalEntity::Ship(1)),
         ];
-        resolve_physics_collisions(&mut state, &contacts, &BTreeSet::new());
+        let masses = DebrisMasses::before_damage(&state.debris);
+        resolve_physics_collisions(&mut state, &contacts, &BTreeSet::new(), &masses);
         assert!(state.rover_debris_collisions.is_empty());
         assert!(state.ship_debris_collisions.is_empty());
         assert_eq!(state.rovers[0].life, rover_life);

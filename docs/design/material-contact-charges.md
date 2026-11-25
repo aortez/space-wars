@@ -395,9 +395,10 @@ the probe below gives its reasons.
   where it needed 200, and against a planet both rules break it from 40 u/s.
   In play, about as many asteroids break as today, since most strikes are
   fast and charges no longer wear asteroids in lasting contact.
-- **When wear lands.** The wear lands just after today's rules, which size a
-  ship's or a rover's damage by the asteroid's mass, so no contact's wear
-  shrinks the asteroid first. They still charge a ship or a rover for each
+- **When wear lands.** The wear lands just after today's rules. They size a
+  ship's or a rover's damage by the asteroid's mass as the step's physics had
+  it, so a laser that breaks the asteroid earlier in the step doesn't change
+  what its strike costs (#714). They still charge a ship or a rover for each
   contact, but an asteroid that now breaks on its first strike can't strike
   again. Dropped on a parked rover at 80 u/s, a radius-5 asteroid cost it
   6.06 in two strikes under today's rules and 1.20 in one under charges.
