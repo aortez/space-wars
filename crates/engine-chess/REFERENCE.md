@@ -388,9 +388,9 @@ as a pass tried a half-move later, is for the benchmark to notice.
 A player may set all five of a search's settings, and the three levels are
 settings to start from. `Settings::for_play` brings whatever a player
 chooses within the limits that every search keeps, and to no more than
-10,000,000 positions a move. The Pi 4 searches about a million positions a
-second, and half that in the slowest position measured, so a search of
-that many would take it ten to twenty seconds.
+10,000,000 positions a move. A search of that many took 6.7 to 10.9 seconds
+on the Pi 4 and 3.0 to 4.6 on the Pi 5, and 18.5 and 8.0 in the slowest
+position measured.
 
 On 2026-11-25 the levels were these, with the search as it is after every
 change listed under [the benchmark](#the-benchmark).
@@ -720,11 +720,11 @@ since a player may still choose it.
 | Normal, four ordinary positions | 3.1 to 5.0 ms | 8.2 to 12.2 ms |
 | 100,000 positions, the same four | 30 to 46 ms | 73 to 113 ms |
 | Hard, the same four | 304 to 447 ms | 722 to 1,098 ms |
-| 10,000,000 positions, the same four | 3.0 to 4.6 s | |
+| 10,000,000 positions, the same four | 3.0 to 4.6 s | 6.7 to 10.9 s |
 | Normal, the position with eleven queens | 7.1 ms | 16.3 ms |
 | 100,000 positions, the same | 78 ms | 183 ms |
 | Hard, the same | 819 ms | 1,946 ms |
-| 10,000,000 positions, the same | 8.0 s | |
+| 10,000,000 positions, the same | 8.0 s | 18.5 s |
 | Starting a search | under 0.1 ms | under 0.2 ms |
 | Slowest of the first 20,000 steps, in the best run | 10 µs | 33 µs |
 
@@ -734,9 +734,9 @@ since a player may still choose it.
   depth and at 100,000 positions each. Nothing in the search uses floating
   point.
 - The searches of 10,000,000 positions, the most a player may give, ran
-  once on the Pi 5 with Hard's other settings, by a program in the tooling
-  outside the repository. The Pi 4 was not on the network by then. Each
-  search looked at positions about as quickly as at 1,000,000.
+  once on each kiosk with Hard's other settings, by a program in the
+  tooling outside the repository. Both kiosks made the same decisions, and
+  each search looked at positions about as quickly as at 1,000,000.
 - Easy answers in under a millisecond on both, and a search holds what it
   holds on the workstation.
 - The kiosks look at about as many positions a second as they did with the

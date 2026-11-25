@@ -56,10 +56,9 @@ pub const MAX_DEPTH: u8 = 32;
 pub const MAX_QUIESCENCE: u8 = 16;
 /// The largest table: two to this power entries of sixteen bytes, or 64 MiB.
 pub const MAX_TABLE_BITS: u8 = 22;
-/// The most positions a player may give a search for one move. The Raspberry
-/// Pi 4, the slowest machine the game runs on, searches about a million
-/// positions a second, and half that in the slowest position measured, so a
-/// search of this many would take it ten to twenty seconds.
+/// The most positions a player may give a search for one move. A search of
+/// this many took 7 to 11 seconds on a Raspberry Pi 4, the slowest machine
+/// the game runs on, and 18 in the slowest position measured there.
 pub const MAX_PLAY_NODES: u64 = 10_000_000;
 
 const MAX_PLY: usize = MAX_DEPTH as usize + MAX_QUIESCENCE as usize;
