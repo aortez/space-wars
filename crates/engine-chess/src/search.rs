@@ -35,7 +35,7 @@ use crate::board::PieceKind;
 use crate::game::{Action, DrawClaim, Game, Revision};
 use crate::moves::Move;
 use crate::position::Position;
-use eval::evaluate;
+use eval::{evaluate_placed, placement, placement_change};
 use exchange::loses;
 use history::History;
 use stack::{Frame, State};
@@ -302,7 +302,8 @@ impl SearchJob {
             })
             .collect();
         let history = History::new();
-        root_moves.sort_by_key(|entry| Reverse(order(&root, entry.mv, None, [None; 2], &history)));
+        let favoured = Favoured::new(None, [None; 2]);
+        root_moves.sort_by_key(|entry| Reverse(order(&root, entry.mv, favoured, &history)));
 
         let (_, before) = game.positions().split_last()?;
         let reach = root.halfmove_clock() as usize;
@@ -493,6 +494,7 @@ impl SearchJob {
     fn push_root_move(&mut self) {
         let frame = &mut self.frames[0];
         frame.position = self.root_moves[self.index].position.clone();
+        frame.placement = placement(&frame.position);
         // The reply is searched from the other player's side, so the window
         // is turned about.
         frame.beta = -self.floor;
@@ -671,6 +673,7 @@ impl SearchJob {
         let frame = &mut below[ply - 1];
         let reply = &mut above[0];
         reply.position = frame.position.pass();
+        reply.placement = frame.placement;
         // All that is asked is whether the value still reaches beta.
         reply.alpha = -frame.beta;
         reply.beta = 1 - frame.beta;
@@ -699,12 +702,11 @@ impl SearchJob {
         let frame = &mut self.frames[ply - 1];
         frame.moves.clear();
         frame.position.candidate_moves(&mut frame.moves);
-        let killers = self.killers[ply];
+        let favoured = Favoured::new(frame.table_move, self.killers[ply]);
         let position = &frame.position;
-        let table_move = frame.table_move;
         frame
             .moves
-            .score(|mv| Some(order(position, mv, table_move, killers, history)));
+            .score(|mv| Some(order(position, mv, favoured, history)));
         frame.best = -INFINITY;
         frame.state = State::Open;
     }
@@ -719,7 +721,7 @@ impl SearchJob {
             let value = if mated {
                 mated_at(ply)
             } else {
-                evaluate(position)
+                evaluate_placed(position, frame.placement)
             };
             frame.state = State::Done(value);
             return;
@@ -728,14 +730,15 @@ impl SearchJob {
         if frame.in_check {
             // Every way out of check is tried, as in the full search.
             position.candidate_moves(&mut frame.moves);
+            let favoured = Favoured::new(None, [None; 2]);
             frame
                 .moves
-                .score(|mv| Some(order(position, mv, None, [None; 2], history)));
+                .score(|mv| Some(order(position, mv, favoured, history)));
             frame.best = -INFINITY;
         } else {
             // The player may decline to capture, so the position is worth at
             // least what it looks.
-            let standing = evaluate(position);
+            let standing = evaluate_placed(position, frame.placement);
             if standing >= frame.beta {
                 frame.state = State::Done(standing);
                 return;
@@ -745,9 +748,20 @@ impl SearchJob {
             position.tactical_moves(&mut frame.moves);
             frame.moves.score(|mv| {
                 let lesser = matches!(mv.promotion, Some(kind) if kind != PieceKind::Queen);
+                if lesser {
+                    return None;
+                }
+                let mover = position.kind_at(mv.from).expect("a move starts on a piece");
+                let captured = position.captured_kind(mv);
                 // A capture that loses material is no reason to think the
                 // position better than it looks.
-                (!lesser && !loses(position, mv)).then(|| tactical_order(position, mv))
+                if loses(position, mv, mover, captured) {
+                    return None;
+                }
+                Some(match captured {
+                    Some(captured) => capture_order(captured, mover),
+                    None => PROMOTION_ORDER,
+                })
             });
         }
         frame.state = State::Open;
@@ -833,11 +847,16 @@ impl SearchJob {
             let Some(mv) = frame.moves.take_best() else {
                 return false;
             };
-            let position = frame.position.make(mv);
-            if !position.mover_is_safe() {
+            let mut placement = frame.placement;
+            let position = frame.position.make_noting(mv, |piece, change| {
+                placement += placement_change(piece, change)
+            });
+            let exposed = frame.position.may_expose_king(mv, frame.in_check);
+            if exposed && !position.mover_is_safe() {
                 frame.moves.discard_last();
                 continue;
             }
+            debug_assert!(position.mover_is_safe(), "{mv} in {}", frame.position);
             frame.legal += 1;
             frame.current = mv;
             // After the first move, the rest need only be shown no better,
@@ -854,6 +873,7 @@ impl SearchJob {
             }
             frame.reduced = reduction > 0;
             reply.position = position;
+            reply.placement = placement;
             reply.beta = -frame.alpha;
             reply.alpha = if frame.probing {
                 -frame.alpha - 1
@@ -1021,7 +1041,7 @@ fn may_pass(frame: &Frame, after_pass: bool) -> bool {
         && frame.beta - frame.alpha == 1
         && frame.beta.abs() < MATE_BOUND
         && frame.position.mover_has_pieces()
-        && evaluate(&frame.position) >= frame.beta
+        && evaluate_placed(&frame.position, frame.placement) >= frame.beta
 }
 
 /// What a pass proves a position to be worth at least, given the value
@@ -1070,47 +1090,60 @@ fn from_table(score: i32, ply: usize) -> i32 {
     }
 }
 
+/// The moves of a position that are tried before the rest whatever they
+/// are, each as the number [`Move::code`] gives it.
+#[derive(Clone, Copy)]
+struct Favoured {
+    table_move: u16,
+    killers: [u16; 2],
+}
+
+impl Favoured {
+    fn new(table_move: Option<Move>, killers: [Option<Move>; 2]) -> Self {
+        // No move has the number that stands for none.
+        let code = |mv: Option<Move>| mv.map_or(u16::MAX, Move::code);
+        Self {
+            table_move: code(table_move),
+            killers: killers.map(code),
+        }
+    }
+}
+
 /// How early to try a move: the table's move, then captures of the most
 /// valuable piece by the least valuable, then promotions to a queen, the
 /// killers, the other quiet moves by how well they have done lately,
 /// promotions to less than a queen, and last the captures that lose material.
-fn order(
-    position: &Position,
-    mv: Move,
-    table_move: Option<Move>,
-    killers: [Option<Move>; 2],
-    history: &History,
-) -> i16 {
-    if Some(mv) == table_move {
+fn order(position: &Position, mv: Move, favoured: Favoured, history: &History) -> i16 {
+    let code = mv.code();
+    if code == favoured.table_move {
         return 30_000;
     }
-    if position.captured_kind(mv).is_some() {
-        let order = tactical_order(position, mv);
-        return if loses(position, mv) {
+    if let Some(captured) = position.captured_kind(mv) {
+        let capturer = position.kind_at(mv.from).expect("a move starts on a piece");
+        let order = capture_order(captured, capturer);
+        return if loses(position, mv, capturer, Some(captured)) {
             order - 30_000
         } else {
             order
         };
     }
     match mv.promotion {
-        Some(PieceKind::Queen) => tactical_order(position, mv),
+        Some(PieceKind::Queen) => PROMOTION_ORDER,
         Some(_) => -History::LIMIT - 1,
-        None if Some(mv) == killers[0] => 10_000,
-        None if Some(mv) == killers[1] => 9_999,
+        None if code == favoured.killers[0] => 10_000,
+        None if code == favoured.killers[1] => 9_999,
         None => history.score(position.side_to_move(), mv),
     }
 }
 
-/// How early to try a capture or a promotion to a queen, among moves that do
-/// not lose material.
-fn tactical_order(position: &Position, mv: Move) -> i16 {
-    match position.captured_kind(mv) {
-        Some(captured) => {
-            let capturer = position.kind_at(mv.from).expect("a move starts on a piece");
-            20_000 + 8 * captured.index() as i16 - capturer.index() as i16
-        }
-        None => 19_000,
-    }
+/// How early to try a promotion to a queen that captures nothing: after
+/// every capture that does not lose material.
+const PROMOTION_ORDER: i16 = 19_000;
+
+/// How early to try a capture, among those that do not lose material: the
+/// most valuable piece taken first, and by the least valuable piece.
+fn capture_order(captured: PieceKind, capturer: PieceKind) -> i16 {
+    20_000 + 8 * captured.index() as i16 - capturer.index() as i16
 }
 
 /// A draw claim that the player to move could make, as the position stands

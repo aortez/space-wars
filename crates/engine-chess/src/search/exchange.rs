@@ -4,7 +4,9 @@
 //! Past the full search, where only captures are followed, the search leaves
 //! out those that lose material. Everywhere else it tries them last.
 
-use crate::bitboard::{bishop_attacks, king_attacks, knight_attacks, pawn_attacks, rook_attacks};
+use crate::bitboard::{
+    bishop_attacks, diagonals, king_attacks, knight_attacks, pawn_attacks, rook_attacks, straights,
+};
 use crate::board::{Color, PieceKind, Square};
 use crate::moves::Move;
 use crate::position::Position;
@@ -16,7 +18,8 @@ fn value(kind: PieceKind) -> i32 {
 }
 
 /// What `mv` wins in centipawns for the player who makes it, if both players
-/// then capture on the square it lands on for as long as that pays them.
+/// then capture on the square it lands on for as long as that pays them. It
+/// moves a piece of kind `mover` and captures one of kind `captured`, if any.
 ///
 /// Each capture is made by the least valuable piece that attacks the square,
 /// and of two alike by the one on the lower square, counting from a1 along
@@ -26,11 +29,10 @@ fn value(kind: PieceKind) -> i32 {
 /// Nothing else about the position is considered. A pinned piece captures as
 /// freely as any other, and of the promotions only the one `mv` itself makes
 /// is counted: a pawn that captures onto the last rank later stays a pawn.
-pub(super) fn exchange(position: &Position, mv: Move) -> i32 {
-    let mover = position.kind_at(mv.from).expect("a move starts on a piece");
+fn exchange(position: &Position, mv: Move, mover: PieceKind, captured: Option<PieceKind>) -> i32 {
     let mut occupied = (position.occupied() ^ mv.from.bit()) | mv.to.bit();
     let mut won = 0;
-    if let Some(captured) = position.captured_kind(mv) {
+    if let Some(captured) = captured {
         won = value(captured);
         if position.kind_at(mv.to).is_none() {
             // En passant: the pawn taken stands beside the capturer.
@@ -47,18 +49,32 @@ pub(super) fn exchange(position: &Position, mv: Move) -> i32 {
     won - recapture(position, mv.to, them, occupied, value(standing))
 }
 
-/// Whether `mv` loses material by [`exchange`].
-pub(super) fn loses(position: &Position, mv: Move) -> bool {
-    if mv.promotion.is_none() {
-        let mover = position.kind_at(mv.from).expect("a move starts on a piece");
-        let captured = position.captured_kind(mv);
+/// Whether `mv` loses material by [`exchange`]. It moves a piece of kind
+/// `mover` and captures one of kind `captured`, if any.
+pub(super) fn loses(
+    position: &Position,
+    mv: Move,
+    mover: PieceKind,
+    captured: Option<PieceKind>,
+) -> bool {
+    if let (Some(captured), None) = (captured, mv.promotion) {
         // A piece that takes one worth as much cannot come out behind: at
         // worst it is taken in turn, and the exchange can stop there.
-        if captured.is_some_and(|captured| value(captured) >= value(mover)) {
+        if value(captured) >= value(mover) {
             return false;
         }
+        // A pawn that takes the piece in turn is the cheapest capturer there
+        // could be, and can itself cost no more than a pawn. If the piece is
+        // worth more than what it took and a pawn together, it comes out
+        // behind whatever follows.
+        let us = position.side_to_move();
+        let their_pawns = position.set(us.opposite(), PieceKind::Pawn);
+        let defended = pawn_attacks(mv.to.bit(), us) & their_pawns != 0;
+        if defended && value(captured) + value(PieceKind::Pawn) < value(mover) {
+            return true;
+        }
     }
-    exchange(position, mv) < 0
+    exchange(position, mv, mover, captured) < 0
 }
 
 /// The most `side` can win by capturing on `square`, where a piece worth
@@ -95,12 +111,20 @@ fn attackers(position: &Position, square: Square, occupied: u64) -> u64 {
     let queens = of(PieceKind::Queen);
     // A piece attacks the square if the same kind of piece, standing on the
     // square, would attack it. For a pawn that means one of the other colour.
-    let attackers = (pawn_attacks(target, Color::Black) & pawns & white)
+    let bishops = (of(PieceKind::Bishop) | queens) & occupied;
+    let rooks = (of(PieceKind::Rook) | queens) & occupied;
+    let mut attackers = (pawn_attacks(target, Color::Black) & pawns & white)
         | (pawn_attacks(target, Color::White) & pawns & black)
         | (knight_attacks(target) & of(PieceKind::Knight))
-        | (king_attacks(target) & of(PieceKind::King))
-        | (bishop_attacks(target, occupied) & (of(PieceKind::Bishop) | queens))
-        | (rook_attacks(target, occupied) & (of(PieceKind::Rook) | queens));
+        | (king_attacks(target) & of(PieceKind::King));
+    // What stands in the way of a sliding piece is looked at only if one
+    // shares a line with the square.
+    if diagonals(square) & bishops != 0 {
+        attackers |= bishop_attacks(square, occupied) & bishops;
+    }
+    if straights(square) & rooks != 0 {
+        attackers |= rook_attacks(square, occupied) & rooks;
+    }
     attackers & occupied
 }
 
@@ -126,6 +150,16 @@ pub(super) mod tests {
 
     fn squares() -> impl Iterator<Item = Square> {
         (0..64).map(Square::from_index)
+    }
+
+    /// What `mv` wins by [`exchange`], and whether it [`loses`].
+    fn worked(position: &Position, mv: Move) -> (i32, bool) {
+        let mover = position.kind_at(mv.from).unwrap();
+        let captured = position.captured_kind(mv);
+        (
+            exchange(position, mv, mover, captured),
+            loses(position, mv, mover, captured),
+        )
     }
 
     /// Whether the piece on `from` attacks `to`.
@@ -305,9 +339,8 @@ pub(super) mod tests {
             let position = Position::from_fen(fen).unwrap();
             let mv = Move::parse(text).unwrap();
             assert!(position.legal_moves().contains(&mv), "{what}: {text}");
-            assert_eq!(exchange(&position, mv), value, "{what}");
+            assert_eq!(worked(&position, mv), (value, value < 0), "{what}");
             assert_eq!(plain_exchange(&position, mv), value, "{what}, plainly");
-            assert_eq!(loses(&position, mv), value < 0, "{what}");
         }
     }
 
@@ -337,9 +370,12 @@ pub(super) mod tests {
                             // Castling moves two pieces and captures nothing.
                             continue;
                         }
-                        let value = exchange(&position, mv);
-                        assert_eq!(value, plain_exchange(&position, mv), "{position}: {mv}");
-                        assert_eq!(loses(&position, mv), value < 0, "{position}: {mv}");
+                        let value = plain_exchange(&position, mv);
+                        assert_eq!(
+                            worked(&position, mv),
+                            (value, value < 0),
+                            "{position}: {mv}"
+                        );
                         moves_checked += 1;
                         losing += u32::from(value < 0);
                     }

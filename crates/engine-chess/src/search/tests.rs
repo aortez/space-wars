@@ -16,6 +16,7 @@
 
 use std::collections::HashMap;
 
+use super::eval::evaluate;
 use super::exchange::tests::plain_exchange;
 use super::*;
 use crate::{Color, Game, Position};
@@ -482,7 +483,8 @@ fn moves_are_tried_most_promising_first() {
         history.record(Color::White, mv("a1b1"), 6_400, true);
         history.record(Color::White, mv("h1g1"), 6_400, false);
     }
-    let score = |text| order(&position, mv(text), Some(mv("e1e2")), killers, &history);
+    let favoured = Favoured::new(Some(mv("e1e2")), killers);
+    let score = |text| order(&position, mv(text), favoured, &history);
     let expected = [
         ("e1e2", "the table's move"),
         ("e4d5", "a pawn takes the queen"),
@@ -697,6 +699,24 @@ fn the_evaluation_counts_material_and_placement() {
     let no_queen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1";
     assert_eq!(value(no_queen), -975);
     assert_eq!(value(&no_queen.replace(" w ", " b ")), 975);
+
+    // One piece besides the kings, which stand alike and cancel out: its
+    // value and the bonus for its square, read from its owner's side.
+    for (board, worth) in [
+        ("4k3/8/8/8/4P3/8/8/4K3", 100 + 10),
+        ("4k3/8/8/8/3N4/8/8/4K3", 330 + 8),
+        ("4k3/8/8/8/8/8/8/2B1K3", 350 - 12),
+        ("4k3/8/8/8/8/8/8/3RK3", 520 + 2),
+        ("4k3/8/8/8/8/8/8/3QK3", 980 - 5),
+        ("4k3/8/8/4p3/8/8/8/4K3", -(100 + 10)),
+        ("4k3/8/8/3n4/8/8/8/4K3", -(330 + 8)),
+        ("2b1k3/8/8/8/8/8/8/4K3", -(350 - 12)),
+        ("3rk3/8/8/8/8/8/8/4K3", -(520 + 2)),
+        ("3qk3/8/8/8/8/8/8/4K3", -(980 - 5)),
+    ] {
+        assert_eq!(value(&format!("{board} w - - 0 1")), worth, "{board}");
+        assert_eq!(value(&format!("{board} b - - 0 1")), -worth, "{board}");
+    }
 
     // The king has changed places with the knight on the g-file, then with
     // the bishop on the c-file. Either castled square is worth 30 to it, on

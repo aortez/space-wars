@@ -190,6 +190,86 @@ fn moves_read_back_from_the_text_they_write() {
 }
 
 #[test]
+fn every_move_has_a_number_of_its_own() {
+    let promotions = [
+        None,
+        Some(PieceKind::Knight),
+        Some(PieceKind::Bishop),
+        Some(PieceKind::Rook),
+        Some(PieceKind::Queen),
+    ];
+    let mut seen = std::collections::HashSet::new();
+    for from in (0..64).map(Square::from_index) {
+        for to in (0..64).map(Square::from_index) {
+            for promotion in promotions {
+                let mv = Move {
+                    from,
+                    to,
+                    promotion,
+                };
+                assert!(seen.insert(mv.code()), "{mv} shares its number");
+            }
+        }
+    }
+    // One number is left to stand for no move at all.
+    assert!(!seen.contains(&u16::MAX));
+}
+
+#[test]
+fn a_move_that_cannot_expose_the_king_leaves_it_safe() {
+    use crate::bitboard::{diagonals, straights};
+
+    // Illegal moves met along the way, by what should have given them away:
+    // made in check, made by the king, and made by a piece that shared a
+    // rank or file with its king, or a diagonal.
+    let (mut in_check, mut by_king, mut off_straight, mut off_diagonal) = (0, 0, 0, 0);
+    let (mut asked, mut spared) = (0, 0);
+    for fen in BUSY {
+        walk(&Position::from_fen(fen).unwrap(), 2, &mut |position| {
+            let checked = position.is_check();
+            let king = position.king(position.side_to_move());
+            let mut moves = Vec::new();
+            position.candidate_moves(&mut moves);
+            for mv in moves {
+                asked += 1;
+                let safe = position.make(mv).mover_is_safe();
+                if !position.may_expose_king(mv, checked) {
+                    spared += 1;
+                    assert!(safe, "{position}: {mv} leaves the king attacked");
+                } else if !safe {
+                    in_check += u32::from(checked && mv.from != king);
+                    by_king += u32::from(mv.from == king);
+                    let pinned = !checked && mv.from != king;
+                    off_straight += u32::from(pinned && straights(king) & mv.from.bit() != 0);
+                    off_diagonal += u32::from(pinned && diagonals(king) & mv.from.bit() != 0);
+                }
+            }
+        });
+    }
+    // These boards are crowded round the kings, and still more than a third
+    // of the moves are spared the test of the position after them.
+    assert!(spared * 3 > asked, "{spared} of {asked} moves spared");
+    for (what, met) in [
+        ("in check", in_check),
+        ("by the king", by_king),
+        ("off a rank or file", off_straight),
+        ("off a diagonal", off_diagonal),
+    ] {
+        assert!(met >= 10, "only {met} illegal moves {what} were met");
+    }
+
+    // Taking this pawn en passant would uncover the bishop's diagonal to the
+    // king, though the capturing pawn shares no line with the king. The
+    // rules keep no en passant square where no capture is legal, so the
+    // square is put there by hand: the answer must not lean on that rule.
+    let mut position = Position::from_fen("4k3/1b6/8/3pP3/8/8/6K1/8 w - - 0 1").unwrap();
+    position.en_passant = Square::from_name("d6");
+    let capture = Move::parse("e5d6").unwrap();
+    assert!(!position.make(capture).mover_is_safe());
+    assert!(position.may_expose_king(capture, false));
+}
+
+#[test]
 fn counters_at_their_limit_do_not_overflow() {
     let fen = format!("4k3/8/8/8/8/8/8/4K2R b - - {0} {0}", u32::MAX);
     let position = Position::from_fen(&fen).unwrap();

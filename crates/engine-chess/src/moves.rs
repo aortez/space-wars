@@ -37,6 +37,13 @@ impl Move {
             promotion,
         })
     }
+
+    /// The move as one number, different for every move, which is quicker
+    /// to compare than the move itself. No move has the number `u16::MAX`.
+    pub(crate) fn code(self) -> u16 {
+        let promotion = self.promotion.map_or(0, |kind| kind.index() + 1);
+        (self.from.index() | self.to.index() << 6 | promotion << 12) as u16
+    }
 }
 
 impl fmt::Display for Move {

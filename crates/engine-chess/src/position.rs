@@ -1,8 +1,8 @@
 //! One arrangement of the board, with the rights that go with it.
 
 use crate::bitboard::{
-    LIGHT_SQUARES, RANK_1, RANK_2, RANK_7, RANK_8, Squares, bishop_attacks, king_attacks,
-    knight_attacks, north, pawn_attacks, rook_attacks, south,
+    LIGHT_SQUARES, RANK_1, RANK_2, RANK_7, RANK_8, Squares, bishop_attacks, diagonals,
+    king_attacks, knight_attacks, north, pawn_attacks, rook_attacks, south, straights,
 };
 use crate::board::{Color, Piece, PieceKind, Square};
 use crate::moves::Move;
@@ -246,14 +246,35 @@ impl Position {
         let occupied = self.occupied();
         let attackers = |kind| self.set(by, kind);
         let queens = attackers(PieceKind::Queen);
+        let bishops = attackers(PieceKind::Bishop) | queens;
+        let rooks = attackers(PieceKind::Rook) | queens;
         // A piece attacks the square if the same kind of piece, standing on
         // the square, would attack it. For a pawn that means one of the
-        // other colour.
+        // other colour. What stands in the way of a sliding piece is looked
+        // at only if one shares a line with the square.
         pawn_attacks(target, by.opposite()) & attackers(PieceKind::Pawn) != 0
             || knight_attacks(target) & attackers(PieceKind::Knight) != 0
             || king_attacks(target) & attackers(PieceKind::King) != 0
-            || bishop_attacks(target, occupied) & (attackers(PieceKind::Bishop) | queens) != 0
-            || rook_attacks(target, occupied) & (attackers(PieceKind::Rook) | queens) != 0
+            || (diagonals(square) & bishops != 0 && bishop_attacks(square, occupied) & bishops != 0)
+            || (straights(square) & rooks != 0 && rook_attacks(square, occupied) & rooks != 0)
+    }
+
+    /// Whether `mv`, a candidate move of the player to move, could leave
+    /// that player's king attacked. `in_check` says whether it is attacked
+    /// now. Only if the answer is yes need the position after the move be
+    /// tested with [`mover_is_safe`](Self::mover_is_safe).
+    ///
+    /// A king that is not attacked can come to be in three ways: it moves, a
+    /// piece leaves a line it shared with the king and so opens the line, or
+    /// a capture en passant takes a pawn off a square the capturer does not
+    /// land on. Any other move leaves every line to the king as it was, or
+    /// blocks one.
+    pub(crate) fn may_expose_king(&self, mv: Move, in_check: bool) -> bool {
+        let king = self.king(self.side_to_move);
+        in_check
+            || mv.from == king
+            || Some(mv.to) == self.en_passant
+            || (straights(king) | diagonals(king)) & mv.from.bit() != 0
     }
 
     /// Whether the player who has just moved left their own king unattacked.
@@ -269,9 +290,10 @@ impl Position {
     fn for_each_successor(&self, mut visit: impl FnMut(Move, Position)) {
         let mut moves = Vec::with_capacity(64);
         self.candidate_moves(&mut moves);
+        let in_check = self.is_check();
         for mv in moves {
             let next = self.make(mv);
-            if next.mover_is_safe() {
+            if !self.may_expose_king(mv, in_check) || next.mover_is_safe() {
                 visit(mv, next);
             }
         }
@@ -341,13 +363,13 @@ impl Position {
             push_moves(moves, from, knight_attacks(from.bit()) & wanted);
         }
         for from in Squares(self.set(us, PieceKind::Bishop)) {
-            push_moves(moves, from, bishop_attacks(from.bit(), occupied) & wanted);
+            push_moves(moves, from, bishop_attacks(from, occupied) & wanted);
         }
         for from in Squares(self.set(us, PieceKind::Rook)) {
-            push_moves(moves, from, rook_attacks(from.bit(), occupied) & wanted);
+            push_moves(moves, from, rook_attacks(from, occupied) & wanted);
         }
         for from in Squares(self.set(us, PieceKind::Queen)) {
-            let targets = bishop_attacks(from.bit(), occupied) | rook_attacks(from.bit(), occupied);
+            let targets = bishop_attacks(from, occupied) | rook_attacks(from, occupied);
             push_moves(moves, from, targets & wanted);
         }
         let king = self.king(us);
@@ -390,6 +412,17 @@ impl Position {
 
     /// Plays a candidate move without testing that it leaves the king safe.
     pub(crate) fn make(&self, mv: Move) -> Position {
+        self.make_noting(mv, |_, _| {})
+    }
+
+    /// Plays a candidate move as [`make`](Self::make) does, and tells `note`
+    /// of every piece it takes off a square (`false`) or puts on one
+    /// (`true`).
+    pub(crate) fn make_noting(
+        &self,
+        mv: Move,
+        mut note: impl FnMut(Piece, (Square, bool)),
+    ) -> Position {
         let us = self.side_to_move;
         let them = us.opposite();
         let kind = self
@@ -397,24 +430,36 @@ impl Position {
             .expect("a candidate move starts on a piece");
         let on_file = |file, rank| Square::new(file, rank).expect("a square on the board");
         let mut next = self.clone();
+        let mut change = |next: &mut Position, color, kind, square, put| {
+            next.toggle(color, kind, square);
+            note(Piece { color, kind }, (square, put));
+        };
 
         let mut restarts_clock = kind == PieceKind::Pawn;
         if let Some(captured) = self.kind_at(mv.to) {
-            next.toggle(them, captured, mv.to);
+            change(&mut next, them, captured, mv.to, false);
             restarts_clock = true;
         }
-        next.toggle(us, kind, mv.from);
-        next.toggle(us, mv.promotion.unwrap_or(kind), mv.to);
+        change(&mut next, us, kind, mv.from, false);
+        change(&mut next, us, mv.promotion.unwrap_or(kind), mv.to, true);
 
         if kind == PieceKind::Pawn && Some(mv.to) == self.en_passant {
             // The captured pawn stands beside the capturer, not on its target.
-            next.toggle(them, PieceKind::Pawn, on_file(mv.to.file(), mv.from.rank()));
+            let beside = on_file(mv.to.file(), mv.from.rank());
+            change(&mut next, them, PieceKind::Pawn, beside, false);
         }
         if kind == PieceKind::King && mv.from.file().abs_diff(mv.to.file()) == 2 {
             // Castling: the rook lands on the square the king crossed.
             let (rook_from, rook_to) = if mv.to.file() == 6 { (7, 5) } else { (0, 3) };
-            next.toggle(us, PieceKind::Rook, on_file(rook_from, mv.from.rank()));
-            next.toggle(us, PieceKind::Rook, on_file(rook_to, mv.from.rank()));
+            let rank = mv.from.rank();
+            change(
+                &mut next,
+                us,
+                PieceKind::Rook,
+                on_file(rook_from, rank),
+                false,
+            );
+            change(&mut next, us, PieceKind::Rook, on_file(rook_to, rank), true);
         }
 
         next.castling &= !(rights_ended_at(mv.from) | rights_ended_at(mv.to));

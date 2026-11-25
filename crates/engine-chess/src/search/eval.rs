@@ -4,7 +4,7 @@
 //! corrections that `REFERENCE.md` describes.
 
 use crate::bitboard::Squares;
-use crate::board::{Color, PieceKind, Square};
+use crate::board::{Color, Piece, PieceKind, Square};
 use crate::position::Position;
 
 /// What each kind of piece is worth in centipawns. The king is never
@@ -102,13 +102,9 @@ const KING_ENDGAME: Table = [
     0, 0, 0, 0, 0, 0, 0, 0,
 ];
 
-const PIECES: [(PieceKind, &Table); 5] = [
-    (PieceKind::Pawn, &PAWN),
-    (PieceKind::Knight, &KNIGHT),
-    (PieceKind::Bishop, &BISHOP),
-    (PieceKind::Rook, &ROOK),
-    (PieceKind::Queen, &QUEEN),
-];
+/// The tables of the pieces other than the king, in the order of
+/// [`PieceKind::ALL`].
+const TABLES: [&Table; 5] = [&PAWN, &KNIGHT, &BISHOP, &ROOK, &QUEEN];
 
 /// The board counts as full with this many pieces on it and as empty of
 /// everything but an endgame with [`ENDGAME_PIECES`]. In between, the two
@@ -124,33 +120,66 @@ fn index(color: Color, square: Square) -> usize {
     usize::from(rank) * 8 + usize::from(square.file())
 }
 
+/// What `piece` is worth on `square` to its owner: its value and the bonus
+/// for the square. The king's part depends on the rest of the board and is
+/// counted apart, so a king is worth nothing here.
+fn worth(piece: Piece, square: Square) -> i32 {
+    match TABLES.get(piece.kind.index()) {
+        Some(table) => VALUES[piece.kind.index()] + i32::from(table[index(piece.color, square)]),
+        None => 0,
+    }
+}
+
+/// How the [`placement`] of a position changes for White when `piece` is put
+/// on `square`, or taken off it if `put` is false.
+pub(super) fn placement_change(piece: Piece, (square, put): (Square, bool)) -> i32 {
+    let gained = (piece.color == Color::White) == put;
+    let worth = worth(piece, square);
+    if gained { worth } else { -worth }
+}
+
+/// What the pieces of `position` are worth where they stand, White's less
+/// Black's, leaving out the kings.
+///
+/// The search keeps this up from one position to the next with
+/// [`placement_change`], which is quicker than counting every piece again.
+pub(super) fn placement(position: &Position) -> i32 {
+    let mut placement = 0;
+    for (color, sign) in [(Color::White, 1), (Color::Black, -1)] {
+        for kind in PieceKind::ALL {
+            for square in Squares(position.set(color, kind)) {
+                placement += sign * worth(Piece { color, kind }, square);
+            }
+        }
+    }
+    placement
+}
+
 /// The value of `position` in centipawns for the player to move: material,
-/// plus where each piece stands.
+/// plus where each piece stands. The search does not count the pieces again
+/// at every position, so only the tests work a value out from nothing.
+#[cfg(test)]
 pub(crate) fn evaluate(position: &Position) -> i32 {
+    evaluate_placed(position, placement(position))
+}
+
+/// The value of `position` in centipawns for the player to move, given its
+/// [`placement`].
+pub(super) fn evaluate_placed(position: &Position, placement: i32) -> i32 {
+    debug_assert_eq!(placement, self::placement(position), "{position}");
     let span = OPENING_PIECES - ENDGAME_PIECES;
     let pieces = position.occupied().count_ones() as i32;
     let opening = (pieces - ENDGAME_PIECES).clamp(0, span);
-
-    let mut score = 0;
-    for color in [Color::White, Color::Black] {
-        let mut side = 0;
-        for (kind, table) in PIECES {
-            let set = position.set(color, kind);
-            side += VALUES[kind.index()] * set.count_ones() as i32;
-            for square in Squares(set) {
-                side += i32::from(table[index(color, square)]);
-            }
-        }
+    let king = |color| {
         let king = index(color, position.king(color));
         let early = i32::from(KING_OPENING[king]);
         let late = i32::from(KING_ENDGAME[king]);
-        side += (early * opening + late * (span - opening)) / span;
+        (early * opening + late * (span - opening)) / span
+    };
 
-        if color == position.side_to_move() {
-            score += side;
-        } else {
-            score -= side;
-        }
+    let for_white = placement + king(Color::White) - king(Color::Black);
+    match position.side_to_move() {
+        Color::White => for_white,
+        Color::Black => -for_white,
     }
-    score
 }
