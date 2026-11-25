@@ -167,8 +167,6 @@ impl Duel {
         };
         let mut running_gear = [None, None];
         let tanks = std::array::from_fn(|index| {
-            let id = PhysicsId::new(placement.ids.start + 10 + index as u64);
-            let mut body = BodyId::new(id, BodyRole::PRIMARY);
             let x = if config.course.is_some() {
                 if index == 0 { course::START_X } else { 38.0 }
             } else if config.roof {
@@ -182,20 +180,6 @@ impl Duel {
             } else {
                 placement.spawn_x[index]
             };
-            let mut collider = ColliderSpec::convex_polygon(
-                ColliderId::new(id, ColliderRole::PRIMARY, 0),
-                RIGID_TANK_HULL.to_vec(),
-            );
-            if let engine_rapier::world::ColliderShape::ConvexPolygon { vertices } =
-                &mut collider.shape
-            {
-                for vertex in vertices {
-                    *vertex *= placement.scale;
-                }
-            }
-            collider.density = 8.0;
-            collider.friction = 1.0;
-            collider.collision_groups = host::FIGHT;
             let position = Vec2::new(
                 x,
                 if let Some(course) = config.course {
@@ -216,28 +200,8 @@ impl Duel {
                     placement.hill(x, seed) + 2.0
                 },
             );
-            if suspension::enabled(config) {
-                let assembly = suspension::insert_scaled(
-                    physics,
-                    id,
-                    placement.point_to_world(position),
-                    config.wheel_tuning,
-                    placement.scale,
-                );
-                body = assembly.bodies()[0];
-                running_gear[index] = Some(assembly);
-            } else {
-                assert!(physics.insert_body(
-                    body,
-                    BodySpec {
-                        position: placement.point_to_world(position),
-                        angular_damping: 2.0,
-                        ccd_enabled: true,
-                        ..Default::default()
-                    },
-                    &[collider]
-                ));
-            }
+            let (body, gear) = Self::insert_tank(physics, config, &placement, index, position);
+            running_gear[index] = gear;
             Tank {
                 body,
                 elevation: 50.0_f32.to_radians(),
@@ -328,6 +292,53 @@ impl Duel {
             flashes: Vec::new(),
             status: "Drive into position, aim and fire. Demo controls both tanks.",
         }
+    }
+    /// Inserts the hull of the tank numbered `index`, or its sprung
+    /// assembly, upright and at rest with the hull at `position` in the
+    /// duel's units. Answers the hull and any running gear.
+    pub(crate) fn insert_tank(
+        physics: &mut PhysicsWorld,
+        config: ScorchedConfig,
+        placement: &host::Placement,
+        index: usize,
+        position: Vec2,
+    ) -> (BodyId, Option<engine_rapier::rover::RoverAssembly>) {
+        let id = PhysicsId::new(placement.ids.start + 10 + index as u64);
+        if suspension::enabled(config) {
+            let assembly = suspension::insert_scaled(
+                physics,
+                id,
+                placement.point_to_world(position),
+                config.wheel_tuning,
+                placement.scale,
+            );
+            return (assembly.bodies()[0], Some(assembly));
+        }
+        let mut collider = ColliderSpec::convex_polygon(
+            ColliderId::new(id, ColliderRole::PRIMARY, 0),
+            RIGID_TANK_HULL.to_vec(),
+        );
+        if let engine_rapier::world::ColliderShape::ConvexPolygon { vertices } = &mut collider.shape
+        {
+            for vertex in vertices {
+                *vertex *= placement.scale;
+            }
+        }
+        collider.density = 8.0;
+        collider.friction = 1.0;
+        collider.collision_groups = host::FIGHT;
+        let body = BodyId::new(id, BodyRole::PRIMARY);
+        assert!(physics.insert_body(
+            body,
+            BodySpec {
+                position: placement.point_to_world(position),
+                angular_damping: 2.0,
+                ccd_enabled: true,
+                ..Default::default()
+            },
+            &[collider]
+        ));
+        (body, None)
     }
     pub fn loose_cells(&self) -> usize {
         self.loose.len()

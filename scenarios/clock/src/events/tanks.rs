@@ -5,7 +5,7 @@ use crate::{
     digit_surfaces::{SurfaceId, SurfaceLedger, SurfacePose},
     layout::Layout,
 };
-use engine_common::{ClockEventKind, ClockTanksState};
+use engine_common::{ClockEventKind, ClockTanksRebuildStage as Stage, ClockTanksState};
 use engine_core::Vec2;
 use engine_rapier::{
     terrain::{GrainSeed, GrainShape, RadialImpulse, TerrainGrain, TerrainSpec},
@@ -25,13 +25,25 @@ pub const BEAM_UP_TICKS: u64 = 2 * FIXED_HZ as u64;
 /// How far the winner's beam lifts it, in the duel's units.
 pub const BEAM_UP_RISE: f32 = 12.0;
 pub const WITHDRAW_TICKS: u64 = 3 * FIXED_HZ as u64;
+/// The longest the fight's end lasts once the loser has blown up: the
+/// aftermath of a parting shot, or a rebuild's aftermath, its sudden death,
+/// the last shells and the second blow-up.
+const ENDING_TICKS: u64 = {
+    let rebuild =
+        REBUILD_BY_TICKS + SUDDEN_DEATH_TICKS + SHELL_LIFETIME_TICKS as u64 + BLOW_UP_TICKS;
+    if rebuild > PARTING_TICKS {
+        rebuild
+    } else {
+        PARTING_TICKS
+    }
+};
 pub const MAX_TICKS: u64 = RAISE_TICKS
     + 2 * BEAM_DOWN_TICKS
     + SETTLE_TICKS
     + COMBAT_TICKS
     + SHELL_LIFETIME_TICKS as u64
     + BLOW_UP_TICKS
-    + PARTING_TICKS
+    + ENDING_TICKS
     + BEAM_UP_TICKS
     + WITHDRAW_TICKS;
 pub const REUSE_TICKS: u64 = 120 * FIXED_HZ as u64;
@@ -113,11 +125,13 @@ pub fn dodging(seed: u64) -> [bool; 2] {
 mod damage;
 mod digits;
 mod entry;
+pub mod rebuild;
 pub mod survivor;
 pub mod wreck;
 pub use damage::MAX_LOOSE;
 pub use entry::placement;
-pub use survivor::{MAX_SURVIVOR_BODIES, PARTING_TICKS};
+pub use rebuild::SUDDEN_DEATH_TICKS;
+pub use survivor::{MAX_SURVIVOR_BODIES, PARTING_TICKS, REBUILD_BY_TICKS};
 pub use wreck::{BLOW_UP_TICKS, MAX_PIECE_COLLIDERS, MAX_PIECES};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -168,6 +182,9 @@ pub struct TanksEvent {
     pub wreck: wreck::Wreck,
     /// The losers' spacelings that get out.
     pub survivors: survivor::Survivors,
+    /// A loser's tank its spaceling rebuilds from its dirt, from when the
+    /// dirt sets off home.
+    pub rebuild: Option<rebuild::Rebuild>,
     pub result: Option<ResultKind>,
     combat_ticks: u64,
     /// The combat tick fire opened on.
@@ -263,6 +280,7 @@ impl TanksEvent {
             converted: Vec::new(),
             wreck: wreck::Wreck::new(seed, scale, shape),
             survivors: survivor::Survivors::new(seed, scale),
+            rebuild: None,
             result: None,
             combat_ticks: 0,
             fire_opened: None,
@@ -407,12 +425,16 @@ impl TanksEvent {
                 self.survivors.control(world, gravity, self.tick, winner);
                 // The winner's turret turns onto a spaceling that
                 // surrenders, and keeps it covered as its beam draws it in,
-                // and onto one it takes its parting shot at.
+                // onto one it takes its parting shot at, and onto a tank's
+                // dirt as it crawls home.
                 if let Some(winner) = winner
                     && let Some(target) = self.survivors.target(winner.barrel[0])
                 {
                     self.duel
                         .point_barrel(winner.slot, survivor::turn_barrel(winner.barrel, target));
+                }
+                if let Some(rebuild) = &mut self.rebuild {
+                    rebuild.crawl(world, self.tick);
                 }
             }
             EventPhase::BeamUp => self.survivors.lift(world, self.phase_tick),
@@ -445,7 +467,14 @@ impl TanksEvent {
             let gravity = self.duel.gravity_scale(world);
             for impact in self.duel.impacts() {
                 // A parting shell's burst throws what the duel does not own.
+                // One that bursts by where a tank's dirt is crawling home
+                // first lets the dirt fall, to throw it with the rest.
                 if self.result.is_some() {
+                    if let Some(rebuild) = &mut self.rebuild
+                        && rebuild.scatters(impact.point)
+                    {
+                        rebuild.drop_cells(world, Stage::Scattered);
+                    }
                     self.survivors.shove(world, impact.point);
                     RadialImpulse {
                         center: impact.point,
@@ -502,9 +531,19 @@ impl TanksEvent {
                 }
             }
             EventPhase::Fighting => {
-                self.combat_ticks += 1;
-                self.open_fire(world);
-                if self.combat_ticks == COMBAT_TICKS
+                // A sudden death runs on its own clock.
+                let over = match &mut self.rebuild {
+                    Some(rebuild) if rebuild.reopened => {
+                        rebuild.sudden_death_ticks += 1;
+                        rebuild.sudden_death_ticks == SUDDEN_DEATH_TICKS
+                    }
+                    _ => {
+                        self.combat_ticks += 1;
+                        self.open_fire(world);
+                        self.combat_ticks == COMBAT_TICKS
+                    }
+                };
+                if over
                     || self
                         .duel
                         .tanks(world)
@@ -536,10 +575,11 @@ impl TanksEvent {
                     winner,
                     deadline,
                 );
-                if !self
-                    .wreck
-                    .observe(world, self.layout, self.tick, ending, &mut self.converted)
-                {
+                let whole =
+                    self.wreck
+                        .observe(world, self.layout, self.tick, ending, &mut self.converted);
+                self.tend_rebuild(world, deadline);
+                if !whole {
                     // A survivor still getting up, looking around, waving,
                     // running or surrendering has the aftermath to finish in,
                     // as does a parting shell still in the air.
@@ -562,7 +602,12 @@ impl TanksEvent {
                     winner,
                     deadline,
                 );
-                if self.survivors.ready(self.tick) || self.phase_tick >= longest {
+                self.tend_rebuild(world, deadline);
+                // The beam comes down once the survivors are ready or out of
+                // time, unless the fight has just reopened.
+                if self.phase == EventPhase::Aftermath
+                    && (self.survivors.ready(self.tick) || self.phase_tick >= longest)
+                {
                     self.begin_beam_up(world);
                 }
             }
@@ -610,6 +655,14 @@ impl TanksEvent {
         self.final_health = Some(health);
         let winners = result.winners();
         let winner_in_view = self.winner(world).is_some();
+        // A sudden death's loser blows up as any does, but no spaceling gets
+        // out of it: a fight gives its loser one chance.
+        let second = self
+            .rebuild
+            .as_ref()
+            .is_some_and(|rebuild| rebuild.reopened);
+        // The rebuilt tank took its dirt's cells, so a second blow-up's
+        // dirt takes them again, whichever tank it is.
         let mut ids = self.duel.conversion_ids();
         let gravity_scale = self.duel.gravity_scale(world);
         for (slot, tank) in tanks
@@ -633,8 +686,10 @@ impl TanksEvent {
             let loser = wreck::Loser { slot, tank, gear };
             self.wreck
                 .blow_up(world, loser, gravity_scale, self.tick, &mut ids);
-            self.survivors
-                .eject(world, slot, &tank, winner_in_view, gravity_scale, self.tick);
+            if !second {
+                self.survivors
+                    .eject(world, slot, &tank, winner_in_view, gravity_scale, self.tick);
+            }
         }
         if self.wreck.pieces.is_empty() {
             self.begin_beam_up(world);
@@ -679,8 +734,143 @@ impl TanksEvent {
         })
     }
 
+    /// Rebuilds a loser's tank from its dirt, once the survivors have moved
+    /// at the event's tick, with the aftermath over by `deadline` at the
+    /// latest. A spaceling that drew the rebuild goes to its tank's dirt once
+    /// all of it lies there, if the tank has a place to stand. Once it
+    /// stands beside the dirt, the dirt sets off home, if there is the time
+    /// for it to get there and for the spaceling to climb in. Once the last
+    /// cell is home, with the spaceling there to climb in, the tank is whole
+    /// again, and once the spaceling is aboard, the fight reopens for its
+    /// sudden death. A spaceling that gives up leaves the dirt where it
+    /// lies, and one whose dirt the winner scatters waves for the rescue
+    /// beam.
+    fn tend_rebuild(&mut self, world: &mut PhysicsWorld, deadline: u64) {
+        let tick = self.tick;
+        let Some(index) = self.survivors.rebuilding() else {
+            if let Some(rebuild) = &mut self.rebuild
+                && rebuild.stage == Stage::Crawling
+            {
+                rebuild.drop_cells(world, Stage::Abandoned);
+            }
+            return;
+        };
+        let scale = self.duel.placement().scale;
+        let survivor = &self.survivors.out[index];
+        let (slot, phase, pile) = (survivor.slot, survivor.phase, survivor.pile);
+        let spaceling = survivor
+            .spaceling
+            .as_ref()
+            .map(|spaceling| spaceling.body().entity);
+        let fired = survivor
+            .shot
+            .as_ref()
+            .is_some_and(|shot| shot.fired.is_some());
+        let Some(rebuild) = &mut self.rebuild else {
+            match (phase, pile, spaceling) {
+                // It waits until every piece of its tank has turned to dirt.
+                (survivor::Phase::LookingAround, None, Some(spaceling))
+                    if !self.wreck.pieces.iter().any(|piece| piece.slot == slot) =>
+                {
+                    let from = self.survivors.out[index].position.x;
+                    let radius = survivor::spec(scale).radius;
+                    let cells = self
+                        .wreck
+                        .all_dirt(slot)
+                        .then(|| rebuild::pile(world, &self.wreck.shares, &self.converted, slot))
+                        .flatten();
+                    let plan = cells.as_ref().and_then(|cells| {
+                        let hull = rebuild::place(world, self.layout, scale, cells, spaceling)?;
+                        Some((
+                            hull,
+                            rebuild::stand(world, scale, hull, from, cells, radius),
+                        ))
+                    });
+                    match (cells, plan) {
+                        (_, Some(plan)) => self
+                            .survivors
+                            .send_to_pile(world, index, plan, tick, deadline),
+                        (None, _) => {
+                            self.survivors
+                                .give_up(index, survivor::Fallback::DirtLost, tick)
+                        }
+                        (Some(_), None) => {
+                            self.survivors
+                                .give_up(index, survivor::Fallback::NoWay, tick)
+                        }
+                    }
+                }
+                (survivor::Phase::Rebuilding, Some(pile), _) => {
+                    match rebuild::pile(world, &self.wreck.shares, &self.converted, slot) {
+                        Some(cells)
+                            if tick + rebuild::REBUILD_TICKS + survivor::BOARD_TICKS
+                                <= deadline =>
+                        {
+                            let first = self.result.expect("the fight's first result");
+                            let rebuild =
+                                rebuild::Rebuild::begin(slot, pile.hull, cells, first, scale, tick);
+                            self.survivors.crawling(index, rebuild.done());
+                            self.rebuild = Some(rebuild);
+                        }
+                        Some(_) => {
+                            self.survivors
+                                .give_up(index, survivor::Fallback::OutOfTime, tick);
+                        }
+                        None => self
+                            .survivors
+                            .give_up(index, survivor::Fallback::DirtLost, tick),
+                    }
+                }
+                _ => (),
+            }
+            return;
+        };
+        rebuild.fired |= fired;
+        match rebuild.stage {
+            Stage::Crawling
+                if tick >= rebuild.done()
+                    && phase == survivor::Phase::Rebuilding
+                    && tick + survivor::BOARD_TICKS <= deadline =>
+            {
+                rebuild.build(
+                    world,
+                    &mut self.duel,
+                    &mut self.converted,
+                    &mut self.wreck,
+                    tick,
+                );
+                let tank = self.duel.tanks(world)[slot].body;
+                let half = self
+                    .duel
+                    .running_gear(world, slot)
+                    .expect("a rebuilt tank's running gear")
+                    .hull_half_extents;
+                self.survivors.board(world, index, tank, half, tick);
+            }
+            Stage::Scattered => {
+                self.survivors
+                    .give_up(index, survivor::Fallback::Scattered, tick);
+            }
+            Stage::Rebuilt if phase == survivor::Phase::Aboard && !rebuild.reopened => {
+                rebuild.reopened = true;
+                self.result = None;
+                self.final_health = None;
+                self.duel.set_driving(true);
+                self.duel.set_firing(true);
+                self.enter(EventPhase::Fighting);
+            }
+            _ => (),
+        }
+    }
+
     fn begin_beam_up(&mut self, world: &mut PhysicsWorld) {
         debug_assert!(self.wreck.pieces.is_empty(), "every piece is dirt");
+        // Dirt still crawling home falls where it is.
+        if let Some(rebuild) = &mut self.rebuild
+            && rebuild.stage == Stage::Crawling
+        {
+            rebuild.drop_cells(world, Stage::Abandoned);
+        }
         self.departure.clear();
         let winners = self.result.expect("result settled").winners();
         for (slot, tank) in self.duel.tanks(world).into_iter().enumerate() {
@@ -807,6 +997,7 @@ impl TanksEvent {
             loose_cells: self.duel.grains().count() as u32,
             shells: self.duel.active_shells() as u32,
             shots: self.duel.shots(),
+            tank_shots: tanks.map(|t| t.shots),
             result: self.result.map(|r| r.label().into()),
             converted_cells: self.converted.len() as u32,
             pieces: self.wreck.pieces.len() as u32,
@@ -822,6 +1013,7 @@ impl TanksEvent {
             knocked_loose: self.damage.knocked_loose(),
             ejections: self.survivors.rolls,
             survivors: [0, 1].map(|slot| self.survivors.state(slot)),
+            rebuild: self.rebuild.as_ref().map(rebuild::Rebuild::state),
         }
     }
 }

@@ -324,6 +324,16 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                     );
                 }
             }
+            if let Some(rebuild) = &tanks.rebuild {
+                println!(
+                    "Tanks rebuild: {} tank {}, first result {}, winner fired={}, sudden death={} ticks",
+                    ["left", "right"][usize::from(rebuild.slot.min(1))],
+                    rebuild.stage.as_str(),
+                    rebuild.first_result,
+                    rebuild.fired,
+                    rebuild.sudden_death_ticks,
+                );
+            }
         }
         if let Some(coins) = &state.coins {
             println!(

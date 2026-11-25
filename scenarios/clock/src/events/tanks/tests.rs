@@ -663,7 +663,7 @@ fn health_outcomes_and_periodic_registration_cover_every_result() {
         engine_common::ClockEventTrigger::Periodic
     );
     assert_eq!(definition.cooldown_ticks, REUSE_TICKS);
-    assert_eq!(MAX_TICKS, 96 * 60);
+    assert_eq!(MAX_TICKS, 131 * 60);
     for profile in [
         ClockEventProfile::Off,
         ClockEventProfile::Calm,
@@ -1352,9 +1352,10 @@ fn one_spaceling_in_five_gets_out_by_a_roll_of_its_own() {
 fn drawing(ending: survivor::Ending) -> f64 {
     match ending {
         survivor::Ending::RescueBeam => 0.1,
-        survivor::Ending::Stowaway => 0.4,
-        survivor::Ending::Surrender => 0.6,
-        survivor::Ending::PartingShot => 0.9,
+        survivor::Ending::Stowaway => 0.3,
+        survivor::Ending::Surrender => 0.5,
+        survivor::Ending::PartingShot => 0.7,
+        survivor::Ending::Rebuild => 0.9,
     }
 }
 
@@ -1606,11 +1607,13 @@ fn a_spaceling_or_pod_that_leaves_the_view_retires_there() {
 #[test]
 fn a_spaceling_still_down_when_its_time_runs_out_is_lifted_out_as_it_lies() {
     use survivor::{Ending, Fallback, Phase};
-    // A stowaway has longer, for its run, and a parting shot longer still.
+    // A stowaway has longer, for its run, a parting shot longer still, and a
+    // rebuild longest.
     for (ending, longest) in [
         (Ending::RescueBeam, survivor::RESCUE_BY_TICKS),
         (Ending::Stowaway, survivor::AFTERMATH_TICKS),
         (Ending::PartingShot, survivor::PARTING_TICKS),
+        (Ending::Rebuild, survivor::REBUILD_BY_TICKS),
     ] {
         let (mut state, loser) = survival(4.0 / 3.0, 43, survivor::Ejection::Thrown, ending);
         assert_eq!(survivor(&state, loser).drawn, ending);
@@ -1805,11 +1808,11 @@ fn obstacle(state: &mut ClockState, index: u64, middle: Vec2, half: Vec2) -> Bod
 fn a_survivor_draws_its_ending_evenly_from_those_that_fit_the_fight() {
     use survivor::{Ejection, Ending};
     // Without a winner in view only the rescue beam fits. With one, each of
-    // the four takes a quarter of the rolls.
+    // the five takes a fifth of the rolls.
     for roll in [0.0, 0.2, 0.4, 0.6, 0.8, 0.999] {
         assert_eq!(survivor::ending(roll, false), Ending::RescueBeam);
     }
-    let mut drawn = [0u32; 4];
+    let mut drawn = [0u32; 5];
     for seed in 0..60_000u64 {
         let fight = seed.wrapping_add((ClockEventKind::Tanks as u64) << 32);
         let rolls = survivor::ending_rolls(fight);
@@ -1825,12 +1828,13 @@ fn a_survivor_draws_its_ending_evenly_from_those_that_fit_the_fight() {
                 Ending::Stowaway => 1,
                 Ending::Surrender => 2,
                 Ending::PartingShot => 3,
+                Ending::Rebuild => 4,
             }] += 1;
         }
     }
     for count in drawn {
         let share = count as f32 / 120_000.0;
-        assert!((share - 1.0 / 4.0).abs() < 0.01, "{drawn:?}");
+        assert!((share - 1.0 / 5.0).abs() < 0.01, "{drawn:?}");
     }
     // The event rolls once, from its own seed, as it starts.
     let mut state = ready(5.0 / 3.0, 42, ClockTimeFormat::TwentyFourHour);
@@ -2627,4 +2631,590 @@ fn a_parting_shell_still_in_the_air_holds_the_aftermath_until_it_lands() {
         tick(&mut state);
     }
     assert!(state.arena.idle());
+}
+
+/// The fight at `seed` on an `aspect` screen, as `survival` sets it up for a
+/// thrown spaceling that draws the rebuild, the winner seeing it go back to
+/// its dirt if it `watched`.
+fn rebuilding(aspect: f32, seed: u64, watched: bool) -> (ClockState, usize) {
+    let (mut state, loser) = survival(
+        aspect,
+        seed,
+        survivor::Ejection::Thrown,
+        survivor::Ending::Rebuild,
+    );
+    event(&mut state).survivors.watched = watched;
+    (state, loser)
+}
+
+/// The cells of the dirt the tank in `slot` blew apart into, as they lie.
+fn dirt_of(state: &ClockState, slot: usize) -> Vec<rebuild::Cell> {
+    let event = tanks(state);
+    rebuild::pile(
+        state.arena.world().unwrap(),
+        &event.wreck.shares,
+        &event.converted,
+        slot,
+    )
+    .expect("all of its dirt")
+}
+
+/// The entities of `cells`, in order.
+fn entities<'a>(cells: impl IntoIterator<Item = &'a rebuild::Cell>) -> Vec<u64> {
+    let mut entities: Vec<u64> = cells
+        .into_iter()
+        .map(|cell| cell.body.entity.value())
+        .collect();
+    entities.sort_unstable();
+    entities
+}
+
+/// The arena's world.
+fn arena(state: &ClockState) -> &PhysicsWorld {
+    state.arena.world().unwrap()
+}
+
+/// The winner's shot at the dirt of the tank in `slot`.
+fn shot_at_dirt(state: &ClockState, slot: usize) -> &survivor::Shot {
+    survivor(state, slot)
+        .shot
+        .as_ref()
+        .expect("a shot at the dirt")
+}
+
+/// The side whose tank in `slot` wins.
+fn win_for(slot: usize) -> ResultKind {
+    if slot == 0 {
+        ResultKind::Left
+    } else {
+        ResultKind::Right
+    }
+}
+
+#[test]
+fn a_spaceling_rebuilds_its_tank_from_its_dirt_and_the_fight_reopens_for_a_sudden_death() {
+    use survivor::{Ending, Phase};
+    let (mut state, loser) = rebuilding(5.0 / 3.0, 43, false);
+    let scale = tanks(&state).duel.placement().scale;
+    let winner = 1 - loser;
+    assert_eq!(survivor(&state, loser).drawn, Ending::Rebuild);
+    // A rebuild's fight waits longer for it.
+    assert_eq!(
+        tanks(&state).survivors.aftermath_ticks(),
+        survivor::REBUILD_BY_TICKS
+    );
+    // Up again, it looks about until every piece of its tank has turned to
+    // dirt. Then it runs to stand beside the dirt, on its own side of where
+    // the tank will stand and clear of its wheels.
+    until_phase(&mut state, loser, Phase::LookingAround, 5 * 60);
+    until_phase(&mut state, loser, Phase::Returning, 5 * 60);
+    assert!(tanks(&state).wreck.all_dirt(loser));
+    let pile = survivor(&state, loser).pile.expect("dirt to rebuild from");
+    let side = (pile.stand - pile.hull.x).signum();
+    assert_eq!(
+        side,
+        (survivor(&state, loser).position.x - pile.hull.x).signum()
+    );
+    assert!(side * (pile.stand - pile.hull.x) > (rebuild::TANK_HALF_WIDTH + 0.5) * scale);
+    // The tank will stand in the middle of its dirt, all 24 cells of it.
+    let cells = dirt_of(&state, loser);
+    assert_eq!(cells.len(), DIRT_PER_TANK);
+    let across = cells.iter().map(|cell| cell.position.x).sum::<f32>() / cells.len() as f32;
+    assert!((pile.hull.x - across).abs() < 1e-3 * scale);
+    // It stops beside the dirt, and the dirt sets off home.
+    until_phase(&mut state, loser, Phase::Rebuilding, 5 * 60);
+    assert!((survivor(&state, loser).position.x - pile.stand).abs() < scale);
+    let rebuilding = tanks(&state)
+        .rebuild
+        .as_ref()
+        .expect("the dirt crawling home");
+    assert_eq!(
+        (rebuilding.slot, rebuilding.hull, rebuilding.stage),
+        (loser, pile.hull, Stage::Crawling)
+    );
+    let since = rebuilding.since;
+    let done = since + rebuild::REBUILD_TICKS;
+    let order: Vec<rebuild::Cell> = rebuilding.cells().copied().collect();
+    assert_eq!(entities(&order), entities(&cells));
+    // Cell by cell, the wheels' first and the turret's last, the dirt crawls
+    // home over the next four seconds. A cell on its way passes everything.
+    // The spaceling waits, and the winner lets the dirt be.
+    let mut set_off: Vec<Option<u64>> = vec![None; order.len()];
+    while tanks(&state).tick < done - 1 {
+        assert_eq!(survivor(&state, loser).phase, Phase::Rebuilding);
+        assert_eq!(tanks(&state).duel.active_shells(), 0);
+        for (index, cell) in order.iter().enumerate() {
+            let kind = arena(&state).body_kind(cell.body);
+            match set_off[index] {
+                None if kind == Some(BodyKind::KinematicPosition) => {
+                    set_off[index] = Some(tanks(&state).tick);
+                }
+                None => assert_eq!(kind, Some(BodyKind::Dynamic)),
+                Some(_) => {
+                    assert_eq!(kind, Some(BodyKind::KinematicPosition));
+                    assert!(arena(&state).contact_points(cell.collider).is_empty());
+                }
+            }
+        }
+        tick(&mut state);
+    }
+    let set_off: Vec<u64> = set_off
+        .into_iter()
+        .map(|tick| tick.expect("every cell on its way"))
+        .collect();
+    assert!(set_off[..8].iter().max() < set_off[DIRT_PER_TANK - 4..].iter().min());
+    // By the last tick of the crawl the cells stand together as the tank.
+    for cell in &order {
+        let at = arena(&state).motion(cell.body).unwrap().position - pile.hull;
+        assert!(
+            at.x.abs() < 2.0 * scale && at.y.abs() < 1.6 * scale,
+            "{:?}",
+            at / scale
+        );
+    }
+    // Then the cells are the tank again, where the dirt said it would stand,
+    // battered, with a quarter of its armor, in puffs of dust. The winner
+    // keeps its own armor.
+    let health = tanks(&state).duel.tanks(arena(&state))[winner].health;
+    tick(&mut state);
+    assert_eq!(
+        tanks(&state).rebuild.as_ref().unwrap().stage,
+        Stage::Rebuilt
+    );
+    for cell in &cells {
+        assert!(arena(&state).motion(cell.body).is_none());
+    }
+    assert!(
+        tanks(&state)
+            .converted
+            .iter()
+            .all(|grain| cells.iter().all(|cell| cell.body != grain.body()))
+    );
+    assert!(
+        !tanks(&state)
+            .wreck
+            .shares
+            .iter()
+            .any(|share| share.slot == loser)
+    );
+    let tank = tanks(&state).duel.tanks(arena(&state))[loser];
+    assert!(tank.present);
+    assert_eq!(tank.health, rebuild::REBUILT_HEALTH);
+    assert!(tank.motion.position.distance_to(pile.hull) < 0.05 * scale);
+    assert!(tank.motion.angle.cos() > 0.999);
+    let tanks_now = tanks(&state).duel.tanks(arena(&state));
+    assert_eq!(tanks_now[winner].health, health);
+    let puffs = tanks(&state)
+        .wreck
+        .puffs
+        .iter()
+        .filter(|puff| puff.tick == done)
+        .count();
+    assert_eq!(puffs, 5);
+    // The spaceling climbs up the tank's side, onto the turret and down
+    // through the hatch, passing everything, and is gone inside.
+    assert_eq!(survivor(&state, loser).phase, Phase::Boarding);
+    let body = survivor(&state, loser).spaceling.as_ref().unwrap().body();
+    assert_eq!(
+        arena(&state).body_kind(body),
+        Some(BodyKind::KinematicPosition)
+    );
+    assert_eq!(
+        until_phase(&mut state, loser, Phase::Aboard, survivor::BOARD_TICKS + 1),
+        survivor::BOARD_TICKS
+    );
+    assert!(survivor(&state, loser).spaceling.is_none());
+    assert!(!survivors_remain(&state));
+    // Once it is aboard, the fight reopens: the first result stands no
+    // longer, and the tanks drive and fire again.
+    assert_eq!(state.event_phase(), Some(EventPhase::Fighting));
+    assert!(tanks(&state).result.is_none());
+    let block = state.tanks_state().unwrap().rebuild.unwrap();
+    assert_eq!(
+        (
+            block.slot as usize,
+            block.stage,
+            block.first_result.as_str(),
+            block.fired
+        ),
+        (loser, Stage::Rebuilt, win_for(winner).label(), false)
+    );
+    // The sudden death runs on its own clock, and the duel steps again,
+    // until the winner destroys the rebuilt tank.
+    let held = tanks(&state).duel.tick();
+    let mut ticks = 0;
+    while tanks(&state).result.is_none() {
+        tick(&mut state);
+        ticks += 1;
+        assert!(ticks <= rebuild::SUDDEN_DEATH_TICKS + SHELL_LIFETIME_TICKS as u64);
+    }
+    assert!(tanks(&state).duel.tick() > held);
+    assert_eq!(tanks(&state).result, Some(win_for(winner)));
+    assert!(
+        tanks(&state).rebuild.as_ref().unwrap().sudden_death_ticks < rebuild::SUDDEN_DEATH_TICKS
+    );
+    // It blows up as any loser does, into the same 24 cells of dirt, and no
+    // spaceling gets out this time.
+    assert_eq!(state.event_phase(), Some(EventPhase::BlowingUp));
+    while state.event_phase() == Some(EventPhase::BlowingUp) {
+        tick(&mut state);
+    }
+    assert!(tanks(&state).wreck.all_dirt(loser));
+    assert_eq!(entities(&dirt_of(&state, loser)), entities(&cells));
+    assert_eq!(tanks(&state).survivors.out.len(), 1);
+    assert!(!survivors_remain(&state));
+    // The winner goes up alone, and the fight never reopens again.
+    while state.event_kind().is_some() {
+        assert!(tanks(&state).result.is_some());
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+#[test]
+fn a_rebuilt_tank_that_destroys_the_winner_wins_and_goes_up_with_its_spaceling() {
+    use survivor::Phase;
+    let (mut state, loser) = rebuilding(5.0 / 3.0, 48, false);
+    let winner = 1 - loser;
+    until_phase(&mut state, loser, Phase::Aboard, 15 * 60);
+    while tanks(&state).result.is_none() {
+        tick(&mut state);
+    }
+    // The first tank destroyed loses: here the winner, which blows up as any
+    // loser does. Its spaceling has had no roll of its own, whatever its
+    // roll said, and the one in the rebuilt tank stays aboard.
+    let health = state.tanks_state().unwrap().health_milli;
+    assert!(health[winner] == 0 && health[loser] > 0, "{health:?}");
+    assert_eq!(tanks(&state).result, Some(win_for(loser)));
+    assert_eq!(state.event_phase(), Some(EventPhase::BlowingUp));
+    assert!(
+        tanks(&state)
+            .wreck
+            .pieces
+            .iter()
+            .any(|piece| piece.slot == winner)
+    );
+    assert_eq!(
+        tanks(&state).survivors.rolls[winner],
+        Some(survivor::Ejection::Thrown)
+    );
+    assert_eq!(tanks(&state).survivors.out.len(), 1);
+    assert_eq!(survivor(&state, loser).phase, Phase::Aboard);
+    // The rebuilt tank goes up in the winner's place.
+    while state.event_phase() != Some(EventPhase::BeamUp) {
+        tick(&mut state);
+    }
+    assert!(tanks(&state).wreck.all_dirt(winner));
+    assert_eq!(dirt_of(&state, winner).len(), DIRT_PER_TANK);
+    assert!(!survivors_remain(&state));
+    while state.event_kind().is_some() {
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+#[test]
+fn a_sudden_death_that_runs_out_goes_to_the_tank_with_more_armor_left() {
+    use survivor::Phase;
+    // One winner kept all its armor, the other less than the rebuilt tank's
+    // quarter.
+    for (seed, rebuilt_wins) in [(43, false), (48, true)] {
+        let (mut state, loser) = rebuilding(5.0 / 3.0, seed, false);
+        let winner = 1 - loser;
+        until_phase(&mut state, loser, Phase::Aboard, 15 * 60);
+        assert_eq!(state.event_phase(), Some(EventPhase::Fighting));
+        // Neither tank fires.
+        event(&mut state).duel.set_firing(false);
+        let mut ticks = 0;
+        while state.event_phase() == Some(EventPhase::Fighting) {
+            tick(&mut state);
+            ticks += 1;
+        }
+        // Twenty seconds on, the sudden death is over, and the tank with more
+        // of its armor left wins. The living loser blows up as a destroyed
+        // one does.
+        assert_eq!(ticks, rebuild::SUDDEN_DEATH_TICKS, "{seed}");
+        let health = state.tanks_state().unwrap().health_milli;
+        assert!(health.iter().all(|&hp| hp > 0), "{health:?}");
+        let (won, lost) = if rebuilt_wins {
+            (loser, winner)
+        } else {
+            (winner, loser)
+        };
+        assert!(health[won] > health[lost], "{seed}: {health:?}");
+        assert_eq!(tanks(&state).result, Some(win_for(won)));
+        assert_eq!(state.event_phase(), Some(EventPhase::BlowingUp));
+        while state.event_phase() == Some(EventPhase::BlowingUp) {
+            tick(&mut state);
+        }
+        assert!(tanks(&state).wreck.all_dirt(lost));
+        assert_eq!(tanks(&state).survivors.out.len(), 1);
+        while state.event_kind().is_some() {
+            tick(&mut state);
+        }
+        assert!(state.arena.idle());
+    }
+}
+
+#[test]
+fn the_winner_shoots_at_the_dirt_crawling_home_and_scatters_it() {
+    use survivor::{Ending, Fallback, Phase};
+    let (mut state, loser) = rebuilding(5.0 / 3.0, 43, true);
+    let scale = tanks(&state).duel.placement().scale;
+    // The winner sees the spaceling set off back to its dirt, and turns on
+    // where the tank will stand, plotting a shot there.
+    until_phase(&mut state, loser, Phase::Returning, 8 * 60);
+    tick(&mut state);
+    let pile = survivor(&state, loser).pile.unwrap();
+    assert!(!pile.watched);
+    assert!(shot_at_dirt(&state, loser).fired.is_none());
+    let pivot = winner(&state).barrel[0];
+    assert!(tanks(&state).survivors.target(pivot).is_some());
+    // It holds its fire until a moment after the dirt sets off, then fires
+    // once, if its shell will land before the last cell is home.
+    until_phase(&mut state, loser, Phase::Rebuilding, 5 * 60);
+    let since = tanks(&state).rebuild.as_ref().unwrap().since;
+    let done = since + rebuild::REBUILD_TICKS;
+    while shot_at_dirt(&state, loser).fired.is_none() {
+        assert_eq!(tanks(&state).duel.active_shells(), 0);
+        tick(&mut state);
+    }
+    let (_, fired) = shot_at_dirt(&state, loser).fired.unwrap();
+    let flight = u64::from(shot_at_dirt(&state, loser).aim.flight_ticks().unwrap());
+    assert!(fired >= since + survivor::REACTION_TICKS);
+    assert!(fired + flight + survivor::REACTION_TICKS <= done);
+    assert_eq!(tanks(&state).duel.active_shells(), 1);
+    let shots = tanks(&state).duel.shots();
+    // The shell bursts by where the tank would stand before the last cell
+    // is home. The cells fall where they are, dirt again, for the burst to
+    // throw, and no tank stands.
+    while shot_at_dirt(&state, loser).landed.is_none() {
+        assert_eq!(tanks(&state).duel.shots(), shots);
+        tick(&mut state);
+    }
+    let (point, landed) = shot_at_dirt(&state, loser).landed.unwrap();
+    assert!(landed < done);
+    let point = point.expect("a burst");
+    assert!(point.distance_to(pile.hull) <= rebuild::SCATTER_REACH * scale);
+    let rebuild = tanks(&state).rebuild.as_ref().unwrap();
+    assert_eq!((rebuild.stage, rebuild.fired), (Stage::Scattered, true));
+    for cell in rebuild.cells() {
+        assert_eq!(arena(&state).body_kind(cell.body), Some(BodyKind::Dynamic));
+    }
+    assert_eq!(dirt_of(&state, loser).len(), DIRT_PER_TANK);
+    assert!(!tanks(&state).duel.tanks(arena(&state))[loser].present);
+    // The spaceling waves for the rescue beam, and the beam takes it.
+    let waving = survivor(&state, loser);
+    assert_eq!(
+        (waving.drawn, waving.ending, waving.fallback),
+        (
+            Ending::Rebuild,
+            Ending::RescueBeam,
+            Some(Fallback::Scattered)
+        )
+    );
+    until_phase(
+        &mut state,
+        loser,
+        Phase::BeamedUp,
+        survivor::REBUILD_BY_TICKS,
+    );
+    // The dirt lies where the burst threw it.
+    while state.event_kind().is_some() {
+        assert_eq!(
+            tanks(&state).rebuild.as_ref().unwrap().stage,
+            Stage::Scattered
+        );
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+#[test]
+fn a_spaceling_whose_dirt_is_lost_out_of_view_waves_for_the_rescue_beam() {
+    use survivor::{Ending, Fallback, Phase};
+    let (mut state, loser) = rebuilding(5.0 / 3.0, 43, false);
+    // A piece of its tank leaves the view before it turns to dirt.
+    let layout = tanks(&state).layout;
+    let piece = tanks(&state)
+        .wreck
+        .pieces
+        .iter()
+        .find(|piece| piece.slot == loser)
+        .unwrap()
+        .body;
+    state.arena.held_mut(OWNER).unwrap().set_pose(
+        piece,
+        Vec2::new(0.0, layout.bounds_min.y - 1.0),
+        0.0,
+        true,
+    );
+    // It waits until the rest is dirt, then waves for the rescue beam: its
+    // tank cannot be rebuilt.
+    until_phase(&mut state, loser, Phase::Waving, 8 * 60);
+    let waving = survivor(&state, loser);
+    assert_eq!(
+        (waving.drawn, waving.ending, waving.fallback),
+        (
+            Ending::Rebuild,
+            Ending::RescueBeam,
+            Some(Fallback::DirtLost)
+        )
+    );
+    assert!(waving.pile.is_none() && tanks(&state).rebuild.is_none());
+    assert!(!tanks(&state).wreck.all_dirt(loser));
+    until_phase(
+        &mut state,
+        loser,
+        Phase::BeamedUp,
+        survivor::REBUILD_BY_TICKS,
+    );
+    while state.event_kind().is_some() {
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+#[test]
+fn a_spaceling_with_no_way_back_to_its_dirt_waves_for_the_rescue_beam() {
+    use survivor::{Ending, Fallback, Phase};
+    let (mut state, loser) = rebuilding(5.0 / 3.0, 43, false);
+    let scale = tanks(&state).duel.placement().scale;
+    until_phase(&mut state, loser, Phase::Returning, 8 * 60);
+    // A wall higher than it jumps comes up just ahead of it.
+    let at = survivor(&state, loser).position;
+    let stand = survivor(&state, loser).pile.unwrap().stand;
+    let ahead = at + Vec2::X * ((stand - at.x).signum() * 1.5 * scale);
+    let (wall, _) = wall(&mut state, 0, ahead, 3.5);
+    // It runs into the wall, makes no headway, and waves for the rescue
+    // beam. The dirt stays where it lies.
+    until_phase(&mut state, loser, Phase::Waving, 3 * 60);
+    let waving = survivor(&state, loser);
+    assert_eq!(
+        (waving.drawn, waving.ending, waving.fallback),
+        (Ending::Rebuild, Ending::RescueBeam, Some(Fallback::NoWay))
+    );
+    assert!(tanks(&state).rebuild.is_none());
+    state
+        .arena
+        .held_mut(OWNER)
+        .unwrap()
+        .remove_entity(wall.entity);
+    until_phase(
+        &mut state,
+        loser,
+        Phase::BeamedUp,
+        survivor::REBUILD_BY_TICKS,
+    );
+    assert_eq!(dirt_of(&state, loser).len(), DIRT_PER_TANK);
+    while state.event_kind().is_some() {
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+#[test]
+fn a_spaceling_up_too_late_to_rebuild_its_tank_waves_for_the_rescue_beam() {
+    use survivor::{Ending, Fallback, Phase};
+    let (mut state, loser) = rebuilding(5.0 / 3.0, 43, false);
+    let body = survivor(&state, loser).spaceling.as_ref().unwrap().body();
+    // It lands, and something keeps it on its back until five seconds are
+    // left: too little to see its tank rebuilt and climb in.
+    until_phase(&mut state, loser, Phase::GettingUp, 2 * 60);
+    let mut aftermath = 0;
+    while aftermath < survivor::REBUILD_BY_TICKS - 5 * 60 {
+        aftermath += u64::from(state.event_phase() == Some(EventPhase::Aftermath));
+        let world = state.arena.held_mut(OWNER).unwrap();
+        let motion = world.motion(body).unwrap();
+        world.set_pose(body, motion.position, std::f32::consts::FRAC_PI_2, true);
+        world.set_velocity(body, Vec2::ZERO, 0.0, true);
+        tick(&mut state);
+    }
+    until_phase(&mut state, loser, Phase::Waving, 3 * 60);
+    let waving = survivor(&state, loser);
+    assert_eq!(
+        (waving.drawn, waving.ending, waving.fallback),
+        (
+            Ending::Rebuild,
+            Ending::RescueBeam,
+            Some(Fallback::OutOfTime)
+        )
+    );
+    assert!(tanks(&state).rebuild.is_none());
+    until_phase(&mut state, loser, Phase::BeamedUp, 5 * 60);
+    while state.event_kind().is_some() {
+        tick(&mut state);
+    }
+    assert!(state.arena.idle());
+}
+
+#[test]
+fn a_rebuild_cut_short_at_any_stage_leaves_nothing_behind() {
+    use survivor::Phase;
+    type Reached = fn(&ClockState, usize) -> bool;
+    let stages: [(bool, &str, Reached); 7] = [
+        (false, "running back", |state, loser| {
+            survivor(state, loser).phase == Phase::Returning
+        }),
+        (false, "crawling home", |state, _| {
+            tanks(state).rebuild.is_some()
+        }),
+        (false, "climbing in", |state, loser| {
+            survivor(state, loser).phase == Phase::Boarding
+        }),
+        (false, "fighting again", |state, _| {
+            tanks(state)
+                .rebuild
+                .as_ref()
+                .is_some_and(|rebuild| rebuild.reopened)
+        }),
+        (false, "blowing up again", |state, _| {
+            tanks(state)
+                .rebuild
+                .as_ref()
+                .is_some_and(|rebuild| rebuild.reopened)
+                && state.event_phase() == Some(EventPhase::BlowingUp)
+        }),
+        (true, "shot at", |state, loser| {
+            survivor(state, loser)
+                .shot
+                .as_ref()
+                .is_some_and(|shot| shot.fired.is_some())
+        }),
+        (true, "scattered", |state, _| {
+            tanks(state)
+                .rebuild
+                .as_ref()
+                .is_some_and(|rebuild| rebuild.stage == Stage::Scattered)
+        }),
+    ];
+    for (index, (watched, stage, reached)) in stages.into_iter().enumerate() {
+        let (mut state, loser) = rebuilding(5.0 / 3.0, 43, watched);
+        let mut ticks = 0;
+        while !reached(&state, loser) {
+            assert!(ticks < 40 * 60, "{stage}");
+            tick(&mut state);
+            ticks += 1;
+        }
+        for _ in 0..5 {
+            tick(&mut state);
+        }
+        if index % 2 == 0 {
+            state.set_aspect_ratio(4.0 / 3.0);
+        } else {
+            state.finish_event();
+        }
+        ClockScenario::step(&mut state, &[], Duration::ZERO);
+        assert!(state.event_kind().is_none(), "{stage}");
+        assert!(
+            !survivors_remain(&state) && !pieces_remain(&state),
+            "{stage}"
+        );
+        assert_eq!(
+            (state.body_count(), state.collider_count()),
+            (0, 0),
+            "{stage}"
+        );
+        assert!(state.arena.idle(), "{stage}");
+    }
 }

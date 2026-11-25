@@ -693,6 +693,103 @@ fn scaled_duels_drive_deform_and_replay_with_native_mass_accounting() {
     }
 }
 
+#[test]
+fn a_host_rebuilds_a_retired_tank_that_fights_on() {
+    for (scale, suspension) in [(1.0, false), (3.0, true)] {
+        let mut config = config(GrainShape::Hexagon);
+        config.suspension = suspension;
+        let mut world = world();
+        world.set_gravity(Vec2::new(0.0, -GRAVITY * scale));
+        world.set_length_unit(scale);
+        let mut placement = Placement::new(1000..100_000, Budget::required(config));
+        placement.scale = scale;
+        let mut duel = HostedDuel::attach(&mut world, config, 42, placement).unwrap();
+        for _ in 0..60 {
+            step(&mut duel, &mut world);
+        }
+        let x = tank_at(&duel, &world, 0).x + 4.0;
+        let at = duel
+            .placement()
+            .point_to_world(Vec2::new(x, duel.placement().hill(x, 42) + 2.0));
+        let bodies = duel.tank_bodies(0).count();
+        let entity = duel.duel.tanks[0].body.entity;
+        // Only a retired tank is rebuilt, between steps, with some health.
+        assert_eq!(
+            duel.rebuild_tank(&mut world, 0, at, 25.0),
+            Err(HostError::Configuration)
+        );
+        duel.retire_tank(&mut world, 0).unwrap();
+        assert!(!world.contains_entity(entity));
+        for (slot, health) in [(2, 25.0), (0, 0.0), (0, 101.0), (0, f32::NAN)] {
+            assert_eq!(
+                duel.rebuild_tank(&mut world, slot, at, health),
+                Err(HostError::Configuration)
+            );
+        }
+        let drives = duel.prepare_step(&mut world).unwrap();
+        assert_eq!(
+            duel.rebuild_tank(&mut world, 0, at, 25.0),
+            Err(HostError::StepOrder)
+        );
+        world.step_with_surface_drives(DT, &drives);
+        duel.finish_step(&mut world).unwrap();
+        duel.rebuild_tank(&mut world, 0, at, 25.0).unwrap();
+        let tank = duel.tanks(&world)[0];
+        assert!(tank.present && tank.body.entity == entity);
+        assert_eq!(tank.health, 25.0);
+        assert!(tank.motion.position.distance_to(at) < 1e-4);
+        assert_eq!(duel.tank_bodies(0).count(), bodies);
+        assert_eq!(duel.running_gear(&world, 0).is_some(), suspension);
+        for body in duel.tank_bodies(0) {
+            assert_eq!(world.gravity_scale(body), Some(duel.gravity_scale(&world)));
+        }
+        // It settles on its wheels, and both CPUs fire again.
+        let fired = duel.tanks(&world).map(|tank| tank.shots);
+        for _ in 0..600 {
+            step(&mut duel, &mut world);
+        }
+        assert!(duel.tanks(&world)[0].supported);
+        let now = duel.tanks(&world).map(|tank| tank.shots);
+        assert!(now[0] > fired[0] && now[1] > fired[1], "{fired:?} {now:?}");
+        let mut replay = duel.clone();
+        let mut replay_world = world.clone();
+        for _ in 0..120 {
+            step(&mut duel, &mut world);
+            step(&mut replay, &mut replay_world);
+            assert_eq!(
+                duel.observe(&world).payload,
+                replay.observe(&replay_world).payload
+            );
+        }
+        // A shell that strikes it takes its armor as one that strikes a
+        // fresh tank does.
+        let health = duel.duel.tanks[0].health;
+        for tank in &mut duel.duel.tanks {
+            tank.next_shot = u64::MAX;
+        }
+        drop_shell(
+            &mut duel,
+            &mut world,
+            &mut armor::NoRecipients,
+            0,
+            6.0,
+            30.0,
+        );
+        assert!(duel.duel.tanks[0].health < health);
+        duel.material_balance(&world).unwrap();
+        duel.retire(&mut world);
+        assert_eq!(
+            (
+                world.body_count(),
+                world.collider_count(),
+                world.joint_count()
+            ),
+            (0, 0, 0)
+        );
+        assert!(world.identity_fault().is_none());
+    }
+}
+
 /// A hosted duel at `scale` whose tanks have settled and hold their fire.
 fn quiet(scale: f32) -> (HostedDuel, PhysicsWorld) {
     let mut config = config(GrainShape::Hexagon);

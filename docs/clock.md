@@ -1174,7 +1174,7 @@ the Off profile still disables every automatic event.
 | `explosion` | Individual digit/AM-PM blocks scatter and bounce | 0.6 s warning + 3.5 s burst + 1.5 s reform | 45 s |
 | `spider` | One visitor on a silk line, climbing and swinging on the digits in the run's arena | At most 30 s including departure, with up to 10 s more to finish leaving | 30 s after departure |
 | `coins` | Lit cells turn into coins that drop, roll and pile; a magpie carries three or four off, and the rest fly home | 0.6 s minting + 4 s cascade + 23 s gathering + 1.5 s reform | 45 s |
-| `tanks` | Two CPU tanks duel on destructible hills below the reading, whose lit cells stop their shells | At most 96 s, including entry, one transport retry and departure | 120 s |
+| `tanks` | Two CPU tanks duel on destructible hills below the reading, whose lit cells stop their shells | At most 131 s, including entry, one transport retry, a sudden death and departure | 120 s |
 
 ### Tanks
 
@@ -1245,16 +1245,16 @@ does.
 | `raising` | 2 s | Physical hills rise from beneath the floor. |
 | `beam-down` | 2 s, plus at most one 2 s retry | Tanks descend from above the frame, through clear digit gaps, to supported hill positions. A reading/font change that closes a lane replans and restarts transport; a second closure withdraws. |
 | `settling` | 2 s | Both hulls must actually be upright and supported before driving or firing. Failure withdraws the hills. |
-| `fighting` | 60 s | Fire is held while the tanks drive to their range, for at most 12 s. Then shared CPU driving and dodging, swept shells that burst on the lit face and knock cells loose, craters, loose dirt and weak-bank collapse. |
+| `fighting` | 60 s, or 20 s for a sudden death | Fire is held while the tanks drive to their range, for at most 12 s, except in a sudden death. Then shared CPU driving and dodging, swept shells that burst on the lit face and knock cells loose, craters, loose dirt and weak-bank collapse. |
 | `finishing-shots` | 10 s | No new driving or fire; existing shells finish before deciding the result. |
 | `blowing-up` | 3 s | Each in-view loser blows apart, and each piece turns to dirt where it comes to rest. |
-| `aftermath` | 6 s, 8 s with a stowaway or a surrender, or 10 s with a parting shot | A spaceling that got out finds its feet, then waves for the rescue beam, runs to the winner and climbs onto its roof, raises a white flag and is drawn to the winner's side, or dodges the winner's parting shot and flees out of view. Skipped when none got out, or once each is ready to leave. |
+| `aftermath` | 6 s, 8 s with a stowaway or a surrender, 10 s with a parting shot, or 12 s with a rebuild | A spaceling that got out finds its feet, then waves for the rescue beam, runs to the winner and climbs onto its roof, raises a white flag and is drawn to the winner's side, dodges the winner's parting shot and flees out of view, or rebuilds its tank from the tank's dirt and climbs in, and the fight reopens for a sudden death. Skipped when none got out, or once each is ready to leave. |
 | `beam-up` | 2 s | Surviving winners depart with a stowaway on the roof or a spaceling that surrendered beside them, and a beam lifts out each other spaceling still in view. |
 | `withdrawing` | 3 s | The remaining owned battlefield moves below the frame and is removed. |
 
 One living tank wins. If both remain alive at timeout, higher health wins and
 exact equality is a draw; if neither survives, neither wins. A living timeout
-loser blows up too.
+loser blows up too. A sudden death, below, ends the same way.
 
 Each loser in view blows apart where it stands. A flash and a fireball burst
 from its hull, and the blast throws its turret up, spinning, its wheels off
@@ -1295,9 +1295,9 @@ the view:
 
 Each spaceling draws how it leaves as it gets out, evenly from the endings
 that fit the fight, by a roll from a third stream of its own. The rescue beam
-always fits. Stowing away, surrendering and the parting shot need the winner
-in view, so a fight that leaves none, in a draw or with no tank standing,
-gives every spaceling the rescue beam.
+always fits. Stowing away, surrendering, the parting shot and the rebuild need
+the winner in view, so a fight that leaves none, in a draw or with no tank
+standing, gives every spaceling the rescue beam.
 
 - **Rescue beam.** Once up, the spaceling looks the other way, then back, and
   waves. In the beam-up, a narrow beam in its team's color comes down on it
@@ -1344,6 +1344,43 @@ gives every spaceling the rescue beam.
   trailing smoke. It takes the hop only when nothing it meets lies in its way
   up to the face, which it rises past in front of, as the shells fly. With no
   clear way up, it runs for the side however far it lies.
+- **Rebuild.** Once up, the spaceling looks one way and the other until every
+  piece of its tank has turned to dirt. The tank will stand again in the
+  middle of its dirt across, far enough inside the battlefield's sides to
+  leave its spaceling room, on the ground there, raised as little as it must
+  be, and at most 1.5 units, to clear all but the dirt and the spaceling. The
+  spaceling runs back as a stowaway runs, to stand half a unit clear of where
+  the wheels will be, on the side it comes from, or up to 3 units farther
+  out, where the dirt lies, so no cell crawls out from under it. Once it has
+  landed within half a unit of there, facing the tank's place, the dirt sets
+  off home, the reverse of the blow-up: cell by cell, the wheels' first, then
+  the hull's and the turret's last, each rising over a low arc that clears
+  the hills and the dirt between, and the last is home 4 s later. A crawling
+  cell passes everything. Then the cells are the tank again, upright where
+  they stood, battered, with a quarter of its armor, in puffs of dust, and
+  the spaceling climbs up its side, onto the turret and down through the
+  hatch over 0.8 s, pushing nothing.
+
+  Once the spaceling is in, the fight reopens for a sudden death. The first
+  result stands no longer, the face's cells can come loose again, and both
+  tanks drive and fire, the winner with the armor it has left. The first tank
+  destroyed loses and blows up as any loser does, a rebuilt tank into the
+  same 24 cells of dirt, and no spaceling gets out of it. After 20 s, once
+  the shells in the air have landed, the tank with more armor left wins, and
+  the other blows up; if neither survives, neither wins. A fight has one
+  rebuild at most.
+
+  One time in two, by a roll of the fight's seed, the winner sees the
+  spaceling set off back to its dirt. With its hull leaning no more than 60°
+  and at least 14 units from where the tank will stand, it turns onto that
+  place and plots a shot there, as it does a parting shot. A quarter of a
+  second after the dirt sets off, once its barrel lies along the arc it
+  chose, it fires, if its shell will land at least a quarter of a second
+  before the last cell is home, and otherwise it holds its fire. A shell that
+  bursts within the 5 units a burst reaches of the tank's place before then
+  scatters the dirt: every cell falls where it is, dirt again, for the burst
+  to throw. A winner that does not see the spaceling go back sees the tank
+  only once it stands.
 
 The rescue beam is every ending's fallback. A stowaway with no way to the
 winner, past a drop deeper than it lands from on its feet, a step higher than
@@ -1356,15 +1393,22 @@ with its hull leaning more than 60°, off its wheels, or out of view, nor when
 no arc reaches the spaceling or no time is left for the shell's flight and the
 spaceling's escape, and the spaceling waves for the rescue beam where it
 stands. After the shot, so does a spaceling with no way out, one with no time
-left to get away, and one that makes no headway for 1.5 s on its run.
+left to get away, and one that makes no headway for 1.5 s on its run. A
+spaceling that drew the rebuild waves for it when some of its tank's dirt
+left the view, when there is no place for the tank to stand or no way to the
+dirt, when there is no time left to run there, see the dirt crawl home and
+climb in, when it makes no headway for 1.5 s on its way, and when the winner's
+shell scatters the dirt.
 
 The `aftermath` phase waits until every spaceling is ready to leave: it has
 waved for a second, sat on the winner's roof for half a second, been drawn to
 the winner's side or fled out of view. It waits at most 6 s after the blow-up,
-8 s when a spaceling drew a stowaway or a surrender, or 10 s when one drew a
-parting shot; a fight without one skips it. A spaceling still down when the
-aftermath runs out is lifted out as it lies, and a pod still sealed would be
-lifted out whole. A spaceling, or a pod with its spaceling still in it, that
+8 s when a spaceling drew a stowaway or a surrender, 10 s when one drew a
+parting shot, or 12 s when one drew the rebuild; a fight without one skips it.
+A spaceling climbing into its rebuilt tank ends it, as the fight reopens. A
+spaceling still down when the aftermath runs out is lifted out as it lies, a
+pod still sealed would be lifted out whole, and dirt still crawling home falls
+where it is. A spaceling, or a pod with its spaceling still in it, that
 leaves the view retires there, and nothing waits for it. The spacelings and
 pods meet the hills, the dirt, the floor and the winner, and pass the pieces,
 the face and one another. Climbing onto the winner, drawn to it or rising on
@@ -1375,9 +1419,10 @@ Started with `--seed 838`, Clock's first event, if it is Tanks, throws its
 loser's spaceling clear whichever tank loses, and it waits for the rescue
 beam. Started with `--seed 3587`, the spaceling gets out in a pod and waits
 for the rescue beam; with `--seed 455`, it is thrown clear and stows away;
-with `--seed 228`, it is thrown clear and surrenders; and with
-`--seed 2728`, it is thrown clear and the winner takes a parting shot at it.
-Both sides of those fights roll the same way.
+with `--seed 1774`, it is thrown clear and surrenders; with `--seed 228`, it
+is thrown clear and the winner takes a parting shot at it; and with
+`--seed 8799`, it is thrown clear and rebuilds its tank, and the winner does
+not see it go back. Both sides of those fights roll the same way.
 
 Each loser has an authored conversion of 24 half-unit cells: six native
 area/mass units at dirt density one, scaled by the square of placement scale.
@@ -1591,14 +1636,92 @@ the slowest 26.5 and 32.5 ms, and three and four refreshes were skipped. In
 the timed run, all seven spacelings that drew the parting shot fled at a run;
 one from a pod was knocked over first, and got up.
 
+A local survey of the rebuild fought 60 seeds at each of the same five shapes,
+once with every loser's spaceling thrown clear and once with every one in a
+pod, each spaceling with a winner in view drawing the rebuild, and 300 seeds
+at each shape with the rolls as they fall:
+
+- Of 272 thrown spacelings that drew it, 133 saw their tanks rebuilt and
+  climbed in, and the winner's shell scattered the dirt of 111. Eleven, all in
+  portrait, lost some of their dirt out of view, and 17 found no way to it or
+  no place for the tank. Of 272 from pods, 131 climbed in, 115 saw their dirt
+  scattered, 10 in portrait lost some of it and 16 found no way.
+- The winner saw 114 of the thrown spacelings and 116 from pods set off back
+  to their dirt, and fired at all but four of them, all in portrait, whose
+  tanks were rebuilt. Every shell it fired burst within reach of the tank's
+  place before the last cell was home.
+- The dirt set off a median of 3.7–4.4 s after the blast when the spaceling
+  was thrown and 4.2–4.8 s from a pod, and at most 8.3 s. The spaceling was in
+  its tank a median of 8.6–9.2 s and 9.0–9.7 s after the blast, and at most
+  13.1 s.
+- Of the 264 sudden deaths, the winner won 192, the rebuilt tank 44, and 28
+  left no survivors. Two ran the full 20 s, both at 5:3, and the rebuilt tank
+  won each on armor. The rest lasted a median of 5.0 s and at most 15.0 s.
+  The rebuilt tank fired in every one, and the winner in 233.
+- A tank fires every 5 s, and the wait stands still while fire is held, so the
+  winner's first shot of a sudden death comes 5 s of fighting after the shot
+  that destroyed the loser, and lands about 5 s after the fight reopens. It is
+  aimed at a tank standing about where the loser stood, by a CPU that keeps
+  what it learned in the fight, while the rebuilt tank's CPU starts afresh. In
+  133 sudden deaths, the rebuilt tank was destroyed 4.8–5.5 s in, by the only
+  shot the winner fired. The rebuilt tank won most often against a winner with
+  little armor left: the 44 it beat had a median of 10% left when the fight
+  reopened, against 68% for all.
+- In each of the 236 sudden deaths that left a winner, the loser blew up into
+  the same 24 cells the rebuilt tank was built from, whichever tank it was,
+  but for two in portrait, whose pieces took 4 and 8 of them out of view.
+- With the rolls as they fall, spacelings got out in 236 of the 1,500 fights,
+  and in the 37 without a winner in view, they all took the rescue beam. Of
+  the 199 with one, 55 drew the rescue beam, 28 a stowaway, 41 a surrender, 22
+  a parting shot and 53 the rebuild. The five shapes fought the same 300 seeds,
+  which roll alike at each, so those counts follow about 40 seeds' rolls. Of
+  the 53 rebuilds, 27 tanks were rebuilt, 21 had their dirt scattered, four
+  spacelings found no way and one lost dirt out of view. Of the 22 winners
+  that fired at the dirt, one missed, its shell bursting 34 units from the
+  tank's place at 5:3, and that tank was rebuilt. The winner won 24 of the 27
+  sudden deaths, the rebuilt tank two, and one left no survivors.
+- Every fight came back to idle with nothing left behind. The longest visit
+  took 105.2 s, within the 131 s bound.
+- On the development workstation, one fight at a time, 24 seeds at each shape
+  with every spaceling thrown clear and drawing the rebuild, a tick while the
+  dirt crawled took a median of 0.12 ms and at most 0.46 ms when the winner
+  did not fire. With its shell in flight, the duel steps again, and a crawl's
+  tick took a median of 0.19 ms, with a 99th percentile of 0.5–6.7 ms and at
+  most 7.6 ms. A sudden death's tick took a median of 0.16 ms, with a 99th
+  percentile of 0.3–6.3 ms and at most 9.2 ms, against a fight's median of
+  0.10 ms, 99th percentile of 0.6–5.7 ms and slowest tick of 7.4 ms. The tick
+  the tank is rebuilt on took a median of 0.11 ms and at most 0.30 ms, and the
+  tick the spaceling sets out on, which finds the tank's place, where to stand
+  and its way there, a median of 0.20 ms and at most 0.65 ms.
+
+On sw-picade-2, the same eight seeds were fought again with a build that sent
+every loser's spaceling out and gave each with a winner in view the rebuild,
+with the winner never seeing it go back, so that every rebuild would finish.
+Two fights left no winner, and their four spacelings took the rescue beam. In
+the other six, the dirt set off home 3.0–5.0 s after the blast, every tank was
+rebuilt and its spaceling climbed in, and the rebuilt tank lost each sudden
+death, about 5 s in. Each fight was traced for 4 s from 5 s into the fighting,
+from when the dirt set off and from the start of the sudden death. While the
+dirt crawled home, loop CPU averaged 11.4 ms, with a 99th percentile of 13.5
+ms and a slowest loop of 16.3 ms, and no display refresh was skipped. In the
+sudden deaths, it averaged 11.4 ms, with a 99th percentile of 16.6 ms; 13 of
+1,440 loops ran over 16.7 ms, the slowest 29.7 ms, and two refreshes were
+skipped, never two in a row. In the first fighting, it averaged 11.3 ms, with
+a 99th percentile of 16.8 ms; 21 of 1,920 loops ran over 16.7 ms, the slowest
+36.7 ms, and five refreshes were skipped, never two in a row. Idle, it
+averaged 5.6 ms. A shot at the dirt steps the duel as a parting shot does,
+which the trial above measured.
+
 The run data stays local.
 
 Once the last shell resolves, the result is latched. Rapier continues to move
 the wreck and the dirt, while duel AI, damage and terrain topology stop
-changing until a winner takes a parting shot. The duel steps again only while
-that shell flies, and its CPUs neither aim, drive nor fire; the shell digs its
-crater and throws the dirt as any does, from where its burst cannot reach the
-winner. Pausing freezes all phases. Reading updates continue throughout, and
+changing until a winner takes a parting shot or a shot at a tank's dirt
+crawling home. The duel steps again only while that shell flies, and its CPUs
+neither aim, drive nor fire; the shell digs its crater and throws the dirt as
+any does, from where its burst cannot reach the winner. A rebuilt tank's
+sudden death unlatches the result, and the duel steps as it does in the
+fight. Pausing freezes all phases. Reading updates continue throughout, and
 both render adapters clip the battlefield below the face; shells and their
 bursts are drawn in front of it. Entry hulls and beams use the full-height
 clear lanes. Layout changes cancel through the normal owned cleanup path.
@@ -1794,7 +1917,7 @@ eight.
 | 1024×768 | ![The right tank's spaceling, its white flag up, lifted in a narrow beam in the left tank's color, the left tank's turret turned toward it](screenshots/clock/tanks-1024x768-surrender-taken.png) | ![The left tank rising in its beam, widened to take the right tank's spaceling up beside it, its flag still up](screenshots/clock/tanks-1024x768-surrender-beam.png) | ![The spaceling raising its white flag, the winner's beam coming down on it, drawn up in that beam, then rising beside the winner in its widened beam](screenshots/clock/tanks-1024x768-surrender-zoom.png) |
 | 800×480 | ![The right tank's spaceling, its white flag up, lifted in a narrow beam in the left tank's color, the left tank's turret turned toward it](screenshots/clock/tanks-800x480-surrender-taken.png) | ![The left tank rising in its beam, widened to take the right tank's spaceling up beside it, its flag still up](screenshots/clock/tanks-800x480-surrender-beam.png) | ![The spaceling raising its white flag, the winner's beam coming down on it, drawn up in that beam, then rising beside the winner in its widened beam](screenshots/clock/tanks-800x480-surrender-zoom.png) |
 
-Seed 455 throws the loser's spaceling clear to stow away, and seed 228 to
+Seed 455 throws the loser's spaceling clear to stow away, and seed 1774 to
 surrender, at both sizes. The stowaway strip shows it 0.75 s into its run,
 a quarter of a second into its climb, a quarter of a second after it sat
 down behind the turret, and 0.83 s into the beam-up. The surrender strip
@@ -1807,10 +1930,10 @@ engine-client tanks_spacelings_stow_away_or_surrender` regenerates all ten.
 
 | | The parting shell's flight, as it bursts | The escape | Covered, running clear, the shell coming down, its burst and the escape, five or six times larger |
 | --- | --- | --- | --- |
-| 1024×768 | ![The left tank's shell arcing over the middle hill and bursting where the right tank's spaceling stood, the spaceling standing clear of it](screenshots/clock/tanks-1024x768-parting-shot.png) | ![The right tank's spaceling running off the right side of the battlefield, the left tank's barrel still raised along its arc](screenshots/clock/tanks-1024x768-parting-escape.png) | ![The spaceling facing the winner as it fires, running clear, standing clear as the shell comes down and bursts where it stood, then running away over the hills](screenshots/clock/tanks-1024x768-parting-zoom.png) |
-| 800×480 | ![The left tank's shell arcing over the middle hill and bursting where the right tank's spaceling stood, the spaceling standing clear of it](screenshots/clock/tanks-800x480-parting-shot.png) | ![The right tank's spaceling rising past the face on its jetpack, trailing smoke](screenshots/clock/tanks-800x480-parting-escape.png) | ![The spaceling facing the winner as it fires, running clear, standing clear as the shell comes down and bursts where it stood, then rising on its jetpack](screenshots/clock/tanks-800x480-parting-zoom.png) |
+| 1024×768 | ![The left tank's shell arcing over the valley and bursting where the right tank's spaceling stood, the spaceling standing clear of it](screenshots/clock/tanks-1024x768-parting-shot.png) | ![The right tank's spaceling running off the right side of the battlefield, the left tank's barrel still raised along its arc](screenshots/clock/tanks-1024x768-parting-escape.png) | ![The spaceling facing the winner as it fires, running clear, standing clear as the shell comes down and bursts where it stood, then running away over the hills](screenshots/clock/tanks-1024x768-parting-zoom.png) |
+| 800×480 | ![The left tank's shell arcing over the valley and bursting where the right tank's spaceling stood, the spaceling standing clear of it](screenshots/clock/tanks-800x480-parting-shot.png) | ![The right tank's spaceling rising past the face on its jetpack, trailing smoke](screenshots/clock/tanks-800x480-parting-escape.png) | ![The spaceling facing the winner as it fires, running clear, standing clear as the shell comes down and bursts where it stood, then rising on its jetpack](screenshots/clock/tanks-800x480-parting-zoom.png) |
 
-Seed 2728 throws the loser's spaceling clear, and the winner takes a parting
+Seed 228 throws the loser's spaceling clear, and the winner takes a parting
 shot at it, at both sizes. Each first picture keeps the shell's whole flight as
 a trail. At 4:3 the spaceling runs off the side; at 5:3 the side lies farther
 off, and it rises out of view on its jetpack. The escape shows it a fifth of a
@@ -1822,6 +1945,21 @@ spaceling stood and where it is; the others on the spaceling.
 `SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
 engine-client tanks_the_winner_takes_a_parting_shot` regenerates all six.
 
+| | The dirt halfway home | The rebuilt tank's shell, as it bursts | By its dirt, the dirt crawling home, the last cells coming in and climbing in, five or six times larger |
+| --- | --- | --- | --- |
+| 1024×768 | ![The left tank's spaceling standing by its tank's dirt, the cells rising from the hills, the right tank waiting](screenshots/clock/tanks-1024x768-rebuild-crawl.png) | ![The rebuilt left tank's shell arcing over the middle hill and bursting on the right tank](screenshots/clock/tanks-1024x768-rebuild-shot.png) | ![The spaceling by the dirt, the cells rising toward the tank's place, the tank's shape nearly whole, then the tank in puffs of dust with the spaceling climbing onto it](screenshots/clock/tanks-1024x768-rebuild-zoom.png) |
+| 800×480 | ![The left tank's spaceling standing by its tank's dirt, the cells rising from the hills, the right tank waiting](screenshots/clock/tanks-800x480-rebuild-crawl.png) | ![The rebuilt left tank's shell arcing over the middle hill and bursting on the right tank](screenshots/clock/tanks-800x480-rebuild-shot.png) | ![The spaceling by the dirt, the cells rising toward the tank's place, the tank's shape nearly whole, then the tank in puffs of dust with the spaceling climbing onto it](screenshots/clock/tanks-800x480-rebuild-zoom.png) |
+
+Seed 8799 throws the loser's spaceling clear, and it rebuilds its tank, at
+both sizes; the winner does not see it go back. Each strip shows the spaceling
+by its dirt a tenth of a second after the dirt sets off, the dirt 2 s into its
+crawl home, the last cells coming in at 3.75 s, and the tank whole, in puffs
+of dust, a third of a second into the spaceling's climb. Once rebuilt, the
+left tank fires first in the sudden death, and that shell destroys the winner;
+the second picture keeps its whole flight as a trail.
+`SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
+engine-client tanks_a_spaceling_rebuilds_its_tank` regenerates all six.
+
 `clock state` includes phase, support, world positions, hull and terrain IDs,
 health, the two CPUs (`cpu`), whether each is dodging a shell (`dodging`),
 shell/shot counts, the shells the face stopped (`face_hits`), the cells they
@@ -1829,7 +1967,10 @@ knocked loose (`knocked_loose`), the losers' pieces not yet turned to dirt
 (`pieces`), how each side's spaceling gets out if its tank blows up
 (`ejections`), each spaceling that has got out with the ending it drew, the
 one it is on and why it fell back, its phase, position and knockdowns
-(`survivors`), conversion accounting and any settling failure in `tanks`.
+(`survivors`), the shells each tank has fired (`tank_shots`), a tank being
+rebuilt, how far it has got, the fight's first result, whether the winner
+fired at the dirt and how long the sudden death has lasted (`rebuild`),
+conversion accounting and any settling failure in `tanks`.
 Values with a `_milli` suffix use thousandths of their inspection
 unit (positions, area and mass use host units). The common damage-material migration
 and damage to resident plants remain follow-up work: this integration uses Scorched's current tank HP rule and does

@@ -10,6 +10,7 @@ use crate::{
     },
     presentation::Bounds,
 };
+use engine_common::ClockTanksRebuildStage as Stage;
 use engine_rapier::world::{BodyMotion, PhysicsWorld};
 use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
@@ -307,10 +308,12 @@ fn survivors(
     let beaming = event.phase == EventPhase::BeamUp;
     for survivor in &survivors.out {
         let color = TEAMS[survivor.slot];
+        // One climbing into its rebuilt tank sinks from view through the
+        // hatch.
         let fade = if beaming {
             survivor.fade(event.phase_tick)
         } else {
-            0.0
+            survivor.boarded(event.tick)
         };
         if let Some(pod) = survivor.pod {
             let motion = world.motion(pod).expect("a survivor's pod");
@@ -356,7 +359,7 @@ fn survivors(
         let flag = survivor.flag(event.tick);
         // A dodger runs until it stands clear, and waits there.
         let running = match survivor.phase {
-            Phase::Running | Phase::Climbing | Phase::Fleeing => true,
+            Phase::Running | Phase::Climbing | Phase::Fleeing | Phase::Returning => true,
             Phase::Dodging => survivor
                 .shot
                 .as_ref()
@@ -941,6 +944,38 @@ pub(super) fn render(
                 tank_bounds,
                 color,
             );
+            // A tank rebuilt from its dirt shows the dirt in patches across
+            // its hull, where the cells went back in.
+            if event
+                .rebuild
+                .as_ref()
+                .is_some_and(|rebuild| rebuild.slot == slot && rebuild.stage == Stage::Rebuilt)
+            {
+                let patch = faded(mix(color, GRAIN, 0.6), color.a);
+                for index in 0..12 {
+                    if unit(event.seed, index) >= 0.45 {
+                        continue;
+                    }
+                    let middle = Vec2::new(
+                        -1.25 + 0.5 * (index % 6) as f32,
+                        if index < 6 { -0.25 } else { 0.25 },
+                    );
+                    polygon(
+                        frame,
+                        ARENA_LAYER,
+                        [
+                            Vec2::new(-0.22, -0.2),
+                            Vec2::new(0.22, -0.2),
+                            Vec2::new(0.22, 0.2),
+                            Vec2::new(-0.22, 0.2),
+                        ]
+                        .map(|corner| local(middle + corner))
+                        .to_vec(),
+                        tank_bounds,
+                        patch,
+                    );
+                }
+            }
             let tire = faded(TIRE, color.a);
             for motion in gear.wheels {
                 wheel(
