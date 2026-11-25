@@ -261,6 +261,31 @@ impl ClientScenario for ClockClientScenario {
         })
     }
 
+    /// The run's arena step, and a Tanks fight's contact charges. Clock's
+    /// other work has no timers.
+    fn benchmark_step_metrics(&self) -> Option<super::BenchmarkStepMetrics> {
+        let arena = self.state.last_arena_step_metrics();
+        let tanks = self.state.tanks_contact_times().unwrap_or_default();
+        Some(super::BenchmarkStepMetrics {
+            physics_time: arena.wall_time,
+            rapier_step_time: arena.rapier_step_time,
+            rapier_update_time: arena.update_time,
+            rapier_user_changes_time: arena.user_changes_time,
+            rapier_kinematic_interpolation_time: arena.kinematic_interpolation_time,
+            rapier_collision_detection_time: arena.collision_detection_time,
+            rapier_broad_phase_time: arena.broad_phase_time,
+            rapier_final_broad_phase_time: arena.final_broad_phase_time,
+            rapier_narrow_phase_time: arena.narrow_phase_time,
+            rapier_island_time: arena.island_time,
+            rapier_island_constraints_time: arena.island_constraints_time,
+            rapier_solver_time: arena.solver_time,
+            capture_time: arena.capture_time,
+            contact_bind_time: tanks.bind,
+            contact_price_time: tanks.price,
+            ..Default::default()
+        })
+    }
+
     fn render_frames(&self, _renderer: RenderBackend, _viewport: Viewport) -> Vec<RenderFrame> {
         vec![ClockScenario::render_frame(&self.state)]
     }

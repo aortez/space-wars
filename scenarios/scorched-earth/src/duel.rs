@@ -351,6 +351,9 @@ impl Duel {
     pub fn contact_diagnostics(&self) -> host::ContactDiagnostics {
         self.contacts.diagnostics
     }
+    pub fn contact_times(&self) -> host::ContactTimes {
+        self.contacts.times
+    }
     pub fn deposited_cells(&self) -> u64 {
         self.loose.deposited_cells()
     }
@@ -573,7 +576,9 @@ impl Duel {
             self.terrain.iter().map(|f| (f.assembly.body(), &f.terrain)),
             DT,
         );
+        let started = std::time::Instant::now();
         self.bind_contacts(physics);
+        self.contacts.times.bind = started.elapsed();
         drives
     }
     pub(crate) fn finish_step(
@@ -582,7 +587,9 @@ impl Duel {
         recipients: &mut impl Recipients,
         surfaces: &mut impl ContactSurfaces,
     ) {
+        let started = std::time::Instant::now();
         self.charge_contacts(physics, surfaces);
+        self.contacts.times.price = started.elapsed();
         self.loose.sample_impact_contacts(physics);
         let mut finished = Vec::new();
         let placement = &self.placement;

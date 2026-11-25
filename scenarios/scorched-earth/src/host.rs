@@ -249,6 +249,15 @@ pub struct ContactDiagnostics {
     pub unpriced: usize,
 }
 
+/// How long a duel's contact charges took in its last step.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct ContactTimes {
+    /// Binding new colliders to regions, before the step.
+    pub bind: std::time::Duration,
+    /// Pricing the step's impacts and charging each tank's armor, after it.
+    pub price: std::time::Duration,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TankState {
     pub body: BodyId,
@@ -531,6 +540,9 @@ impl HostedDuel {
     }
     pub fn contact_diagnostics(&self) -> ContactDiagnostics {
         self.duel.contact_diagnostics()
+    }
+    pub fn contact_times(&self) -> ContactTimes {
+        self.duel.contact_times()
     }
     /// Points a tank's barrel along `direction`, in the world as in the
     /// duel, as a host's own choreography may once the duel is over. The

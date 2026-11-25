@@ -1203,7 +1203,8 @@ impl ClockState {
         self.arena.state()
     }
 
-    /// Timings and populations from the arena's last step.
+    /// Timings and populations from this tick's arena step, or none on a
+    /// tick that did not step the arena.
     pub fn last_arena_step_metrics(&self) -> engine_rapier::world::PhysicsStepMetrics {
         self.arena.metrics()
     }
@@ -1491,6 +1492,15 @@ impl ClockState {
     pub fn tanks_state(&self) -> Option<engine_common::ClockTanksState> {
         match self.active_event.as_ref()? {
             ActiveEvent::Tanks(event) => Some(event.diagnostics(&self.arena)),
+            _ => None,
+        }
+    }
+
+    /// What a Tanks fight's contact charges took this tick, while one is
+    /// under way.
+    pub fn tanks_contact_times(&self) -> Option<scenario_scorched_earth::host::ContactTimes> {
+        match self.active_event.as_ref()? {
+            ActiveEvent::Tanks(event) => Some(event.contact_times()),
             _ => None,
         }
     }

@@ -421,6 +421,36 @@ fn rejected_batches_are_atomic_and_do_not_rearm_existing_episodes() {
 }
 
 #[test]
+fn a_pair_without_solver_contacts_costs_one_visit() {
+    // Two slabs part slowly. For a while Rapier keeps their pair, with a
+    // manifold but no solver contacts. Capture passes over it before looking
+    // at its colliders, so it costs one visit, as an unbound pair does.
+    let (mut world, _) = slabs(1, 0.0, 0.0, false, CaptureConfig::default());
+    world.step(DT);
+    assert_eq!(transitions(&world).len(), 1);
+    assert!(world.set_velocity(body(1), Vec2::X * -0.05, 0.0, true));
+    let parted = |world: &PhysicsWorld| {
+        world
+            .raw
+            .contact_pairs()
+            .any(|pair| !pair.manifolds.is_empty() && !pair.has_any_active_contact())
+    };
+    for _ in 0..20 {
+        if parted(&world) {
+            break;
+        }
+        world.step(DT);
+    }
+    assert!(parted(&world));
+    world.loading.as_mut().unwrap().config.max_visits_per_batch = 1;
+    world.step(DT);
+    assert!(parted(&world));
+    assert_eq!(world.loading_diagnostics().rejected_batches, 0);
+    assert_eq!(world.loading_batches().len(), 1);
+    assert!(world.loading_batches()[0].contacts.is_empty());
+}
+
+#[test]
 fn episode_and_registry_limits_reject_without_partial_admission() {
     let config = CaptureConfig {
         max_regions: 2,

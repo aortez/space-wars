@@ -429,6 +429,11 @@ pub struct SpacewarsStepMetrics {
     pub gravity_time: Duration,
     pub collision_time: Duration,
     pub physics_time: Duration,
+    /// Binding new colliders to contact regions, part of the workload.
+    pub contact_bind_time: Duration,
+    /// Pricing the step's impacts and wearing asteroids by them, part of the
+    /// collisions.
+    pub contact_price_time: Duration,
     pub added: usize,
     pub removed: usize,
     pub gravity: GravityStepMetrics,
@@ -1505,7 +1510,9 @@ impl SpacewarsScenario {
 
         terrain::loose::capture_impacts(state, dt);
         let shots = shots::prepare(state, dt);
+        let bind_started = Instant::now();
         contact_charges::bind(&mut state.physics);
+        let contact_bind_time = bind_started.elapsed();
         let rapier = state.physics.step(dt);
         terrain::loose::sample_impacts(state);
         motion_diagnostics_time += terrain::capture_motion(state, TerrainMotionStage::AfterPhysics);
@@ -1525,7 +1532,9 @@ impl SpacewarsScenario {
 
         let collision_started = Instant::now();
         let debris_masses = DebrisMasses::before_damage(&state.debris);
+        let price_started = Instant::now();
         contact_charges::price(state, surface_pilots);
+        let mut contact_price_time = price_started.elapsed();
         update_ship_lasers(state, dt);
         state.laser_hits = resolve_laser_hits(state, surface_pilots);
         surface_sortie::match_rules::apply_lasers(state, surface_pilots);
@@ -1546,7 +1555,9 @@ impl SpacewarsScenario {
         }
         surface_sortie::match_rules::apply_contacts(state, surface_pilots, &contacts);
         resolve_physics_collisions(state, &contacts, &accepted_ports, &debris_masses);
+        let wear_started = Instant::now();
         contact_charges::wear_asteroids(state);
+        contact_price_time += wear_started.elapsed();
         surface_sortie::solar::apply_damage(state, surface_pilots, dt);
         surface_sortie::match_rules::apply_heat(state, surface_pilots, dt);
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
@@ -1578,6 +1589,8 @@ impl SpacewarsScenario {
             gravity_time,
             collision_time,
             physics_time: rapier.wall_time,
+            contact_bind_time,
+            contact_price_time,
             added: lifecycle.added,
             removed: lifecycle.removed,
             gravity,

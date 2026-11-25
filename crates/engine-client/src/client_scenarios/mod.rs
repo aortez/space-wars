@@ -29,6 +29,7 @@ mod terrain_grains;
 mod terrain_lab;
 
 pub use clock::benchmark::{ClockBenchmarkCase, ClockBenchmarkConfig, ClockBenchmarkTheme};
+pub use spacewars::SpacewarsBenchmarkCase;
 
 #[cfg(test)]
 pub(crate) use pizza::PizzaClientScenario;
@@ -57,6 +58,7 @@ impl RenderBackend {
 pub struct BenchmarkConfiguration {
     pub pizza: PizzaBenchmarkConfig,
     pub clock: ClockBenchmarkConfig,
+    pub spacewars: SpacewarsBenchmarkCase,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -129,6 +131,12 @@ pub struct BenchmarkStepMetrics {
     pub rapier_island_time: Duration,
     pub rapier_island_constraints_time: Duration,
     pub rapier_solver_time: Duration,
+    /// Contact capture, within the physics step.
+    pub capture_time: Duration,
+    /// Binding new colliders to contact regions.
+    pub contact_bind_time: Duration,
+    /// Pricing impacts with contact charges and applying what they cost.
+    pub contact_price_time: Duration,
     pub added: usize,
     pub removed: usize,
 }
@@ -156,6 +164,9 @@ impl std::ops::AddAssign for BenchmarkStepMetrics {
         self.rapier_island_time += rhs.rapier_island_time;
         self.rapier_island_constraints_time += rhs.rapier_island_constraints_time;
         self.rapier_solver_time += rhs.rapier_solver_time;
+        self.capture_time += rhs.capture_time;
+        self.contact_bind_time += rhs.contact_bind_time;
+        self.contact_price_time += rhs.contact_price_time;
         self.added += rhs.added;
         self.removed += rhs.removed;
     }

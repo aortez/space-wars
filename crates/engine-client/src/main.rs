@@ -179,6 +179,10 @@ struct Args {
     #[arg(long, value_enum, default_value = "normal")]
     clock_benchmark_theme: client_scenarios::ClockBenchmarkTheme,
 
+    /// Deterministic Spacewars fixture for --benchmark and --benchmark-headless.
+    #[arg(long, value_enum, default_value = "standard")]
+    spacewars_benchmark_case: client_scenarios::SpacewarsBenchmarkCase,
+
     /// Optional CSV file path for --benchmark-headless output.
     #[arg(long)]
     benchmark_report: Option<PathBuf>,
@@ -331,6 +335,7 @@ impl Args {
                 marquee_preset: self.clock_benchmark_recipe,
                 theme: self.clock_benchmark_theme,
             },
+            spacewars: self.spacewars_benchmark_case,
         }
     }
 }
@@ -3125,6 +3130,7 @@ mod tests {
             clock_benchmark_case: client_scenarios::ClockBenchmarkCase::Idle,
             clock_benchmark_recipe: engine_common::ClockMarqueePreset::ClockWave,
             clock_benchmark_theme: client_scenarios::ClockBenchmarkTheme::Normal,
+            spacewars_benchmark_case: client_scenarios::SpacewarsBenchmarkCase::Standard,
             benchmark_report: None,
             pizza_benchmark_balls: scenario_pizza::DEFAULT_BENCHMARK_BALLS,
             pizza_benchmark_backend: PizzaBenchmarkBackendArg::Rapier,

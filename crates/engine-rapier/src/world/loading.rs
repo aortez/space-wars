@@ -94,7 +94,8 @@ pub struct ContactBatch {
 pub struct CaptureConfig {
     pub max_regions: usize,
     pub max_bindings: usize,
-    /// Counts pair, manifold and point visits, including unbound pairs.
+    /// Counts a visit for each pair, unbound ones included, and for each
+    /// manifold and point of a bound pair with solver contacts.
     pub max_visits_per_batch: usize,
     pub max_contacts_per_batch: usize,
     pub max_episodes: usize,
@@ -237,6 +238,9 @@ pub(super) struct LoadingState {
     diagnostics: CaptureDiagnostics,
     #[serde(skip)]
     records: usize,
+    // How long the step's capture took, for profiling.
+    #[serde(skip)]
+    capture_time: std::time::Duration,
     // Stored separately in snapshot v3, keeping the capture-only v2 layout.
     #[serde(skip)]
     response: Option<response::ResponseState>,
@@ -272,6 +276,7 @@ impl LoadingState {
             supported: false,
             diagnostics: CaptureDiagnostics::default(),
             records: 0,
+            capture_time: std::time::Duration::ZERO,
             response: None,
             arrival_departures: None,
             flat_departures: None,
@@ -287,9 +292,16 @@ impl LoadingState {
         self.supported = false;
         self.diagnostics = CaptureDiagnostics::default();
         self.records = 0;
+        self.capture_time = std::time::Duration::ZERO;
         if let Some(response) = &mut self.response {
             response.begin_step();
         }
+    }
+
+    /// How long capture took in the last step, the material response's work
+    /// included.
+    pub(super) fn capture_time(&self) -> std::time::Duration {
+        self.capture_time
     }
 
     pub(super) fn unbind(&mut self, collider: ColliderId) {
@@ -446,6 +458,7 @@ impl LoadingState {
     }
 
     fn capture(&mut self, context: &mut SolverContactBatchContext<'_>, external_constraints: bool) {
+        let started = std::time::Instant::now();
         let substep = self.diagnostics.batches_seen;
         self.diagnostics.batches_seen = substep.saturating_add(1);
         let result = if substep >= self.config.max_batches_per_step {
@@ -477,6 +490,7 @@ impl LoadingState {
                 }
             }
         }
+        self.capture_time += started.elapsed();
     }
 
     // Stage a whole batch before committing any episode transition. Overflow
@@ -498,6 +512,12 @@ impl LoadingState {
         };
         for pair in context.contact_pairs() {
             visit()?;
+            // Most pairs in a busy world are only near each other. A pair
+            // without solver contacts has nothing to record, so it is passed
+            // over before its colliders are looked up.
+            if !pair.has_any_active_contact() {
+                continue;
+            }
             let raw = [
                 &context.colliders[pair.collider1],
                 &context.colliders[pair.collider2],

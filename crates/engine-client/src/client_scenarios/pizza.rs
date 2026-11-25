@@ -226,6 +226,10 @@ impl ClientScenario for PizzaClientScenario {
             rapier_island_time: metrics.rapier.island_time,
             rapier_island_constraints_time: metrics.rapier.island_constraints_time,
             rapier_solver_time: metrics.rapier.solver_time,
+            capture_time: metrics.rapier.capture_time,
+            // Pizza prices no contacts.
+            contact_bind_time: Duration::ZERO,
+            contact_price_time: Duration::ZERO,
             added: metrics.added,
             removed: metrics.removed,
         })

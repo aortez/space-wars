@@ -42,7 +42,7 @@
 //! surfaces the same way, as it does the host's recipients: each loses the
 //! share of its capacity that the same contact would cost it at scale 1.
 use super::*;
-use crate::host::{Contact, ContactDiagnostics};
+use crate::host::{Contact, ContactDiagnostics, ContactTimes};
 use engine_material::ROCK;
 use engine_rapier::world::loading::charges::{
     ContactCharge, ContactSurface, ContactSurfaces, Depth,
@@ -84,6 +84,7 @@ pub(crate) struct Contacts {
     /// How many tokens to hold before forgetting the retired ones.
     prune_at: usize,
     pub(crate) diagnostics: ContactDiagnostics,
+    pub(crate) times: ContactTimes,
 }
 
 impl Contacts {

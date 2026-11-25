@@ -229,9 +229,9 @@ after the impacts' charges:
 - Rapier's restitution sets the bounce. The ledger's recoverable energy is not
   applied. [Ledger-set bounce](material-ledger-bounce.md) measures what
   setting it would change.
-- Capture's bounds still refuse a whole batch on overflow, and every
-  contacting pair counts toward its visits, bound or not. Neither game comes
-  near them, as the next section shows.
+- Capture's bounds still refuse a whole batch on overflow. Each pair the
+  narrow phase tracks counts toward its visits, touching or not and bound or
+  not. Neither game comes near them, as the next section shows.
 - A refused batch ends none of the episodes it would have ended. Once a scene
   fills capture's room for episodes, each batch that opens more episodes than
   it ends is refused, and pairs that have parted keep their room while the
@@ -372,8 +372,10 @@ the probe below gives its reasons.
   contacts start anew. Its impacts with a body it was already touching, as
   the contact rules recall it, go on with that contact until those rules see
   the two part, so the host lists none, as those rules count none.
-  Walking the world's colliders took about 9 µs a step on the workstation at
-  the census's settings, with up to 399 colliders.
+  The host walks every collider each step, and asks whether charges price
+  its body before it looks up its binding. In Deathmatch the walk covers
+  about 1,250 colliders and takes about 50 µs a step on the workstation,
+  nearly all of binding's time.
 - **Surfaces.** A body with health is its health map's region, as for
   [weapon sources](material-sources.md#spacewars-bodies), at a fixed depth:
   the health it brought into the step, less what the step's earlier impacts
@@ -429,6 +431,28 @@ the probe below gives its reasons.
   the world refused and the impacts left unpriced. Forty small asteroids that
   strike a large one in the same step have more points than a budget takes,
   so all forty go unpriced and wear nothing.
+- **Cost on the Pi.** #332 timed charges on the Pi 4 and the Pi 5 beside
+  their running kiosks, with seed 7, no input, and both ships at 500% healed
+  before each step. The records are in
+  `/home/data2/space-wars3-artifacts/material-cost-332-20261125`.
+  - On the Pi 4, in Deathmatch, charges take 0.68 ms of a 22 ms step in
+    release, 3%: binding 0.38, capture 0.16, pricing 0.10 and the asteroids'
+    wear 0.04. In the default universe they take 0.19 ms of 9.3 ms, 2%.
+  - On the Pi 5 they take 0.20 ms of a 6.0 ms step in Deathmatch, 3%:
+    binding 0.13, capture 0.03, pricing 0.03 and wear 0.01. In the default
+    universe they take 0.04 ms of 2.8 ms, 1.5%.
+  - In the tests' `ci` build, which the 2026-11-24 baseline used, the Pi 4's
+    Deathmatch charges take 0.89 ms of 28 ms, 3%. On 2026-11-24 they added
+    2.7 ms to a 22.6 ms step, 12%, and 1.8 ms of it was in the physics step,
+    where capture runs. Capture now passes over pairs without solver
+    contacts. Every step was slower than on 2026-11-24, with charges or
+    without, so compare the shares. The Pi 5 has no earlier figures.
+  - Capture visits about 2,800 pairs a step in Deathmatch. About 40 touch,
+    and about one has both sides bound.
+  - With charges on, Deathmatch keeps 8% fewer debris. On the Pi 4 its whole
+    step was 1% slower with charges in one build and 6% faster in the other,
+    while repeats of one build beside the kiosk varied by 3 to 7%. On the
+    Pi 5 it was 0.3 to 1.1% faster in both.
 
 The contact-half probe of 2026-11-23 bound the same bodies, with loose terrain,
 the boundary and all rock debris besides, and set charges beside today's rules
@@ -533,11 +557,25 @@ contacts cost in play.
   each grain's contacts with the terrain and its neighbors and added about
   15% to a duel's step on the workstation. With tanks and terrain alone,
   capture, binding and pricing add 1 to 5% there.
-- **Cost on the Pi.** Beside the running kiosk, a duel's step of 2.3 to 3.4 ms
-  gains 0.09 to 0.10 ms, 3 to 4%: capture 62 to 82 µs, binding 10 to 13 and
-  pricing 4 to 7. Capture visits every pair of colliders in contact, 134 to
-  172 a step, bound or not. The host prices only the steps that start an
-  impact.
+- **Cost on the Pi.** #332 timed the duels and Clock's Tanks fights on the
+  Pi 4 and the Pi 5 beside their running kiosks. The records are in
+  `/home/data2/space-wars3-artifacts/material-cost-332-20261125`.
+  - On the Pi 4 a duel's step of 2.4 to 3.3 ms gains 0.09 to 0.10 ms, 3 to
+    4%: capture 68 to 85 µs, binding 10 to 13 and pricing 4 to 8, as for
+    #331. The host prices only the steps that start an impact. On the Pi 5
+    a step of 0.68 to 0.97 ms gains 17 to 19 µs, 1.8 to 2.6%: capture 12 to
+    16 µs, binding 2 to 3 and pricing under 2.
+  - Capture visits 135 to 174 pairs a step, and passing over those without
+    solver contacts saved the duels nothing measurable. On the workstation
+    three quarters of capture's time is its loop over the pairs, where each
+    of the 61 to 77 that touch has both colliders looked up. Only 2 or 3 of
+    those are bound: the rest have a collider without a region, such as a
+    loose grain.
+  - In Clock's Tanks fights on the Pi 4, capture and charges add 71 to 89 µs
+    to the arena's step over a whole fight, 3.9 to 4.4%: capture 52 to
+    64 µs, binding 12 to 16 and pricing 3 to 9. For #331 they added 79 to
+    106 µs, 4.8 to 5.5%, with capture 56 to 76. On the Pi 5 they add 12 to
+    16 µs, 2.8 to 3.2%, with capture 8 to 11.
 - **Capture's bounds** are the defaults with room for 8,192 bindings, 4,096
   episodes, 65,536 visits and 8,192 contacts a batch, and 32,768 records a
   step. A world that already captures keeps its own. In 96 CPU duels no batch
