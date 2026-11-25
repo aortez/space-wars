@@ -413,35 +413,45 @@ pub struct RadialImpulse {
     pub speed: f32,
 }
 impl RadialImpulse {
-    pub fn apply(
-        self,
-        world: &mut PhysicsWorld,
-        bodies: impl IntoIterator<Item = BodyId>,
-    ) -> usize {
+    /// The velocity change this gives a body whose center of mass is at
+    /// `center`: outward, falling off linearly to nothing at the radius. It is
+    /// zero outside the radius, at the center itself, and for an impulse that
+    /// is not finite, has no radius or has a negative speed.
+    pub fn velocity_change(self, center: Vec2) -> Vec2 {
         if ![self.center.x, self.center.y, self.radius, self.speed]
             .into_iter()
             .all(f32::is_finite)
             || self.radius <= 0.0
             || self.speed < 0.0
         {
-            return 0;
+            return Vec2::ZERO;
         }
+        let offset = center - self.center;
+        let distance = offset.length();
+        if !(distance > 0.0001 && distance < self.radius) {
+            return Vec2::ZERO;
+        }
+        let delta = offset / distance * (self.speed * (1.0 - distance / self.radius));
+        if delta.x.is_finite() && delta.y.is_finite() {
+            delta
+        } else {
+            Vec2::ZERO
+        }
+    }
+
+    pub fn apply(
+        self,
+        world: &mut PhysicsWorld,
+        bodies: impl IntoIterator<Item = BodyId>,
+    ) -> usize {
         let mut moved = 0;
         for body in bodies {
             let Some(center) = world.center_of_mass(body) else {
                 continue;
             };
-            let offset = center - self.center;
-            let distance = offset.length();
-            if distance > 0.0001 && distance < self.radius {
-                let delta = offset / distance * (self.speed * (1.0 - distance / self.radius));
-                if delta.length_squared() > 0.0
-                    && delta.x.is_finite()
-                    && delta.y.is_finite()
-                    && world.apply_velocity_delta(body, delta, true)
-                {
-                    moved += 1;
-                }
+            let delta = self.velocity_change(center);
+            if delta.length_squared() > 0.0 && world.apply_velocity_delta(body, delta, true) {
+                moved += 1;
             }
         }
         moved

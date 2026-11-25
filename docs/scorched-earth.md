@@ -181,8 +181,9 @@ law consumed there. Pricing moves nothing, so Rapier still decides the bounce.
     grain bound, capture added about 15% to a duel's step, against about 3%
     without.
   - Shells. They are rays, not bodies, and charge armor as sources, so no hit
-    is counted twice. A burst's push is not taken from its payload, though,
-    so what a pushed tank then strikes is priced on top of the burst.
+    is counted twice. A burst's push on a tank comes out of the tank's share
+    of the payload, so what a pushed tank then strikes is priced from motion
+    the payload paid for.
 - **Listing.** `contacts()` lists the tanks' new impacts in the step just
   taken: the two entities, which is a tank, the closing speed, the energy and
   the work each armor took. `contact_diagnostics()` counts the batches and
@@ -2328,8 +2329,9 @@ It calls the existing [shared loose-terrain layer](shared-loose-terrain.md):
 2. At impact, `PreparedRelease` plans the affected fields before changing them.
    Admission covers the complete event. `LooseTerrain::commit` transfers removed
    cells into conserved grains and detached material fields.
-3. `RadialImpulse` throws nearby loose material and kicks tank hulls. Rapier
-   supplies gravity and contact response in the same world as the terrain.
+3. `RadialImpulse` throws nearby loose material and kicks tank hulls. A tank's
+   kick comes out of its share of the payload. Rapier supplies gravity and
+   contact response in the same world as the terrain.
 4. `LooseTerrain::settle` returns eligible quiet groups to existing terrain
    through the ordinary deposit boundary. Published geometry and collision
    shapes update together, with actor clearance checked by the shared layer.

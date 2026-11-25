@@ -201,10 +201,11 @@ the model replaced or left in place.
 - **Steady loads.** No game prices supports yet. #243, #302 and #311 add them
   where bodies crush. Supports are priced only while steady, awake and outside
   a step that CCD splits, and for their normal load alone.
-- **Pushes.** A Scorched burst pushes the tanks without taking the push from
-  its payload, so what a pushed tank then strikes is priced on top. A
-  Spacewars ship's death impulse, which throws its escape pod clear, is a game
-  rule outside the ledger.
+- **Pushes.** A Scorched burst's push on a tank comes out of the tank's share
+  of the payload. Two pushes stay outside the ledger: the burst's push on
+  loose dirt and fallen terrain, which is the terrain's own effect, and a
+  Spacewars ship's death impulse, a game rule that throws its escape pod
+  clear.
 - **Weapons.** Deposits carry no momentum, a shot stops at its first hard
   contact without ricochet or penetration, and `Weapons` isn't saved
   ([sources' limits](material-sources.md#limits)).

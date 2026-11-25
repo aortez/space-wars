@@ -388,6 +388,10 @@ the probe below gives its reasons.
 - **Supports** go unpriced. The host never calls `charge_contact_supports`,
   so the steady load of a ship, pod, pilot or rover resting on a planet costs
   nothing, and only impacts are listed.
+- **Ejection.** The hit that kills a ship throws its escape pod at the hit's
+  damage as a speed along it. That kick is a game rule outside the ledger: a
+  weapon's source charged the hull only for what it delivered, and the pod's
+  crashes keep today's rules.
 - **Asteroid wear.** An asteroid loses the health its impacts consumed, and
   today's contact rules no longer wear it. It chips and breaks by its health
   as before, but what a strike costs it has changed. Today's rules took no
@@ -509,8 +513,13 @@ contacts cost in play.
   health, and from 20 and 30 units nothing. Rapier's prediction distance
   follows the world's length unit, so a hosted world can count those patches
   differently from a standalone one.
-- **Bursts.** A shell's burst pushes the tanks without taking the push from
-  its payload, so what a pushed tank then strikes is priced on top.
+- **Bursts.** A shell's burst pushes each tank it reaches, and the push's
+  energy in the tank's own frame comes out of the tank's share of the
+  payload. The armor takes the rest, and what the pushed tank then strikes is
+  priced from motion the payload paid for. A share too small for the whole
+  push moves the tank as far as it pays for. The impact event lists each
+  push as `pushed`. The burst's push on loose dirt and fallen terrain is the
+  terrain's own effect, outside the ledger.
 - **Clones.** With capture on, a world clones through a snapshot of itself. A
   duel's clone goes on tick for tick as the duel does.
 - **Loose dirt** is left out for its cost. A grain's mass is 0.25, and as rock

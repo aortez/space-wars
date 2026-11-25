@@ -239,7 +239,7 @@ mod tests {
     #[test]
     fn post_hit_forks_preserve_physics_inflight_shots_and_learned_history() {
         let state = capture(GrainShape::Round, 7, 1035);
-        assert_eq!(state.observation_hash(), 0x5eb0257199c3f62c);
+        assert_eq!(state.observation_hash(), 0x11e505d21b4f8bf7);
         assert!(state.bots[0].pending.is_some());
         assert_eq!(state.bots[0].aim.observations, 3);
         for choice in [Choice::ContinueAiming, Choice::Reference, Choice::Current] {

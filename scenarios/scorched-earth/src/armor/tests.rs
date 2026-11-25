@@ -157,6 +157,7 @@ fn a_burst_between_the_tanks_divides_one_payload() {
             at + Vec2::X * 3.0,
             &mut source,
             &mut Keys::default(),
+            &[Push::default(); 2],
         )
         .absorbed;
     assert!(absorbed[0] > 0.0);
@@ -168,6 +169,50 @@ fn a_burst_between_the_tanks_divides_one_payload() {
         source.release(&[]),
         Err(SourceError::Spent(Part::Payload))
     ));
+}
+
+#[test]
+fn a_bursts_push_on_a_tank_comes_out_of_its_share_of_the_payload() {
+    for suspension in [false, true] {
+        let state = settled(suspension);
+        let body = state.tanks[0].body;
+        let point = position(&state, 0) + Vec2::new(2.5, 1.0);
+        // The same burst pushing the tanks, and releasing its payload alone.
+        let mut pushing = state.clone();
+        let before = pushing.physics.motion(body).unwrap().linear_velocity;
+        let mut source = charge(1, None);
+        let struck = pushing.duel.burst(
+            &mut pushing.physics,
+            &mut NoRecipients,
+            point,
+            point,
+            &mut source,
+            &mut Keys::default(),
+        );
+        let paid = source.ledger().payload;
+        let mut source = charge(1, None);
+        let still = state.duel.clone().release_payload(
+            &state.physics,
+            &mut NoRecipients,
+            point,
+            &mut source,
+            &mut Keys::default(),
+            &[Push::default(); 2],
+        );
+        let unpaid = source.ledger().payload;
+        // The push's energy in the tank's own frame is what its share paid,
+        // and its armor took that much less.
+        let delta = pushing.physics.motion(body).unwrap().linear_velocity - before;
+        let mass = pushing.physics.body_mass(body).unwrap();
+        let pushed = struck.pushed[0];
+        assert!(pushed > 0.0, "sprung={suspension}");
+        assert_eq!(struck.pushed[1], 0.0);
+        assert!((0.5 * mass * delta.length_squared() - pushed).abs() < 1e-3 * pushed);
+        assert!(struck.absorbed[0] < still.absorbed[0]);
+        // The payload delivered what the shares carried, less the push.
+        let shortfall = unpaid.delivered - paid.delivered;
+        assert!((shortfall - f64::from(pushed)).abs() < 1e-3 * f64::from(pushed));
+    }
 }
 
 #[test]
