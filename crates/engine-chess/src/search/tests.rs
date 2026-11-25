@@ -926,7 +926,14 @@ fn a_mate_announced_close_to_the_hundredth_half_move_is_real() {
     // the ten that are left, and a search that trusted its table across
     // counts used to announce one in eleven.
     let rook = game("8/8/7k/8/1R2K3/8/8/8 w - - 90 84", "");
-    let job = searched(&rook, Level::Normal.settings(), IN_PLAY);
+    let then = Settings {
+        depth: MAX_DEPTH,
+        nodes: 100_000,
+        quiescence: 8,
+        table_bits: 16,
+        margin: 20,
+    };
+    let job = searched(&rook, then, IN_PLAY);
     let score = job.decision().unwrap().score.unwrap();
     assert!(score.abs() < MATE_BOUND, "a mate was announced: {score}");
 
@@ -972,6 +979,29 @@ fn settings_beyond_their_limits_are_brought_back_to_them() {
     // A search of no depth at all is one of a single half-move.
     let job = SearchJob::new(&game, settings(0, 0, 0, 0), 0).unwrap();
     assert_eq!(job.settings.depth, 1);
+
+    // What a player asks for is held to the same limits, and to a number
+    // of positions that keeps the time of a move bounded. A search itself
+    // takes as many positions as it is given.
+    let asked = Settings {
+        nodes: u64::MAX,
+        ..beyond
+    };
+    let most = Settings {
+        nodes: MAX_PLAY_NODES,
+        ..within
+    };
+    assert_eq!(asked.for_play(), most);
+    assert_eq!(most.for_play(), most);
+    assert_eq!(within.for_play(), within);
+    assert_eq!(
+        SearchJob::new(&game, asked, 0).unwrap().settings.nodes,
+        u64::MAX
+    );
+    // Every named level is within what a player may ask for.
+    for level in Level::ALL {
+        assert_eq!(level.settings().for_play(), level.settings(), "{level:?}");
+    }
 }
 
 #[test]

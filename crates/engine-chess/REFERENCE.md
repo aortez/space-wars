@@ -321,7 +321,7 @@ for a legal action after every step of three searches.
 
 ### Checking the tests
 
-On 2026-11-25 the search was broken in 132 ways, one at a time, in a copy
+On 2026-11-25 the search was broken in 133 ways, one at a time, in a copy
 of the crate, and its tests were rerun. Every break failed at least one
 test.
 
@@ -337,7 +337,8 @@ A review of the whole change then found four things that the sweep had
 never broken and no test would have noticed: the limits on a search's
 settings, the range of the evaluation, the margin beside a forced mate and
 the table beside the fifty-move rule. The last three were wrong as well. Ten
-breaks went in with the fixes and their tests.
+breaks went in with the fixes and their tests, and one more with the limit
+on the positions a player may give a search.
 
 | What was broken | Breaks | Tests that noticed |
 | --- | --- | --- |
@@ -368,7 +369,7 @@ breaks went in with the fixes and their tests.
 | Moves as numbers: promotions sharing one, the best move misread | 2 | `src/tests.rs`, order of moves |
 | A decision that names the wrong state of the game | 1 | A legal action after any step |
 | Evaluation for the wrong player, tables read from the far side, tables mirrored for White | 3 | Evaluation |
-| Settings beyond their limits: a search deeper than the deepest or of no depth, captures followed past their limit, a table larger than the largest | 4 | Limits of the settings |
+| Settings beyond their limits: a search deeper than the deepest or of no depth, captures followed past their limit, a table larger than the largest, a player given positions without limit | 5 | Limits of the settings |
 | A position that looks better than a forced mate | 1 | A board full of queens |
 | A mated move good enough under the widest margin | 1 | The margin beside a mate |
 | The table beside the fifty-move rule: the count left out of what it knows a position by, a mate believed though it would come too late, by one half-move, or at the hundredth | 4 | The table and the count |
@@ -382,38 +383,93 @@ The sweep cannot say that the pass and the reductions are tuned well, only
 that they keep to their conditions. A break that merely weakens them, such
 as a pass tried a half-move later, is for the benchmark to notice.
 
-### How strong the levels are
+### The levels and a player's settings
 
-On 2026-11-24 and 2026-11-25 the tooling outside the repository measured
-the three levels with their starting budgets, first with the search as
-first built and last with every change listed under [the
-benchmark](#the-benchmark). The figures
-here are the last ones. Nothing here is a rating, and a level that wins
-every game against a weaker level of the same search need not be as far
-ahead of a person.
+A player may set all five of a search's settings, and the three levels are
+settings to start from. `Settings::for_play` brings whatever a player
+chooses within the limits that every search keeps, and to no more than
+10,000,000 positions a move. The Pi 4 searches about a million positions a
+second, and half that in the slowest position measured, so a search of
+that many would take it ten to twenty seconds.
+
+On 2026-11-25 the levels were these, with the search as it is after every
+change listed under [the benchmark](#the-benchmark).
+
+| | Easy | Normal | Hard |
+| --- | --- | --- | --- |
+| Deepest full search, in half-moves | 2 | 32, the deepest there is | 32 |
+| Positions a move | 5,000, of which it uses under 1,000 | 10,000 | 1,000,000 |
+| Half-moves of captures followed past the full search | none | 8 | 8 |
+| Table | none | 1 MiB | 16 MiB |
+| Margin, in centipawns | 60 | 30 | 8 |
+| Plays about as well as Stockfish held to | far below 1320, its lowest | 1405 ± 58 | 2160 ± 53 |
+| Test positions found, of 300 | 34 | 166 | 272 |
+| A move on the Pi 4 | under 1 ms | 8 to 12 ms | 0.7 to 1.1 s |
+| A move on the Pi 5 | under 1 ms | 3 to 5 ms | 0.3 to 0.45 s |
+| What a search holds | 105 KiB | 1.1 MiB | 16.1 MiB |
+
+The times are for four ordinary positions. In the slowest position measured,
+which has eleven queens, a move takes about twice as long: see [On the
+kiosks](#on-the-kiosks).
+
+Until 2026-11-25 Normal had 100,000 positions a move and a margin of 20, the
+budget the search was first given. With every change to the search it then
+played like Stockfish held to 1725 ± 59, much nearer Hard than Easy, and
+took 73 to 113 ms a move on the Pi 4. A tenth of the positions put it
+between the two.
+
+What each setting costs and buys, as far as it was measured:
+
+- **Positions:** on Stockfish's scale, 1,000 a move played like 1175 ± 74,
+  3,000 like 1308 ± 62, 10,000 like 1405 ± 58, 100,000 like 1725 ± 59 and
+  1,000,000 like 2160 ± 53. That is 230 to 440 points for each tenfold. The
+  fewest measured, 1,000, played far better than Easy. The time a move
+  takes is in proportion to them, about a millisecond for each thousand on
+  the Pi 4 and 0.4 on the Pi 5.
+- **The table:** sixteen bytes an entry, and a search holds about 100 KiB
+  besides. What its size is worth by itself has not been measured.
+- **The margin:** moves within it of the best are all good enough, and the
+  seed chooses between them. A wider margin varies the play and weakens it.
+  What it costs by itself has not been measured: each setting measured here
+  changed it along with the positions, from 40 at 1,000 to 8 at 1,000,000.
+- **Depth and captures:** Easy is weak in another way. It looks two
+  half-moves ahead and follows no captures past them, so it walks into
+  exchanges. A search three half-moves deep at 5,000 positions, following
+  two half-moves of captures, played like 1163 ± 75.
+
+Each placement on Stockfish's scale comes from 60 games, 30 openings played
+twice, against Stockfish 19 held to each of three or four ratings and given
+200,000 positions a move. It cannot be repeated exactly: see [the
+benchmark](#the-benchmark). Easy won 4 of its 180 games against Stockfish
+held to 1320, 1450 and 1600, which puts it at about 765 ± 176 if the scale
+goes on below Stockfish's lowest rating.
+
+The tooling outside the repository also measured the levels against the
+search itself. Nothing here is a rating, and a level that wins every game
+against a weaker level of the same search need not be as far ahead of a
+person.
 
 - **Test positions:** the earlier engine's repository holds `WAC.EPD`, 300
   positions from *Win at Chess* with the move to find in each. Searching
-  without the margin, Easy found 34 (11%), Normal 228 (76%) and Hard 272
-  (91%). Hard found 286 (95%) with four times its budget and 288 (96%) with
-  sixteen times. The first search had found 36, 182 and 222, and 250 and 258
-  with the larger budgets.
+  without the margin, Easy found 34 (11%), Normal 166 (55%) and Hard 272
+  (91%). With 100,000 positions the search found 228 (76%). Hard found 286
+  (95%) with four times its budget and 288 (96%) with sixteen times. The
+  search as first built had found 36 at Easy, 182 at 100,000 positions and
+  222 at Hard, and 250 and 258 with Hard's larger budgets.
 - **Games:** each pair of levels played 50 openings of four random half-moves,
   each opening twice with the colours exchanged. Normal beat Easy in all 100
-  games, and so did Hard. Hard against Normal won 99 and lost one.
+  games, and so did Hard. Hard against Normal won 99 and drew one by
+  repetition.
 - **A level against itself:** over the same 100 games, 94 ended in checkmate
-  at Easy, 82 at Normal and 90 at Hard. Two games at Normal were stopped
-  undecided after 400 half-moves, and the rest ended in a claimed draw or a
-  dead position. The median game lasted 103 half-moves at Easy, 169 at
-  Normal and 164 at Hard.
+  at Easy, 78 at Normal and 90 at Hard. Two games at Normal were stopped
+  undecided after 400 half-moves, and the rest ended in a claimed draw,
+  stalemate or a dead position. The median game lasted 103 half-moves at
+  Easy, 159 at Normal and 164 at Hard.
 
 Easy searches two half-moves deep, too shallow for a pass or a reduction, so
-only its evaluation and the order of its moves changed. The budgets of
-Normal and Hard are those the first search was given. They buy more now.
-Normal and Hard also use all of their budgets, where they used a little
-over half. The search is quicker, and they still take up to twice as long
-as they did at first: see [Measurements](#measurements). The budgets have
-not been set again.
+of the changes to the search only those to its evaluation and the order of
+its moves reach it. A search now uses all of its positions, where at first
+it used a little over half: see [How the budget is spent](#how-the-budget-is-spent).
 
 ### The benchmark
 
@@ -564,6 +620,9 @@ positions a move.
 
 ### Measurements
 
+Until 2026-11-25 Normal had 100,000 positions a move, and it has them in
+what follows wherever it is not said to have 10,000.
+
 On 2026-11-24 `cargo run --release -p engine-chess --example search_bench`
 ran on the development workstation and, built for `aarch64`, on two of the
 kiosks while they showed the Clock. Every machine reached the same decision
@@ -601,7 +660,8 @@ The same program ran again on the workstation later that day, in turn with
 one built from the baseline and one built from the search before it was
 made quicker, eight times each. The quickest run of each is given. The last
 column was timed an hour later, again in turn with the baseline, which ran
-as it had before. The kiosks have not been timed again.
+as it had before. The kiosks were timed again the day after: see [On the
+kiosks](#on-the-kiosks).
 
 | Four ordinary positions | Baseline | With the pass and the reductions | Made quicker, and using its whole budget | With the terms for pawns and rooks |
 | --- | --- | --- | --- | --- |
@@ -644,11 +704,46 @@ as it had before. The kiosks have not been timed again.
   each position's count of pieces.
 - In the position with eleven queens, Normal searches one half-move in full
   in 29 ms, and Hard two in 302 ms.
-- At the speeds measured on the kiosks for the baseline, 100,000 positions
-  take about 40 to 50 ms on the Pi 5 and 85 to 110 ms on the Pi 4, and
-  1,000,000 ten times as long. The search as it is now should need less,
-  which has not been measured. Nor has the comparison between machines
-  been repeated. Nothing in the search uses floating point.
+
+#### On the kiosks
+
+On 2026-11-25 the same program ran three times on each kiosk while it showed
+the Clock, built for `aarch64` from the search as it is, and three times
+more once Normal had 10,000 positions. The quickest run of each search is
+given. Normal's earlier budget of 100,000 positions is kept in the table,
+since a player may still choose it.
+
+| | Pi 5 (`spacewars`) | Pi 4 (`sw-picade-2`) |
+| --- | --- | --- |
+| Move generation, million positions a second | 19.4 | 7.7 |
+| Search, million positions a second | 2.2 to 3.4 | 0.9 to 1.4 |
+| Normal, four ordinary positions | 3.1 to 5.0 ms | 8.2 to 12.2 ms |
+| 100,000 positions, the same four | 30 to 46 ms | 73 to 113 ms |
+| Hard, the same four | 304 to 447 ms | 722 to 1,098 ms |
+| 10,000,000 positions, the same four | 3.0 to 4.6 s | |
+| Normal, the position with eleven queens | 7.1 ms | 16.3 ms |
+| 100,000 positions, the same | 78 ms | 183 ms |
+| Hard, the same | 819 ms | 1,946 ms |
+| 10,000,000 positions, the same | 8.0 s | |
+| Starting a search | under 0.1 ms | under 0.2 ms |
+| Slowest of the first 20,000 steps, in the best run | 10 µs | 33 µs |
+
+- Every search gave the same depth, positions, move and score on the
+  workstation and on both kiosks: the fifteen of this program in each of
+  its runs, and eighty more over forty positions from games, to a fixed
+  depth and at 100,000 positions each. Nothing in the search uses floating
+  point.
+- The searches of 10,000,000 positions, the most a player may give, ran
+  once on the Pi 5 with Hard's other settings, by a program in the tooling
+  outside the repository. The Pi 4 was not on the network by then. Each
+  search looked at positions about as quickly as at 1,000,000.
+- Easy answers in under a millisecond on both, and a search holds what it
+  holds on the workstation.
+- The kiosks look at about as many positions a second as they did with the
+  baseline, where the workstation looks at 1.3 to 1.5 times as many. What
+  was done for speed tells less on them, and a search that uses its whole
+  budget takes one and a half to two times as long as the baseline did on
+  the same four positions.
 
 ## The tooling outside the repository
 
@@ -676,7 +771,8 @@ running them.
   each build needs to finish each depth.
 - What it takes to make the search quicker without changing what it finds:
   a program that searches forty positions from games and prints a digest of
-  its decisions, a profiler, and a script that times builds in turn.
+  its decisions, a profiler, and a script that times builds in turn. A
+  program beside them times a search at any number of positions a move.
 
 Without the tooling, a new case can still be added by hand: write the entry in
 the table and compute its expected value with any trusted chess library.
