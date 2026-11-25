@@ -14,7 +14,7 @@ use engine_rapier::{
 use engine_terrain::{Cell, MaterialId};
 use scenario_scorched_earth::{
     BankStrength, CpuPolicy, FIXED_HZ, FiringRange, SHELL_LIFETIME_TICKS, ScorchedConfig,
-    host::{Bounds, Budget, HostedDuel, Placement},
+    host::{Bounds, Budget, HostedDuel, Placement, capture_contacts},
 };
 
 pub const RAISE_TICKS: u64 = 2 * FIXED_HZ as u64;
@@ -228,6 +228,8 @@ impl TanksEvent {
             GrainShape::Hexagon
         };
         let world = arena.claim_resident(OWNER, layout);
+        // The tanks' contacts charge their armor, as a standalone duel's do.
+        capture_contacts(world);
         let config = config(shape, seed);
         let cpu = [config.cpu_label(0), config.cpu_label(1)];
         let mut duel = match HostedDuel::attach(world, config, seed, place) {

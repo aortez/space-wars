@@ -1256,6 +1256,21 @@ One living tank wins. If both remain alive at timeout, higher health wins and
 exact equality is a draw; if neither survives, neither wins. A living timeout
 loser blows up too. A sudden death, below, ends the same way.
 
+The tanks' contacts charge their armor as a standalone duel's do
+([Scorched Earth](scorched-earth.md#armor-and-contacts)): the event turns
+contact capture on in the arena's world before the duel moves in. On the
+hills' rock a sprung tank's landings and driving cost nothing. In 48 fights,
+24 seeds each at 16:9 and 4:3, the tanks' 4,935 impacts cost none of them
+anything, the fastest at 6.6 u/s in the duel's units, and 18 went unpriced.
+The face, the wrecks' pieces and the spacelings have no region, so the tanks'
+contacts with them are not priced.
+
+On the Pi (`sw-picade`, kiosk running, load 2 to 3), over 12 fights at each
+shape, capture and pricing add about 0.1 ms to Clock's step in a fight, 5%:
+2.17 to 2.29 ms at 16:9 and 1.94 to 2.04 ms at 4:3. Capture is most of
+that. On the workstation, with other jobs loading it, they add 3 to 6%. A
+world that outlives the fight keeps capturing, with nothing bound.
+
 Each loser in view blows apart where it stands. A flash and a fireball burst
 from its hull, and the blast throws its turret up, spinning, its wheels off
 their springs and away to either side, and its hull, torn across in two or
