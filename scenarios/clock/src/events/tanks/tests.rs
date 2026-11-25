@@ -1400,6 +1400,8 @@ fn drawing(ending: survivor::Ending) -> f64 {
         survivor::Ending::Surrender => 0.5,
         survivor::Ending::PartingShot => 0.7,
         survivor::Ending::Rebuild => 0.9,
+        // Far enough into its pick, with a winner in view or without one.
+        survivor::Ending::Stranded => 0.99,
     }
 }
 
@@ -1652,12 +1654,14 @@ fn a_spaceling_or_pod_that_leaves_the_view_retires_there() {
 fn a_spaceling_still_down_when_its_time_runs_out_is_lifted_out_as_it_lies() {
     use survivor::{Ending, Fallback, Phase};
     // A stowaway has longer, for its run, a parting shot longer still, and a
-    // rebuild longest.
+    // rebuild longest. One that drew no beam has as long as one that drew
+    // the rescue beam.
     for (ending, longest) in [
         (Ending::RescueBeam, survivor::RESCUE_BY_TICKS),
         (Ending::Stowaway, survivor::AFTERMATH_TICKS),
         (Ending::PartingShot, survivor::PARTING_TICKS),
         (Ending::Rebuild, survivor::REBUILD_BY_TICKS),
+        (Ending::Stranded, survivor::RESCUE_BY_TICKS),
     ] {
         let (mut state, loser) = survival(4.0 / 3.0, 43, survivor::Ejection::Thrown, ending);
         assert_eq!(survivor(&state, loser).drawn, ending);
@@ -1677,7 +1681,8 @@ fn a_spaceling_still_down_when_its_time_runs_out_is_lifted_out_as_it_lies() {
             tick(&mut state);
         }
         // The aftermath waits for it as long as it may, then the beam takes
-        // it as it lies, whatever it drew.
+        // it as it lies, whatever it drew: the hills leave behind only a
+        // spaceling on its feet.
         assert_eq!(aftermath, longest, "{ending:?}");
         assert_eq!(state.event_phase(), Some(EventPhase::BeamUp));
         let survivor = survivor(&state, loser);
@@ -1851,12 +1856,30 @@ fn obstacle(state: &mut ClockState, index: u64, middle: Vec2, half: Vec2) -> Bod
 #[test]
 fn a_survivor_draws_its_ending_evenly_from_those_that_fit_the_fight() {
     use survivor::{Ejection, Ending};
-    // Without a winner in view only the rescue beam fits. With one, each of
-    // the five takes a fifth of the rolls.
+    let index = |ending| match ending {
+        Ending::RescueBeam => 0,
+        Ending::Stowaway => 1,
+        Ending::Surrender => 2,
+        Ending::PartingShot => 3,
+        Ending::Rebuild => 4,
+        Ending::Stranded => 5,
+    };
+    // Without a winner in view the rescue beam fits, and being stranded
+    // while the clock has room for it: half the rolls each. With no room,
+    // only the rescue beam does.
     for roll in [0.0, 0.2, 0.4, 0.6, 0.8, 0.999] {
-        assert_eq!(survivor::ending(roll, false), Ending::RescueBeam);
+        assert_eq!(survivor::ending(roll, false, false), Ending::RescueBeam);
+        let stranded = if roll < 0.5 {
+            Ending::RescueBeam
+        } else {
+            Ending::Stranded
+        };
+        assert_eq!(survivor::ending(roll, false, true), stranded);
     }
-    let mut drawn = [0u32; 5];
+    // With one, each of the six takes a sixth of the rolls, or each of the
+    // other five a fifth with no room to be stranded. A roll that draws
+    // another ending with room draws the same one without.
+    let mut drawn = [[0u32; 6]; 2];
     for seed in 0..60_000u64 {
         let fight = seed.wrapping_add((ClockEventKind::Tanks as u64) << 32);
         let rolls = survivor::ending_rolls(fight);
@@ -1867,19 +1890,35 @@ fn a_survivor_draws_its_ending_evenly_from_those_that_fit_the_fight() {
         );
         for roll in rolls {
             assert!((0.0..1.0).contains(&roll));
-            drawn[match survivor::ending(roll, true) {
-                Ending::RescueBeam => 0,
-                Ending::Stowaway => 1,
-                Ending::Surrender => 2,
-                Ending::PartingShot => 3,
-                Ending::Rebuild => 4,
-            }] += 1;
+            let [with, without] = [true, false].map(|room| survivor::ending(roll, true, room));
+            drawn[0][index(with)] += 1;
+            drawn[1][index(without)] += 1;
+            assert!(with == Ending::Stranded || with == without);
         }
     }
-    for count in drawn {
+    for count in drawn[0] {
         let share = count as f32 / 120_000.0;
+        assert!((share - 1.0 / 6.0).abs() < 0.01, "{drawn:?}");
+    }
+    assert_eq!(drawn[1][5], 0);
+    for count in &drawn[1][..5] {
+        let share = *count as f32 / 120_000.0;
         assert!((share - 1.0 / 5.0).abs() < 0.01, "{drawn:?}");
     }
+    for ending in [
+        Ending::RescueBeam,
+        Ending::Stowaway,
+        Ending::Surrender,
+        Ending::PartingShot,
+        Ending::Rebuild,
+        Ending::Stranded,
+    ] {
+        assert_eq!(survivor::ending(drawing(ending), true, true), ending);
+    }
+    assert_eq!(
+        survivor::ending(drawing(Ending::Stranded), false, true),
+        Ending::Stranded
+    );
     // The event rolls once, from its own seed, as it starts.
     let mut state = ready(5.0 / 3.0, 42, ClockTimeFormat::TwentyFourHour);
     state.preview_event(ClockEventKind::Tanks);
@@ -1888,13 +1927,14 @@ fn a_survivor_draws_its_ending_evenly_from_those_that_fit_the_fight() {
         fight.survivors.ending_rolls,
         survivor::ending_rolls(fight.seed)
     );
-    // A fight that leaves no winner gives each spaceling the rescue beam,
-    // whatever its roll, and waits no longer than a rescue takes.
+    // A fight that leaves no winner gives a spaceling that drew an ending
+    // with the winner the rescue beam, and waits no longer than a rescue
+    // takes.
     let mut state = ready(4.0 / 3.0, 69, ClockTimeFormat::TwentyFourHour);
     start_fighting(&mut state);
     event(&mut state).survivors.rolls = [Some(Ejection::Thrown); 2];
     event(&mut state).survivors.ending_rolls =
-        [drawing(Ending::Stowaway), drawing(Ending::Surrender)];
+        [drawing(Ending::Stowaway), drawing(Ending::RescueBeam)];
     to_the_result(&mut state);
     assert_eq!(tanks(&state).result, Some(ResultKind::Neither));
     for slot in 0..2 {

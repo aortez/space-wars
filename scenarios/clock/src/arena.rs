@@ -87,6 +87,10 @@ pub(crate) enum Owner {
     /// digit column it may land on. It comes and goes like a visit, and a
     /// resize ends it.
     Crow,
+    /// A spaceling the hills of a Tanks fight left behind: a temporary actor
+    /// with its body, and a perch for the digit block it stands on and for
+    /// the one it is going to. It stays a while, and a resize ends its stay.
+    Stranded,
 }
 
 impl Owner {
@@ -99,12 +103,16 @@ impl Owner {
     /// An owner that rests on the floor, so the arena keeps a floor under it
     /// while no visit's terrain is one. Soil is fixed in place and needs none.
     fn rests(self) -> bool {
-        matches!(self, Self::Fixture(_) | Self::Spider | Self::Crow)
+        matches!(
+            self,
+            Self::Fixture(_) | Self::Spider | Self::Crow | Self::Stranded
+        )
     }
 
     /// An owner whose bodies fall at Clock's own gravity, whoever set the
     /// world's. The crow is not one: its wings and legs carry its weight, and
-    /// its controller brings the pull it flies against.
+    /// its controller brings the pull it flies against. Nor is a stranded
+    /// spaceling, which keeps the fall of the fight that left it behind.
     fn weighed(self) -> bool {
         matches!(self, Self::Fixture(_) | Self::Spider)
     }
@@ -112,7 +120,7 @@ impl Owner {
     /// An owner that brings no world of its own, so the world keeps the
     /// settings it would be built with while only such owners hold it.
     fn worldless(self) -> bool {
-        self.resident() || matches!(self, Self::Spider | Self::Crow)
+        self.resident() || matches!(self, Self::Spider | Self::Crow | Self::Stranded)
     }
 
     /// Whether the entity `id` is one of this owner's.
@@ -180,6 +188,12 @@ impl Owner {
                 let bodies = count(&ids::canonical::CROW) + count(&ids::canonical::CROW_PERCHES);
                 Population::new(bodies, bodies)
             }
+            // Its body and its two perches, each with one collider.
+            Self::Stranded => {
+                let bodies =
+                    count(&ids::canonical::STRANDED) + count(&ids::canonical::STRANDED_PERCHES);
+                Population::new(bodies, bodies)
+            }
         }
     }
 
@@ -214,6 +228,7 @@ impl Owner {
             Self::Fixture(index) => &FIXTURE_OWNER_BALLS[index as usize],
             Self::Spider => &[SPIDER, SPIDER_FRAME, SPIDER_SURFACES],
             Self::Crow => &[CROW, CROW_PERCHES],
+            Self::Stranded => &[STRANDED, STRANDED_PERCHES],
         }
     }
 }
@@ -227,6 +242,7 @@ impl From<Owner> for ClockArenaOwner {
             Owner::Fixture(index) => Self::Fixture { index },
             Owner::Spider => Self::Spider,
             Owner::Crow => Self::Crow,
+            Owner::Stranded => Self::Stranded,
         }
     }
 }
@@ -256,18 +272,20 @@ const LARGEST_EVENT: Population = {
 };
 
 /// The most bodies, colliders and joints the arena holds at once: a visit
-/// and the largest event sharing its arena, with the crow, soil and one arena
-/// fixture, and the spider's line. The spider takes no more room than the
-/// largest event, so beside a visit and the residents it fits where an event
-/// would, and it never shares the arena with an event that has bodies,
-/// because the two together do not. The crow can still be in the air when an
-/// event that takes its perches starts, so its room is kept for it, as
+/// and the largest event sharing its arena, with the crow, a stranded
+/// spaceling, soil and one arena fixture, and the spider's line. The spider
+/// takes no more room than the largest event, so beside a visit and the
+/// residents it fits where an event would, and it never shares the arena with
+/// an event that has bodies, because the two together do not. The crow can
+/// still be in the air when an event that takes its perches starts, and a
+/// stranded spaceling in its beam, so their room is kept for them, as
 /// [`admits`] says. Everything Clock ships fits, so only residents beyond
 /// those make the arena refuse a claim.
 pub const ARENA_CAPACITY: Population = Owner::Visit
     .budget()
     .plus(LARGEST_EVENT)
     .plus(Owner::Crow.budget())
+    .plus(Owner::Stranded.budget())
     .plus(Owner::Soil.budget())
     .plus(Owner::Fixture(0).budget())
     .plus(Population {
@@ -278,9 +296,12 @@ pub const ARENA_CAPACITY: Population = Owner::Visit
 
 // Tanks has a separate reservation for chunked terrain and cannot share a
 // visit, the spider or the crow. Its larger collider allowance must not relax
-// admissions for the existing visitor/event combinations.
+// admissions for the existing visitor/event combinations. A spaceling its
+// hills leave behind takes its place in the arena as they withdraw, and one
+// stranded earlier is still in its beam as the next fight's hills rise.
 const TANKS_CAPACITY: Population = crate::events::tanks::POPULATION
     .plus(FLOOR_BUDGET)
+    .plus(Owner::Stranded.budget())
     .plus(Owner::Soil.budget())
     .plus(Owner::Fixture(0).budget());
 
@@ -302,8 +323,9 @@ const _: () = assert!(
 pub const MAX_RESIDENT_CLAIMS: usize = 4;
 
 /// The most owners that hold the arena at once: a visit, one event sharing
-/// its arena or the spider, the crow, and the residents.
-pub const MAX_ARENA_CLAIMS: usize = 3 + MAX_RESIDENT_CLAIMS;
+/// its arena or the spider, the crow, a stranded spaceling, and the
+/// residents.
+pub const MAX_ARENA_CLAIMS: usize = 4 + MAX_RESIDENT_CLAIMS;
 
 const _: () = assert!(
     FLOOR_BUDGET
@@ -317,8 +339,8 @@ const _: () = assert!(
 /// reserved for the whole run, so it counts whether or not the soil holds the
 /// arena yet, and soil is never refused. Outside the duel the crow's room,
 /// and the floor kept under it, is reserved the same way: the crow takes no
-/// room that another claim counts on, and is never refused for room. Changes
-/// nothing.
+/// room that another claim counts on, and is never refused for room. So is
+/// a stranded spaceling's, in the duel and out of it. Changes nothing.
 pub(crate) fn admits(owners: &[Owner]) -> Result<(), Unavailable> {
     let mut held: Vec<Owner> = Vec::with_capacity(owners.len() + 2);
     for owner in owners.iter().copied().chain([Owner::Soil]) {
@@ -344,6 +366,9 @@ pub(crate) fn admits(owners: &[Owner]) -> Result<(), Unavailable> {
     }
     if !tanks && !held.contains(&Owner::Crow) {
         held.push(Owner::Crow);
+    }
+    if !held.contains(&Owner::Stranded) {
+        held.push(Owner::Stranded);
     }
     let floor = held.iter().any(|owner| owner.rests()) && !held.contains(&Owner::Visit);
     let floor = if floor {
@@ -1377,6 +1402,12 @@ pub(crate) mod ids {
         pub(crate) const CROW_PERCHES: Range<u64> = 8510..8510 + crate::crow::PERCH_COLUMNS as u64;
         /// The magpie's body, which comes for the coins.
         pub(crate) const MAGPIE: Range<u64> = 8601..8602;
+        /// A stranded spaceling's body.
+        pub(crate) const STRANDED: Range<u64> = 8701..8702;
+        /// A stranded spaceling's perches: the digit block it stands on, and
+        /// the one it is going to.
+        pub(crate) const STRANDED_PERCHES: Range<u64> =
+            8710..8710 + crate::stranded::PERCHES as u64;
         /// The duel, its monotonic material allocator and reserved conversion tail.
         pub(crate) const TANKS: Range<u64> = 20_000..60_000;
         /// Retained soil, the one resident today that outlives its admitting
@@ -1458,6 +1489,8 @@ pub(crate) mod ids {
             ("CROW", CROW),
             ("CROW_PERCHES", CROW_PERCHES),
             ("MAGPIE", MAGPIE),
+            ("STRANDED", STRANDED),
+            ("STRANDED_PERCHES", STRANDED_PERCHES),
             ("SOIL", SOIL),
             ("TEST_OBSTACLES", TEST_OBSTACLES),
         ];

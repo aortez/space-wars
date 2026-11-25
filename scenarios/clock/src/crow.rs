@@ -346,6 +346,12 @@ impl CrowVisit {
         false
     }
 
+    /// Where the crow is going: the feet of the perch or the spot on the
+    /// ground it has chosen, if it has one.
+    pub fn destination(&self) -> Option<Vec2> {
+        self.target.map(Target::feet)
+    }
+
     /// How many perches the crow has placed in the arena.
     #[cfg(test)]
     pub fn perch_count(&self) -> usize {

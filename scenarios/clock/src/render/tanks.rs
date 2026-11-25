@@ -16,7 +16,7 @@ use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
 const EARTH: RenderColor = RenderColor::rgb(0.36, 0.27, 0.16);
 const GRAIN: RenderColor = RenderColor::rgb(0.69, 0.48, 0.25);
-const TEAMS: [RenderColor; 2] = [
+pub(super) const TEAMS: [RenderColor; 2] = [
     RenderColor::rgb(0.35, 0.85, 0.68),
     RenderColor::rgb(0.98, 0.51, 0.27),
 ];
@@ -48,7 +48,7 @@ const POD_SHELL: RenderColor = RenderColor::rgb(0.74, 0.77, 0.8);
 const POD_INSIDE: RenderColor = RenderColor::rgb(0.12, 0.13, 0.15);
 /// A white flag, and the stick it flies from.
 const FLAG: RenderColor = RenderColor::rgb(0.98, 0.98, 0.95);
-const STICK: RenderColor = RenderColor::rgb(0.6, 0.5, 0.36);
+pub(super) const STICK: RenderColor = RenderColor::rgb(0.6, 0.5, 0.36);
 /// A running spaceling's strides a second.
 const STRIDE_HZ: f32 = 3.5;
 /// A jetpack's flame, and its hot core.
@@ -77,7 +77,7 @@ fn glow(heat: f32) -> RenderColor {
     mix(GLOW[index], GLOW[index + 1], t.clamp(0.0, 1.0))
 }
 
-fn faded(mut color: RenderColor, alpha: f32) -> RenderColor {
+pub(super) fn faded(mut color: RenderColor, alpha: f32) -> RenderColor {
     color.a = alpha;
     color
 }
@@ -92,7 +92,7 @@ fn unit(pattern: u64, index: u64) -> f32 {
     (x >> 40) as f32 / (1u64 << 24) as f32
 }
 
-fn polygon(
+pub(super) fn polygon(
     frame: &mut RenderFrame,
     layer: i32,
     mut points: Vec<Vec2>,
@@ -163,7 +163,7 @@ fn disc(
     );
 }
 
-fn strip(
+pub(super) fn strip(
     frame: &mut RenderFrame,
     layer: i32,
     a: Vec2,
@@ -266,7 +266,7 @@ fn wreck(
 
 /// The smoke a burning piece, a pod in flight or a jetpack left behind it,
 /// on `layer`, each puff rising and spreading as it thins.
-fn trail(
+pub(super) fn trail(
     frame: &mut RenderFrame,
     layer: i32,
     puffs: &[Puff],
@@ -375,6 +375,7 @@ fn survivors(
             flag: (flag > 0.0).then(|| (flag, event.tick as f32 / FIXED_HZ as f32)),
             stride: running.then_some(seconds),
             jet: hopping.then_some(seconds),
+            plant: None,
         };
         // Rising out of view, it passes in front of the face, as the shells
         // do.
@@ -422,7 +423,7 @@ fn rescue_beam(
 
 /// A beam narrower than a tank's, `descent` of the way down from the top of
 /// the view to a spaceling's `feet`.
-fn narrow_beam(
+pub(super) fn narrow_beam(
     frame: &mut RenderFrame,
     feet: Vec2,
     descent: f32,
@@ -520,14 +521,16 @@ fn escape_pod(
 
 /// What a spaceling does with its arms and legs: waves, `wave` seconds into
 /// a wave; holds up a white flag, from down to all the way up, `flag`
-/// seconds into the event; or runs, `stride` seconds into its run.
+/// seconds into the event; runs, `stride` seconds into its run; or plants a
+/// flag beside it, its arm out to the stick as far as `plant` says.
 #[derive(Clone, Copy, Default)]
-struct Pose {
-    wave: Option<f32>,
-    flag: Option<(f32, f32)>,
-    stride: Option<f32>,
+pub(super) struct Pose {
+    pub wave: Option<f32>,
+    pub flag: Option<(f32, f32)>,
+    pub stride: Option<f32>,
     /// Seconds into a jetpack hop.
-    jet: Option<f32>,
+    pub jet: Option<f32>,
+    pub plant: Option<f32>,
 }
 
 /// A spaceling at `motion`, facing `facing`, in a suit of `color`, posed
@@ -536,7 +539,7 @@ struct Pose {
 /// the physics crate's spaceling's proportions, shrunk to Clock's, on
 /// `layer`.
 #[allow(clippy::too_many_arguments)]
-fn pilot(
+pub(super) fn pilot(
     frame: &mut RenderFrame,
     layer: i32,
     motion: BodyMotion,
@@ -592,6 +595,10 @@ fn pilot(
             (_, _, Some(seconds)) => {
                 let swing = (seconds * TAU * STRIDE_HZ + (side + 1.0) * FRAC_PI_2).sin();
                 arm(-FRAC_PI_2 - side * facing * 0.6 * swing)
+            }
+            // The arm on the side it faces goes out to the stick it plants.
+            _ if side == facing && pose.plant.is_some() => {
+                arm(-1.2 + 1.1 * pose.plant.unwrap_or(0.0))
             }
             _ => at(side * 0.36, -0.12),
         };

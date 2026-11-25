@@ -564,8 +564,8 @@ fn tanks_spacelings_get_out_and_are_beamed_up() {
     // so whichever tank loses, its spaceling is thrown clear, or gets out in
     // a pod, and waits for its beam.
     for (size, thrown, pod, patch, scale) in [
-        ((1024, 768), 838, 3587, (112, 64), 5),
-        ((800, 480), 838, 3587, (88, 48), 6),
+        ((1024, 768), 1003, 2610, (112, 64), 5),
+        ((800, 480), 1003, 2610, (88, 48), 6),
     ] {
         let viewport = Viewport::new(size.0 as f32, size.1 as f32);
         let name = format!("{}x{}", size.0, size.1);
@@ -707,7 +707,9 @@ fn tanks_spacelings_stow_away_or_surrender() {
                     ],
                     &[("-taken", 2), ("-beam", 3)],
                 ),
-                Ending::RescueBeam | Ending::PartingShot | Ending::Rebuild => unreachable!(),
+                Ending::RescueBeam | Ending::PartingShot | Ending::Rebuild | Ending::Stranded => {
+                    unreachable!()
+                }
             };
             let shots = camera.frames(size, seed, &ticks);
             for (state, _) in &shots {
@@ -939,5 +941,133 @@ fn tanks_a_spaceling_rebuilds_its_tank_for_a_sudden_death() {
                 scale,
             ),
         );
+    }
+}
+
+#[test]
+fn tanks_the_hills_leave_a_spaceling_stranded_on_the_clock() {
+    use engine_common::{
+        ClockStrandedDeparture as Departure, ClockStrandedPhase as Phase,
+        ClockTanksEnding as Ending,
+    };
+    let camera = Camera::new();
+    let seed = 9715;
+    // Both sides of this fight roll the same way and draw no beam, so
+    // whichever tank loses, its spaceling is thrown clear and left behind.
+    for (size, patch, scale) in [((1024, 768), (72, 60), 5), ((800, 480), (60, 48), 6)] {
+        let viewport = Viewport::new(size.0 as f32, size.1 as f32);
+        camera.window.set_size(PhysicalSize::new(size.0, size.1));
+        let name = format!("{}x{}", size.0, size.1);
+        let mut state = face_fight(viewport, seed);
+        let spaceling = |state: &scenario_clock::ClockState| {
+            state
+                .stranded_state()
+                .and_then(|stranded| stranded.spaceling)
+        };
+        let until = |state: &mut scenario_clock::ClockState, phase: Phase, limit: usize| {
+            for _ in 0..limit {
+                if spaceling(state).is_some_and(|spaceling| spaceling.phase == phase) {
+                    return;
+                }
+                step(state);
+            }
+            panic!("{name} {seed}: {phase:?}, {:?}", spaceling(state));
+        };
+        // The frame, and where the spaceling's feet are on it, `above` of a
+        // patch's height lower.
+        let shot_from = |state: &scenario_clock::ClockState, above: f32| {
+            let frame = ClockScenario::render_frame(state);
+            let pixels = draw(&camera.ui, &camera.window, &frame, viewport, false);
+            let feet = on_screen(state, size, spaceling(state).unwrap().position_milli);
+            (pixels, [feet[0], feet[1] - patch.1 as f32 * above])
+        };
+        let shot = |state: &scenario_clock::ClockState| shot_from(state, 0.2);
+        let mut drew = None;
+        while spaceling(&state).is_none() {
+            let tanks = state.tanks_state().expect("the fight");
+            let out = tanks.survivors.into_iter().flatten().next();
+            drew = out.map(|survivor| survivor.drawn).or(drew);
+            step(&mut state);
+        }
+        assert_eq!(drew, Some(Ending::Stranded), "{name}");
+        assert_eq!(spaceling(&state).unwrap().phase, Phase::Flying);
+        // Its jetpack lifts it off the hills as they withdraw.
+        for _ in 0..12 {
+            step(&mut state);
+        }
+        assert!(state.tanks_state().is_some());
+        assert_eq!(spaceling(&state).unwrap().phase, Phase::Flying);
+        let mut strip = vec![shot_from(&state, -0.2)];
+        // On the digit it lands on, it plants its flag.
+        until(&mut state, Phase::Planting, 4 * 60);
+        for _ in 0..30 {
+            step(&mut state);
+        }
+        strip.push(shot(&state));
+        until(&mut state, Phase::Standing, 60);
+        let stranded = state.stranded_state().unwrap();
+        let perch = stranded.spaceling.unwrap().perch;
+        assert_eq!(stranded.flag.map(|flag| flag.block), perch);
+        assert!(perch.is_some());
+        for _ in 0..4 * 60 {
+            step(&mut state);
+        }
+        assert!(state.tanks_state().is_none(), "the hills have gone");
+        camera.keep(&format!("{name}-stranded-flag"), &shot(&state).0);
+        // In time it goes down to the floor, and walks there.
+        until(&mut state, Phase::Walking, 10 * 60 * 60);
+        for _ in 0..40 {
+            step(&mut state);
+        }
+        assert_eq!(spaceling(&state).unwrap().phase, Phase::Walking);
+        strip.push(shot(&state));
+        // It shelters from the rain under a lit block of a digit.
+        ClockScenario::step(
+            &mut state,
+            &[ClockAction::preview_event(ClockEventKind::Rain)],
+            Duration::ZERO,
+        );
+        until(&mut state, Phase::Sheltering, 4 * 60);
+        for _ in 0..14 * 60 {
+            step(&mut state);
+        }
+        assert!(state.rain_state().is_some());
+        assert_eq!(spaceling(&state).unwrap().phase, Phase::Sheltering);
+        let sheltering = shot(&state);
+        camera.keep(&format!("{name}-stranded-rain"), &sheltering.0);
+        strip.push(sheltering);
+        // Twenty minutes after the hills left it, the minute turns, and its
+        // beam comes for it.
+        while spaceling(&state).unwrap().age_ticks < 20 * 60 * 60 {
+            step(&mut state);
+        }
+        assert!(spaceling(&state).unwrap().leaving.is_none());
+        ClockScenario::step(
+            &mut state,
+            &[ClockAction::set_reading(
+                ClockReading::new(12, 40, 0).unwrap(),
+            )],
+            Duration::ZERO,
+        );
+        assert_eq!(spaceling(&state).unwrap().leaving, Some(Departure::TimeUp));
+        for _ in 0..50 {
+            step(&mut state);
+        }
+        assert_eq!(spaceling(&state).unwrap().phase, Phase::BeamedUp);
+        strip.push(shot(&state));
+        let frames: Vec<_> = strip
+            .iter()
+            .map(|(pixels, centre)| (pixels, *centre))
+            .collect();
+        camera.keep(
+            &format!("{name}-stranded-zoom"),
+            &follow(&frames, patch, scale),
+        );
+        for _ in 0..2 * 60 {
+            step(&mut state);
+        }
+        let stranded = state.stranded_state().unwrap();
+        assert!(stranded.spaceling.is_none());
+        assert_eq!(stranded.accounting.time_up, 1);
     }
 }

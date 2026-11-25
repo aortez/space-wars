@@ -69,6 +69,9 @@ pub enum ClockArenaOwner {
     Spider,
     /// The crow, a temporary actor that perches on the digits.
     Crow,
+    /// A spaceling the hills of a Tanks fight left behind, a temporary actor
+    /// that stands on the floor and the digits.
+    Stranded,
 }
 
 /// Why the arena could not take a claim or start an event. Nothing changed:

@@ -19,6 +19,9 @@ pub fn clear(layout: Layout, display: DisplaySnapshot, scale: f32, x: f32) -> bo
         .all(|span| x + half <= span[0] || x - half >= span[1])
 }
 
+/// What the tanks' lanes and the hills need not be clear of: the floor, the
+/// event's own bodies, and a stranded spaceling with its perch, which its
+/// beam lifts out as the hills rise.
 fn excluded(world: Option<&PhysicsWorld>) -> Vec<PhysicsId> {
     world
         .into_iter()
@@ -27,6 +30,8 @@ fn excluded(world: Option<&PhysicsWorld>) -> Vec<PhysicsId> {
             canonical::ARENA_FLOOR.contains(&id.value())
                 || canonical::TANKS.contains(&id.value())
                 || canonical::TANKS_DIGITS.contains(&id.value())
+                || canonical::STRANDED.contains(&id.value())
+                || canonical::STRANDED_PERCHES.contains(&id.value())
         })
         .collect()
 }

@@ -23,8 +23,10 @@
 //! battlefield, or rises up and out of view on its jetpack. A stowaway with
 //! no way to the winner, or no time left to reach it, waves for the rescue
 //! beam instead, as does one still surrendering when its time runs out, one
-//! the winner has no shot at and one with no way out. The empty pods stay
-//! until the hills withdraw, and go with them.
+//! the winner has no shot at and one with no way out. Or no beam comes for
+//! it at all: it waves as the others do, the winner goes up without it, and
+//! as the hills withdraw it is left on the clock, a visitor there for a
+//! while. The empty pods stay until the hills withdraw, and go with them.
 //!
 //! The spacelings and the pods meet the hills, the dirt, the floor and the
 //! winner, and pass the pieces of the wreck, the face and one another. One
@@ -219,7 +221,8 @@ const DT: f32 = 1.0 / FIXED_HZ as f32;
 /// always fits, then those that need a winner in view. The rebuild needs all
 /// of the loser's dirt in view as well, which a loser that blows up mostly
 /// leaves there. Its spaceling learns whether it does only once the dirt
-/// lies still, and waves for the rescue beam if some was lost.
+/// lies still, and waves for the rescue beam if some was lost. A roll may
+/// leave its spaceling stranded instead of any of them.
 const ENDINGS: [Ending; 5] = [
     Ending::RescueBeam,
     Ending::Stowaway,
@@ -298,10 +301,20 @@ pub fn ending_rolls(seed: u64) -> [f64; 2] {
 }
 
 /// The ending a `roll` draws, evenly from those that fit the fight: any of
-/// them with a winner in view, and the rescue beam alone without one.
-pub fn ending(roll: f64, winner_in_view: bool) -> Ending {
+/// [`ENDINGS`] with a winner in view, and the rescue beam alone without one.
+/// With room on the clock for a spaceling to be `stranded`, the hills leave
+/// it there as often as it draws each of the others: the roll picks among
+/// the others, and how far into its pick it falls says whether no beam
+/// comes instead.
+pub fn ending(roll: f64, winner_in_view: bool, stranded: bool) -> Ending {
     let fit = if winner_in_view { ENDINGS.len() } else { 1 };
-    ENDINGS[((roll * fit as f64) as usize).min(fit - 1)]
+    let scaled = roll * fit as f64;
+    let pick = (scaled as usize).min(fit - 1);
+    if stranded && scaled - pick as f64 >= fit as f64 / (fit + 1) as f64 {
+        Ending::Stranded
+    } else {
+        ENDINGS[pick]
+    }
 }
 
 /// The winner as it stands, for a stowaway running to it and a spaceling
@@ -886,9 +899,10 @@ impl Survivors {
 
     /// The spaceling of the loser in `slot`, blowing up at `tick` as `tank`
     /// last stood, gets out if its roll says so, and draws its ending from
-    /// those that fit, whether or not there is a winner in view. It leaves
-    /// toward the middle of the view, and falls as the duel's dirt does, by
-    /// `gravity_scale`.
+    /// those that fit, whether or not there is a winner in view. The clock
+    /// has room for one stranded spaceling, so only one of a fight's two may
+    /// draw that. It leaves toward the middle of the view, and falls as the
+    /// duel's dirt does, by `gravity_scale`.
     pub fn eject(
         &mut self,
         world: &mut PhysicsWorld,
@@ -903,7 +917,11 @@ impl Survivors {
         };
         self.gravity_scale = gravity_scale;
         let scale = self.scale;
-        let drawn = ending(self.ending_rolls[slot], winner_in_view);
+        let room = !self
+            .out
+            .iter()
+            .any(|survivor| survivor.drawn == Ending::Stranded);
+        let drawn = ending(self.ending_rolls[slot], winner_in_view, room);
         let hull = tank.motion;
         let [hatch, _] = tank.barrel;
         let arm = hatch - hull.position;
@@ -1541,7 +1559,7 @@ impl Survivors {
                         _ => (),
                     }
                 }
-                Phase::BeamedUp | Phase::Fled | Phase::Lost | Phase::Aboard => (),
+                Phase::BeamedUp | Phase::Fled | Phase::Lost | Phase::Aboard | Phase::Stranded => (),
             }
             if parting {
                 self.parting(world, duel, index, layout, tick, winner, deadline);
@@ -2060,7 +2078,11 @@ impl Survivors {
                 .is_some_and(|shot| shot.fired.is_some() && shot.landed.is_none());
             !flying
                 && match survivor.phase {
-                    Phase::Lost | Phase::BeamedUp | Phase::Fled | Phase::Aboard => true,
+                    Phase::Lost
+                    | Phase::BeamedUp
+                    | Phase::Fled
+                    | Phase::Aboard
+                    | Phase::Stranded => true,
                     Phase::Waving => tick - survivor.since >= WAVE_TICKS,
                     Phase::Riding => tick - survivor.since >= RIDE_TICKS,
                     Phase::Taken => tick - survivor.since >= TAKE_TICKS,
@@ -2076,7 +2098,7 @@ impl Survivors {
         self.out
             .iter()
             .map(|survivor| match survivor.drawn {
-                Ending::RescueBeam => RESCUE_BY_TICKS,
+                Ending::RescueBeam | Ending::Stranded => RESCUE_BY_TICKS,
                 Ending::Stowaway | Ending::Surrender => AFTERMATH_TICKS,
                 Ending::PartingShot => PARTING_TICKS,
                 Ending::Rebuild => REBUILD_BY_TICKS,
@@ -2110,7 +2132,9 @@ impl Survivors {
     /// that the winner's beam does not carry: each spaceling standing or as
     /// it lies, or in its pod if it never climbed out. One whose own ending
     /// had not finished falls back to the rescue beam: out of time, or with
-    /// no way once the `winner` has gone. Answers whether there are any.
+    /// no way once the `winner` has gone. No beam comes for one that drew
+    /// none and has waved for it: it turns to watch the winner go. Answers
+    /// whether there are any beams.
     pub fn begin_rescue(
         &mut self,
         world: &mut PhysicsWorld,
@@ -2128,12 +2152,22 @@ impl Survivors {
                     | Phase::Riding
                     | Phase::Taken
                     | Phase::Aboard
+                    | Phase::Stranded
             ) {
                 continue;
             }
+            if survivor.ending == Ending::Stranded && survivor.phase == Phase::Waving {
+                if let Some(winner) = winner {
+                    survivor.facing = (winner.hull.position.x - survivor.position.x).signum();
+                }
+                survivor.enter(Phase::Stranded, tick);
+                continue;
+            }
             if survivor.ending != Ending::RescueBeam {
+                // One left behind that never found its feet ran out of time.
+                let stranded = survivor.ending == Ending::Stranded;
                 survivor.ending = Ending::RescueBeam;
-                survivor.fallback = Some(if winner.is_some() {
+                survivor.fallback = Some(if winner.is_some() || stranded {
                     Fallback::OutOfTime
                 } else {
                     Fallback::NoWay
@@ -2174,6 +2208,43 @@ impl Survivors {
             world.set_next_kinematic_pose(body, position, from.angle);
             survivor.position = position;
         }
+    }
+
+    /// A spaceling left behind stands where it is through the beam-up, in
+    /// the fall the duel gives its bodies, `gravity`.
+    pub fn stand(&mut self, world: &mut PhysicsWorld, gravity: Vec2) {
+        for survivor in &mut self.out {
+            if let (Phase::Stranded, Some(spaceling)) = (survivor.phase, &mut survivor.spaceling) {
+                spaceling.apply_control(world, SpacelingControl::default(), gravity, DT);
+            }
+        }
+    }
+
+    /// As the hills withdraw, the spaceling they leave behind is the
+    /// fight's no longer: answers it as it stands, falling as the duel's
+    /// bodies do by `fall`, with the fight's `seed`, for the clock to take.
+    pub fn strand(
+        &mut self,
+        world: &mut PhysicsWorld,
+        fall: f32,
+        seed: u64,
+    ) -> Option<crate::stranded::Strand> {
+        let survivor = self
+            .out
+            .iter_mut()
+            .find(|survivor| survivor.phase == Phase::Stranded && survivor.spaceling.is_some())?;
+        let body = survivor.spaceling.take()?.body();
+        let motion = world.motion(body)?;
+        world.remove_entity(body.entity);
+        survivor.position = motion.position;
+        Some(crate::stranded::Strand {
+            slot: survivor.slot,
+            motion,
+            facing: survivor.facing,
+            scale: self.scale,
+            fall,
+            seed,
+        })
     }
 
     /// How far into the beam-up a survivor its own beam lifts rises and

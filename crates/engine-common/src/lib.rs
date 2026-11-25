@@ -1288,6 +1288,9 @@ pub enum ClockTanksEnding {
     /// scatters the dirt first, and fights the winner again in a
     /// sudden-death round.
     Rebuild,
+    /// No beam comes for it. The hills leave without it, and it stays on the
+    /// clock for a while.
+    Stranded,
 }
 
 impl ClockTanksEnding {
@@ -1298,6 +1301,7 @@ impl ClockTanksEnding {
             Self::Surrender => "surrender",
             Self::PartingShot => "parting-shot",
             Self::Rebuild => "rebuild",
+            Self::Stranded => "stranded",
         }
     }
 }
@@ -1382,6 +1386,8 @@ pub enum ClockTanksSurvivorPhase {
     Boarding,
     /// In its rebuilt tank, fighting on.
     Aboard,
+    /// Left behind, standing as the winner goes up and the hills withdraw.
+    Stranded,
     /// Lifted out by its beam, or by the winner's.
     BeamedUp,
     /// Gone out of view the way it fled.
@@ -1413,6 +1419,7 @@ impl ClockTanksSurvivorPhase {
             Self::Rebuilding => "rebuilding",
             Self::Boarding => "boarding",
             Self::Aboard => "aboard",
+            Self::Stranded => "stranded",
             Self::BeamedUp => "beamed-up",
             Self::Fled => "fled",
             Self::Lost => "lost",
@@ -1705,6 +1712,133 @@ pub struct ClockCrowState {
 
 fn shy_crow_water_tolerance() -> ClockCrowWaterTolerance {
     ClockCrowWaterTolerance::Shy
+}
+
+/// What a spaceling the hills left behind is doing on the clock.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockStrandedPhase {
+    /// Carried by its jetpack to where it will stand.
+    Flying,
+    /// Held aloft by its jetpack, with nowhere to stand for the moment.
+    Hovering,
+    /// Standing, looking around.
+    Standing,
+    /// Walking along the floor.
+    Walking,
+    /// Planting its flag on the digit it stands on.
+    Planting,
+    /// Standing under a lit block of a digit, out of the rain.
+    Sheltering,
+    /// Knocked off its feet, and not yet standing.
+    GettingUp,
+    /// Lifted out by its beam.
+    BeamedUp,
+}
+
+impl ClockStrandedPhase {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Flying => "flying",
+            Self::Hovering => "hovering",
+            Self::Standing => "standing",
+            Self::Walking => "walking",
+            Self::Planting => "planting",
+            Self::Sheltering => "sheltering",
+            Self::GettingUp => "getting-up",
+            Self::BeamedUp => "beamed-up",
+        }
+    }
+}
+
+/// Why a stranded spaceling's beam came for it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockStrandedDeparture {
+    /// It had stayed as long as it may, and the time changed.
+    TimeUp,
+    /// An event that leaves it no digit to stand on began.
+    Event,
+    /// It had nowhere to stand for as long as its jetpack holds it aloft.
+    NoPlace,
+}
+
+impl ClockStrandedDeparture {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::TimeUp => "time-up",
+            Self::Event => "event",
+            Self::NoPlace => "no-place",
+        }
+    }
+}
+
+/// A losing tank's spaceling that the hills left behind, staying on the
+/// clock for a while.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockStrandedSpaceling {
+    /// The event ID of the fight that left it behind.
+    pub fight_id: u64,
+    /// The side its tank fought on: 0 for the left, 1 for the right.
+    pub slot: u8,
+    pub phase: ClockStrandedPhase,
+    pub phase_tick: u64,
+    pub age_ticks: u64,
+    /// Its feet, in world milli units.
+    pub position_milli: [i32; 2],
+    pub facing_right: bool,
+    /// The digit block it stands on or is going to: digit slot, grid column
+    /// and grid row. None while it is on the floor or going there.
+    pub perch: Option<[u8; 3]>,
+    /// The flags it has planted.
+    pub flags: u32,
+    /// The times its jetpack has carried it to another place.
+    pub flights: u32,
+    /// The times something has knocked it down.
+    pub knockdowns: u32,
+    /// Why its beam came, once it has.
+    pub leaving: Option<ClockStrandedDeparture>,
+}
+
+/// The flag a stranded spaceling planted on a digit block, which stands
+/// until that block goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockStrandedFlag {
+    /// The side the spaceling that planted it fought on.
+    pub slot: u8,
+    /// The digit block it stands on: digit slot, grid column and grid row.
+    pub block: [u8; 3],
+    /// How long it has stood.
+    pub age_ticks: u64,
+}
+
+/// What became of the spacelings the run's fights left behind.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockStrandedAccounting {
+    /// The spacelings left behind.
+    pub stranded: u32,
+    /// Those a beam lifted out once they had stayed as long as they may.
+    pub time_up: u32,
+    /// Those a beam lifted out as an event that left them no digit to stand
+    /// on began.
+    pub event: u32,
+    /// Those a beam lifted out with nowhere left to stand.
+    pub no_place: u32,
+    /// Those whose stay a resize ended.
+    pub cleared: u32,
+    /// Those that left the view.
+    pub lost: u32,
+}
+
+/// The spaceling a Tanks fight's hills left behind, the flag one planted,
+/// and what became of those the run has had.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockStrandedState {
+    /// The spaceling, while it stays.
+    pub spaceling: Option<ClockStrandedSpaceling>,
+    /// The flag, while it stands.
+    pub flag: Option<ClockStrandedFlag>,
+    pub accounting: ClockStrandedAccounting,
 }
 
 /// Bounded Spider visitor diagnostics, independent of the timed animation.

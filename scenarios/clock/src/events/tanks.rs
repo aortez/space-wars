@@ -185,6 +185,9 @@ pub struct TanksEvent {
     /// A loser's tank its spaceling rebuilds from its dirt, from when the
     /// dirt sets off home.
     pub rebuild: Option<rebuild::Rebuild>,
+    /// The spaceling the hills leave behind as they withdraw, until the
+    /// clock takes it.
+    pub strand: Option<crate::stranded::Strand>,
     pub result: Option<ResultKind>,
     combat_ticks: u64,
     /// The combat tick fire opened on.
@@ -283,6 +286,7 @@ impl TanksEvent {
             wreck: wreck::Wreck::new(seed, scale, shape),
             survivors: survivor::Survivors::new(seed, scale),
             rebuild: None,
+            strand: None,
             result: None,
             combat_ticks: 0,
             fire_opened: None,
@@ -439,7 +443,11 @@ impl TanksEvent {
                     rebuild.crawl(world, self.tick);
                 }
             }
-            EventPhase::BeamUp => self.survivors.lift(world, self.phase_tick),
+            EventPhase::BeamUp => {
+                self.survivors.lift(world, self.phase_tick);
+                let gravity = world.gravity() * self.duel.gravity_scale(world);
+                self.survivors.stand(world, gravity);
+            }
             _ => (),
         }
         if self.simulates_duel() {
@@ -907,8 +915,11 @@ impl TanksEvent {
                 .retire_tank(world, slot)
                 .expect("post-step retirement");
         }
-        // The survivors have gone up their beams; their empty pods go with
-        // the hills.
+        // The survivors have gone up their beams, but for one no beam came
+        // for, which the hills leave behind. Their empty pods go with the
+        // hills.
+        let fall = -world.gravity().y * self.duel.gravity_scale(world);
+        self.strand = self.survivors.strand(world, fall, self.seed);
         let pods = self.survivors.withdraw(world);
         self.departure = self
             .duel

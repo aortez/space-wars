@@ -56,6 +56,7 @@ mod presentation;
 mod rain;
 mod render;
 pub mod spider;
+mod stranded;
 mod theme;
 #[cfg(test)]
 mod unknown_time_tests;
@@ -585,6 +586,9 @@ pub struct ClockState {
     spider_visit: Option<spider::visit::SpiderVisit>,
     spider_accounting: spider::SpiderAccounting,
     crow_visit: Option<crow::CrowVisit>,
+    // The spaceling a Tanks fight's hills left behind, the flag one planted,
+    // and what became of those the run has had.
+    stranded: stranded::Scene,
     // The corner lamps' minds, on their own seeded stream.
     lamps: lamps::Lamps,
     /// The lamps' light along the floor, sampled every few ticks for drawing.
@@ -1103,6 +1107,7 @@ impl ClockState {
         // new view if they can come in as they are.
         self.finish_duck_visit();
         self.finish_crow_visit();
+        self.clear_stranded();
         if self.active_event.is_some() {
             self.finish_event();
         }
@@ -1470,6 +1475,12 @@ impl ClockState {
         self.crow_visit.as_ref().map(crow::CrowVisit::diagnostics)
     }
 
+    /// The spaceling a Tanks fight's hills left behind, the flag one planted
+    /// and what became of those the run has had, once it has had one.
+    pub fn stranded_state(&self) -> Option<engine_common::ClockStrandedState> {
+        self.stranded.state(self.schedule.tick)
+    }
+
     pub fn explosion_state(&self) -> Option<engine_common::ClockExplosionState> {
         match self.active_event.as_ref()? {
             ActiveEvent::Explosion(event) => Some(event.diagnostics()),
@@ -1578,6 +1589,87 @@ impl ClockState {
             self.arena.release(arena::Owner::Crow);
             self.schedule.retire(ClockEventKind::Crow);
             self.sync_event_schedule();
+        }
+    }
+
+    /// A resize ends a stranded spaceling's stay at once, and takes the flag
+    /// with the block it stood on.
+    fn clear_stranded(&mut self) {
+        self.stranded.flag = None;
+        if self.stranded.spaceling.is_some() {
+            self.stranded.end(stranded::Gone::Cleared);
+            self.arena.release(arena::Owner::Stranded);
+        }
+    }
+
+    /// What a stranded spaceling goes by, but for the face's surfaces.
+    fn stranded_view(&self) -> stranded::Surroundings<'static> {
+        let event = self.event_kind();
+        stranded::Surroundings {
+            surfaces: &[],
+            event,
+            // A course, an open drain or an event's own panels are not the
+            // floor it walks, nor are a fight's hills over it.
+            floor: self.duck_visit.is_none()
+                && !self.arena.holds(arena::Owner::Visit)
+                && self.floor.mode() == engine_common::ClockFloorMode::Closed
+                && event != Some(ClockEventKind::Tanks),
+            birds: self
+                .crow_visit
+                .as_ref()
+                .map_or([None; 2], |crow| [Some(crow.position), crow.destination()]),
+            digits: self.display.digits,
+            tick: self.schedule.tick,
+        }
+    }
+
+    /// Takes the spaceling a Tanks fight's hills leave behind as they begin
+    /// to withdraw: from then it is a visitor with its own claim on the
+    /// arena. The arena keeps the room for one.
+    fn take_strand(&mut self, layout: Layout) {
+        let Some(ActiveEvent::Tanks(event)) = &mut self.active_event else {
+            return;
+        };
+        let Some(strand) = event.strand.take() else {
+            return;
+        };
+        let mut owners = self.arena.owners().to_vec();
+        owners.push(arena::Owner::Stranded);
+        if self.stranded.spaceling.is_some() || self.arena.admit(&owners).is_err() {
+            return;
+        }
+        let around = stranded::Surroundings {
+            surfaces: &self.published,
+            ..self.stranded_view()
+        };
+        let world = self.arena.claim_resident(arena::Owner::Stranded, layout);
+        self.stranded
+            .admit(world, layout, strand, self.schedule.event_id, around);
+    }
+
+    /// The stranded spaceling's tick after the arena's step, or, between
+    /// ticks, its look at what has changed around it. Its stay over, it
+    /// leaves the arena with its perch. The flag stands until its block goes.
+    fn update_stranded(&mut self, advance: bool) {
+        let layout = Layout::new(self.aspect_ratio());
+        self.stranded.tend_flag(layout, &self.published);
+        if self.stranded.spaceling.is_none() {
+            return;
+        }
+        let around = stranded::Surroundings {
+            surfaces: &self.published,
+            ..self.stranded_view()
+        };
+        let world = self
+            .arena
+            .held_mut(arena::Owner::Stranded)
+            .expect("the stranded spaceling's claim keeps a world");
+        if advance {
+            if self.stranded.step(world, around) {
+                self.arena.release(arena::Owner::Stranded);
+            }
+        } else if let Some(spaceling) = &mut self.stranded.spaceling {
+            spaceling.synchronize(world, around);
         }
     }
     pub fn cell_swap_state(&self) -> Option<engine_common::ClockCellSwapState> {
@@ -2086,6 +2178,15 @@ impl ClockState {
                 self.active_event.as_ref().map(ActiveEvent::kind),
             );
         }
+        // A stranded spaceling's perch goes where it stands or is going, and
+        // its body takes what it does next.
+        if let Some(spaceling) = &mut self.stranded.spaceling {
+            let world = self
+                .arena
+                .held_mut(arena::Owner::Stranded)
+                .expect("the stranded spaceling's claim keeps a world");
+            spaceling.drive(world);
+        }
         // The arena's one rigid step this tick, whoever holds it.
         self.arena.step(events::duck::DT);
         if let Some(spider) = &mut self.spider {
@@ -2101,10 +2202,12 @@ impl ClockState {
             (Some(duck), Some(step)) => duck.post_step(&mut self.arena, water, step),
             _ => false,
         };
-        if let Some(finished) = shared
-            && (self.observe_active_event(layout) || finished)
-        {
-            self.finish_event();
+        if let Some(finished) = shared {
+            let finished = self.observe_active_event(layout) || finished;
+            self.take_strand(layout);
+            if finished {
+                self.finish_event();
+            }
         }
         if visit_finished {
             self.finish_duck_visit();
@@ -2118,6 +2221,7 @@ impl ClockState {
             self.sync_event_schedule();
         }
         self.update_crow(true);
+        self.update_stranded(true);
         let (view, facts) = self.lamp_sight(&layout);
         self.lamps.perceive(
             &Self::scene_worlds(&self.arena, self.active_event.as_ref()),
@@ -2505,6 +2609,7 @@ impl Scenario for ClockScenario {
             spider_visit: None,
             spider_accounting: spider::SpiderAccounting::default(),
             crow_visit: None,
+            stranded: stranded::Scene::default(),
             lamps: lamps::Lamps::new(seed),
             floor_light: Vec::new(),
             player_duck_sequence: 0,
@@ -2597,6 +2702,8 @@ impl Scenario for ClockScenario {
             state.sample_floor_light();
         }
         state.settle_surfaces();
+        // A stranded spaceling goes by the face as it now stands.
+        state.update_stranded(false);
         StepResult::default()
     }
 
