@@ -231,6 +231,50 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
     }
 }
 
+/// The spaceling a Tanks fight's hills left behind, the flag one planted and
+/// what became of those the run has had.
+fn print_stranded(stranded: &engine_common::ClockStrandedState) {
+    let side = |slot: u8| ["left", "right"][usize::from(slot.min(1))];
+    if let Some(spaceling) = &stranded.spaceling {
+        let leaving = spaceling
+            .leaving
+            .map(|why| format!(", leaving ({})", why.as_str()))
+            .unwrap_or_default();
+        println!(
+            "Stranded spaceling: {} tank's, from fight {}, {}{leaving}, age={} phase tick={}, position={:?}, facing right={}, perch={:?}, flags={} flights={} knockdowns={}",
+            side(spaceling.slot),
+            spaceling.fight_id,
+            spaceling.phase.as_str(),
+            spaceling.age_ticks,
+            spaceling.phase_tick,
+            spaceling.position_milli,
+            spaceling.facing_right,
+            spaceling.perch,
+            spaceling.flags,
+            spaceling.flights,
+            spaceling.knockdowns
+        );
+    }
+    if let Some(flag) = &stranded.flag {
+        println!(
+            "Stranded flag: {} tank's, on block {:?}, age={}",
+            side(flag.slot),
+            flag.block,
+            flag.age_ticks
+        );
+    }
+    let accounting = &stranded.accounting;
+    println!(
+        "Stranded so far: {} left behind; beamed out time-up={} event={} no-place={}; cleared={} lost={}",
+        accounting.stranded,
+        accounting.time_up,
+        accounting.event,
+        accounting.no_place,
+        accounting.cleared,
+        accounting.lost
+    );
+}
+
 fn deadline(timeout: Duration) -> Result<Instant, CliError> {
     Instant::now()
         .checked_add(timeout)
@@ -379,6 +423,9 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 crow.wetness_milli,
                 crow.wet_departures
             );
+        }
+        if let Some(stranded) = &state.stranded {
+            print_stranded(stranded);
         }
         if let Some(spider) = &state.spider {
             println!(
@@ -679,6 +726,7 @@ fn print_arena(arena: &ClockArenaState) {
                 ClockArenaOwner::Fixture { index } => format!("fixture {index}"),
                 ClockArenaOwner::Spider => "spider".into(),
                 ClockArenaOwner::Crow => "crow".into(),
+                ClockArenaOwner::Stranded => "stranded".into(),
             };
             format!(
                 "{owner} {}/{} bodies, {}/{} colliders",

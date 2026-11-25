@@ -74,6 +74,10 @@ pub struct ClockState {
     pub duck: Option<engine_common::ClockDuckState>,
     #[serde(default)]
     pub crow: Option<engine_common::ClockCrowState>,
+    /// The spaceling a Tanks fight's hills left behind, the flag one planted
+    /// and what became of those the run has had, once it has had one.
+    #[serde(default)]
+    pub stranded: Option<engine_common::ClockStrandedState>,
     #[serde(default)]
     pub spider: Option<engine_common::ClockSpiderState>,
     #[serde(default)]
@@ -477,6 +481,7 @@ mod tests {
             meltdown: None,
             duck: None,
             crow: None,
+            stranded: None,
             spider: None,
             explosion: None,
             coins: None,

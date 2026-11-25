@@ -34,6 +34,7 @@ mod slot_machine;
 #[cfg(test)]
 mod slot_machine_contract;
 mod spider;
+mod stranded;
 mod string_lights;
 mod tanks;
 
@@ -667,6 +668,7 @@ fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout:
     if let Some(visit) = &state.crow_visit {
         crow::render(frame, visit, layout);
     }
+    stranded::render(frame, &state.stranded, state.simulation_tick(), layout);
     if let Some(fixture) = &state.spider {
         spider::render(frame, &fixture.state(&state.arena, &state.published));
     }

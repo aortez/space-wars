@@ -503,7 +503,7 @@ load, and without it the grains at the bottom read as knocked tick after
 tick.
 
 A look visits at most 512 bodies across the worlds; the arena holds at most
-281, or 368 under Tanks. On the development workstation (`--profile ci`), the
+283, or 370 under Tanks. On the development workstation (`--profile ci`), the
 ignored test `what_a_look_costs` timed a look at 512 moving bodies, all in
 view, at about 52 µs. In events the 99th percentile was about 10 µs for
 Tanks, with up to 92 bodies, 8 µs for Exploding digits and for Coins, and
@@ -1195,7 +1195,10 @@ of the CPUs' range; the outer margins are fallbacks. The landing positions
 therefore vary with the reading. Terrain and full-height lanes are checked
 against current resident shapes before insertion; if none fits, admission leaves
 the current scene intact. Tanks excludes Duck, Crow and Spider in both directions,
-including controlled ducks. Its terrain
+including controlled ducks. A spaceling an earlier fight left stranded does not
+keep it out: the lanes and the hills' place need not be clear of it, and its
+beam lifts it out as the hills rise ([Stranded spaceling](#stranded-spaceling)).
+Its terrain
 reservation is separate from the existing visitor combinations; inspection
 reports the capacity for the current composition. Residents keep their bodies
 and world, and cleanup removes only identities in the Tanks namespace.
@@ -1248,9 +1251,9 @@ does.
 | `fighting` | 60 s, or 20 s for a sudden death | Fire is held while the tanks drive to their range, for at most 12 s, except in a sudden death. Then shared CPU driving and dodging, swept shells that burst on the lit face and knock cells loose, craters, loose dirt and weak-bank collapse. |
 | `finishing-shots` | 10 s | No new driving or fire; existing shells finish before deciding the result. |
 | `blowing-up` | 3 s | Each in-view loser blows apart, and each piece turns to dirt where it comes to rest. |
-| `aftermath` | 6 s, 8 s with a stowaway or a surrender, 10 s with a parting shot, or 12 s with a rebuild | A spaceling that got out finds its feet, then waves for the rescue beam, runs to the winner and climbs onto its roof, raises a white flag and is drawn to the winner's side, dodges the winner's parting shot and flees out of view, or rebuilds its tank from the tank's dirt and climbs in, and the fight reopens for a sudden death. Skipped when none got out, or once each is ready to leave. |
-| `beam-up` | 2 s | Surviving winners depart with a stowaway on the roof or a spaceling that surrendered beside them, and a beam lifts out each other spaceling still in view. |
-| `withdrawing` | 3 s | The remaining owned battlefield moves below the frame and is removed. |
+| `aftermath` | 6 s, 8 s with a stowaway or a surrender, 10 s with a parting shot, or 12 s with a rebuild | A spaceling that got out finds its feet, then waves for the rescue beam, runs to the winner and climbs onto its roof, raises a white flag and is drawn to the winner's side, dodges the winner's parting shot and flees out of view, or rebuilds its tank from the tank's dirt and climbs in, and the fight reopens for a sudden death. One that will be left stranded waves as for the rescue beam. Skipped when none got out, or once each is ready to leave. |
+| `beam-up` | 2 s | Surviving winners depart with a stowaway on the roof or a spaceling that surrendered beside them, and a beam lifts out each other spaceling still in view, but for one left stranded, which stands where it is. |
+| `withdrawing` | 3 s | The remaining owned battlefield moves below the frame and is removed. A spaceling left stranded lifts off it on its jetpack, the clock's visitor from then on. |
 
 One living tank wins. If both remain alive at timeout, higher health wins and
 exact equality is a draw; if neither survives, neither wins. A living timeout
@@ -1311,8 +1314,16 @@ the view:
 Each spaceling draws how it leaves as it gets out, evenly from the endings
 that fit the fight, by a roll from a third stream of its own. The rescue beam
 always fits. Stowing away, surrendering, the parting shot and the rebuild need
-the winner in view, so a fight that leaves none, in a draw or with no tank
-standing, gives every spaceling the rescue beam.
+the winner in view. Being left stranded needs room on the clock, which holds
+one stranded spaceling at a time. An earlier fight's has gone in its beam
+before a fight's own hills are up, so there is room unless the fight's other
+spaceling has drawn the same. With a winner in view, then, each of the six
+comes one time in six, and a fight that leaves none, in a draw or with no tank
+standing, gives a spaceling the rescue beam or leaves it stranded, half and
+half. The roll picks among the rescue beam and the endings that need the
+winner, and how far into its pick it falls says whether the spaceling is left
+stranded instead, so a roll that draws another ending draws the same one with
+no room on the clock.
 
 - **Rescue beam.** Once up, the spaceling looks the other way, then back, and
   waves. In the beam-up, a narrow beam in its team's color comes down on it
@@ -1396,6 +1407,12 @@ standing, gives every spaceling the rescue beam.
   scatters the dirt: every cell falls where it is, dirt again, for the burst
   to throw. A winner that does not see the spaceling go back sees the tank
   only once it stands.
+- **Stranded.** Once up, the spaceling looks the other way, then back, and
+  waves, as one that drew the rescue beam does. In the beam-up no beam comes
+  down on it: it turns to the winner and stands where it is as the winner
+  goes up. As the hills begin to withdraw it is the fight's no longer. Its
+  jetpack lifts it off them onto a digit, and it stays on the clock for a
+  while ([Stranded spaceling](#stranded-spaceling)).
 
 The rescue beam is every ending's fallback. A stowaway with no way to the
 winner, past a drop deeper than it lands from on its feet, a step higher than
@@ -1413,7 +1430,9 @@ spaceling that drew the rebuild waves for it when some of its tank's dirt
 left the view, when there is no place for the tank to stand or no way to the
 dirt, when there is no time left to run there, see the dirt crawl home and
 climb in, when it makes no headway for 1.5 s on its way, and when the winner's
-shell scatters the dirt.
+shell scatters the dirt. The hills leave behind only a spaceling on its feet:
+one that drew no beam and is not up and waving when the beam-up begins is out
+of time, and its beam lifts it out as it lies.
 
 The `aftermath` phase waits until every spaceling is ready to leave: it has
 waved for a second, sat on the winner's roof for half a second, been drawn to
@@ -1430,14 +1449,16 @@ the face and one another. Climbing onto the winner, drawn to it or rising on
 its jetpack, a spaceling pushes nothing. The arena keeps room for both sides'
 spacelings and pods, in four bodies and four colliders.
 
-Started with `--seed 838`, Clock's first event, if it is Tanks, throws its
+Started with `--seed 1003`, Clock's first event, if it is Tanks, throws its
 loser's spaceling clear whichever tank loses, and it waits for the rescue
-beam. Started with `--seed 3587`, the spaceling gets out in a pod and waits
+beam. Started with `--seed 2610`, the spaceling gets out in a pod and waits
 for the rescue beam; with `--seed 455`, it is thrown clear and stows away;
 with `--seed 1774`, it is thrown clear and surrenders; with `--seed 228`, it
 is thrown clear and the winner takes a parting shot at it; and with
-`--seed 8799`, it is thrown clear and rebuilds its tank, and the winner does
-not see it go back. Both sides of those fights roll the same way.
+`--seed 9715`, it is thrown clear and left stranded. Both sides of those
+fights roll the same way. With `--seed 8799`, the left tank's spaceling is
+thrown clear and rebuilds its tank, and the winner does not see it go back;
+the right tank's would be left stranded.
 
 Each loser has an authored conversion of 24 half-unit cells: six native
 area/mass units at dirt density one, scaled by the square of placement scale.
@@ -1907,12 +1928,12 @@ engine-client tanks_blow_apart_and_turn_to_dirt` regenerates all four.
 
 | | The rescue, as the winner beams up | Getting out, standing, waving and the rescue beam, five or six times larger |
 | --- | --- | --- |
-| 1024×768, thrown | ![The left tank in its wide beam, and the right tank's spaceling lifted in a narrow beam](screenshots/clock/tanks-1024x768-thrown-rescue.png) | ![The spaceling thrown up out of the fireball, down where it landed, waving, then lifted in its beam](screenshots/clock/tanks-1024x768-thrown-zoom.png) |
+| 1024×768, thrown | ![The left tank in its wide beam, and the right tank's spaceling lifted in a narrow beam](screenshots/clock/tanks-1024x768-thrown-rescue.png) | ![The spaceling in the air after the blast, down where it landed beside a cooling piece of the wreck, waving, then lifted in its beam](screenshots/clock/tanks-1024x768-thrown-zoom.png) |
 | 1024×768, pod | ![The right tank in its wide beam, and the left tank's spaceling lifted in a narrow beam beside its open pod](screenshots/clock/tanks-1024x768-pod-rescue.png) | ![The pod thrown out of the fireball, landed with its hatch opening, the spaceling climbing out, waving beside it, then lifted in its beam](screenshots/clock/tanks-1024x768-pod-zoom.png) |
 | 800×480, thrown | ![The left tank in its wide beam, and the right tank's spaceling lifted in a narrow beam](screenshots/clock/tanks-800x480-thrown-rescue.png) | ![The spaceling thrown up out of the fireball, down where it landed, waving, then lifted in its beam](screenshots/clock/tanks-800x480-thrown-zoom.png) |
-| 800×480, pod | ![The right tank in its wide beam, and the left tank's spaceling lifted in a narrow beam beside its open pod](screenshots/clock/tanks-800x480-pod-rescue.png) | ![The pod thrown out of the fireball, landed with its hatch opening, the spaceling climbing out, waving beside it, then lifted in its beam](screenshots/clock/tanks-800x480-pod-zoom.png) |
+| 800×480, pod | ![The left tank in its wide beam, and the right tank's spaceling lifted in a narrow beam beside its open pod](screenshots/clock/tanks-800x480-pod-rescue.png) | ![The pod thrown out of the fireball, landed with its hatch opening, the spaceling climbing out, waving beside it, then lifted in its beam](screenshots/clock/tanks-800x480-pod-zoom.png) |
 
-Seed 838 throws the loser's spaceling clear, and seed 3587 sends it out in a
+Seed 1003 throws the loser's spaceling clear, and seed 2610 sends it out in a
 pod, at both sizes. A thrown strip shows the spaceling 0.4 s after the blast,
 tumbling clear of the fireball, then down where it landed, waving, and lifted
 out 1.25 s into the beam-up. A pod strip shows the pod in flight 0.5 s after
@@ -1965,11 +1986,12 @@ engine-client tanks_the_winner_takes_a_parting_shot` regenerates all six.
 | 1024×768 | ![The left tank's spaceling standing by its tank's dirt, the cells rising from the hills, the right tank waiting](screenshots/clock/tanks-1024x768-rebuild-crawl.png) | ![The rebuilt left tank's shell arcing over the middle hill and bursting on the right tank](screenshots/clock/tanks-1024x768-rebuild-shot.png) | ![The spaceling by the dirt, the cells rising toward the tank's place, the tank's shape nearly whole, then the tank in puffs of dust with the spaceling climbing onto it](screenshots/clock/tanks-1024x768-rebuild-zoom.png) |
 | 800×480 | ![The left tank's spaceling standing by its tank's dirt, the cells rising from the hills, the right tank waiting](screenshots/clock/tanks-800x480-rebuild-crawl.png) | ![The rebuilt left tank's shell arcing over the middle hill and bursting on the right tank](screenshots/clock/tanks-800x480-rebuild-shot.png) | ![The spaceling by the dirt, the cells rising toward the tank's place, the tank's shape nearly whole, then the tank in puffs of dust with the spaceling climbing onto it](screenshots/clock/tanks-800x480-rebuild-zoom.png) |
 
-Seed 8799 throws the loser's spaceling clear, and it rebuilds its tank, at
-both sizes; the winner does not see it go back. Each strip shows the spaceling
-by its dirt a tenth of a second after the dirt sets off, the dirt 2 s into its
-crawl home, the last cells coming in at 3.75 s, and the tank whole, in puffs
-of dust, a third of a second into the spaceling's climb. Once rebuilt, the
+Seed 8799 throws the left tank's spaceling clear, the left tank loses at both
+sizes, and its spaceling rebuilds it; the winner does not see it go back.
+Each strip shows the spaceling by its dirt a tenth of a second after the
+dirt sets off, the dirt 2 s into its crawl home, the last cells coming in at
+3.75 s, and the tank whole, in puffs of dust, a third of a second into the
+spaceling's climb. Once rebuilt, the
 left tank fires first in the sudden death, and that shell destroys the winner;
 the second picture keeps its whole flight as a trail.
 `SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
@@ -1985,7 +2007,10 @@ one it is on and why it fell back, its phase, position and knockdowns
 (`survivors`), the shells each tank has fired (`tank_shots`), a tank being
 rebuilt, how far it has got, the fight's first result, whether the winner
 fired at the dirt and how long the sudden death has lasted (`rebuild`),
-conversion accounting and any settling failure in `tanks`.
+conversion accounting and any settling failure in `tanks`. A spaceling a
+fight leaves stranded keeps the ending and the phase `stranded` there until
+the fight is over, and from the moment the hills begin to withdraw it is
+reported beside `tanks`, in `stranded`.
 Values with a `_milli` suffix use thousandths of their inspection
 unit (positions, area and mass use host units). The common damage-material migration
 and damage to resident plants remain follow-up work: this integration uses Scorched's current tank HP rule and does
@@ -1997,6 +2022,220 @@ The local render test `tanks_render_both_adapters_and_controls_without_covering_
 exports captures when `SPACEWARS_TANKS_ARTIFACTS` names a directory outside the
 repository. It exercises the production raster adapter and the production vector
 paths rasterized through Slint's SVG loader; it is not a live GPU/device test.
+
+### Stranded spaceling
+
+A spaceling that a [Tanks](#tanks) fight's hills leave behind stays on the
+clock for a while as a tiny visitor, one at a time. It comes no other way. It
+is the fight's spaceling still: the physics crate's body at the fight's size,
+a fifth to a third of a lit block tall, in its team's color, and it falls as
+the fight's bodies fell, whatever the arena's own gravity.
+
+**Where it stands.** It stands on lit digit blocks and walks the floor. A
+block holds it when its cell rests whole at a place in the face, as the
+[digit surfaces](#following-the-digits-surfaces) say, with no lit cell
+directly over it. A cell counts where it is, which after a Cell Swap is not
+where it was lit. A digit with a cell that an event is moving, fading or has
+knocked loose has no such block until all of it is at rest again. Out of the
+rain the spaceling stands only on the topmost block of a column, as the crow
+perches. It brings one perch to the arena, a fixed square where the block it
+stands on or is going to is drawn, solid for whatever meets it but the birds,
+which bring perches of their own. The floor holds it while it is the
+ordinary floor, closed: not a duck's course, an open drain, an event's own
+panels or a fight's hills.
+
+**Getting about.** A jetpack carries it from place to place: up from where
+its feet are, over an arc, and down onto where they will stand, at 28 units
+a second, in half a second at least and 3 s at most, trailing smoke. In
+flight, as in its beam, it passes in front of the face and whatever else is
+in the way, and pushes nothing. As its fight's hills begin to withdraw, its
+first flight lifts it off them onto the nearest block it can stand on top
+of. From then it stands on a block for 6–14 s, looking one way and the
+other, and flies on: to one of the eight nearest other blocks, or, four
+times in ten while the floor is there, down to the floor within 25 units
+across of where it stood. On the floor it takes one to three walks of 6–24
+units at a stroll, 0.45 of a spaceling's walk, standing 1.5–4 s between
+them, then flies back up. Its choices come from a stream of its own, seeded
+by its fight, so a stay replays alike.
+
+**Its flag.** Landing on top of a digit while no flag stands on the clock
+and no rain falls, it plants one over 0.8 s: a stick with a cloth in its
+team's color. The flag stands until its block goes, when that digit changes
+or an event moves it or takes it apart, whether or not the spaceling is
+still here.
+
+**Rain.** While Rain is under way it shelters on a block with another lit
+block of its column over it: first one with a single free cell between them,
+as the top of a digit's lower stroke has under its upper one, and of those
+the nearest. It stays there, off the floor's pools, until the event is
+over, and stands 2–4 s more. A face with no such block, as the dashes of an
+unknown time have none, leaves it on top of a block.
+
+**The crow.** It keeps 3 pitches clear of a crow and of where the crow is
+going: when either comes within that of where it stands or is going, it
+flies to a place clear of both, if there is one, and looks again a second
+later. The magpie comes only with Coins, which the spaceling does not stay
+for.
+
+**Knocks.** Standing or walking, its body is a spaceling's among the arena's
+others, and what meets it pushes it, as a spider crossing its block does.
+Knocked down, it gets up as the physics crate's spaceling does. If it is not
+up within 2 s, or has no room to get up, its jetpack rights it and takes it
+back to where it stood, and one knocked off its block flies back onto it.
+
+**Nowhere to stand.** While no digit is at rest and the floor is not the
+ordinary one, as when the reels turn over a duck's course, its jetpack lifts
+it 3 units above where it was and holds it there, bobbing, and it takes the
+first place that is there again. Its jetpack holds it so for at most 10 s.
+
+| While | The spaceling |
+| --- | --- |
+| Color Cycle, a crow, Grass or a spider | Carries on. |
+| Rain | Shelters. |
+| A duck, automatic or a player's | Leaves the floor for the digits until the course has gone. |
+| Digit Slide | Leaves a digit that slides, at once, for another block. The other digits hold it as before, and the one that slid does again once it rests. |
+| Cell Swap or Slot Machine | Has no block to stand on while cells are on their way or the reels turn, so it goes down to the floor until they rest, or hovers where it is if the floor is not there either. |
+| Falling, Meltdown, Explosion, Coins, Marquee or Aquarium | Leaves in its beam as the event begins. |
+| The next Tanks fight | Leaves in its beam as the hills rise. |
+
+**Leaving.** It leaves in a beam, as a spaceling the rescue beam finds does:
+a narrow beam in its team's color comes down on it over half a second, then
+lifts it 10 units over 1.5 s as it fades. The beam comes when an event it
+does not stay for begins (`event`), when it has had nowhere to stand for the
+10 s its jetpack holds it aloft (`no-place`), and at the first change of the
+time once it has stayed 20 minutes (`time-up`), or 90 s after that if the
+time has not changed, as an unknown time does not. A resize ends its stay at
+once and takes the flag, and a restart begins with neither.
+
+**In the arena.** Its claim, `stranded`, is its body and its perch: two
+bodies with a collider each. The arena keeps that room whether or not a
+spaceling is there, in the duel as out of it, so the hills can always leave
+one behind, and the arena keeps a floor under it
+([arena](#sharing-the-runs-physics-arena)). A fight cut short before its
+hills begin to withdraw takes its spaceling with it. Once they have, the
+spaceling is the clock's and stays. Its claim keeps the fight's world, and
+with it the contact capture the fight turned on, with nothing bound
+([Tanks](#tanks)).
+
+`clock state` reports `stranded` once a fight has left a spaceling behind.
+`spaceling`, while one stays, gives the fight it came from (`fight_id`), its
+side (`slot`), its phase (`flying`, `hovering`, `standing`, `walking`,
+`planting`, `sheltering`, `getting-up` or `beamed-up`), its age, where its
+feet are, the block it stands on or is going to (`perch`, as digit slot,
+column and row, and null for the floor), its flags, flights and knockdowns,
+and why it is `leaving`. `flag`, while one stands, gives its block and its
+age. `accounting` counts the spacelings the run's fights have left behind
+and what became of them: `time_up`, `event` and `no_place` for those a beam
+lifted out, `cleared` by a resize, and `lost` out of view. Seven seconds
+into a stay, `spacewars-cli clock state` printed:
+
+```text
+Stranded spaceling: right tank's, from fight 1, standing, age=437 phase tick=222, position=[187733, 85079], facing right=true, perch=Some([2, 5, 7]), flags=1 flights=1 knockdowns=0
+Stranded flag: right tank's, on block [2, 5, 7], age=222
+Stranded so far: 1 left behind; beamed out time-up=0 event=0 no-place=0; cleared=0 lost=0
+```
+
+`cargo test --locked -p scenario-clock stranded` covers the blocks a face
+gives it and those a Cell Swap leaves, the hills leaving it behind with its
+own claim and body, one at a time, a fight cut short before and after, its
+stays on digits and floor, a seeded replay, the time limit and the wait for
+the time to change, with the time unknown too, the beam before each event
+it does not stay for and its stay through the others, a digit changing
+under it, a Digit Slide, sheltering from Rain with and without cover, the
+crow, a duck's course, hovering while the reels turn over that course and
+the beam that comes when nothing is left to stand on, a knock off its block,
+a resize, and the next fight starting with it on the floor. The fight's side
+is under `events::tanks`: the even draw among six endings, and the beam for
+a spaceling that is not on its feet when the winner goes up.
+
+A local survey fought 60 seeds at each of five shapes, 4:3, 5:3, 16:9,
+portrait (0.6) and 4:1, once with every loser's spaceling thrown clear and
+once with every one in a pod, each drawing no beam, and followed each
+spaceling the hills left behind for two minutes with no events and the time
+standing still. Longer stays ran with the time moving: 20 seeds at each
+shape with only the events it stays through, on the calm profile and again
+on the demo profile, and 40 seeds at each shape with every event on the
+calm profile. A last survey fought 300 seeds at each shape with the rolls
+as they fall:
+
+- 298 of the 300 fights each way left a spaceling stranded. In two portrait
+  fights the loser was out of view when it was destroyed, so nothing got
+  out. In the 26 fights that left no winner, the other loser's spaceling
+  took the rescue beam, as the clock holds one at a time.
+- The hills left it behind a median of 6.0 s after the blast when it was
+  thrown and 7.3 s from a pod, and at most 8.7 s.
+- In its first two minutes none was lost or knocked down, and each planted
+  one flag, which still stood at the end. It flew a median of eight or nine
+  times, none for longer than 3 s, and spent 63% of the time standing, 24%
+  walking and 13% in flight.
+- With only the events it stays through, every stay ended in its beam at the
+  first change of the time after 20 minutes, 20.0–21.0 minutes after the
+  hills left it: 100 on the calm profile and 99 on the demo profile. The
+  run of the hundredth, at 4:1, stopped when an automatic duck's buoyancy
+  check failed in Rain, which happens with no spaceling on the clock too
+  (#723).
+- None left for want of a place. It hovered in 97 of the 99 demo stays, for
+  at most 4.5 s at a time, and in none of the calm ones. It never stood on
+  the floor in the rain, and sheltered for up to 41.5 s at a stretch. It
+  spent 43% of its time on its feet on the floor in the calm stays and 31%
+  in the demo stays, and planted a median of 7 and 20 flags.
+- All but one of its knockdowns, 9 in the calm stays and 42 in the demo
+  stays, came while the spider was out, and it got up from every one.
+- A crow came within 3 pitches of it as the crow flew in or out, before it
+  looked again, 0.89 pitches at the closest, and while it hovered with
+  nowhere to go, 0.15 pitches at the closest.
+- With every event on the calm profile, all 200 stays ended in its beam as
+  an event it does not stay for began, a median of 2.1 minutes after the
+  hills left it and at most 8.0: Aquarium 40 times, Meltdown and Marquee 35
+  each, Explosion and Falling 30 each, Coins 20 and the next Tanks fight 10.
+- With the rolls as they fall, 239 spacelings got out of the 1,500 fights.
+  Of the 199 with a winner in view, 44 drew the rescue beam, 19 a stowaway,
+  36 a surrender, 18 a parting shot, 41 the rebuild and 41 no beam; of the
+  40 without one, 18 drew the rescue beam and 22 no beam. All 63 that drew
+  no beam were left on the clock. The five shapes fought the same 300 seeds,
+  which roll alike at each, so those counts follow about 48 seeds' rolls.
+  The longest visit took 83.7 s, within the 131 s bound.
+- On the development workstation, one process at a time, 8 seeds at each
+  shape, a tick of the idle clock took a median of 2–3 µs with no spaceling
+  on it, and 9–15 µs with one, whether it stood, walked or flew. The slowest
+  such tick took 0.08 ms, as it planted a flag. The contact capture it keeps
+  from the fight added nothing measurable: timed alternately with a build
+  without it, under another job's load, a tick with the spaceling took a
+  median of 15–24 µs either way.
+
+On sw-picade-2, a Pi 4 Picade at 1024×768 with the raster renderer at scale
+1, eight Tanks fights were fought with a trial build that sends every
+loser's spaceling out, thrown clear, and draws it no beam. Every fight left
+a spaceling stranded, about 5.6–8.1 s after the blast, and the next fight's
+beam lifted it out as its hills rose. Each spaceling was traced for 4 s from
+when the hills left it, and three times on the idle clock. With it there,
+loop CPU averaged 6.29 ms, with a 99th percentile of 8.36 ms and a slowest
+loop of 10.1 ms, against 5.71 ms on the idle clock before the first fight.
+No loop ran over 16.7 ms, and one of 5,731 refreshes was skipped. While the
+hills withdrew and it flew up onto a digit, loop CPU averaged 8.70 ms, with
+a slowest loop of 14.5 ms, and no refresh was skipped. As the next fight's
+hills rose with its beam, loop CPU averaged 10.11 ms, against 9.99 ms for
+the first fight's, with one loop of 1,680 over 16.7 ms and no refresh
+skipped.
+
+The run data stays local.
+
+| | On a digit with its flag | Sheltering from the rain | Off the hills on its jetpack, planting its flag, walking the floor, sheltering, and in its beam, five or six times larger |
+| --- | --- | --- | --- |
+| 1024×768 | ![The clock with the hills gone, the spaceling a speck on top of the 3 beside its flag](screenshots/clock/tanks-1024x768-stranded-flag.png) | ![Rain falling on the clock and pooling on the floor around a rubber duck, the spaceling a speck sheltering in the 3, on top of its lower right stroke under the upper one, its flag still on top of the 3](screenshots/clock/tanks-1024x768-stranded-rain.png) | ![The spaceling rising on its jetpack over the withdrawing hills, planting its flag on a digit block, walking the floor, standing on a block under another with rain water around it, then fading in its beam](screenshots/clock/tanks-1024x768-stranded-zoom.png) |
+| 800×480 | ![The clock with the hills gone, the spaceling a speck on top of the 3 beside its flag](screenshots/clock/tanks-800x480-stranded-flag.png) | ![Rain falling on the clock and pooling on the floor around a rubber duck, the spaceling a speck sheltering in the 3, on top of its lower right stroke under the upper one, its flag still on top of the 3](screenshots/clock/tanks-800x480-stranded-rain.png) | ![The spaceling rising on its jetpack over the withdrawing hills, planting its flag on a digit block, walking the floor, standing on a block under another with rain water around it, then fading in its beam](screenshots/clock/tanks-800x480-stranded-zoom.png) |
+
+Seed 9715 rolls alike for both sides: whichever tank loses, its spaceling is
+thrown clear and draws no beam, so the hills leave it behind at both sizes.
+The first picture shows it 4 s after it planted its flag on top of the 3,
+once the hills have gone, and the second 14 s into the rain, sheltering on
+the top of the 3's lower right stroke, under its upper one. Each strip shows
+it 0.2 s after the hills begin to withdraw, half a second into planting its
+flag, two-thirds of a second into a walk on the floor, 14 s into its
+shelter, and 0.83 s into the beam that comes when the minute turns 20
+minutes after the hills left it, each frame centered on the spaceling.
+`SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
+engine-client tanks_the_hills_leave_a_spaceling` regenerates all six.
 
 ### Cell swaps
 
@@ -4440,7 +4679,9 @@ Its module comment states the rules, and `arena_contract.rs` holds them:
   frame it climbs and a proxy for each digit cell
   ([below](#the-spider-on-the-digits)). The crow claims it for its visit, with
   its body and a perch on top of each exposed digit column
-  ([above](#crow-visitor)). Residents keep it for the rest of the
+  ([above](#crow-visitor)). A spaceling a Tanks fight left stranded claims
+  it for its stay, with its body and one perch
+  ([above](#stranded-spaceling)). Residents keep it for the rest of the
   run: retained soil, and the development arena fixtures. The first claim
   builds the world and the last to let go takes it away. Each owner's bodies
   take identities from its own ranges in `arena::ids::canonical`, and an owner
@@ -4448,15 +4689,17 @@ Its module comment states the rules, and `arena_contract.rs` holds them:
   scale while it holds the arena, and the residents' own return once it has
   gone.
 - **Claims are bounded.** Each owner declares a budget of bodies, colliders
-  and joints. The arena holds at most **281 bodies / 313 colliders** and one
-  joint, the spider's line: a visit, the largest event, the crow, soil and one
-  fixture together, so everything Clock ships fits. The spider takes no more
-  room than the largest event, so beside a visit and the residents it fits
-  where an event would, and it never shares the arena with an event that has
-  bodies. The crow's room, and the floor kept under it, is reserved whether
-  it is there or not, as soil's is, so it never takes room another claim
-  counts on and only the duel refuses it.
-  At most **7** owners hold it at once, and at most **4** of them are
+  and joints. The arena holds at most **283 bodies / 315 colliders** and one
+  joint, the spider's line: a visit, the largest event, the crow, a stranded
+  spaceling, soil and one fixture together, so everything Clock ships fits.
+  The spider takes no more room than the largest event, so beside a visit and
+  the residents it fits where an event would, and it never shares the arena
+  with an event that has bodies. The crow's room, and the floor kept under
+  it, is reserved whether it is there or not, as soil's is, so it never takes
+  room another claim counts on and only the duel refuses it. A stranded
+  spaceling's two bodies are reserved the same way, and in the duel too,
+  whose hills leave it behind and rise again while its beam lifts it out.
+  At most **8** owners hold it at once, and at most **4** of them are
   residents, soil included. A claim beyond those is refused before anything
   changes, as `residents` or `capacity`. So is a visit, an event, the spider
   or the crow that uses the floor while the residents do not fit the view, as
@@ -4521,7 +4764,7 @@ At rest, the two owners hold the arena with all five balls asleep on the closed
 floor (timings vary by machine):
 
 ```text
-Arena: 2 claims, 2 residents (at most 7 and 4); 6 bodies, 6 colliders, 0 joints (at most 281, 313, 1); floor 1 bodies
+Arena: 2 claims, 2 residents (at most 8 and 4); 6 bodies, 6 colliders, 0 joints (at most 283, 315, 1); floor 1 bodies
 Arena claims: fixture 0 3/4 bodies, 3/4 colliders; fixture 1 2/4 bodies, 2/4 colliders
 Arena run: 1 worlds, 183 steps; granted=2 released=0 refused=0; layout incompatible=false, last remap=None
 Arena step: 3 us (collision detection 2 us, solver 0 us); bodies active=0 sleeping=5; pairs candidate=5 contact=5, contacts=5, CCD substeps=1
@@ -4534,7 +4777,7 @@ has no room for this`, and `clock events` shows `blocked by arena=capacity` for
 Meltdown, Explosion, Coins and Aquarium:
 
 ```text
-Arena: 3 claims, 2 residents (at most 7 and 4); 10 bodies, 10 colliders, 0 joints (at most 281, 313, 1); floor 0 bodies
+Arena: 3 claims, 2 residents (at most 8 and 4); 10 bodies, 10 colliders, 0 joints (at most 283, 315, 1); floor 0 bodies
 Arena claims: fixture 0 3/4 bodies, 3/4 colliders; fixture 1 2/4 bodies, 2/4 colliders; visit 5/11 bodies, 5/11 colliders
 ```
 
@@ -4970,9 +5213,10 @@ colliders and joints in its world, and over the run the claims `granted`,
 The schedule leaves out events the arena would refuse, and `clock trigger` fails
 one before it reaches the arena, so neither counts. `claims` lists each owner in
 the order it claimed the arena (`visit`, `event` with its kind, `soil`,
-`fixture` with its index, `spider` or `crow`), whether it is a resident, and its bodies and colliders
-beside its budget. `floor` counts the floor the arena keeps under resting
-residents while no visit's terrain is one; the claims and the floor together
+`fixture` with its index, `spider`, `crow` or `stranded`), whether it is a
+resident, and its bodies and colliders beside its budget. `floor` counts the
+floor the arena keeps under resting residents while no visit's terrain is
+one; the claims and the floor together
 account for everything in the world. `last_step` is the arena's last step: wall,
 collision-detection and solver time in microseconds, CCD substeps, active and
 sleeping bodies, candidate and contact pairs, and contacts. It is null before the
