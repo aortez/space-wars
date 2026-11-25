@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/engine-chess",
     "crates/engine-common",
     "crates/engine-core",
     "crates/engine-gravity",
@@ -150,3 +151,8 @@ overflow-checks = true
 incremental = false
 lto = "off"
 codegen-units = 16
+
+# The chess rules and search are tested by counting every line of play and by
+# searching without shortcuts, which takes a minute unoptimized.
+[profile.dev.package.engine-chess]
+opt-level = 2
