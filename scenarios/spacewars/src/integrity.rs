@@ -39,7 +39,7 @@ const PLATE_DEPTH: f32 = 0.2;
 /// of the patch a shell strikes, whatever the rock's size.
 const ROCK_DEPTH: f32 = 1.0;
 /// Represented depth into the screen of ships, rovers and debris, `wu`.
-const THICKNESS: f32 = 2.0;
+pub(super) const THICKNESS: f32 = 2.0;
 /// Represented depth of an escape pod into the screen, `wu`.
 const POD_THICKNESS: f32 = 1.0;
 /// Perimeter of the open-winged ship's collision hull, `wu`.

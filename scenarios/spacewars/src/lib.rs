@@ -4,6 +4,7 @@
 //! collision response, damage, debris, asteroids, weapons, exhaust trails, and
 //! escape pods. Sounds, scoring, and final HUD polish land in later slices.
 
+mod contact_charges;
 pub mod integrity;
 mod lasers;
 mod physics;
@@ -19,6 +20,7 @@ mod terrain;
 pub mod terrain_art;
 pub mod thrusters;
 pub mod weapons;
+pub use contact_charges::{ContactDiagnostics, ContactHit};
 pub use terrain::{
     TerrainDiagnostics, TerrainMotionAnomaly, TerrainMotionBody, TerrainMotionFrame,
     TerrainMotionPeaks, TerrainMotionStage, fixture_controls as terrain_fixture_controls,
@@ -392,6 +394,8 @@ pub struct SpacewarsState {
     pub debris_body_collisions: Vec<DebrisBodyCollision>,
     pub body_collisions: Vec<BodyCollision>,
     pub body_impacts: Vec<BodyImpact>,
+    /// Each new impact contact charges priced in this step.
+    pub contact_hits: Vec<ContactHit>,
     pub spaceport_contacts: Vec<SpaceportContact>,
     pub player_view_heights: [f32; 2],
     pub last_step_metrics: SpacewarsStepMetrics,
@@ -1316,6 +1320,7 @@ impl Scenario for SpacewarsScenario {
             debris_body_collisions: Vec::new(),
             body_collisions: Vec::new(),
             body_impacts: Vec::new(),
+            contact_hits: Vec::new(),
             spaceport_contacts: Vec::new(),
             player_view_heights,
             last_step_metrics: SpacewarsStepMetrics::default(),
@@ -1496,6 +1501,7 @@ impl SpacewarsScenario {
 
         terrain::loose::capture_impacts(state, dt);
         let shots = shots::prepare(state, dt);
+        contact_charges::bind(&mut state.physics);
         let rapier = state.physics.step(dt);
         terrain::loose::sample_impacts(state);
         motion_diagnostics_time += terrain::capture_motion(state, TerrainMotionStage::AfterPhysics);
@@ -1514,6 +1520,7 @@ impl SpacewarsScenario {
         }
 
         let collision_started = Instant::now();
+        contact_charges::price(state, surface_pilots);
         update_ship_lasers(state, dt);
         state.laser_hits = resolve_laser_hits(state, surface_pilots);
         surface_sortie::match_rules::apply_lasers(state, surface_pilots);
@@ -1534,6 +1541,8 @@ impl SpacewarsScenario {
         }
         surface_sortie::match_rules::apply_contacts(state, surface_pilots, &contacts);
         resolve_physics_collisions(state, &contacts, &accepted_ports);
+        // After the rules, which size a ship's damage by the asteroid's mass.
+        contact_charges::wear_asteroids(state);
         surface_sortie::solar::apply_damage(state, surface_pilots, dt);
         surface_sortie::match_rules::apply_heat(state, surface_pilots, dt);
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
@@ -3070,14 +3079,17 @@ fn resolve_physics_collisions(
                 let ship_color = state.ships[ship].color;
                 let intercept = contact.point.unwrap_or(ship_position);
 
+                let worn = contact_charges::wears(state, &state.debris[debris_index]);
                 state.ships[ship].translate_life_with_impulse(-damage, -normal * damage);
-                damage_debris(
-                    state,
-                    debris_index,
-                    damage,
-                    normal,
-                    0x51DE_0000 ^ ship as u64,
-                );
+                if !worn {
+                    damage_debris(
+                        state,
+                        debris_index,
+                        damage,
+                        normal,
+                        0x51DE_0000 ^ ship as u64,
+                    );
+                }
                 state.ship_debris_collisions.push(ShipDebrisCollision {
                     ship,
                     debris: debris_index,
@@ -3133,7 +3145,9 @@ fn resolve_physics_collisions(
                 let intercept = contact.point.unwrap_or(rover_position);
 
                 state.rovers[rover_index].apply_damage(damage);
-                damage_debris(state, debris_index, damage, normal, 0x707E_D000 ^ rover_id);
+                if !contact_charges::wears(state, &debris) {
+                    damage_debris(state, debris_index, damage, normal, 0x707E_D000 ^ rover_id);
+                }
                 state.rover_debris_collisions.push(RoverDebrisCollision {
                     rover: rover_id,
                     debris: debris_index,
@@ -3168,20 +3182,22 @@ fn resolve_physics_collisions(
                     .point
                     .unwrap_or(body.position + normal * body.radius);
 
-                damage_debris(
-                    state,
-                    debris_index,
-                    impact_damage,
-                    normal,
-                    0xDEB0_B0D0 ^ debris_index as u64 ^ ((body.order as u64) << 16),
-                );
-                damage_debris(
-                    state,
-                    debris_index,
-                    body_damage,
-                    normal,
-                    0xDEB0_B0D1 ^ debris_index as u64 ^ ((body.order as u64) << 16),
-                );
+                if !contact_charges::wears(state, &debris) {
+                    damage_debris(
+                        state,
+                        debris_index,
+                        impact_damage,
+                        normal,
+                        0xDEB0_B0D0 ^ debris_index as u64 ^ ((body.order as u64) << 16),
+                    );
+                    damage_debris(
+                        state,
+                        debris_index,
+                        body_damage,
+                        normal,
+                        0xDEB0_B0D1 ^ debris_index as u64 ^ ((body.order as u64) << 16),
+                    );
+                }
                 state.debris_body_collisions.push(DebrisBodyCollision {
                     debris: debris_index,
                     body: body_id,
@@ -3235,20 +3251,25 @@ fn resolve_physics_collisions(
                 let normal = contact.normal;
                 let intercept = contact.point.unwrap_or(a_state.position);
 
-                damage_debris(
-                    state,
-                    a,
-                    damage_to_a,
-                    normal,
-                    0xDEB1_0000 ^ a as u64 ^ ((b as u64) << 16),
-                );
-                damage_debris(
-                    state,
-                    b,
-                    damage_to_b,
-                    -normal,
-                    0xDEB2_0000 ^ a as u64 ^ ((b as u64) << 16),
-                );
+                // A shell's shot still charges an asteroid it strikes.
+                if !contact_charges::wears(state, &a_state) || b_state.kind == DebrisKind::Shell {
+                    damage_debris(
+                        state,
+                        a,
+                        damage_to_a,
+                        normal,
+                        0xDEB1_0000 ^ a as u64 ^ ((b as u64) << 16),
+                    );
+                }
+                if !contact_charges::wears(state, &b_state) || a_state.kind == DebrisKind::Shell {
+                    damage_debris(
+                        state,
+                        b,
+                        damage_to_b,
+                        -normal,
+                        0xDEB2_0000 ^ a as u64 ^ ((b as u64) << 16),
+                    );
+                }
                 state.debris_collisions.push(DebrisCollision { a, b });
                 spawn_impact_particles(
                     state,
