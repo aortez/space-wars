@@ -1,9 +1,10 @@
 //! How good a position looks without looking ahead.
 //!
-//! The piece values and tables are those of `aortez/cuda-chess`, with two
-//! corrections that `REFERENCE.md` describes.
+//! The piece values, the tables and the terms for pawns and rooks are those
+//! of `aortez/cuda-chess`, with the differences that `REFERENCE.md`
+//! describes.
 
-use crate::bitboard::Squares;
+use crate::bitboard::{FILE_A, FILE_H, RANK_7, RANK_8, Squares};
 use crate::board::{Color, Piece, PieceKind, Square};
 use crate::position::Position;
 
@@ -106,6 +107,17 @@ const KING_ENDGAME: Table = [
 /// [`PieceKind::ALL`].
 const TABLES: [&Table; 5] = [&PAWN, &KNIGHT, &BISHOP, &ROOK, &QUEEN];
 
+/// What a passed pawn is worth beyond its placement, by the rank it stands
+/// on, counted from its owner's back rank.
+const PASSED_PAWN: [i32; 8] = [0, 0, 3, 20, 40, 60, 70, 90];
+/// What a pawn costs that stands behind another of its own on a file.
+const DOUBLED_PAWN: i32 = -11;
+/// What a rook is worth on a file with no pawn of either player.
+const ROOK_ON_OPEN_FILE: i32 = 9;
+/// What a rook is worth on the rank where the other player's pawns start,
+/// while there is a pawn or a king for it to hem in.
+const ROOK_ON_SEVENTH: i32 = 17;
+
 /// The board counts as full with this many pieces on it and as empty of
 /// everything but an endgame with [`ENDGAME_PIECES`]. In between, the two
 /// king tables are blended.
@@ -177,9 +189,88 @@ pub(super) fn evaluate_placed(position: &Position, placement: i32) -> i32 {
         (early * opening + late * (span - opening)) / span
     };
 
-    let for_white = placement + king(Color::White) - king(Color::Black);
+    let for_white = placement + king(Color::White) - king(Color::Black) + structure(position);
     match position.side_to_move() {
         Color::White => for_white,
         Color::Black => -for_white,
     }
+}
+
+/// The pieces of one player that are judged by more than where they stand,
+/// with that player's king.
+struct Side {
+    pawns: u64,
+    rooks: u64,
+    king: u64,
+}
+
+impl Side {
+    fn of(position: &Position, color: Color) -> Self {
+        Self {
+            pawns: position.set(color, PieceKind::Pawn),
+            rooks: position.set(color, PieceKind::Rook),
+            king: position.set(color, PieceKind::King),
+        }
+    }
+
+    /// The same pieces on a board turned top to bottom, where Black's pawns
+    /// move up it as White's do.
+    fn turned(&self) -> Self {
+        Self {
+            pawns: self.pawns.swap_bytes(),
+            rooks: self.rooks.swap_bytes(),
+            king: self.king.swap_bytes(),
+        }
+    }
+}
+
+/// Every square further up the board than a square of `set`, on its file.
+fn above(set: u64) -> u64 {
+    let mut fill = set << 8;
+    fill |= fill << 8;
+    fill |= fill << 16;
+    fill |= fill << 32;
+    fill
+}
+
+/// Every square further down the board than a square of `set`, on its file.
+fn below(set: u64) -> u64 {
+    let mut fill = set >> 8;
+    fill |= fill >> 8;
+    fill |= fill >> 16;
+    fill |= fill >> 32;
+    fill
+}
+
+/// What the pawns and rooks of `own` are worth beyond their placement,
+/// against `their` pieces. Both stand on a board where the pawns of `own`
+/// move up it.
+fn standing(own: &Side, their: &Side) -> i32 {
+    let mut score = 0;
+    // A pawn is passed if no pawn of the other player stands ahead of it on
+    // its file or on a file beside it. Of two on one file, only the one in
+    // front can be.
+    let beside = their.pawns | (their.pawns << 1) & !FILE_A | (their.pawns >> 1) & !FILE_H;
+    let behind_own = below(own.pawns);
+    let passed = own.pawns & !below(beside) & !behind_own;
+    for square in Squares(passed) {
+        score += PASSED_PAWN[usize::from(square.rank())];
+    }
+    score += DOUBLED_PAWN * (own.pawns & behind_own).count_ones() as i32;
+
+    let pawns = own.pawns | their.pawns;
+    let open = !(pawns | above(pawns) | below(pawns));
+    score += ROOK_ON_OPEN_FILE * (own.rooks & open).count_ones() as i32;
+    if their.king & RANK_8 != 0 || their.pawns & RANK_7 != 0 {
+        score += ROOK_ON_SEVENTH * (own.rooks & RANK_7).count_ones() as i32;
+    }
+    score
+}
+
+/// What the pawns and rooks are worth beyond their placement, White's less
+/// Black's.
+fn structure(position: &Position) -> i32 {
+    let white = Side::of(position, Color::White);
+    let black = Side::of(position, Color::Black);
+    standing(&white, &black) - standing(&black.turned(), &white.turned())
 }
