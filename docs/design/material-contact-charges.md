@@ -279,8 +279,9 @@ the Scorched figures with patches and the severe contacts.
     episode.
   - A sprung tank dropped from 30 units costs 2.6 hp.
   - A rigid tank thrown into the other at 8 u/s costs each 1.2 hp.
-  - Whether a severe flat drop should cost is a choice for #331. The options
-    are a dirt material, a rigid floor and pricing re-impacts.
+  - Whether a severe flat drop should cost was a choice for #331, between a
+    dirt material, a rigid floor and pricing re-impacts. #331 kept the rock,
+    as [its host](#scorched-host-331) says.
 
 **Spacewars.** 300 seconds of Spacewars at the asteroid census's settings:
 radius 1200, 20 asteroids a second, and each player's health at 500, so 7
@@ -445,6 +446,105 @@ policy rather than a weaker material. Their materials hold weapon fire as
 #330 calibrated them, and the same materials can't also give today's crashes.
 Charging those crashes would take new materials, which would move weapon
 balance too, or a factor for each class.
+
+## Scorched host (#331)
+
+`scenarios/scorched-earth/src/armor/contacts.rs` is Scorched's host. A
+standalone duel's world has it on, and a hosted duel's once its host calls
+`host::capture_contacts`. It charges each tank's armor with the work its
+impacts consumed, and lists them in the duel's `contacts()`.
+[Scorched's own page](../scorched-earth.md#armor-and-contacts) has what
+contacts cost in play.
+
+- **Regions.** Each tank body has a region: a rigid hull, or a sprung chassis
+  and each of its wheels. Each terrain body has one, attached or fallen, and
+  all its chunks are bound to it as one patch. Loose dirt has none, and
+  neither has anything of a host's that the host has not bound.
+- **Binding.** Before each step the duel binds each unbound collider of a
+  tank or of the terrain: a new body's, or the chunks a crater replaced.
+  Removing a body retires its region, as retiring a tank does.
+- **Surfaces.**
+  - A tank's bodies are its armor region, as for
+    [weapon sources](material-sources.md#scorched-tanks), at the plate's
+    depth of 0.2, with what the step's earlier impacts consumed already
+    absorbed.
+  - A hull meets others with a radius of 0.5, an estimate, about that of the
+    rigid hull's chamfered ends. A wheel meets them with its own radius.
+  - Terrain is rock as a half-space, flat and always shielded, holding as
+    much as a region can so that nothing wears it.
+- **Scale.** A hosted duel's world is the placement's scale times Scorched's
+  size. Its bodies keep their densities, so masses grow with the square of
+  the scale, speeds with it and energies with its fourth power. A material
+  whose stiffness, strength and toughness grow with the scale then loses the
+  same share of its capacity to the same contact at every scale. The duel's
+  surfaces are such materials, in volumes times the scale's cube. A tank
+  thrown into the other costs each the same health at scales 1 and 3, to
+  within a thousandth, and within a few percent in a world set up as Clock's
+  is. A charge that takes all the scaled armor has left takes all the armor
+  has left, so a tank the law fails is dead at any scale.
+- **A host's surfaces.** The host binds its own colliders and declares their
+  surfaces through `HostedDuel::finish_step_among`, in world units. The duel
+  sees each at its own scale, as it does the host's
+  [recipients](material-sources.md#scorched-tanks): its material at that
+  scale, in the volume the host gave, with the same share of its capacity
+  left. Work charged to it goes back by the ratio of the capacities, so it
+  loses the share the same contact would cost it at scale 1. The duel makes
+  the step's one call to the charges, so impacts between two of the host's
+  surfaces are priced there too, at the duel's scale. The host learns of its
+  charges through `absorb` alone.
+- **Supports** go unpriced, as in Spacewars. In the probes above no tank side
+  yielded under one. A tank resting on a host's surface is not priced either,
+  which #311's plants will need.
+- **Wheels on terrain.** A wheel's patch on flat rock is as wide as its
+  radius gives, and a wheel of mass 2.9 lands on it for nothing up to 21 u/s.
+  The terrain is many pieces, though, and each piece whose point pushes along
+  its own normal counts as a patch. A faster wheel that lands near a seam, or
+  fast enough for the next piece's point to arrive within the step, is priced
+  across two patches or more, and the rock takes four times the energy
+  before the plate yields. So a hard landing's price goes by where and how
+  fast the wheel comes down: a tank dropped from 15 units lost 0, 0.2 or 0.3
+  health, and from 20 and 30 units nothing. Rapier's prediction distance
+  follows the world's length unit, so a hosted world can count those patches
+  differently from a standalone one.
+- **Bursts.** A shell's burst pushes the tanks without taking the push from
+  its payload, so what a pushed tank then strikes is priced on top.
+- **Clones.** With capture on, a world clones through a snapshot of itself. A
+  duel's clone goes on tick for tick as the duel does.
+- **Loose dirt** is left out for its cost. A grain's mass is 0.25, and as rock
+  it would have to strike a hull at 56 u/s to cost it anything, where a burst
+  throws dirt at 16 u/s at most. With every grain bound, capture recorded
+  each grain's contacts with the terrain and its neighbors and added about
+  15% to a duel's step on the workstation. With tanks and terrain alone,
+  capture, binding and pricing add 1 to 5% there.
+- **Cost on the Pi.** Beside the running kiosk, a duel's step of 2.3 to 3.4 ms
+  gains 0.09 to 0.10 ms, 3 to 4%: capture 62 to 82 µs, binding 10 to 13 and
+  pricing 4 to 7. Capture visits every pair of colliders in contact, 134 to
+  172 a step, bound or not. The host prices only the steps that start an
+  impact.
+- **Capture's bounds** are the defaults with room for 8,192 bindings, 4,096
+  episodes, 65,536 visits and 8,192 contacts a batch, and 32,768 records a
+  step. A world that already captures keeps its own. In 96 CPU duels no batch
+  or binding was refused, and 30 of the 3,511 tank impacts were unpriced, each
+  a sprung tank's whose budget did not converge.
+
+#331's probe of 2026-11-24 priced every tank impact against soil, rock,
+packed earth and a floor that never gives, on both running gears, in 96 duels
+and in 48 of Clock's Tanks fights. Its records are in
+`/home/data2/space-wars3-artifacts/contact-probe-331-20261124`.
+
+- A ground strong enough to make falls cost charges routine bumps more. Packed
+  earth, as strong as the armor, cost rigid tanks 16 health over 24 duels and
+  a 10-unit drop 0.7. The floor cost that drop 18.5, and settling from spawn
+  3.9.
+- On rock, sprung tanks paid nothing in any duel or fight. Rigid tanks paid
+  1.3 health over 24 duels with a hull corner of radius 0.2 and 0.1 with 0.5.
+- A sprung tank meets the ground on its wheels alone, a sixth of its mass.
+  Its springs take up to a 2-unit drop and bottom out from 5, so the contact
+  law sees little of a fall. Pricing falls would take a rule of its own on
+  the hull's whole mass. None is in place.
+
+So the ground is rock, the sprung gear is the reference and the rigid hull's
+corner is 0.5.
 
 ## Evidence
 

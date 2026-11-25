@@ -271,8 +271,8 @@ is one region the duel keeps.
   charged the share of its capacity that the same delivery would cost at
   scale 1.
 
-Contacts charge nothing yet, so a tank that falls or rams something is
-unharmed. They wait on an experiment with measured contacts.
+A tank's contacts charge the same armor, through
+[contact charges](material-contact-charges.md#scorched-host-331).
 [Scorched Earth](../scorched-earth.md#armor-and-shells) has the calibration.
 
 ## Spacewars bodies

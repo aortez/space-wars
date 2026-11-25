@@ -1,4 +1,5 @@
 use super::*;
+use engine_rapier::world::loading::charges::ContactSurfaces;
 use engine_rapier::world::{RayHit, weapon::Recipients};
 
 /// The ray a shell at `position` casts across its next tick of flight, and the
@@ -283,6 +284,8 @@ impl Duel {
             firing: true,
             retired: [None, None],
             impact_events: Vec::with_capacity(MAX_SHELLS),
+            contacts: Default::default(),
+            contact_events: Vec::new(),
             terrain,
             loose: LooseTerrain::new(LooseTerrainConfig {
                 max_grains: config.max_grains - placement.reserved_grains,
@@ -328,6 +331,14 @@ impl Duel {
     }
     pub fn loose_cells(&self) -> usize {
         self.loose.len()
+    }
+    /// The tanks' new impacts in the step just taken, as contact charges
+    /// priced them.
+    pub fn contacts(&self) -> &[host::Contact] {
+        &self.contact_events
+    }
+    pub fn contact_diagnostics(&self) -> host::ContactDiagnostics {
+        self.contacts.diagnostics
     }
     pub fn deposited_cells(&self) -> u64 {
         self.loose.deposited_cells()
@@ -491,6 +502,7 @@ impl Duel {
         support_checks: [driving::SupportCheckFn; 2],
     ) -> Vec<engine_rapier::world::SurfaceDrive> {
         self.impact_events.clear();
+        self.contact_events.clear();
         let drives =
             self.prepare_driving(physics, drive, override_axis, ground_checks, support_checks);
         if self.config.roof {
@@ -550,13 +562,16 @@ impl Duel {
             self.terrain.iter().map(|f| (f.assembly.body(), &f.terrain)),
             DT,
         );
+        self.bind_contacts(physics);
         drives
     }
     pub(crate) fn finish_step(
         &mut self,
         physics: &mut PhysicsWorld,
         recipients: &mut impl Recipients,
+        surfaces: &mut impl ContactSurfaces,
     ) {
+        self.charge_contacts(physics, surfaces);
         self.loose.sample_impact_contacts(physics);
         let mut finished = Vec::new();
         let placement = &self.placement;

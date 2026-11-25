@@ -197,6 +197,8 @@ pub struct Duel {
     firing: bool,
     retired: [Option<engine_rapier::world::BodyMotion>; 2],
     impact_events: Vec<host::Impact>,
+    contacts: armor::contacts::Contacts,
+    contact_events: Vec<host::Contact>,
     terrain: Vec<TerrainFragment>,
     loose: LooseTerrain,
     next_id: u64,
@@ -247,13 +249,24 @@ fn hill(x: f32, seed: u64) -> f32 {
 
 impl ScorchedState {
     pub fn new(config: ScorchedConfig, seed: u64) -> Self {
-        let mut physics = PhysicsWorld::new(PhysicsWorldConfig {
+        let mut physics = Self::mechanics();
+        let priced = host::capture_contacts(&mut physics);
+        debug_assert!(priced, "a new world prices contacts");
+        Self::in_world(physics, config, seed)
+    }
+    /// An empty world with standalone Scorched's settings.
+    fn mechanics() -> PhysicsWorld {
+        PhysicsWorld::new(PhysicsWorldConfig {
             gravity: Vec2::new(0.0, -GRAVITY),
             solver_iterations: 8,
             internal_stabilization_iterations: 2,
             max_ccd_substeps: 4,
             ..Default::default()
-        });
+        })
+    }
+    /// A duel in `physics`, a world from [`Self::mechanics`]. Its contacts
+    /// charge the tanks only if the world captures them.
+    fn in_world(mut physics: PhysicsWorld, config: ScorchedConfig, seed: u64) -> Self {
         let mut duel = Duel::insert(&mut physics, config, seed, host::Placement::standalone());
         physics.step(DT);
         duel.driving = std::array::from_fn(|i| {
@@ -276,8 +289,11 @@ impl ScorchedState {
     fn advance(&mut self, drive: f32) {
         let drives = self.duel.prepare_controls(&mut self.physics, drive);
         self.duel.last_physics = self.physics.step_with_surface_drives(DT, &drives);
-        self.duel
-            .finish_step(&mut self.physics, &mut armor::NoRecipients);
+        self.duel.finish_step(
+            &mut self.physics,
+            &mut armor::NoRecipients,
+            &mut armor::contacts::NoSurfaces,
+        );
     }
     fn advance_with_drive_override(
         &mut self,
@@ -290,8 +306,11 @@ impl ScorchedState {
             self.duel
                 .prepare_with_drive_override(&mut self.physics, drive, axis, ground, support);
         self.duel.last_physics = self.physics.step_with_surface_drives(DT, &drives);
-        self.duel
-            .finish_step(&mut self.physics, &mut armor::NoRecipients);
+        self.duel.finish_step(
+            &mut self.physics,
+            &mut armor::NoRecipients,
+            &mut armor::contacts::NoSurfaces,
+        );
     }
 
     pub fn camera(&self) -> Camera2 {

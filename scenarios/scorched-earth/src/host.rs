@@ -3,10 +3,20 @@
 //!
 //! Placement maps Scorched's native coordinates into the host's physical units.
 //! Both use downward gravity. Contact fracture requires event collection.
+//!
+//! The tanks' contacts charge their armor in a world where
+//! [`capture_contacts`] has turned capture on, as `armor::contacts` describes.
+//! The duel binds its own colliders and makes the step's one call to the
+//! engine's contact charges, in `finish_step`. A host with surfaces of its own
+//! binds their colliders and declares them through
+//! [`HostedDuel::finish_step_among`].
 use super::*;
+use engine_rapier::world::loading::charges::{ContactSurfaces, Unpriced};
 use engine_rapier::world::weapon::Recipients;
 use engine_rapier::world::{BodyMotion, CollisionGroups, RayHit, SurfaceDrive};
 use std::ops::Range;
+
+pub use crate::armor::contacts::capture_contacts;
 
 /// Bounded host terrain; the standalone field retains its original dimensions.
 pub const MAX_TERRAIN_WIDTH: u32 = 2049;
@@ -200,6 +210,40 @@ pub struct Impact {
     /// than charged: the hit's, on terrain or any body that is not a tank,
     /// and the burst's shares on the host's bodies.
     pub unmodeled: f32,
+}
+
+/// One new impact on a tank, as contact charges priced it after the step.
+/// Each side's slot follows `entities`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Contact {
+    /// The two entities that met.
+    pub entities: [PhysicsId; 2],
+    /// The tank on each side, by its slot in the duel. The ground and the
+    /// host's bodies show none.
+    pub tanks: [Option<usize>; 2],
+    /// The fastest approach that started the impact, in the world's units.
+    pub closing_speed: f32,
+    /// The impact's energy, in Scorched's units. An impact whose budget
+    /// failed shows none.
+    pub energy: f32,
+    /// Work each tank's armor took, in Scorched's units. A side that is no
+    /// tank shows none.
+    pub absorbed: [f32; 2],
+    /// Why charges did not price the impact, if they did not.
+    pub unpriced: Option<Unpriced>,
+}
+
+/// What a duel's contact charges missed since it began.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ContactDiagnostics {
+    /// Contact batches capture rejected. Their impacts are missing from the
+    /// duel's contacts.
+    pub rejected_batches: usize,
+    /// Regions and bindings the world refused, each leaving a collider
+    /// unbound for a step.
+    pub refused_bindings: usize,
+    /// The tanks' impacts that charges left unpriced.
+    pub unpriced: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -425,6 +469,22 @@ impl HostedDuel {
         world: &mut PhysicsWorld,
         recipients: &mut impl Recipients,
     ) -> Result<(), HostError> {
+        self.finish_step_among(world, recipients, &mut armor::contacts::NoSurfaces)
+    }
+
+    /// [`Self::finish_step_with`] with the host's own surfaces among the
+    /// contacts: `surfaces` keeps what stands behind each source the host
+    /// has bound, in world units, and is charged through. The duel sees each
+    /// at its own scale, so it loses the share of its capacity that the same
+    /// contact would cost it at scale 1. The step's impacts are priced here,
+    /// once, those between two of the host's surfaces too, so the host does
+    /// not call the engine's contact charges itself.
+    pub fn finish_step_among(
+        &mut self,
+        world: &mut PhysicsWorld,
+        recipients: &mut impl Recipients,
+        surfaces: &mut impl ContactSurfaces,
+    ) -> Result<(), HostError> {
         if self.retired {
             return Err(HostError::Retired);
         }
@@ -432,7 +492,7 @@ impl HostedDuel {
             return Err(HostError::StepOrder);
         }
         Self::gravity(world, self.duel.placement.scale)?;
-        self.duel.finish_step(world, recipients);
+        self.duel.finish_step(world, recipients, surfaces);
         self.sync_gravity(world);
         self.prepared = false;
         Ok(())
@@ -458,6 +518,14 @@ impl HostedDuel {
     }
     pub fn impacts(&self) -> &[Impact] {
         &self.duel.impact_events
+    }
+    /// The tanks' new impacts in the step just finished, as contact charges
+    /// priced them. Empty in a world that does not capture contacts.
+    pub fn contacts(&self) -> &[Contact] {
+        self.duel.contacts()
+    }
+    pub fn contact_diagnostics(&self) -> ContactDiagnostics {
+        self.duel.contact_diagnostics()
     }
     /// Points a tank's barrel along `direction`, in the world as in the
     /// duel, as a host's own choreography may once the duel is over. The
@@ -679,6 +747,7 @@ impl HostedDuel {
             LooseTerrain::new(self.duel.loose.config()).expect("existing configuration");
         self.duel.shells.clear();
         self.duel.impact_events.clear();
+        self.duel.contact_events.clear();
         self.duel.flashes.clear();
         self.duel.firing = false;
         self.retired = true;

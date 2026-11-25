@@ -335,8 +335,8 @@ the cheap route as an opt-in yet:
 3. **If they do, step 3's PRs, in order:**
    1. Engine-held surfaces, as above.
    2. Re-impacts. A new point in an open episode is priced as an impact of its
-      own. This is also the option #331 has open for severe flat drops, and
-      charges would gain the tank energy that goes unpriced today.
+      own. #331 weighed this for severe flat drops and kept its rock ground
+      instead. Charges would gain the tank energy that goes unpriced today.
    3. The ledger's bounce as an opt-in. The hook prices each new impact and
       sets its restitution, and each charge reports the rebound measured after
       the solve beside the ledger's, so a shortfall is visible.

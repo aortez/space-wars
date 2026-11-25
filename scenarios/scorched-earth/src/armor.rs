@@ -486,5 +486,6 @@ impl Duel {
     }
 }
 
+pub(crate) mod contacts;
 #[cfg(test)]
 mod tests;
