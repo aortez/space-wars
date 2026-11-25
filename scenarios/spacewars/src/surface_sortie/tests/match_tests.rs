@@ -1,6 +1,7 @@
 use super::*;
 use match_rules::{MatchOutcome, PILOT_HEALTH, POD_HULL_HEALTH, PilotDamageCause};
 
+mod contact_charges;
 mod durability;
 mod material_lasers;
 mod material_shots;

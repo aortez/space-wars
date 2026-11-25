@@ -343,6 +343,70 @@ those of the rule above in
   against 6 µs for the impacts. Their cost also needs measuring on the Pi
   before adoption.
 
+## Spacewars host (#330)
+
+`scenarios/spacewars/src/contact_charges.rs` is Spacewars' host. It is off
+unless a world calls `SpacewarsState::enable_contact_charges`, which only
+tests do so far, and it charges nothing: it lists each step's impacts, as
+priced, in `SpacewarsState::contact_hits`, and today's contact rules still
+deal all contact damage. #330's next steps apply what it prices, asteroids
+first.
+
+- **Regions.** Each body a crash can harm, or that a crash strikes, has a
+  region: a ship or a pod, a pilot on foot, each of a rover's three bodies, an
+  asteroid, the sun and each planet. Every collider of such a body is bound to
+  its region, sensors included, which never touch. A landing foot is a patch
+  of its own. Shells, chips, breakup fragments, wreckage, tanks, loose terrain
+  and the universe's boundary have no region, so none of their contacts is
+  priced.
+- **Binding.** Before each step the host binds each unbound collider of such
+  a body: a new body's, or one whose colliders were replaced. A sortie's wing
+  sweep replaces a ship's colliders, and its region outlives them. Removing a
+  body retires its region. The game rebuilds a body for most changes of
+  shape, such as a ship's wing sweep outside a sortie, docking, a turn into a
+  pod and an asteroid's chip, so the rebuilt body has a new region and its
+  contacts start anew. Its impacts with a body it was already touching, as
+  the contact rules recall it, go on with that contact until those rules see
+  the two part, so the host lists none, as those rules count none.
+  Walking the world's colliders took about 9 µs a step on the workstation at
+  the census's settings, with up to 399 colliders.
+- **Surfaces.** A body with health is its health map's region, as for
+  [weapon sources](material-sources.md#spacewars-bodies), at a fixed depth:
+  the health it brought into the step, less what the step's earlier impacts
+  consumed. A hull meets others with a radius of 1, an estimate. A pilot meets
+  them with the capsule's radius, each of a rover's bodies with its wheels'
+  0.75, and debris with its own radius. The sun and the planets are rock as a
+  half-space, with their own radius, holding as much as a region can so that
+  nothing wears them.
+- **Shielding.** The sun and the planets are always shielded. So are a pod
+  and a pilot outside a match, priced at full health since only a match
+  harms them, and a pod or a pilot under ejection protection.
+- **Supports** go unpriced. The host never calls `charge_contact_supports`,
+  so the steady load of a ship, pod, pilot or rover resting on a planet costs
+  nothing, and only impacts are listed.
+- **Capture's bounds** are 4,096 regions, 16,384 bindings, 4,096 episodes,
+  65,536 visits and 8,192 contacts a batch, and 32,768 records a step, to
+  hold `MAX_ASTEROIDS` asteroids beside the rest. In 15 seconds at the
+  census's settings, the host's test finds no batch refused, every impact
+  priced and the same trajectory as without charges.
+
+The contact-half probe of 2026-11-23 bound the same bodies, with loose terrain,
+the boundary and all rock debris besides, and set charges beside today's rules
+in the census, the AI games and the matches, on the workstation and the Pi.
+Its records are in
+`/home/data2/space-wars3-artifacts/contact-half-probe-20261123`.
+
+- On rock planets, asteroids wear as they do today. Every asteroid that hits
+  a planet or the sun breaks under both. One that hits a ship breaks 97% of
+  the time today and 98 to 100% under charges.
+- Ships take 30 to 130 times today's damage from planets and the sun, and
+  pods and pilots far less than today's match rule. No planet material suits
+  both ships and asteroids, so ships, pods, pilots and rovers wait on a
+  decision about their materials.
+- Capture added 2 to 17% to a step on the workstation and up to 15% on the
+  Pi, and charges 0.03 to 0.5 ms a step on the Pi. With everything bound,
+  Deathmatch peaked at 1,577 regions.
+
 ## Evidence
 
 `crates/engine-rapier/src/world/loading/charges/tests.rs` covers:

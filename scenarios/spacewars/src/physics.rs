@@ -241,6 +241,9 @@ struct PlanetColliderKey {
 struct DebrisColliderKey {
     signature: u64,
     armed: bool,
+    /// Never changes for a piece of debris; kept so contact charges can tell
+    /// asteroids apart without the game's debris list.
+    kind: DebrisKind,
 }
 
 #[derive(Debug, Clone)]
@@ -278,6 +281,9 @@ pub(super) struct SpacewarsPhysics {
     next_debris_entity: u64,
     /// The cannon shells' shots and the lasers' beams (#330).
     weapons: Weapons,
+    /// The regions contact charges keep for the bodies, once a world enables
+    /// them (#330).
+    pub(super) contacts: Option<super::contact_charges::Regions>,
 }
 
 pub(super) struct PhysicsReconcileInput<'a> {
@@ -347,6 +353,7 @@ impl SpacewarsPhysics {
             debris_keys: BTreeMap::new(),
             next_debris_entity: DEBRIS_ENTITY_BASE,
             weapons: Weapons::new(),
+            contacts: None,
         }
     }
 
@@ -1298,6 +1305,25 @@ impl SpacewarsPhysics {
         contacts
     }
 
+    /// Whether the contact rules saw `a` and `b` touch recently enough that
+    /// their contact now would not start a new one.
+    pub(super) fn touched_lately(&self, a: MechanicalEntity, b: MechanicalEntity) -> bool {
+        self.contact_last_seen
+            .get(&ordered_entity_pair(a, b))
+            .is_some_and(|&seen| self.tick.saturating_sub(seen) <= CONTACT_REARM_TICKS)
+    }
+
+    /// The pairs the contact rules saw touch recently enough that their
+    /// contact now would not start a new one.
+    pub(super) fn recent_contacts(
+        &self,
+    ) -> impl Iterator<Item = (MechanicalEntity, MechanicalEntity)> + '_ {
+        self.contact_last_seen
+            .iter()
+            .filter(|&(_, &seen)| self.tick.saturating_sub(seen) <= CONTACT_REARM_TICKS)
+            .map(|(&pair, _)| pair)
+    }
+
     pub fn spaceport_contacts(&self) -> Vec<(usize, usize, bool)> {
         let mut contacts = BTreeMap::new();
         for intersection in self.world.sensor_intersections() {
@@ -1353,6 +1379,11 @@ impl SpacewarsPhysics {
         })
     }
 
+    /// The kind of the debris whose physics id is `id`, while it has a body.
+    pub(super) fn debris_kind(&self, id: u64) -> Option<DebrisKind> {
+        self.debris_keys.get(&id).map(|key| key.kind)
+    }
+
     pub(super) fn allocate_debris_id(&mut self) -> u64 {
         let id = self.next_debris_entity;
         self.next_debris_entity += 1;
@@ -1384,6 +1415,7 @@ impl SpacewarsPhysics {
                 } else {
                     item.spawn_tick < tick
                 },
+                kind: item.kind,
             };
             if self.debris_keys.get(&item.physics_id) != Some(&key) {
                 let entity = PhysicsId::new(item.physics_id);
@@ -1973,6 +2005,17 @@ fn debris_signature(debris: &DebrisState) -> u64 {
         }
     }
     hash
+}
+
+/// The contact patch a collider touches with (#330). A landing foot touches
+/// apart from its ship's hull, so each foot is a patch of its own, numbered
+/// from 1. The rest of a body is patch 0.
+pub(super) fn contact_patch(collider: ColliderId) -> u32 {
+    if collider.role == LANDING_FOOT_ROLE {
+        1 + u32::from(collider.part)
+    } else {
+        0
+    }
 }
 
 pub(super) fn primary_body(entity: PhysicsId) -> PhysicsBodyId {
