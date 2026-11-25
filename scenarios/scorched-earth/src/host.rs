@@ -232,6 +232,35 @@ pub struct ShellState {
     pub age: u32,
 }
 
+/// A shot a host plots from one tank at a point of its own, once the duel is
+/// over, as a plotted CPU plots its shot at its opponent: one traced arc for
+/// each whole degree of elevation, a share of them each tick, and the middle
+/// of the widest band of arcs that reach the point.
+#[derive(Clone)]
+pub struct Aim {
+    slot: usize,
+    plot: bot::Plot,
+}
+
+impl Aim {
+    /// Whether every arc has been traced.
+    pub fn plotted(&self) -> bool {
+        self.plot.finished.is_some()
+    }
+
+    /// The direction the chosen arc leaves the barrel in, in the world as in
+    /// the duel, once every arc has been traced. There is none if no arc
+    /// reaches the point.
+    pub fn direction(&self) -> Option<Vec2> {
+        self.plot.direction()
+    }
+
+    /// How long the chosen arc's shell flies before it bursts, in ticks.
+    pub fn flight_ticks(&self) -> Option<u32> {
+        self.plot.flight_ticks()
+    }
+}
+
 /// Clone together with the host's PhysicsWorld for a deterministic checkpoint.
 #[derive(Clone)]
 pub struct HostedDuel {
@@ -438,6 +467,65 @@ impl HostedDuel {
         let tank = &mut self.duel.tanks[slot];
         tank.facing = if direction.x < 0.0 { -1.0 } else { 1.0 };
         tank.elevation = direction.y.atan2(direction.x.abs());
+    }
+    /// Begins a shot from `slot`'s tank, as it stands, at `target` in the
+    /// world.
+    pub fn aim_at(&self, world: &PhysicsWorld, slot: usize, target: Vec2) -> Aim {
+        let target = self.duel.placement.point_from_world(target);
+        Aim {
+            slot,
+            plot: bot::Plot::at(&self.duel, world, slot, target),
+        }
+    }
+    /// Traces the next share of `aim`'s arcs: as many rays as a plotted CPU
+    /// casts for its plot in a tick, until every arc is traced.
+    pub fn plot(&self, world: &PhysicsWorld, aim: &mut Aim) {
+        if !aim.plotted() {
+            aim.plot.advance(&self.duel, world, aim.slot);
+        }
+    }
+    /// Fires one shell from `aim`'s tank along the arc it chose, as a host's
+    /// own choreography may once the duel is over. The barrel turns onto the
+    /// arc, and the shell leaves at the power that reaches the point from
+    /// where the tank stands now. While the host steps the duel, the shell
+    /// flies, bursts and digs as the duel's own do, and the CPUs neither
+    /// learn from it nor dodge it. Answers the shell's source, or none if no
+    /// arc reaches the point, the tank has retired or too many shells fly.
+    pub fn fire_aim(&mut self, world: &mut PhysicsWorld, aim: &Aim) -> Option<ShotSource> {
+        if self.retired {
+            return None;
+        }
+        let id = self.duel.fire_plot(world, aim.slot, &aim.plot)?;
+        Some(ShotSource {
+            owner: self.duel.tanks[aim.slot].body.entity,
+            id,
+        })
+    }
+    /// Where the shell from `source` will burst, in the world, flown on from
+    /// where it is as fired shells fly, passing through `through`: the trace
+    /// a dodging CPU makes of a shell coming at it, which passes through its
+    /// own hull. A shell young enough to pass through its shooter passes
+    /// through that instead. There is none once the shell has landed, or if
+    /// it would leave the field or expire first.
+    pub fn landing(
+        &self,
+        world: &PhysicsWorld,
+        source: ShotSource,
+        through: Option<PhysicsId>,
+    ) -> Option<Vec2> {
+        let shell = self
+            .duel
+            .shells
+            .iter()
+            .find(|shell| shell.source.id() == source.id)?;
+        let through = if shell.age < 8 {
+            Some(self.duel.tanks[shell.owner].body.entity)
+        } else {
+            through
+        };
+        self.duel
+            .burst_through(world, through, shell)
+            .map(|point| self.duel.placement.point_to_world(point))
     }
     pub fn reserved_grains(&self) -> usize {
         self.duel.placement.reserved_grains

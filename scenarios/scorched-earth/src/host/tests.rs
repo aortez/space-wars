@@ -479,6 +479,73 @@ fn a_host_points_a_tanks_barrel_either_way_and_below_the_level() {
 }
 
 #[test]
+fn a_host_plots_a_shot_at_a_point_fires_it_once_the_duel_is_over_and_traces_its_burst() {
+    for scale in [1.0, 3.0] {
+        let (mut duel, mut world) = quiet(scale);
+        duel.retire_tank(&mut world, 0).unwrap();
+        let shooter = duel.tanks(&world)[1].motion.position;
+        // A point just above the hill, 24 units in front of the winner.
+        let ground = world
+            .cast_ray(
+                shooter + Vec2::new(-24.0, 20.0) * scale,
+                Vec2::new(0.0, -1.0),
+                RayCastOptions {
+                    max_distance: 60.0 * scale,
+                    ..Default::default()
+                },
+            )
+            .unwrap()
+            .point;
+        let target = ground + Vec2::Y * (0.5 * scale);
+        let mut aim = duel.aim_at(&world, 1, target);
+        let mut ticks = 0;
+        while !aim.plotted() {
+            duel.plot(&world, &mut aim);
+            ticks += 1;
+        }
+        assert!((5..=40).contains(&ticks), "{ticks} ticks to plot");
+        let direction = aim.direction().expect("an arc that reaches the point");
+        assert!(direction.x < 0.0 && direction.y > 0.0, "{direction:?}");
+        let flight = aim.flight_ticks().unwrap();
+        let (shots, observations) = (duel.shots(), duel.shot_observations().len());
+        let source = duel.fire_aim(&mut world, &aim).expect("a shot");
+        assert_eq!(duel.shots(), shots + 1);
+        let [pivot, muzzle] = duel.tanks(&world)[1].barrel;
+        assert!(((muzzle - pivot).normalized() - direction).length() < 1e-4);
+        let traced = duel.landing(&world, source, None).expect("a burst");
+        assert!(
+            traced.distance_to(target) < 1.5 * scale,
+            "{traced:?} for {target:?}"
+        );
+        let mut flown = 0_u32;
+        let impact = loop {
+            step(&mut duel, &mut world);
+            flown += 1;
+            if let Some(impact) = duel.impacts().iter().find(|i| i.source == source) {
+                break *impact;
+            }
+            assert!(flown < 400, "the shell never burst");
+        };
+        assert!(
+            flown.abs_diff(flight) <= 2,
+            "flew {flown} ticks, plotted {flight}"
+        );
+        assert!(
+            impact.point.distance_to(traced) < 0.05 * scale,
+            "{:?} from {traced:?}",
+            impact.point
+        );
+        assert_eq!(duel.active_shells(), 0);
+        assert!(duel.landing(&world, source, None).is_none());
+        // The CPUs neither learned from it nor took it for their own.
+        assert_eq!(duel.shot_observations().len(), observations);
+        assert!(duel.material_balance(&world).is_ok());
+        duel.retire(&mut world);
+        assert_eq!(world.entity_ids().count(), 0);
+    }
+}
+
+#[test]
 fn host_gravity_and_step_order_keep_controls_and_material_in_the_shared_world() {
     let config = config(GrainShape::Round);
     let mut world = world();

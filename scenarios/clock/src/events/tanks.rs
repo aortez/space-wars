@@ -8,7 +8,7 @@ use crate::{
 use engine_common::{ClockEventKind, ClockTanksState};
 use engine_core::Vec2;
 use engine_rapier::{
-    terrain::{GrainSeed, GrainShape, TerrainGrain, TerrainSpec},
+    terrain::{GrainSeed, GrainShape, RadialImpulse, TerrainGrain, TerrainSpec},
     world::{BodyId, BodyKind, BodyMotion, CollisionGroups, PhysicsId, PhysicsWorld},
 };
 use engine_terrain::{Cell, MaterialId};
@@ -31,7 +31,7 @@ pub const MAX_TICKS: u64 = RAISE_TICKS
     + COMBAT_TICKS
     + SHELL_LIFETIME_TICKS as u64
     + BLOW_UP_TICKS
-    + AFTERMATH_TICKS
+    + PARTING_TICKS
     + BEAM_UP_TICKS
     + WITHDRAW_TICKS;
 pub const REUSE_TICKS: u64 = 120 * FIXED_HZ as u64;
@@ -71,6 +71,8 @@ const RANGE: FiringRange = FiringRange {
 const LANDING_X: f32 = (RANGE.near + RANGE.far) / 4.0;
 /// The longest the tanks drive to their range before fire opens anyway.
 const OPENING_TICKS: u64 = 12 * FIXED_HZ as u64;
+/// How long the cells a parting shell knocks loose lie before they go home.
+const LIE_TICKS: u64 = FIXED_HZ as u64;
 
 pub fn config(shape: GrainShape, seed: u64) -> ScorchedConfig {
     ScorchedConfig {
@@ -115,7 +117,7 @@ pub mod survivor;
 pub mod wreck;
 pub use damage::MAX_LOOSE;
 pub use entry::placement;
-pub use survivor::{AFTERMATH_TICKS, MAX_SURVIVOR_BODIES};
+pub use survivor::{MAX_SURVIVOR_BODIES, PARTING_TICKS};
 pub use wreck::{BLOW_UP_TICKS, MAX_PIECE_COLLIDERS, MAX_PIECES};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -404,9 +406,10 @@ impl TanksEvent {
                 let winner = self.winner(world);
                 self.survivors.control(world, gravity, self.tick, winner);
                 // The winner's turret turns onto a spaceling that
-                // surrenders, and keeps it covered as its beam draws it in.
-                if let Some(target) = self.survivors.target()
-                    && let Some(winner) = winner
+                // surrenders, and keeps it covered as its beam draws it in,
+                // and onto one it takes its parting shot at.
+                if let Some(winner) = winner
+                    && let Some(target) = self.survivors.target(winner.barrel[0])
                 {
                     self.duel
                         .point_barrel(winner.slot, survivor::turn_barrel(winner.barrel, target));
@@ -433,6 +436,7 @@ impl TanksEvent {
             ..
         } = context;
         let world = arena.held_mut(OWNER).expect("Tanks holds the arena");
+        let scale = self.duel.placement().scale;
         if self.simulates_duel() {
             self.duel
                 .finish_step(world)
@@ -440,6 +444,16 @@ impl TanksEvent {
             // Loose cells fall as the dirt does.
             let gravity = self.duel.gravity_scale(world);
             for impact in self.duel.impacts() {
+                // A parting shell's burst throws what the duel does not own.
+                if self.result.is_some() {
+                    self.survivors.shove(world, impact.point);
+                    RadialImpulse {
+                        center: impact.point,
+                        radius: survivor::PUSH_REACH * scale,
+                        speed: survivor::PUSH_SPEED * scale,
+                    }
+                    .apply(world, self.converted.iter().map(|grain| grain.body()));
+                }
                 if impact.collider.entity == digits::BODY {
                     self.face_hits += 1;
                     self.damage.knock_loose(
@@ -514,14 +528,21 @@ impl TanksEvent {
                 // Were the wreck done now, the aftermath would end this long
                 // from now at the latest.
                 let deadline = self.tick + self.survivors.aftermath_ticks();
-                self.survivors
-                    .observe(world, self.layout, self.tick, winner, deadline);
+                self.survivors.observe(
+                    world,
+                    &mut self.duel,
+                    self.layout,
+                    self.tick,
+                    winner,
+                    deadline,
+                );
                 if !self
                     .wreck
                     .observe(world, self.layout, self.tick, ending, &mut self.converted)
                 {
                     // A survivor still getting up, looking around, waving,
-                    // running or surrendering has the aftermath to finish in.
+                    // running or surrendering has the aftermath to finish in,
+                    // as does a parting shell still in the air.
                     if self.survivors.ready(self.tick) {
                         self.begin_beam_up(world);
                     } else {
@@ -533,8 +554,14 @@ impl TanksEvent {
                 let winner = self.winner(world);
                 let longest = self.survivors.aftermath_ticks();
                 let deadline = self.tick - self.phase_tick + longest;
-                self.survivors
-                    .observe(world, self.layout, self.tick, winner, deadline);
+                self.survivors.observe(
+                    world,
+                    &mut self.duel,
+                    self.layout,
+                    self.tick,
+                    winner,
+                    deadline,
+                );
                 if self.survivors.ready(self.tick) || self.phase_tick >= longest {
                     self.begin_beam_up(world);
                 }
@@ -546,8 +573,9 @@ impl TanksEvent {
             }
             _ => (),
         }
-        // Once the last shell has landed, every damaged digit comes home.
-        if self.result.is_some() {
+        // Once the last shell has landed, every damaged digit comes home. The
+        // cells a parting shell knocks loose lie a moment first.
+        if self.result.is_some() && !self.survivors.shelling(self.tick, LIE_TICKS) {
             let world = arena.held_mut(OWNER).expect("Tanks holds the arena");
             self.damage
                 .bring_home(world, self.layout, display, surfaces);
@@ -616,10 +644,12 @@ impl TanksEvent {
     }
 
     // Once the last shell resolves, Rapier continues the physical aftermath,
-    // but duel AI, damage and terrain topology cannot change the latched result
-    // or create bodies outside the withdrawal's captured population.
+    // and the duel steps again only while the winner's parting shell flies.
+    // Its CPUs neither aim nor drive by then, so nothing changes the latched
+    // result, and nothing makes bodies once the withdrawal has captured them.
     fn simulates_duel(&self) -> bool {
-        self.result.is_none() && self.phase != EventPhase::Withdrawing
+        self.phase != EventPhase::Withdrawing
+            && (self.result.is_none() || self.duel.active_shells() > 0)
     }
 
     /// The winner, once the fight is over, while it stands in view: none

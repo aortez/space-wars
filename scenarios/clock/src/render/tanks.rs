@@ -50,6 +50,11 @@ const FLAG: RenderColor = RenderColor::rgb(0.98, 0.98, 0.95);
 const STICK: RenderColor = RenderColor::rgb(0.6, 0.5, 0.36);
 /// A running spaceling's strides a second.
 const STRIDE_HZ: f32 = 3.5;
+/// A jetpack's flame, and its hot core.
+const FLAME: RenderColor = RenderColor::rgba(1.0, 0.55, 0.15, 0.85);
+const FLAME_CORE: RenderColor = RenderColor::rgb(1.0, 0.92, 0.6);
+/// How long the flash of a shell's burst lasts.
+const FLASH_TICKS: u64 = 22;
 
 fn mix(a: RenderColor, b: RenderColor, t: f32) -> RenderColor {
     RenderColor::rgba(
@@ -159,6 +164,7 @@ fn disc(
 
 fn strip(
     frame: &mut RenderFrame,
+    layer: i32,
     a: Vec2,
     b: Vec2,
     width: f32,
@@ -169,7 +175,7 @@ fn strip(
     let side = Vec2::new(-direction.y, direction.x) * width * 0.5;
     polygon(
         frame,
-        ARENA_LAYER,
+        layer,
         vec![a - side, b - side, b + side, a + side],
         bounds,
         color,
@@ -190,6 +196,7 @@ fn wheel(
         let direction = Vec2::from_radians(angle + spoke as f32 * TAU / 3.0);
         strip(
             frame,
+            ARENA_LAYER,
             center,
             center + direction * 0.8 * radius,
             0.2 * radius,
@@ -215,7 +222,7 @@ fn wreck(
     for blast in &wreck.blasts {
         plume(frame, blast, event.tick, scale, bounds);
     }
-    trail(frame, &wreck.puffs, event.tick, scale, bounds);
+    trail(frame, ARENA_LAYER, &wreck.puffs, event.tick, scale, bounds);
     for piece in &wreck.pieces {
         let motion = world.motion(piece.body).expect("a piece of a tank");
         let heat = wreck.heat(piece.slot, event.tick);
@@ -230,6 +237,7 @@ fn wreck(
                 disc(frame, ARENA_LAYER, motion.position, *radius, bounds, color);
                 strip(
                     frame,
+                    ARENA_LAYER,
                     motion.position,
                     at(Vec2::new(*barrel, 0.0)),
                     *width,
@@ -255,9 +263,16 @@ fn wreck(
     }
 }
 
-/// The smoke a burning piece or a pod in flight left behind it, each puff
-/// rising and spreading as it thins.
-fn trail(frame: &mut RenderFrame, puffs: &[Puff], tick: u64, scale: f32, bounds: Bounds) {
+/// The smoke a burning piece, a pod in flight or a jetpack left behind it,
+/// on `layer`, each puff rising and spreading as it thins.
+fn trail(
+    frame: &mut RenderFrame,
+    layer: i32,
+    puffs: &[Puff],
+    tick: u64,
+    scale: f32,
+    bounds: Bounds,
+) {
     for puff in puffs {
         let age = tick - puff.tick;
         if age >= TRAIL_LIFE {
@@ -267,7 +282,7 @@ fn trail(frame: &mut RenderFrame, puffs: &[Puff], tick: u64, scale: f32, bounds:
         let seconds = age as f32 / FIXED_HZ as f32;
         disc(
             frame,
-            ARENA_LAYER,
+            layer,
             puff.point + Vec2::Y * (0.8 * seconds * scale),
             (0.25 + 0.6 * t) * scale,
             bounds,
@@ -279,10 +294,16 @@ fn trail(frame: &mut RenderFrame, puffs: &[Puff], tick: u64, scale: f32, bounds:
 /// The losers' spacelings that got out: the smoke behind each pod in
 /// flight, the pods, the beams that come down for the spacelings, and the
 /// spacelings themselves, standing, tumbling or lying where they landed.
-fn survivors(frame: &mut RenderFrame, event: &TanksEvent, world: &PhysicsWorld, bounds: Bounds) {
+fn survivors(
+    frame: &mut RenderFrame,
+    event: &TanksEvent,
+    world: &PhysicsWorld,
+    [bounds, sky]: [Bounds; 2],
+) {
     let scale = event.duel.placement().scale;
     let survivors = &event.survivors;
-    trail(frame, &survivors.puffs, event.tick, scale, bounds);
+    // A jetpack's smoke rises in front of the face, with the spaceling.
+    trail(frame, SHOT_LAYER, &survivors.puffs, event.tick, scale, sky);
     let beaming = event.phase == EventPhase::BeamUp;
     for survivor in &survivors.out {
         let color = TEAMS[survivor.slot];
@@ -333,15 +354,35 @@ fn survivors(frame: &mut RenderFrame, event: &TanksEvent, world: &PhysicsWorld, 
             .expect("a survivor's spaceling");
         let seconds = (event.tick - survivor.since) as f32 / FIXED_HZ as f32;
         let flag = survivor.flag(event.tick);
+        // A dodger runs until it stands clear, and waits there.
+        let running = match survivor.phase {
+            Phase::Running | Phase::Climbing | Phase::Fleeing => true,
+            Phase::Dodging => survivor
+                .shot
+                .as_ref()
+                .and_then(|shot| shot.dodge)
+                .is_some_and(|dodge| !dodge.stopped),
+            _ => false,
+        };
+        let hopping = survivor.phase == Phase::Hopping;
         let pose = Pose {
             wave: (survivor.phase == Phase::Waving
                 || (survivor.phase == Phase::BeamedUp && survivor.stood_up && flag == 0.0))
                 .then_some(seconds),
             flag: (flag > 0.0).then(|| (flag, event.tick as f32 / FIXED_HZ as f32)),
-            stride: matches!(survivor.phase, Phase::Running | Phase::Climbing).then_some(seconds),
+            stride: running.then_some(seconds),
+            jet: hopping.then_some(seconds),
+        };
+        // Rising out of view, it passes in front of the face, as the shells
+        // do.
+        let (layer, bounds) = if hopping {
+            (SHOT_LAYER, sky)
+        } else {
+            (ARENA_LAYER, bounds)
         };
         pilot(
             frame,
+            layer,
             motion,
             survivor.facing,
             pose,
@@ -482,14 +523,19 @@ struct Pose {
     wave: Option<f32>,
     flag: Option<(f32, f32)>,
     stride: Option<f32>,
+    /// Seconds into a jetpack hop.
+    jet: Option<f32>,
 }
 
 /// A spaceling at `motion`, facing `facing`, in a suit of `color`, posed
 /// as `pose` says: its legs, its arms, its body, its helmet and its visor,
-/// and the flag it may hold up. It is drawn in the physics crate's
-/// spaceling's proportions, shrunk to Clock's.
+/// the flag it may hold up, and the jetpack it may rise on. It is drawn in
+/// the physics crate's spaceling's proportions, shrunk to Clock's, on
+/// `layer`.
+#[allow(clippy::too_many_arguments)]
 fn pilot(
     frame: &mut RenderFrame,
+    layer: i32,
     motion: BodyMotion,
     facing: f32,
     pose: Pose,
@@ -516,6 +562,7 @@ fn pilot(
         };
         strip(
             frame,
+            layer,
             at(side * 0.1, -0.15),
             foot,
             0.14 * size,
@@ -545,12 +592,13 @@ fn pilot(
             }
             _ => at(side * 0.36, -0.12),
         };
-        strip(frame, shoulder, hand, 0.13 * size, bounds, color);
+        strip(frame, layer, shoulder, hand, 0.13 * size, bounds, color);
         if let Some((_, seconds)) = pose.flag
             && side == facing
         {
             white_flag(
                 frame,
+                layer,
                 hand,
                 motion.angle,
                 facing,
@@ -561,19 +609,46 @@ fn pilot(
             );
         }
     }
+    // A jetpack on its back, and the flame it rises on, flickering.
+    if let Some(seconds) = pose.jet {
+        let back = -facing;
+        polygon(
+            frame,
+            layer,
+            [(0.24, -0.12), (0.42, -0.12), (0.42, 0.34), (0.24, 0.34)]
+                .map(|(x, y)| at(back * x, y))
+                .to_vec(),
+            bounds,
+            faded(POD_SHELL, color.a),
+        );
+        let flicker = 0.8 + 0.2 * (seconds * TAU * 9.0).sin();
+        for (half, length, flame) in [(0.1, 1.4, FLAME), (0.05, 0.7, FLAME_CORE)] {
+            polygon(
+                frame,
+                layer,
+                vec![
+                    at(back * (0.33 - half), -0.14),
+                    at(back * (0.33 + half), -0.14),
+                    at(back * 0.33, -0.14 - length * flicker),
+                ],
+                bounds,
+                faded(flame, color.a),
+            );
+        }
+    }
     polygon(
         frame,
-        ARENA_LAYER,
+        layer,
         [(-0.23, -0.2), (0.23, -0.2), (0.26, 0.4), (-0.26, 0.4)]
             .map(|(x, y)| at(x, y))
             .to_vec(),
         bounds,
         color,
     );
-    disc(frame, ARENA_LAYER, at(0.0, 0.63), 0.25 * size, bounds, legs);
+    disc(frame, layer, at(0.0, 0.63), 0.25 * size, bounds, legs);
     disc(
         frame,
-        ARENA_LAYER,
+        layer,
         at(facing * 0.1, 0.65),
         0.14 * size,
         bounds,
@@ -587,6 +662,7 @@ fn pilot(
 #[allow(clippy::too_many_arguments)]
 fn white_flag(
     frame: &mut RenderFrame,
+    layer: i32,
     hand: Vec2,
     angle: f32,
     facing: f32,
@@ -600,6 +676,7 @@ fn white_flag(
     let top = hand + up * 1.35;
     strip(
         frame,
+        layer,
         hand - up * 0.25,
         top,
         0.09 * size,
@@ -609,7 +686,7 @@ fn white_flag(
     let flutter = |phase: f32| up * (0.08 * (seconds * TAU * 2.5 + phase).sin());
     polygon(
         frame,
-        ARENA_LAYER,
+        layer,
         vec![
             top,
             top + out * 0.8 + flutter(0.0),
@@ -890,6 +967,7 @@ pub(super) fn render(
             );
             strip(
                 frame,
+                ARENA_LAYER,
                 barrel[0],
                 barrel[1],
                 BARREL_WIDTH * scale,
@@ -899,7 +977,7 @@ pub(super) fn render(
         }
     }
     wreck(frame, event, world, [bounds, sky]);
-    survivors(frame, event, world, bounds);
+    survivors(frame, event, world, [bounds, sky]);
     for shell in event.duel.shells() {
         disc(
             frame,
@@ -910,8 +988,20 @@ pub(super) fn render(
             RenderColor::rgb(1.0, 0.91, 0.62),
         );
     }
-    for (point, age) in event.duel.flashes().filter(|_| event.result.is_none()) {
-        let t = age as f32 / 22.0;
+    // The duel's flashes stop with it once the fight is over, and Clock
+    // times a parting shell's.
+    let parting = event.survivors.out.iter().filter_map(|survivor| {
+        let (point, tick) = survivor.shot.as_ref()?.landed?;
+        Some((point?, event.tick - tick))
+    });
+    for (point, age) in event
+        .duel
+        .flashes()
+        .filter(|_| event.result.is_none())
+        .chain(parting)
+        .filter(|(_, age)| *age < FLASH_TICKS)
+    {
+        let t = age as f32 / FLASH_TICKS as f32;
         disc(
             frame,
             SHOT_LAYER,

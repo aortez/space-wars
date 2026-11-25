@@ -366,6 +366,18 @@ impl Duel {
         {
             return;
         }
+        self.launch(physics, player, true);
+        self.tanks[player].next_shot = self.tick + 75;
+    }
+    /// Launches a shell from `player`'s barrel as it points, at its speed,
+    /// and answers its id. A shell the duel fires records its flight for the
+    /// CPUs to learn from and dodge; a host's does not.
+    pub(crate) fn launch(
+        &mut self,
+        physics: &mut PhysicsWorld,
+        player: usize,
+        recorded: bool,
+    ) -> u64 {
         let tank = self.tanks[player];
         let motion = self.motion(physics, tank.body).unwrap();
         let (pivot, muzzle) = self.muzzle(physics, player);
@@ -383,20 +395,22 @@ impl Duel {
             )
             .map_or(muzzle, |hit| hit.point);
         let velocity = tank.direction() * tank.speed + motion.linear_velocity;
-        let flight = self.record_launch(physics, player, position, velocity, position != muzzle);
+        let flight = recorded
+            .then(|| self.record_launch(physics, player, position, velocity, position != muzzle));
         let owner = Some(tank.body.entity.value());
+        let id = self.shots + 1;
         self.shells.push(Shell {
             owner: player,
             position,
             velocity,
             age: 0,
-            flight: Some(flight),
-            source: armor::shell(self.shots + 1, owner, velocity.length()),
+            flight,
+            source: armor::shell(id, owner, velocity.length()),
             keys: armor::Keys::default(),
         });
-        self.tanks[player].next_shot = self.tick + 75;
         self.tanks[player].shots += 1;
         self.shots += 1;
+        id
     }
     pub(crate) fn aim_bot(&mut self, physics: &mut PhysicsWorld, player: usize) {
         if self.calibrated_cpu(player) {
