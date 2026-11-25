@@ -307,11 +307,9 @@ impl Engine {
                     decision.choice
                 )?;
                 out.flush()?;
-                // Each depth takes several times as long as the last, so one
-                // begun with under a third of the time gone is the last that
-                // can finish.
-                stopped |= time.is_some_and(|time| started.elapsed() * 10 >= time * 3);
             }
+            // A depth cut short by the clock still counts for the moves it
+            // got to, so the search runs for all of its time.
             stopped |= time.is_some_and(|time| started.elapsed() >= time);
 
             while let Some(line) = waiting() {

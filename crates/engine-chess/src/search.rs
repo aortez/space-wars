@@ -8,6 +8,11 @@
 //! action. The same game, settings, seed and number of steps always give the
 //! same decision.
 //!
+//! Left to run, a search goes on until it has looked at as many positions as
+//! its settings allow. It ends sooner only at its deepest allowed search or
+//! at a forced mate that a deeper search could not better. Stopped partway
+//! through a depth, it answers from the moves that depth got to.
+//!
 //! The search is the usual one for chess. It tries all moves to a depth
 //! that grows by one half-move at a time, and past that depth follows only
 //! captures that do not lose material. It skips lines that cannot change the
@@ -53,10 +58,6 @@ pub const MAX_TABLE_BITS: u8 = 22;
 
 const MAX_PLY: usize = MAX_DEPTH as usize + MAX_QUIESCENCE as usize;
 
-/// A deeper search starts only while the budget has this many times the
-/// positions that the last depth took. Fewer would not finish it.
-const GROWTH: u64 = 3;
-
 /// The shallowest full search in which the player to move may pass.
 const PASS_DEPTH: u8 = 2;
 /// How many half-moves shallower the reply to a pass is searched than the
@@ -90,7 +91,8 @@ const LOGARITHMS: [u16; 64] = [
 pub struct Settings {
     /// The deepest full search in half-moves, from 1 to [`MAX_DEPTH`].
     pub depth: u8,
-    /// The most positions the search looks at.
+    /// The most positions the search looks at. It looks at all of them
+    /// unless `depth` or a forced mate ends it sooner.
     pub nodes: u64,
     /// How many half-moves of captures are followed past the full search, up
     /// to [`MAX_QUIESCENCE`]. With zero, a player sees the reply to a move
@@ -155,10 +157,14 @@ pub struct Decision {
     /// The move the search would play if it claimed nothing. `action` plays
     /// it unless `action` is a claim.
     pub choice: Move,
-    /// What the search made of the best move, in centipawns for the player
-    /// to move, or `None` if no depth was finished.
+    /// The best value the search found, in centipawns for the player to
+    /// move, or `None` if it had not finished with any move. A search that
+    /// stopped partway through a depth gives the best of the moves that
+    /// depth got to, and the depth might have found better.
     pub score: Option<i32>,
-    /// The deepest full search that finished, in half-moves.
+    /// The deepest full search that finished, in half-moves. `choice` and
+    /// `score` come from the next depth if the search stopped partway
+    /// through it with a move searched.
     pub depth: u8,
     /// How many positions the search had looked at.
     pub nodes: u64,
@@ -190,13 +196,22 @@ struct RootMove {
     exact: bool,
 }
 
+/// What the search makes of the root moves it has searched at one depth.
+#[derive(Clone, Copy)]
+struct Chosen {
+    /// The move to play: one of those good enough, as the seed decides.
+    choice: Move,
+    /// The best value among the moves.
+    score: i32,
+    /// How many of them were good enough to choose between.
+    candidates: u16,
+}
+
 /// The outcome of a depth that was searched to the end.
 #[derive(Clone, Copy)]
 struct Finished {
     depth: u8,
-    score: i32,
-    candidates: u16,
-    choice: Move,
+    chosen: Chosen,
 }
 
 /// What the tests may switch off, to compare the search with a plain one
@@ -229,6 +244,9 @@ pub struct SearchJob {
     claim: Option<Action>,
     rules: Rules,
 
+    /// The legal moves of `root`. The first `index` have been searched at
+    /// `depth` and stand best first. The rest stand as the depth before left
+    /// them, which is the order they are searched in.
     root_moves: Vec<RootMove>,
     frames: Vec<Frame>,
     /// How many frames are in use.
@@ -250,8 +268,10 @@ pub struct SearchJob {
     /// Whether the root move is being searched only to see if it beats
     /// `floor`.
     probing: bool,
+    /// What the root move being searched is worth at least, once a search
+    /// has shown that it beats `floor` and while its value is worked out.
+    proved: Option<i32>,
     nodes: u64,
-    nodes_before_depth: u64,
     finished: Option<Finished>,
     decision: Option<Decision>,
 }
@@ -312,8 +332,8 @@ impl SearchJob {
             best: -INFINITY,
             floor: -INFINITY,
             probing: false,
+            proved: None,
             nodes: 0,
-            nodes_before_depth: 0,
             finished: None,
             decision: None,
         };
@@ -340,15 +360,14 @@ impl SearchJob {
     /// The decision the search would give if it stopped now. It is legal
     /// from the first, before any step.
     pub fn best_so_far(&self) -> Decision {
-        let (choice, score, depth, candidates) = match self.finished {
-            Some(finished) => (
-                finished.choice,
-                Some(finished.score),
-                finished.depth,
-                finished.candidates,
-            ),
-            None => (self.root_moves[0].mv, None, 0, 1),
+        // What the depth in hand has found outranks the depth before it,
+        // which searched the same moves less deeply.
+        let finished = self.finished.map(|finished| finished.chosen);
+        let (choice, score, candidates) = match self.chosen().or(finished) {
+            Some(chosen) => (chosen.choice, Some(chosen.score), chosen.candidates),
+            None => (self.root_moves[0].mv, None, 1),
         };
+        let depth = self.finished.map_or(0, |finished| finished.depth);
         let action = match (self.claim, score) {
             // A draw in hand is worth more than a move that is no better
             // than one.
@@ -419,6 +438,35 @@ impl SearchJob {
         self.decision = Some(self.best_so_far());
     }
 
+    /// The choice among the root moves searched so far at the depth in hand,
+    /// or `None` if none has been.
+    fn chosen(&self) -> Option<Chosen> {
+        if let Some(at_least) = self.proved {
+            // The move in hand is good enough whatever its value turns out
+            // to be, and it may be better than all the others. They can no
+            // longer be told from it, so it is the one to play.
+            return Some(Chosen {
+                choice: self.root_moves[self.index].mv,
+                score: self.best.max(at_least),
+                candidates: 1,
+            });
+        }
+        let searched = &self.root_moves[..self.index];
+        let best = searched.first()?.score;
+        let enough = self.margin_below(best);
+        let candidates = searched
+            .iter()
+            .take_while(|entry| entry.exact && entry.score >= enough)
+            .count()
+            .max(1);
+        let pick = mix(self.seed ^ self.root.hash()) % candidates as u64;
+        Some(Chosen {
+            choice: searched[pick as usize].mv,
+            score: best,
+            candidates: candidates as u16,
+        })
+    }
+
     /// What a root move must beat: within the margin of the best so far.
     /// Close to a forced mate there is no margin, so the quickest is chosen.
     fn margin_below(&self, best: i32) -> i32 {
@@ -465,9 +513,11 @@ impl SearchJob {
         if self.probing && score > self.floor {
             // It is among the best: search it again for its value.
             self.probing = false;
+            self.proved = Some(score);
             self.push_root_move();
             return;
         }
+        self.proved = None;
         let exact = !self.probing && score > self.floor;
         let entry = &mut self.root_moves[self.index];
         entry.score = score;
@@ -475,6 +525,10 @@ impl SearchJob {
         if exact && score > self.best {
             self.best = score;
         }
+        // The moves searched at this depth stand best first, and of two with
+        // the same score the one searched earlier.
+        let ahead = self.root_moves[..self.index].partition_point(|other| other.score >= score);
+        self.root_moves[ahead..=self.index].rotate_right(1);
 
         self.index += 1;
         if self.index < self.root_moves.len() {
@@ -485,36 +539,24 @@ impl SearchJob {
     }
 
     fn finish_depth(&mut self) {
-        // The sort keeps the earlier order among equal scores.
-        self.root_moves.sort_by_key(|entry| Reverse(entry.score));
-        let best = self.root_moves[0].score;
-        let enough = self.margin_below(best);
-        let candidates = self
-            .root_moves
-            .iter()
-            .take_while(|entry| entry.exact && entry.score >= enough)
-            .count()
-            .max(1);
-        let pick = mix(self.seed ^ self.root.hash()) % candidates as u64;
+        let chosen = self.chosen().expect("every move has been searched");
         self.finished = Some(Finished {
             depth: self.depth,
-            score: best,
-            candidates: candidates as u16,
-            choice: self.root_moves[pick as usize].mv,
+            chosen,
         });
 
-        let spent = self.nodes - self.nodes_before_depth;
-        let left = self.settings.nodes - self.nodes;
+        let best = chosen.score;
         // A mate inside the full search cannot be bettered by a deeper one.
         let settled = best.abs() >= MATE_BOUND && MATE - best.abs() <= i32::from(self.depth);
-        if self.depth >= self.settings.depth || settled || left / GROWTH < spent {
+        if self.depth >= self.settings.depth || settled {
             self.conclude();
             return;
         }
+        // The next depth is begun whatever is left of the budget. If it is
+        // not finished, the moves it got to still count.
         self.depth += 1;
         self.index = 0;
         self.best = -INFINITY;
-        self.nodes_before_depth = self.nodes;
         self.begin_root_move();
     }
 

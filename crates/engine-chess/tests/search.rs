@@ -439,7 +439,6 @@ fn a_position_full_of_captures_stays_within_every_limit() {
     job.run(u64::MAX);
     let decision = *job.decision().unwrap();
     assert_eq!((decision.nodes, decision.depth), (few.nodes, 0));
-    assert_eq!(decision.score, None);
     let mut after = game.clone();
     assert!(
         after

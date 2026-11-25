@@ -527,7 +527,7 @@ fn the_table_saves_work() {
 }
 
 #[test]
-fn a_depth_is_started_only_with_the_budget_to_finish_it() {
+fn a_search_goes_on_until_its_positions_are_spent() {
     for fen in [START, KIWIPETE, TACTICS, ROOK_ENDGAME] {
         let game = game(fen, "");
         let settings = Settings {
@@ -535,21 +535,118 @@ fn a_depth_is_started_only_with_the_budget_to_finish_it() {
             ..Level::Normal.settings()
         };
         let mut job = SearchJob::new(&game, settings, 0).unwrap();
-        let mut started_at = 0;
-        let mut depths = 0;
-        while !job.is_finished() {
-            let depth = job.depth;
-            job.step();
-            if job.depth != depth {
-                let spent = job.nodes - started_at;
-                let left = settings.nodes - job.nodes;
-                assert!(left >= GROWTH * spent, "{fen}: depth {} started", job.depth);
-                started_at = job.nodes;
-                depths += 1;
+        job.run(u64::MAX);
+        let decision = job.decision().unwrap();
+        assert_eq!(decision.nodes, settings.nodes, "{fen}");
+        assert!(decision.depth >= 2, "{fen}: several depths were searched");
+        // The depth after the last one finished was begun and left off.
+        assert_eq!(job.depth, decision.depth + 1, "{fen}");
+    }
+}
+
+/// Checks the decision of a search stopped where `job` stands against the
+/// plain search: it is made from the moves searched so far at the depth in
+/// hand, or from the depth before if there are none yet.
+fn assert_answers_from_what_it_searched(job: &SearchJob, expected: &mut Expected, context: &str) {
+    let decision = job.best_so_far();
+    let finished = job.finished.map_or(0, |finished| finished.depth);
+    assert_eq!(decision.depth, finished, "{context}");
+
+    let in_hand: Vec<Move> = job.root_moves[..job.index]
+        .iter()
+        .map(|entry| entry.mv)
+        .collect();
+    let (depth, searched) = if !in_hand.is_empty() {
+        (job.depth, in_hand)
+    } else if finished > 0 {
+        let all = job.root_moves.iter().map(|entry| entry.mv).collect();
+        (finished, all)
+    } else {
+        // Nothing has been searched: the move is the first to be tried.
+        assert_eq!(decision.score, None, "{context}");
+        assert_eq!(decision.choice, job.root_moves[0].mv, "{context}");
+        return;
+    };
+    let context = format!("{context}, {} moves into depth {depth}", searched.len());
+    let value = |expected: &mut Expected, mv: Move| {
+        let values = expected.at(depth);
+        values.iter().find(|&&(other, _)| other == mv).unwrap().1
+    };
+    let values: Vec<i32> = searched.iter().map(|&mv| value(expected, mv)).collect();
+    let best = *values.iter().max().unwrap();
+    let margin = if best.abs() >= MATE_BOUND {
+        0
+    } else {
+        i32::from(job.settings.margin)
+    };
+
+    if let Some(at_least) = job.proved {
+        // The move in hand has been shown good enough, and its value is
+        // still being worked out.
+        let mv = job.root_moves[job.index].mv;
+        let value = value(expected, mv);
+        assert!(value >= best - margin, "{context}: {mv} is worth {value}");
+        assert!(
+            (best - margin..=value).contains(&at_least),
+            "{context}: {mv} is worth {value}, not at least {at_least}"
+        );
+        assert_eq!(decision.choice, mv, "{context}");
+        assert_eq!(decision.score, Some(best.max(at_least)), "{context}");
+        assert_eq!(decision.candidates, 1, "{context}");
+        return;
+    }
+    assert_eq!(decision.score, Some(best), "{context}: the best value");
+    let good_enough = values.iter().filter(|&&value| value >= best - margin);
+    assert_eq!(
+        usize::from(decision.candidates),
+        good_enough.count(),
+        "{context}: the moves to choose between"
+    );
+    let chosen = searched.iter().position(|&mv| mv == decision.choice);
+    let chosen = chosen.unwrap_or_else(|| panic!("{context}: {} chosen", decision.choice));
+    assert!(
+        values[chosen] >= best - margin,
+        "{context}: the chosen move"
+    );
+}
+
+#[test]
+fn a_search_stopped_after_any_step_answers_from_the_moves_it_has_searched() {
+    let (mut partway, mut proved) = (0, 0);
+    for (name, fen, played, depth, quiescence) in CASES {
+        let game = game(fen, played);
+        let mut expected = Expected::new(name, &game, quiescence, WITHOUT_TABLE);
+        for margin in [0, 40] {
+            let settings = settings(depth, quiescence, 0, margin);
+            let mut job = SearchJob::new(&game, settings, 5).unwrap();
+            job.rules = WITHOUT_TABLE;
+            let mut last = None;
+            loop {
+                // The answer can change only when the search has got
+                // further with the moves of the root.
+                let stands = (job.depth, job.index, job.proved, job.best_so_far().choice);
+                if last != Some(stands) {
+                    let context = format!("{name}, margin {margin}, {} steps", job.nodes);
+                    assert_answers_from_what_it_searched(&job, &mut expected, &context);
+                    let unfinished = job
+                        .finished
+                        .is_none_or(|finished| finished.depth < job.depth);
+                    partway += u32::from(unfinished && job.index > 0);
+                    proved += u32::from(job.proved.is_some());
+                    last = Some(stands);
+                }
+                if job.is_finished() {
+                    break;
+                }
+                job.step();
             }
         }
-        assert!(depths >= 2, "{fen}: several depths were searched");
     }
+    assert!(partway > 500, "only {partway} answers from a depth in hand");
+    assert!(
+        proved > 50,
+        "only {proved} from a move with its value unfinished"
+    );
 }
 
 #[test]
