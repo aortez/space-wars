@@ -19,7 +19,8 @@ in the pure crate. `engine_rapier::world::weapon` flies real shots and beams
 [Material Lab](material-lab.md#shell-through-moss) fires one shell through moss
 into a plate, and [Scorched](#scorched-tanks) charges its tanks' armor from
 shells it sweeps itself. [Spacewars](#spacewars-bodies) keeps a region over the
-health of each body a weapon can harm, and can fly its cannon shells as shots.
+health of each body a weapon can harm, flies its cannon shells as shots and
+fires its lasers as beams.
 
 ## Deliveries
 

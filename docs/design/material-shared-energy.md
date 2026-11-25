@@ -228,9 +228,14 @@ ordinary-physics fallback.
 General footprint aggregation, pulse-allocation calibration and admission of
 friction, joints, CCD arrivals, penetration correction and external work remain open.
 
-Patch geometry/admission, sustained and connection loads, other external work,
-soft queries and failure consequences remain unfinished #327/#328 work. This
-experiment is not completion of either issue.
+Patch geometry and admission, sustained and connection loads, the work of
+moving bodies, soft queries and failure consequences came later, in
+[contact charges](material-contact-charges.md),
+[connection loads](material-connection-loads.md),
+[nonblocking recipients](material-sources.md#grass-and-other-nonblocking-recipients),
+and #328's [support failure](material-support-failure.md) and
+[region split](material-region-split.md). This experiment completed neither
+#327 nor #328.
 
 ```sh
 cargo test -p engine-material --lib shared_impact

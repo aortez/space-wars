@@ -167,9 +167,11 @@ and count rejected/observed batches. A rejected observation cannot imply that
 all contacts separated: cached episodes retain their previous state.
 
 This is an observation admission policy. It makes missing data explicit; it
-does not define what gameplay should do if a future damaging event cannot be
-admitted. Material/consequence admission must resolve that policy before a
-production damage migration. The current module creates no lethal consequences.
+does not define what gameplay should do if a damaging event cannot be
+admitted. Both games' hosts leave a refused batch's impacts unpriced and count
+the refusal, and neither comes near the bounds
+([game worlds](material-contact-charges.md#game-worlds)). Capture itself
+creates no lethal consequences.
 
 ## Persistence
 
@@ -229,5 +231,8 @@ The pulse split is an explicit approximation that still needs calibration.
 [Contact charges](material-contact-charges.md) price each new impact after the
 step from these records, in any world whose capture admits speculative
 arrivals, and leave the physics unchanged.
-Sustained/connection loads, attributable external work, nonblocking soft queries
-and gameplay consequences remain separate unfinished parts of #327/#328.
+They price steady supports too. Welds are
+[connection loads](material-connection-loads.md), nonblocking recipients such
+as grass are [weapon sources'](material-sources.md#grass-and-other-nonblocking-recipients),
+and each host owns its gameplay consequences, as the
+[guide](material-guide.md) describes.

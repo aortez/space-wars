@@ -102,7 +102,9 @@ bounds. Its identities are fixed fixture IDs, its episode latch is for one
 planar body pair, and its contact admission requires touching faces. It is not
 used by scenarios and does not expose raw Rapier types to a new engine API.
 
-Before completing #327, implement and test:
+When this experiment ran, #327 still needed the following. The later documents
+deliver them, and the [guide](material-guide.md#limits) lists what remains,
+such as joints left out of the budget:
 
 - A backend-private conversion to canonical engine records, with stable
   source/region/episode identities across split, merge, retirement and handle

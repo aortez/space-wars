@@ -1987,9 +1987,10 @@ rebuilt, how far it has got, the fight's first result, whether the winner
 fired at the dirt and how long the sudden death has lasted (`rebuild`),
 conversion accounting and any settling failure in `tanks`.
 Values with a `_milli` suffix use thousandths of their inspection
-unit (positions, area and mass use host units). The common damage-material migration
-and damage to resident plants remain follow-up work: this integration uses Scorched's current tank HP rule and does
-not yet route the exposed impact notifications into plant tissue. Contact-driven
+unit (positions, area and mass use host units). The tanks' armor takes shells
+and contacts through the shared material model, as Scorched's does. Damage to
+resident plants remains follow-up work (#297): the exposed impact notifications
+don't yet reach plant tissue. Contact-driven
 bank fracture is disabled in Clock's arena; blast destruction and weak-bank
 collapse remain active.
 

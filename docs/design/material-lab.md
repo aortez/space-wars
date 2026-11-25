@@ -469,4 +469,4 @@ cases keep their refusal on exhaustion. The split case's fragment is cut by the
 lab, not by a failure, and the branch case's severing removes only its weld.
 The shell case's shell stops at its first hard contact, and its blast meets the
 plate as four circles the lab admits. A moving rigid platen over one material,
-and debris after failure, remain later Lab slices. #327 remains open.
+and debris after failure, remain later Lab slices.

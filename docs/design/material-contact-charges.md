@@ -246,7 +246,10 @@ owner's workstation in
 `/home/data2/space-wars3-artifacts/contact-charges-probe-20261122`. Their
 rerun on the final code, in
 `/home/data2/space-wars3-artifacts/support-loads-review-probe-20261122`, gave
-the Scorched figures with patches and the severe contacts.
+the Scorched figures with patches and the severe contacts. The probes came
+before the games' hosts below, which bind fewer bodies and set their own
+surfaces. Scorched's host gives a hull a radius of 0.5 where the probe gave
+0.2, and binds no loose dirt.
 
 **Scorched.**
 - **Setup:** #331's contact probe from 2026-11-15 was rerun with charges beside
@@ -292,8 +295,8 @@ games ran.
   solver's restarted pass, 4 failed to converge.
 - Other jobs were loading the workstation, and one repeat ran a third slow
   throughout. In the steadier repeats capture cost 1 to 4% of a 1.2 ms step,
-  and charges cost 3 to 6 µs a step. Capture's cost needs measuring on the Pi
-  before adoption.
+  and charges cost 3 to 6 µs a step. Each host's section below gives
+  capture's cost on the Pi.
 
 **Supports.** The same probes then priced supports. The first draft's records
 are in `/home/data2/space-wars3-artifacts/support-loads-probe-20261122`, and
