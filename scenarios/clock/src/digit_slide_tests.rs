@@ -157,7 +157,19 @@ fn off_disabled_and_busy_events_skip_transitions_without_a_backlog() {
         tick(&mut state, Some(to));
         assert_eq!(state.event_kind(), Some(kind));
         assert_eq!(state.event_id(), 1);
-        for _ in 1..EVENT_CATALOG[kind as usize].duration_ticks + COOLDOWN_TICKS {
+        // The event ends within its bound, and the cooldown after it passes
+        // with no slide left over. Waiting out the whole bound could reach
+        // the next event the profile brings.
+        let mut ticks = 1;
+        while state.event_kind().is_some() {
+            assert!(
+                ticks < EVENT_CATALOG[kind as usize].duration_ticks,
+                "{kind:?}"
+            );
+            tick(&mut state, None);
+            ticks += 1;
+        }
+        for _ in 0..COOLDOWN_TICKS {
             tick(&mut state, None);
         }
         assert_eq!(state.event_kind(), None);

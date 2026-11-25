@@ -79,6 +79,17 @@ pub(crate) fn armor() -> Region {
     Region::new(ARMOR, ARMOR_VOLUME).expect("the armor's volume is in the law's range")
 }
 
+/// A tank's armor with `health` left on the 0 to 100 scale.
+pub(crate) fn armor_left(health: f32) -> Region {
+    let capacity = f64::from(armor().capacity());
+    Region::with_remaining(
+        ARMOR,
+        ARMOR_VOLUME,
+        (capacity * f64::from(health) / 100.0).clamp(0.0, capacity),
+    )
+    .expect("the armor's volume is in the law's range")
+}
+
 /// A shell's source: its mass leaving the barrel at `speed`, and its payload.
 /// `owner` is the firing tank's entity, which the source keeps after the tank
 /// is gone. A speed the law refuses, such as a non-finite one, leaves the

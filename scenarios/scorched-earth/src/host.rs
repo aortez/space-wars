@@ -213,6 +213,8 @@ pub struct TankState {
     pub health: f32,
     pub present: bool,
     pub supported: bool,
+    /// The shells it has fired, rebuilt or not.
+    pub shots: u64,
 }
 
 /// A sprung tank's running gear in host units, for presentation.
@@ -611,6 +613,7 @@ impl HostedDuel {
                 supported: !self.retired
                     && self.duel.retired[slot].is_none()
                     && self.duel.has_track_support(world, slot),
+                shots: tank.shots,
             }
         })
     }
@@ -659,6 +662,58 @@ impl HostedDuel {
             self.duel.tanks[slot].health = 0.0;
             world.remove_entity(body.entity);
         }
+        Ok(())
+    }
+
+    /// Puts a retired tank back in the duel, as a host's own choreography may
+    /// once the duel is over: the same tank in the same entity, upright and
+    /// at rest with its hull at `position` in the world, and with `health` of
+    /// its armor left on the 0 to 100 scale. Its CPU starts afresh, facing
+    /// its opponent, and may fire as soon as it is ready. The duel fights
+    /// again once the host lets it fire.
+    pub fn rebuild_tank(
+        &mut self,
+        world: &mut PhysicsWorld,
+        slot: usize,
+        position: Vec2,
+        health: f32,
+    ) -> Result<(), HostError> {
+        if slot >= 2
+            || !(health > 0.0 && health <= 100.0)
+            || !(position.x.is_finite() && position.y.is_finite())
+        {
+            return Err(HostError::Configuration);
+        }
+        if self.retired {
+            return Err(HostError::Retired);
+        }
+        if self.prepared {
+            return Err(HostError::StepOrder);
+        }
+        let duel = &mut self.duel;
+        if duel.retired[slot].is_none() {
+            return Err(HostError::Configuration);
+        }
+        let at = duel.placement.point_from_world(position);
+        let (body, gear) = Duel::insert_tank(world, duel.config, &duel.placement, slot, at);
+        let opponent = duel
+            .motion(world, duel.tanks[1 - slot].body)
+            .expect("the opponent, present or retired")
+            .position;
+        let armor = armor::armor_left(health);
+        let tank = &mut duel.tanks[slot];
+        tank.body = body;
+        tank.elevation = 50.0_f32.to_radians();
+        tank.speed = 32.0;
+        tank.facing = if opponent.x >= at.x { 1.0 } else { -1.0 };
+        tank.health = armor.normalized_health();
+        tank.armor = armor;
+        tank.next_shot = duel.tick;
+        duel.running_gear[slot] = gear;
+        duel.retired[slot] = None;
+        duel.bots[slot] = Default::default();
+        duel.driving[slot] = driving::TankDrive::new(at);
+        self.sync_gravity(world);
         Ok(())
     }
 

@@ -65,6 +65,37 @@ pub enum Shape {
     Hull { corners: [Vec2; 4] },
 }
 
+/// What a piece was in its tank: the turret, a wheel, from the left, or a
+/// piece of the hull, numbered from the left of however many there are.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Part {
+    Turret,
+    Wheel(usize),
+    Hull { index: usize, of: usize },
+}
+
+/// The dirt a piece of a tank turns into: its cells' first ID, which the
+/// others follow, and their columns and rows, from the piece's lower left.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Share {
+    pub slot: usize,
+    pub part: Part,
+    pub first_id: u64,
+    pub dirt: [usize; 2],
+}
+
+impl Share {
+    /// The cells of dirt it is.
+    pub fn cells(&self) -> usize {
+        self.dirt[0] * self.dirt[1]
+    }
+
+    /// Whether the cell with `id` is one of its cells.
+    pub fn holds(&self, id: u64) -> bool {
+        (self.first_id..self.first_id + self.cells() as u64).contains(&id)
+    }
+}
+
 /// One piece of a blown-up tank.
 #[derive(Clone, Debug)]
 pub struct Piece {
@@ -119,6 +150,9 @@ pub struct Loser {
 pub struct Wreck {
     pub blasts: Vec<Blast>,
     pub pieces: Vec<Piece>,
+    /// The dirt of each tank's last blow-up, piece by piece, but for the
+    /// pieces that left the view.
+    pub shares: Vec<Share>,
     pub puffs: Vec<Puff>,
     /// Host units per duel unit.
     scale: f32,
@@ -132,6 +166,7 @@ impl Wreck {
         Self {
             blasts: Vec::new(),
             pieces: Vec::new(),
+            shares: Vec::new(),
             puffs: Vec::new(),
             scale,
             grain,
@@ -146,11 +181,24 @@ impl Wreck {
     pub fn heat(&self, slot: usize, tick: u64) -> f32 {
         self.blasts
             .iter()
-            .find(|blast| blast.slot == slot)
+            .rfind(|blast| blast.slot == slot)
             .map_or(0.0, |blast| {
                 1.0 - (tick - blast.tick) as f32 / BURN_TICKS as f32
             })
             .clamp(0.0, 1.0)
+    }
+
+    /// Whether the tank in `slot` has blown up and every piece of it has
+    /// turned to dirt, with none of them lost out of view.
+    pub fn all_dirt(&self, slot: usize) -> bool {
+        !self.pieces.iter().any(|piece| piece.slot == slot)
+            && self
+                .shares
+                .iter()
+                .filter(|share| share.slot == slot)
+                .map(Share::cells)
+                .sum::<usize>()
+                == DIRT_PER_TANK
     }
 
     /// Blows `loser` apart, retired from the duel just now, at the event's
@@ -181,6 +229,7 @@ impl Wreck {
             tick,
             pattern: self.rng.random(),
         });
+        self.shares.retain(|share| share.slot != slot);
         let mut index = 0;
         let start = ids.start;
 
@@ -205,7 +254,8 @@ impl Wreck {
             linear_velocity: launch,
             angular_velocity: spin,
         };
-        self.insert(world, slot, &mut index, shape, motion, [2, 2], ids);
+        let piece = (Part::Turret, shape, motion, [2, 2]);
+        self.insert(world, slot, &mut index, piece, ids);
 
         // Each wheel, off its spring, away to its own side.
         for (side, wheel) in gear.wheels.into_iter().enumerate() {
@@ -222,7 +272,8 @@ impl Wreck {
             let shape = Shape::Wheel {
                 radius: gear.wheel_radius,
             };
-            self.insert(world, slot, &mut index, shape, motion, [2, 2], ids);
+            let piece = (Part::Wheel(side), shape, motion, [2, 2]);
+            self.insert(world, slot, &mut index, piece, ids);
         }
 
         // The hull, torn across in two or three, each cut slanted and none
@@ -239,7 +290,7 @@ impl Wreck {
         }
         edges.push([half.x; 2]);
         let dirt = if count == 2 { [3, 2] } else { [2, 2] };
-        for pair in edges.windows(2) {
+        for (cut, pair) in edges.windows(2).enumerate() {
             let [left, right] = [pair[0], pair[1]];
             let corners = [
                 Vec2::new(left[0], -half.y),
@@ -263,46 +314,48 @@ impl Wreck {
             let shape = Shape::Hull {
                 corners: corners.map(|corner| corner - middle),
             };
-            self.insert(world, slot, &mut index, shape, motion, dirt, ids);
+            let part = Part::Hull {
+                index: cut,
+                of: count,
+            };
+            self.insert(world, slot, &mut index, (part, shape, motion, dirt), ids);
         }
         debug_assert_eq!(ids.start - start, DIRT_PER_TANK as u64);
     }
 
     /// Adds the piece of the tank in `slot` numbered `index`, then numbers the
-    /// next.
-    #[allow(clippy::too_many_arguments)]
+    /// next: what it was, its shape, how it flies off and the dirt it turns
+    /// into.
     fn insert(
         &mut self,
         world: &mut PhysicsWorld,
         slot: usize,
         index: &mut usize,
-        shape: Shape,
-        motion: BodyMotion,
-        dirt: [usize; 2],
+        (part, shape, motion, dirt): (Part, Shape, BodyMotion, [usize; 2]),
         ids: &mut std::ops::Range<u64>,
     ) {
         let entity = PhysicsId::new(
             canonical::TANKS_PIECES.start + (slot * PIECES_PER_TANK + *index) as u64,
         );
         *index += 1;
-        let part = |part| ColliderId::new(entity, ColliderRole::PRIMARY, part);
+        let collider = |index| ColliderId::new(entity, ColliderRole::PRIMARY, index);
         let mut colliders = match &shape {
             Shape::Turret {
                 radius,
                 barrel,
                 width,
             } => {
-                let mut tube = ColliderSpec::cuboid(part(1), barrel * 0.5, width * 0.5);
+                let mut tube = ColliderSpec::cuboid(collider(1), barrel * 0.5, width * 0.5);
                 tube.local_position = Vec2::new(barrel * 0.5, 0.0);
-                vec![ColliderSpec::ball(part(0), *radius), tube]
+                vec![ColliderSpec::ball(collider(0), *radius), tube]
             }
             Shape::Wheel { radius } => {
-                let mut tire = ColliderSpec::ball(part(0), *radius);
+                let mut tire = ColliderSpec::ball(collider(0), *radius);
                 tire.restitution = 0.3;
                 vec![tire]
             }
             Shape::Hull { corners } => {
-                vec![ColliderSpec::convex_polygon(part(0), corners.to_vec())]
+                vec![ColliderSpec::convex_polygon(collider(0), corners.to_vec())]
             }
         };
         for collider in &mut colliders {
@@ -340,6 +393,12 @@ impl Wreck {
             first_id: ids.start,
             still: 0,
         };
+        self.shares.push(Share {
+            slot,
+            part,
+            first_id: ids.start,
+            dirt,
+        });
         ids.start += piece.cells() as u64;
         assert!(ids.start <= ids.end, "reserved dirt conversion");
         self.pieces.push(piece);
@@ -364,6 +423,7 @@ impl Wreck {
                 || motion.position.x.abs() > layout.bounds_max.x
             {
                 world.remove_entity(piece.body.entity);
+                self.shares.retain(|share| share.first_id != piece.first_id);
                 continue;
             }
             let age = tick - self.blast(piece.slot).tick;
@@ -393,7 +453,7 @@ impl Wreck {
         *self
             .blasts
             .iter()
-            .find(|blast| blast.slot == slot)
+            .rfind(|blast| blast.slot == slot)
             .expect("a piece's blast")
     }
 

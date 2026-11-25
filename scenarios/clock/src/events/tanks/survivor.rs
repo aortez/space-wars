@@ -65,6 +65,12 @@ pub const AFTERMATH_TICKS: u64 = 8 * FIXED_HZ as u64;
 /// The longest the aftermath lasts: as long as the winner's parting shot may
 /// take to fly and land, and the spaceling to get up and flee.
 pub const PARTING_TICKS: u64 = 10 * FIXED_HZ as u64;
+/// The longest the aftermath waits for a spaceling to run to its tank's
+/// dirt, see it crawl back into the tank and climb in.
+pub const REBUILD_BY_TICKS: u64 = 12 * FIXED_HZ as u64;
+/// How long a spaceling takes to climb into its rebuilt tank, up its side,
+/// over the hull and down through the turret's hatch.
+pub const BOARD_TICKS: u64 = 4 * FIXED_HZ as u64 / 5;
 /// Clock's spaceling beside the physics crate's 1.8-unit one: about 1 of the
 /// duel's units, a third of a tank's height from the bottom of its wheels to
 /// the top of its turret.
@@ -210,12 +216,16 @@ const JET_TRAIL_TICKS: u64 = 3;
 const DT: f32 = 1.0 / FIXED_HZ as f32;
 
 /// The endings in the order a roll picks among them: the rescue beam, which
-/// always fits, then those that need a winner in view.
-const ENDINGS: [Ending; 4] = [
+/// always fits, then those that need a winner in view. The rebuild needs all
+/// of the loser's dirt in view as well, which a loser that blows up mostly
+/// leaves there. Its spaceling learns whether it does only once the dirt
+/// lies still, and waves for the rescue beam if some was lost.
+const ENDINGS: [Ending; 5] = [
     Ending::RescueBeam,
     Ending::Stowaway,
     Ending::Surrender,
     Ending::PartingShot,
+    Ending::Rebuild,
 ];
 
 /// Clock's spaceling: the physics crate's, shrunk by [`PILOT_SCALE`], at
@@ -444,12 +454,14 @@ fn in_time(gap: f32, scale: f32, tick: u64, deadline: u64, spare: u64) -> bool {
 /// Where a stowaway is `ticks` into its climb onto the winner, along its
 /// `path` in the frame of the winner's hull: from where it set out, up the
 /// hull's side to the edge of its roof, over the turret if it must, and onto
-/// the roof behind the turret.
-fn climbing(path: [Vec2; 4], ticks: u64) -> Vec2 {
+/// the roof behind the turret. A spaceling climbing into its rebuilt tank
+/// climbs up its side, onto the turret and down through the hatch. The climb
+/// takes `duration`.
+fn climbing(path: [Vec2; 4], ticks: u64, duration: u64) -> Vec2 {
     let ease = |u: f32| u * u * (3.0 - 2.0 * u);
     let lengths = [0, 1, 2].map(|leg| path[leg].distance_to(path[leg + 1]));
     let total: f32 = lengths.iter().sum();
-    let mut along = ease((ticks as f32 / CLIMB_TICKS as f32).min(1.0)) * total;
+    let mut along = ease((ticks as f32 / duration as f32).min(1.0)) * total;
     for (leg, length) in lengths.into_iter().enumerate() {
         if along <= length && length > 0.0 {
             return path[leg] + (path[leg + 1] - path[leg]) * (along / length);
@@ -609,8 +621,21 @@ fn sky_clear(
     true
 }
 
+/// For a spaceling rebuilding its tank: where it stands beside the tank's
+/// dirt, across, and where the rebuilt tank's hull will stand, and once the
+/// dirt has set off, when the last cell is home.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Pile {
+    pub stand: f32,
+    pub hull: Vec2,
+    pub done: Option<u64>,
+    /// Whether the winner saw the spaceling set off back to its dirt, and
+    /// has yet to turn on it.
+    pub watched: bool,
+}
+
 /// The winner's parting shot at a spaceling, and how the spaceling dodges
-/// it.
+/// it, or its shot at a rebuilding tank's dirt.
 pub struct Shot {
     /// The winner's aim at where the spaceling stood.
     pub aim: Aim,
@@ -671,11 +696,18 @@ pub struct Survivor {
     /// and how high it lifts it on the way.
     pub taken: Option<(BodyMotion, Vec2, f32)>,
     /// For a stowaway: its climb onto the winner's roof, in the frame of the
-    /// winner's hull, from where it climbs on to where it rides.
+    /// winner's hull, from where it climbs on to where it rides. For a
+    /// spaceling climbing into its rebuilt tank: its climb in, in the frame
+    /// of that tank's hull.
     pub climb: Option<[Vec2; 4]>,
     /// For a spaceling the winner takes its parting shot at: the shot, from
-    /// the winner's aim to where its shell burst.
+    /// the winner's aim to where its shell burst. For one rebuilding its
+    /// tank: the winner's shot at the dirt.
     pub shot: Option<Shot>,
+    /// For a spaceling rebuilding its tank: where, and how far it has gone,
+    /// and once the tank is whole, its hull.
+    pub pile: Option<Pile>,
+    pub tank: Option<BodyId>,
     /// For a spaceling rising out of view on its jetpack: where it took off.
     pub hop: Option<BodyMotion>,
     /// Whether it has stood up since it got out.
@@ -733,6 +765,38 @@ impl Survivor {
         self.headway = (tick, x);
     }
 
+    /// Runs on at `tick` to stand beside its tank's dirt, or stands there
+    /// already, facing where the tank will stand.
+    fn return_to_pile(&mut self, scale: f32, tick: u64) {
+        let pile = self.pile.expect("dirt to return to");
+        let at = self.position.x;
+        if (pile.stand - at).abs() <= REACH * scale {
+            self.walk(scale);
+            self.facing = (pile.hull.x - at).signum();
+            self.enter(Phase::Rebuilding, tick);
+        } else {
+            self.facing = (pile.stand - at).signum();
+            self.run(scale, at, tick);
+            self.enter(Phase::Returning, tick);
+        }
+    }
+
+    /// How far it has sunk from view through its rebuilt tank's hatch, from
+    /// not at all to gone, at `tick`: over the last leg of its climb in.
+    pub fn boarded(&self, tick: u64) -> f32 {
+        match (self.phase, self.climb) {
+            (Phase::Boarding, Some(path)) => {
+                let lengths = [0, 1, 2].map(|leg| path[leg].distance_to(path[leg + 1]));
+                let total: f32 = lengths.iter().sum();
+                let u = (tick.saturating_sub(self.since) as f32 / BOARD_TICKS as f32).min(1.0);
+                let along = u * u * (3.0 - 2.0 * u) * total;
+                ((along - lengths[0] - lengths[1]) / lengths[2].max(f32::EPSILON)).clamp(0.0, 1.0)
+            }
+            (Phase::Aboard, _) => 1.0,
+            _ => 0.0,
+        }
+    }
+
     /// Whether it has made no headway for `ticks`, having moved on from `x`
     /// at `tick`.
     fn stuck(&mut self, scale: f32, x: f32, tick: u64, ticks: u64) -> bool {
@@ -785,6 +849,8 @@ pub struct Survivors {
     pub rolls: [Option<Ejection>; 2],
     /// Each side's roll for its spaceling's ending.
     pub ending_rolls: [f64; 2],
+    /// Whether the winner sees a spaceling go back to its tank's dirt.
+    pub watched: bool,
     pub out: Vec<Survivor>,
     /// The smoke the pods left behind them as they flew.
     pub puffs: Vec<Puff>,
@@ -803,6 +869,7 @@ impl Survivors {
         Self {
             rolls: rolls(seed),
             ending_rolls: ending_rolls(seed),
+            watched: rebuild::watched(seed),
             out: Vec::new(),
             puffs: Vec::new(),
             scale,
@@ -859,6 +926,8 @@ impl Survivors {
             taken: None,
             climb: None,
             shot: None,
+            pile: None,
+            tank: None,
             hop: None,
             stood_up: false,
             ran: false,
@@ -1027,12 +1096,25 @@ impl Survivors {
                     }
                     continue;
                 }
+                Phase::Boarding => {
+                    if let (Some(tank), Some(climb)) = (survivor.tank, survivor.climb)
+                        && let Some(hull) = world.motion(tank)
+                    {
+                        let local = climbing(climb, ticks, BOARD_TICKS);
+                        world.set_next_kinematic_pose(
+                            spaceling.body(),
+                            hull.position + local.rotate_radians(hull.angle),
+                            hull.angle,
+                        );
+                    }
+                    continue;
+                }
                 Phase::Climbing | Phase::Riding => {
                     if let (Some(winner), Some(climb)) = (winner, survivor.climb) {
                         let local = if survivor.phase == Phase::Riding {
                             climb[3]
                         } else {
-                            climbing(climb, ticks)
+                            climbing(climb, ticks, CLIMB_TICKS)
                         };
                         world.set_next_kinematic_pose(
                             spaceling.body(),
@@ -1081,8 +1163,9 @@ impl Survivors {
             let mut hopping = false;
             let at = snapshot.motion.position;
             // Which way a runner runs, how fast, and how far it has to go: a
-            // stowaway to the winner, slowing as it comes up to it, and one
-            // dodging or fleeing a parting shot as fast as it can.
+            // stowaway to the winner, and one rebuilding its tank to its
+            // dirt, slowing as it comes up to it, and one dodging or fleeing
+            // a parting shot as fast as it can.
             let run = match (survivor.phase, &survivor.shot) {
                 (Phase::Running, _) => winner.map(|winner| {
                     let gap = winner.gap(at.x);
@@ -1090,6 +1173,14 @@ impl Survivors {
                         (winner.hull.position.x - at.x).signum(),
                         (gap / (SLOWING * scale)).clamp(0.3, 1.0),
                         gap - REACH * scale,
+                    )
+                }),
+                (Phase::Returning, _) => survivor.pile.map(|pile| {
+                    let gap = (pile.stand - at.x).abs();
+                    (
+                        (pile.stand - at.x).signum(),
+                        (gap / (SLOWING * scale)).clamp(0.3, 1.0),
+                        gap,
                     )
                 }),
                 (Phase::Dodging, Some(shot)) => {
@@ -1134,6 +1225,30 @@ impl Survivors {
         }
     }
 
+    /// Notes where and when each shell the winner fired at a survivor or its
+    /// dirt landed, once it has, after the `duel`'s step at `tick`, whatever
+    /// the spaceling is doing and whatever the event's phase. One still
+    /// dodging stops where it is, and it takes the blast at a walk.
+    pub fn land(&mut self, duel: &HostedDuel, tick: u64) {
+        let scale = self.scale;
+        for survivor in &mut self.out {
+            if let Some(shot) = &mut survivor.shot
+                && let Some((source, _)) = shot.fired
+                && shot.landed.is_none()
+                && !duel.shells().any(|shell| shell.source == source)
+            {
+                let burst = duel.impacts().iter().find(|impact| impact.source == source);
+                shot.landed = Some((burst.map(|impact| impact.point), tick));
+                if let Some(dodge) = &mut shot.dodge {
+                    dodge.stopped = true;
+                }
+                if survivor.phase == Phase::Dodging {
+                    survivor.walk(scale);
+                }
+            }
+        }
+    }
+
     /// Follows the survivors after the arena's step at `tick`, with the
     /// `winner` as it stands and the aftermath at the latest over by
     /// `deadline`. A pod opens once it has lain still a moment, and its
@@ -1159,28 +1274,13 @@ impl Survivors {
         let scale = self.scale;
         let outside =
             |point: Vec2| point.y < layout.bounds_min.y || point.x.abs() > layout.bounds_max.x;
+        self.land(duel, tick);
         for index in 0..self.out.len() {
             let survivor = &mut self.out[index];
             let mut run = false;
             let mut climb = false;
             let mut take = false;
             let mut parting = false;
-            // Its shell lands, whatever the spaceling is doing. One still
-            // dodging stops where it is, and it takes the blast at a walk.
-            if let Some(shot) = &mut survivor.shot
-                && let Some((source, _)) = shot.fired
-                && shot.landed.is_none()
-                && !duel.shells().any(|shell| shell.source == source)
-            {
-                let burst = duel.impacts().iter().find(|impact| impact.source == source);
-                shot.landed = Some((burst.map(|impact| impact.point), tick));
-                if let Some(dodge) = &mut shot.dodge {
-                    dodge.stopped = true;
-                }
-                if survivor.phase == Phase::Dodging {
-                    survivor.walk(scale);
-                }
-            }
             match survivor.phase {
                 Phase::Sealed | Phase::Opening => {
                     let pod = survivor.pod.expect("a sealed pod");
@@ -1232,6 +1332,17 @@ impl Survivors {
                         survivor.ride(tick);
                     }
                 }
+                // Down through the hatch, it is in its tank.
+                Phase::Boarding => {
+                    let spaceling = survivor.spaceling.as_ref().expect("a spaceling boarding");
+                    let body = spaceling.body();
+                    survivor.position = world.motion(body).expect("a spaceling boarding").position;
+                    if tick - survivor.since >= BOARD_TICKS {
+                        world.remove_entity(body.entity);
+                        survivor.spaceling = None;
+                        survivor.enter(Phase::Aboard, tick);
+                    }
+                }
                 // Its jetpack leaves a trail of smoke, and it is gone once
                 // it has risen out of view.
                 Phase::Hopping => {
@@ -1263,7 +1374,9 @@ impl Survivors {
                 | Phase::Surrendering
                 | Phase::Covered
                 | Phase::Dodging
-                | Phase::Fleeing => {
+                | Phase::Fleeing
+                | Phase::Returning
+                | Phase::Rebuilding => {
                     let spaceling = survivor.spaceling.as_ref().expect("a spaceling out");
                     let snapshot = spaceling.snapshot(world).expect("a survivor's spaceling");
                     let at = snapshot.motion.position;
@@ -1285,7 +1398,7 @@ impl Survivors {
                         && snapshot.motion.angular_velocity.abs() < REST_SPIN;
                     // A runner knocked about but not down rights itself as
                     // it goes.
-                    let fallen = if survivor.ran || fleeing {
+                    let fallen = if survivor.ran || fleeing || survivor.phase == Phase::Returning {
                         snapshot.balance != SpacelingBalance::Balanced
                     } else {
                         snapshot.needs_get_up()
@@ -1306,14 +1419,22 @@ impl Survivors {
                             // Up again under fire, it dodges on, or flees
                             // once the shell has landed. Knocked down before
                             // the winner fired, it is aimed at afresh.
-                            parting = survivor
-                                .shot
-                                .as_ref()
-                                .is_some_and(|shot| shot.fired.is_some());
-                            if !parting {
-                                survivor.shot = None;
+                            if survivor.ending == Ending::PartingShot {
+                                parting = survivor
+                                    .shot
+                                    .as_ref()
+                                    .is_some_and(|shot| shot.fired.is_some());
+                                if !parting {
+                                    survivor.shot = None;
+                                }
                             }
-                            if !run && !parting {
+                            // Up again on its way to its dirt, or beside it,
+                            // it carries on.
+                            let rebuilding =
+                                survivor.ending == Ending::Rebuild && survivor.pile.is_some();
+                            if rebuilding {
+                                survivor.return_to_pile(scale, tick);
+                            } else if !run && !parting {
                                 survivor.enter(Phase::LookingAround, tick);
                             }
                         }
@@ -1328,6 +1449,8 @@ impl Survivors {
                         | Phase::Covered
                         | Phase::Dodging
                         | Phase::Fleeing
+                        | Phase::Returning
+                        | Phase::Rebuilding
                             if fallen =>
                         {
                             survivor.enter(Phase::GettingUp, tick);
@@ -1336,10 +1459,38 @@ impl Survivors {
                             parting = true;
                         }
                         Phase::Covered | Phase::Dodging | Phase::Fleeing => parting = true,
+                        // It runs to stand beside its dirt, if it can be
+                        // there with time to rebuild its tank and climb in.
+                        Phase::Returning => {
+                            let pile = survivor.pile.expect("dirt to return to");
+                            let gap = (pile.stand - at.x).abs();
+                            let left = pile
+                                .done
+                                .map_or(rebuild::REBUILD_TICKS, |done| done.saturating_sub(tick));
+                            // It stops once it lands, not mid-leap.
+                            if gap <= REACH * scale && snapshot.grounded() {
+                                survivor.walk(scale);
+                                survivor.facing = (pile.hull.x - at.x).signum();
+                                survivor.enter(Phase::Rebuilding, tick);
+                            } else if survivor.stuck(scale, at.x, tick, STUCK_TICKS) {
+                                survivor.fall_back(Fallback::NoWay, tick);
+                            } else if tick + 2 * run_ticks(gap, scale) + left + BOARD_TICKS
+                                > deadline
+                            {
+                                survivor.fall_back(Fallback::OutOfTime, tick);
+                            }
+                        }
                         Phase::LookingAround => {
                             let looked = tick - survivor.since;
                             match (survivor.ending, toward) {
                                 (Ending::Stowaway, _) => run = looked >= SPOT_TICKS,
+                                // One that rebuilds its tank waits, looking
+                                // about, until the tank is all dirt.
+                                (Ending::Rebuild, _) => {
+                                    if looked > 0 && looked.is_multiple_of(LOOK_TICKS / 3) {
+                                        survivor.facing = -survivor.facing;
+                                    }
+                                }
                                 (Ending::Surrender, Some(toward)) if looked >= LOOK_TICKS => {
                                     survivor.facing = toward;
                                     if tick + FLAG_TICKS + WAVE_TICKS + TAKE_TICKS <= deadline {
@@ -1390,7 +1541,7 @@ impl Survivors {
                         _ => (),
                     }
                 }
-                Phase::BeamedUp | Phase::Fled | Phase::Lost => (),
+                Phase::BeamedUp | Phase::Fled | Phase::Lost | Phase::Aboard => (),
             }
             if parting {
                 self.parting(world, duel, index, layout, tick, winner, deadline);
@@ -1401,7 +1552,181 @@ impl Survivors {
             } else if take {
                 self.take(world, index, winner.expect("a winner to take it"), tick);
             }
+            // The winner's shot at a tank's dirt goes on whatever its
+            // spaceling is doing.
+            let survivor = &self.out[index];
+            if survivor.ending == Ending::Rebuild && survivor.pile.is_some() {
+                self.race(world, duel, index, tick, winner);
+            }
         }
+    }
+
+    /// The survivor that drew the rebuild and is still on it, if any.
+    pub fn rebuilding(&self) -> Option<usize> {
+        self.out
+            .iter()
+            .position(|survivor| survivor.ending == Ending::Rebuild)
+    }
+
+    /// Sends the spaceling of survivor `index`, which rebuilds its tank, to
+    /// stand at `stand` across beside the tank's dirt at `tick`, the tank's
+    /// hull to stand at `hull`. It runs there if it has a way over the hills,
+    /// and the time to get there, see the tank rebuilt and climb in before
+    /// `deadline`. Otherwise it waves for the rescue beam.
+    pub fn send_to_pile(
+        &mut self,
+        world: &PhysicsWorld,
+        index: usize,
+        (hull, stand): (Vec2, f32),
+        tick: u64,
+        deadline: u64,
+    ) {
+        let scale = self.scale;
+        let walker = spec(scale);
+        let watched = self.watched;
+        let survivor = &mut self.out[index];
+        let spaceling = survivor.spaceling.as_ref().expect("a spaceling rebuilding");
+        let at = survivor.position;
+        let gap = (stand - at.x).abs();
+        let feet = at - Vec2::Y * walker.half_height();
+        if !way_clear(world, feet, stand, scale, spaceling.body().entity) {
+            survivor.fall_back(Fallback::NoWay, tick);
+        } else if tick
+            + 2 * run_ticks(gap, scale)
+            + rebuild::REBUILD_TICKS
+            + BOARD_TICKS
+            + SET_OUT_SPARE_TICKS
+            > deadline
+        {
+            survivor.fall_back(Fallback::OutOfTime, tick);
+        } else {
+            survivor.pile = Some(Pile {
+                stand,
+                hull,
+                done: None,
+                watched,
+            });
+            survivor.return_to_pile(scale, tick);
+        }
+    }
+
+    /// The dirt of survivor `index`'s tank has set off home, and the last
+    /// cell will be home on the event's tick `done`.
+    pub fn crawling(&mut self, index: usize, done: u64) {
+        let pile = self.out[index].pile.as_mut().expect("dirt crawling home");
+        pile.done = Some(done);
+    }
+
+    /// Survivor `index` gives up rebuilding its tank at `tick`, `why`, and
+    /// waves for the rescue beam.
+    pub fn give_up(&mut self, index: usize, why: Fallback, tick: u64) {
+        let survivor = &mut self.out[index];
+        if survivor.ending == Ending::Rebuild {
+            survivor.fall_back(why, tick);
+        }
+    }
+
+    /// The winner's shot at the dirt of survivor `index`'s tank, at `tick`.
+    /// A `winner` that saw the spaceling go back to its dirt, standing on its
+    /// wheels and far enough off, turns on where the tank will stand and
+    /// plots a shot there with the `duel`, a share of the arcs each tick, as
+    /// it does a parting shot. A moment after the dirt sets off, once its
+    /// barrel lies along the arc it chose, it fires, if its shell will land
+    /// before the last cell is home. Otherwise it holds its fire.
+    fn race(
+        &mut self,
+        world: &mut PhysicsWorld,
+        duel: &mut HostedDuel,
+        index: usize,
+        tick: u64,
+        winner: Option<Winner>,
+    ) {
+        let scale = self.scale;
+        let survivor = &mut self.out[index];
+        let pile = survivor.pile.as_mut().expect("dirt to rebuild from");
+        let upright = |winner: &Winner| winner.hull.angle.cos() >= UPRIGHT;
+        if pile.watched {
+            pile.watched = false;
+            if let Some(winner) = winner.filter(|winner| {
+                upright(winner) && winner.hull.position.distance_to(pile.hull) >= SHOT_RANGE * scale
+            }) {
+                let ground = pile.hull - Vec2::Y * (rebuild::RESTS * scale);
+                survivor.shot = Some(Shot {
+                    aim: duel.aim_at(world, winner.slot, ground),
+                    away: survivor.facing,
+                    fired: None,
+                    burst: None,
+                    dodge: None,
+                    landed: None,
+                });
+            }
+            return;
+        }
+        let Some(shot) = survivor.shot.as_mut().filter(|shot| shot.fired.is_none()) else {
+            return;
+        };
+        let Some(winner) = winner.filter(upright) else {
+            survivor.shot = None;
+            return;
+        };
+        duel.plot(world, &mut shot.aim);
+        let Some(done) = pile.done.filter(|&done| {
+            tick >= done - rebuild::REBUILD_TICKS + REACTION_TICKS && shot.aim.plotted()
+        }) else {
+            return;
+        };
+        match (shot.aim.direction(), shot.aim.flight_ticks()) {
+            (Some(direction), Some(flight))
+                if tick + u64::from(flight) + REACTION_TICKS <= done =>
+            {
+                if on_target(winner.barrel, winner.barrel[0] + direction) {
+                    match duel.fire_aim(world, &shot.aim) {
+                        Some(source) => shot.fired = Some((source, tick)),
+                        None => survivor.shot = None,
+                    }
+                }
+            }
+            _ => survivor.shot = None,
+        }
+    }
+
+    /// The spaceling of survivor `index` climbs into its rebuilt tank, whose
+    /// hull is `tank` with `half` its extents, at `tick`: up the hull's side
+    /// to the edge of its roof, onto the turret and down through its hatch.
+    /// From here the hull carries it, and it pushes nothing.
+    pub fn board(
+        &mut self,
+        world: &mut PhysicsWorld,
+        index: usize,
+        tank: BodyId,
+        half: Vec2,
+        tick: u64,
+    ) {
+        let scale = self.scale;
+        let walker = spec(scale);
+        let survivor = &mut self.out[index];
+        let spaceling = survivor.spaceling.as_ref().expect("a spaceling boarding");
+        let body = spaceling.body();
+        let at = world.motion(body).expect("a spaceling boarding").position;
+        let hull = world.motion(tank).expect("a rebuilt tank");
+        let local = (at - hull.position).rotate_radians(-hull.angle);
+        let side = if local.x < 0.0 { -1.0 } else { 1.0 };
+        let edge = Vec2::new(
+            side * (half.x + walker.radius + 0.05 * scale),
+            half.y + walker.half_height() + 0.05 * scale,
+        );
+        let pivot = rebuild::PIVOT * scale;
+        let top = Vec2::new(
+            0.0,
+            pivot + wreck::TURRET_RADIUS * scale + walker.half_height() + 0.05 * scale,
+        );
+        let hatch = Vec2::new(0.0, pivot);
+        world.set_body_kind(body, BodyKind::KinematicPosition, true);
+        world.set_collision_groups(spaceling.collider(), CollisionGroups::NONE);
+        survivor.climb = Some([local, edge, top, hatch]);
+        survivor.tank = Some(tank);
+        survivor.facing = -side;
+        survivor.enter(Phase::Boarding, tick);
     }
 
     /// The spaceling of survivor `index` climbs out of its pod, lying at
@@ -1735,7 +2060,7 @@ impl Survivors {
                 .is_some_and(|shot| shot.fired.is_some() && shot.landed.is_none());
             !flying
                 && match survivor.phase {
-                    Phase::Lost | Phase::BeamedUp | Phase::Fled => true,
+                    Phase::Lost | Phase::BeamedUp | Phase::Fled | Phase::Aboard => true,
                     Phase::Waving => tick - survivor.since >= WAVE_TICKS,
                     Phase::Riding => tick - survivor.since >= RIDE_TICKS,
                     Phase::Taken => tick - survivor.since >= TAKE_TICKS,
@@ -1754,6 +2079,7 @@ impl Survivors {
                 Ending::RescueBeam => RESCUE_BY_TICKS,
                 Ending::Stowaway | Ending::Surrender => AFTERMATH_TICKS,
                 Ending::PartingShot => PARTING_TICKS,
+                Ending::Rebuild => REBUILD_BY_TICKS,
             })
             .max()
             .unwrap_or(RESCUE_BY_TICKS)
@@ -1801,6 +2127,7 @@ impl Survivors {
                     | Phase::Climbing
                     | Phase::Riding
                     | Phase::Taken
+                    | Phase::Aboard
             ) {
                 continue;
             }
@@ -1859,8 +2186,9 @@ impl Survivors {
 
     /// Where the winner's turret turns, about its barrel's `pivot`: onto a
     /// spaceling that surrenders, from when its flag goes up, and as the
-    /// winner's beam draws it in; and onto one it covers for its parting
-    /// shot, then along the arc it plots.
+    /// winner's beam draws it in; onto one it covers for its parting shot,
+    /// then along the arc it plots; and onto where a tank its dirt is
+    /// rebuilding will stand, then along the arc it plots, until it fires.
     pub fn target(&self, pivot: Vec2) -> Option<Vec2> {
         self.out.iter().find_map(|survivor| match survivor.phase {
             Phase::Surrendering | Phase::Taken => Some(survivor.position),
@@ -1871,14 +2199,23 @@ impl Survivors {
                     .and_then(|shot| shot.aim.direction())
                     .map_or(survivor.position, |direction| pivot + direction),
             ),
+            _ if survivor.ending == Ending::Rebuild => {
+                let pile = survivor.pile?;
+                let shot = survivor.shot.as_ref().filter(|shot| shot.fired.is_none())?;
+                Some(
+                    shot.aim
+                        .direction()
+                        .map_or(pile.hull, |direction| pivot + direction),
+                )
+            }
             _ => None,
         })
     }
 
     /// Throws the spacelings and pods about a parting shell's `burst`: a pod
     /// as the duel's bursts throw its dirt, and a spaceling hard enough near
-    /// the burst to knock it off its feet. Those carried, hopping or lifted
-    /// stay as they are.
+    /// the burst to knock it off its feet. Those carried, hopping, climbing
+    /// into a tank or lifted stay as they are.
     pub fn shove(&self, world: &mut PhysicsWorld, burst: Vec2) {
         let scale = self.scale;
         let free = || {
@@ -1886,7 +2223,11 @@ impl Survivors {
                 survivor.lifted.is_none()
                     && !matches!(
                         survivor.phase,
-                        Phase::Climbing | Phase::Riding | Phase::Taken | Phase::Hopping
+                        Phase::Climbing
+                            | Phase::Riding
+                            | Phase::Taken
+                            | Phase::Hopping
+                            | Phase::Boarding
                     )
             })
         };

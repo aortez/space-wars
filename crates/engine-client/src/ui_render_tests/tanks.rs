@@ -667,7 +667,7 @@ fn tanks_spacelings_stow_away_or_surrender() {
     for (size, patch, scale) in [((1024, 768), (112, 64), 5), ((800, 480), (88, 48), 6)] {
         let viewport = Viewport::new(size.0 as f32, size.1 as f32);
         let name = format!("{}x{}", size.0, size.1);
-        for (seed, ending) in [(455, Ending::Stowaway), (228, Ending::Surrender)] {
+        for (seed, ending) in [(455, Ending::Stowaway), (1774, Ending::Surrender)] {
             let readings = record_through(face_fight(viewport, seed), |tanks| {
                 tanks.survivors.into_iter().flatten().next()
             });
@@ -707,7 +707,7 @@ fn tanks_spacelings_stow_away_or_surrender() {
                     ],
                     &[("-taken", 2), ("-beam", 3)],
                 ),
-                Ending::RescueBeam | Ending::PartingShot => unreachable!(),
+                Ending::RescueBeam | Ending::PartingShot | Ending::Rebuild => unreachable!(),
             };
             let shots = camera.frames(size, seed, &ticks);
             for (state, _) in &shots {
@@ -740,7 +740,7 @@ fn tanks_spacelings_stow_away_or_surrender() {
 fn tanks_the_winner_takes_a_parting_shot_and_the_spaceling_flees() {
     use engine_common::{ClockTanksEnding as Ending, ClockTanksSurvivorPhase as Phase};
     let camera = Camera::new();
-    let seed = 2728;
+    let seed = 228;
     // Both sides of this fight are thrown clear and draw the parting shot,
     // so whichever tank loses, the winner fires one last shell at its
     // spaceling, which dodges it, then runs off the side of the battlefield
@@ -832,6 +832,112 @@ fn tanks_the_winner_takes_a_parting_shot_and_the_spaceling_flees() {
         camera.keep(
             &format!("{name}-parting-zoom"),
             &follow(&framed, patch, scale),
+        );
+    }
+}
+
+#[test]
+fn tanks_a_spaceling_rebuilds_its_tank_for_a_sudden_death() {
+    use engine_common::{
+        ClockTanksEnding as Ending, ClockTanksRebuildStage as Stage,
+        ClockTanksSurvivorPhase as Phase,
+    };
+    let camera = Camera::new();
+    let seed = 8799;
+    // Both sides of this fight are thrown clear and draw the rebuild, and the
+    // winner lets the dirt be, so whichever tank loses, its spaceling runs
+    // back to the tank's dirt, sees it crawl home and climbs in. Here the
+    // left tank loses at both sizes, and once rebuilt, it fires first in the
+    // sudden death and destroys the winner.
+    for (size, patch, scale) in [((1024, 768), (112, 64), 5), ((800, 480), (88, 48), 6)] {
+        let viewport = Viewport::new(size.0 as f32, size.1 as f32);
+        let name = format!("{}x{}", size.0, size.1);
+        let readings = record_through(face_fight(viewport, seed), |tanks| {
+            (
+                tanks.survivors.into_iter().flatten().next(),
+                tanks
+                    .rebuild
+                    .as_ref()
+                    .map(|rebuild| (usize::from(rebuild.slot), rebuild.stage)),
+                tanks.tank_shots,
+                tanks.shells,
+                tanks.positions_milli,
+                tanks.result.clone(),
+            )
+        });
+        let first = |phase: Phase| {
+            readings
+                .iter()
+                .position(|(_, (survivor, ..))| survivor.is_some_and(|s| s.phase == phase))
+                .unwrap_or_else(|| panic!("{name} {seed}: {phase:?}"))
+        };
+        let (rebuilding, boarding, aboard) = (
+            first(Phase::Rebuilding),
+            first(Phase::Boarding),
+            first(Phase::Aboard),
+        );
+        let (slot, _) = readings[rebuilding].1.1.unwrap();
+        assert_eq!(slot, 0);
+        // The rebuilt tank's first shell of the sudden death is in the air
+        // from the tick it is fired until the tick it lands, and the winner
+        // fires none.
+        let before = readings[aboard].1.2;
+        let fired = (aboard..readings.len())
+            .find(|&i| readings[i].1.2[slot] > before[slot])
+            .expect("the rebuilt tank fires");
+        let landed = (fired..readings.len())
+            .find(|&i| readings[i].1.3 == 0)
+            .unwrap();
+        assert_eq!(readings[landed].1.2[1 - slot], before[1 - slot]);
+        // The rebuilt tank wins the sudden death.
+        let result = (landed..readings.len())
+            .find_map(|i| readings[i].1.5.clone())
+            .expect("a second result");
+        assert_eq!(result, "left wins");
+        // By the tank's dirt as the dirt sets off, the dirt halfway home, the
+        // last cells coming in, and climbing into the tank, whole in its
+        // puffs of dust.
+        let ticks = [
+            rebuilding + 6,
+            rebuilding + 120,
+            rebuilding + 225,
+            boarding + 20,
+        ];
+        let shots = camera.frames(size, seed, &ticks);
+        for (state, _) in &shots {
+            let survivor = state.survivors.into_iter().flatten().next().unwrap();
+            assert_eq!(
+                (survivor.drawn, survivor.ending, survivor.fallback),
+                (Ending::Rebuild, Ending::Rebuild, None)
+            );
+        }
+        assert_eq!(readings[ticks[2]].1.1, Some((slot, Stage::Crawling)));
+        assert_eq!(readings[ticks[3]].1.1, Some((slot, Stage::Rebuilt)));
+        camera.keep(&format!("{name}-rebuild-crawl"), &shots[1].1);
+        // The rebuilt tank's shell's whole flight, left as a trail, as it
+        // bursts.
+        camera.picture(size, "rebuild-shot", seed, fired, landed + 4);
+        // Each frame around the tank's place, a third of the way to where the
+        // spaceling stands, and a little above it.
+        let state = face_fight(viewport, seed);
+        let hull = on_screen(&state, size, readings[boarding].1.4[slot]);
+        let stands = on_screen(
+            &state,
+            size,
+            readings[rebuilding].1.0.unwrap().position_milli,
+        );
+        let frames: Vec<_> = shots.iter().map(|(_, pixels)| pixels).collect();
+        camera.keep(
+            &format!("{name}-rebuild-zoom"),
+            &zoom(
+                &frames,
+                [
+                    hull[0] + (stands[0] - hull[0]) / 3.0,
+                    hull[1] - patch.1 as f32 * 0.15,
+                ],
+                patch,
+                scale,
+            ),
         );
     }
 }

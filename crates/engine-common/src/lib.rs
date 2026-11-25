@@ -1173,6 +1173,10 @@ pub struct ClockTanksState {
     pub loose_cells: u32,
     pub shells: u32,
     pub shots: u64,
+    /// The shells each tank has fired, a rebuilt tank's before and after it
+    /// blew up.
+    #[serde(default)]
+    pub tank_shots: [u64; 2],
     pub result: Option<String>,
     pub converted_cells: u32,
     /// Pieces of the losers still whole, not yet turned to dirt.
@@ -1201,6 +1205,50 @@ pub struct ClockTanksState {
     /// Each side's spaceling, once it has got out.
     #[serde(default)]
     pub survivors: [Option<ClockTanksSurvivor>; 2],
+    /// A loser's tank being rebuilt from its dirt, from when the cells start
+    /// back, and the sudden-death round it fights.
+    #[serde(default)]
+    pub rebuild: Option<ClockTanksRebuild>,
+}
+
+/// A loser's spaceling rebuilding its tank from the tank's dirt, and the
+/// sudden-death round the rebuilt tank fights.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockTanksRebuild {
+    /// The side whose tank is rebuilt.
+    pub slot: u8,
+    pub stage: ClockTanksRebuildStage,
+    /// The fight's first result, which the sudden death reopens.
+    pub first_result: String,
+    /// Whether the winner fired at the dirt as it crawled back.
+    pub fired: bool,
+    /// How long the sudden death has lasted, in ticks.
+    pub sudden_death_ticks: u64,
+}
+
+/// How far a rebuild has gone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockTanksRebuildStage {
+    /// The dirt crawling back into the tank.
+    Crawling,
+    /// The tank rebuilt, from when its cells are all home.
+    Rebuilt,
+    /// The winner's shell scattered the dirt first.
+    Scattered,
+    /// The aftermath ran out first, and the dirt fell where it was.
+    Abandoned,
+}
+
+impl ClockTanksRebuildStage {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Crawling => "crawling",
+            Self::Rebuilt => "rebuilt",
+            Self::Scattered => "scattered",
+            Self::Abandoned => "abandoned",
+        }
+    }
 }
 
 /// How a losing tank's spaceling gets out as the tank blows up.
@@ -1236,6 +1284,10 @@ pub enum ClockTanksEnding {
     /// The winner fires one last shell at it, and it dodges and flees out of
     /// view.
     PartingShot,
+    /// It rebuilds its tank from the tank's dirt, unless the winner's shell
+    /// scatters the dirt first, and fights the winner again in a
+    /// sudden-death round.
+    Rebuild,
 }
 
 impl ClockTanksEnding {
@@ -1245,6 +1297,7 @@ impl ClockTanksEnding {
             Self::Stowaway => "stowaway",
             Self::Surrender => "surrender",
             Self::PartingShot => "parting-shot",
+            Self::Rebuild => "rebuild",
         }
     }
 }
@@ -1262,6 +1315,12 @@ pub enum ClockTanksFallback {
     /// The winner had no shot at it: too near the winner, with no arc that
     /// reaches it, or with the winner off its wheels or out of view.
     NoShot,
+    /// The winner's shell scattered its tank's dirt before the dirt had
+    /// crawled back into the tank.
+    Scattered,
+    /// Some of its tank's dirt was lost out of view, so the tank could not
+    /// be rebuilt.
+    DirtLost,
 }
 
 impl ClockTanksFallback {
@@ -1270,6 +1329,8 @@ impl ClockTanksFallback {
             Self::NoWay => "no-way",
             Self::OutOfTime => "out-of-time",
             Self::NoShot => "no-shot",
+            Self::Scattered => "scattered",
+            Self::DirtLost => "dirt-lost",
         }
     }
 }
@@ -1312,6 +1373,15 @@ pub enum ClockTanksSurvivorPhase {
     Fleeing,
     /// Rising up and out of view on a jetpack, once the shell has landed.
     Hopping,
+    /// Running to its tank's dirt, to rebuild the tank.
+    Returning,
+    /// Standing beside its tank's dirt as the cells crawl back into the
+    /// tank.
+    Rebuilding,
+    /// Climbing into its rebuilt tank.
+    Boarding,
+    /// In its rebuilt tank, fighting on.
+    Aboard,
     /// Lifted out by its beam, or by the winner's.
     BeamedUp,
     /// Gone out of view the way it fled.
@@ -1339,6 +1409,10 @@ impl ClockTanksSurvivorPhase {
             Self::Dodging => "dodging",
             Self::Fleeing => "fleeing",
             Self::Hopping => "hopping",
+            Self::Returning => "returning",
+            Self::Rebuilding => "rebuilding",
+            Self::Boarding => "boarding",
+            Self::Aboard => "aboard",
             Self::BeamedUp => "beamed-up",
             Self::Fled => "fled",
             Self::Lost => "lost",
