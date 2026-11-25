@@ -426,14 +426,26 @@ What each setting costs and buys, as far as it was measured:
   fewest measured, 1,000, played far better than Easy. The time a move
   takes is in proportion to them, about a millisecond for each thousand on
   the Pi 4 and 0.4 on the Pi 5.
-- **The table:** sixteen bytes an entry, and a search holds about 100 KiB
-  besides. What its size is worth in strength has not been measured, but
-  its cost in time has. Up to 1 MiB it costs nothing that shows. A larger
-  table is cleared for every move, which on the Pi 4 adds up to 2 ms for
-  4 MiB and 4 to 8 ms for 16 MiB: nothing beside Hard's second, but half
-  as long again as Normal's whole search. The largest, 64 MiB, costs
-  nothing to make, and instead slows the search, by about a tenth of a
-  second at 1,000,000 positions. The Pi 5 pays about a quarter as
+- **The table, for strength:** having one is worth a great deal, and one
+  larger than the search can fill is worth nothing. In matches of 600
+  games, with no margin:
+  - at 10,000 positions, 1 MiB won 91 (64 to 118) against no table;
+  - at 10,000 and at 100,000, 16 MiB against 1 MiB made no difference
+    that showed, +9 and +10;
+  - at 1,000,000, 1 MiB was too small, and 16 MiB won 61 (36 to 86);
+  - at 1,000,000, 64 MiB against 16 MiB made none, +1.
+
+  A table with an entry for every position or two was always enough, and
+  one with an entry for every fifteen was not. Normal's 1 MiB and Hard's
+  16 MiB are both enough for their positions, and a larger table would
+  only cost them time.
+- **The table, in time:** sixteen bytes an entry, and a search holds
+  about 100 KiB besides. Up to 1 MiB a table costs no time that shows. A
+  larger table is cleared for every move, which on the Pi 4 adds up to
+  2 ms for 4 MiB and 4 to 8 ms for 16 MiB: nothing beside Hard's second,
+  but half as long again as Normal's whole search. The largest, 64 MiB,
+  costs nothing to make, and instead slows the search, by about a tenth
+  of a second at 1,000,000 positions. The Pi 5 pays about a quarter as
   much. See [On the kiosks](#on-the-kiosks).
 - **The margin:** moves within it of the best are all good enough, and the
   seed chooses between them. A wider margin varies the play and weakens it.

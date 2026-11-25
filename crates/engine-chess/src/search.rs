@@ -113,9 +113,10 @@ pub struct Settings {
     pub quiescence: u8,
     /// The table of positions already searched holds two to this power
     /// entries of sixteen bytes, up to [`MAX_TABLE_BITS`]. Zero means no
-    /// table. A table of more than 1 MiB also costs time on every move: on
-    /// a Raspberry Pi 4, 4 to 8 ms for 16 MiB, and about a tenth of a
-    /// second for 64 MiB at a million positions.
+    /// table. A table with an entry for every position or two of `nodes`
+    /// played as well as any larger one. Beyond 1 MiB a table also costs
+    /// time on every move: on a Raspberry Pi 4, 4 to 8 ms for 16 MiB, and
+    /// about a tenth of a second for 64 MiB at a million positions.
     pub table_bits: u8,
     /// Moves within this many centipawns of the best are all good enough,
     /// and the seed chooses between them.
