@@ -133,9 +133,30 @@ impl Position {
     }
 
     pub fn has_legal_move(&self) -> bool {
-        let mut moves = Vec::with_capacity(64);
-        self.candidate_moves(&mut moves);
-        moves.into_iter().any(|mv| self.leaves_king_safe(mv))
+        /// Takes candidate moves and keeps only whether one was legal, so
+        /// that nothing has to be set aside for them.
+        struct Found<'a> {
+            position: &'a Position,
+            in_check: bool,
+            legal: bool,
+        }
+
+        impl MoveSink for Found<'_> {
+            fn add(&mut self, mv: Move) {
+                let position = self.position;
+                self.legal = self.legal
+                    || !position.may_expose_king(mv, self.in_check)
+                    || position.leaves_king_safe(mv);
+            }
+        }
+
+        let mut found = Found {
+            position: self,
+            in_check: self.is_check(),
+            legal: false,
+        };
+        self.candidate_moves(&mut found);
+        found.legal
     }
 
     /// Every legal move with the position it leads to.

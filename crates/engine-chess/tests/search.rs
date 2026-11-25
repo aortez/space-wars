@@ -1,7 +1,7 @@
 //! The computer opponent through its public interface: what a host that runs
 //! a search may rely on.
 
-use engine_chess::search::{Level, MATE, SearchJob, Settings};
+use engine_chess::search::{Level, MATE, MAX_DEPTH, SearchJob, Settings};
 use engine_chess::{Action, ActionError, DrawClaim, DrawReason, Game, Move, Outcome, Position};
 
 const START: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -9,14 +9,27 @@ const KIWIPETE: &str = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R 
 const MIDDLEGAME: &str = "r1bq1rk1/pp2ppbp/2np1np1/8/3NP3/2N1BP2/PPPQ2PP/R3KB1R w KQ - 3 9";
 const ROOK_ENDGAME: &str = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1";
 const PAWN_ENDGAME: &str = "8/8/8/4k3/8/8/4P3/4K3 w - - 0 1";
-/// Twenty queens and no quiet move in sight: a search that followed every
-/// capture to the end would never come back.
+/// Eleven queens among twenty-nine pieces, with captures on every side: a
+/// search that followed every capture to the end would be long in coming
+/// back.
 const ALL_CAPTURES: &str = "q2k2q1/2nqn2b/1n1P1n1b/2rnr2Q/1NQ1QN1Q/3Q3B/2RQR2B/Q2K2Q1 w - - 0 1";
 const BACK_RANK: &str = "6k1/5ppp/8/8/8/8/8/R3K3 w Q - 0 1";
 const ROOK_MATE: &str = "7k/8/5K2/8/8/8/8/6R1 w - - 0 1";
 const STALEMATE_TRAP: &str = "k7/8/1Q6/8/8/8/8/7K w - - 0 1";
 const WHITE_LACKS_A_QUEEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1";
 const BLACK_LACKS_A_QUEEN: &str = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+/// More queens than any game could reach. The rules accept such positions,
+/// so a search has to cope with them.
+const QUEENS_AGAINST_A_PAWN: &str =
+    "qqqqqqqk/qPqqqqqq/qqqqqqqq/qqqqqqqq/qqqq4/8/3p2PP/2Q3QK w - - 0 1";
+const QUEENS_ROUND_A_KING: &str =
+    "qqq1qqqq/qqqqqqq1/q1q1qqqq/1qqkqqqq/qqqqqqqq/8/p5PP/QQ3NQK w - - 0 1";
+/// Any quiet move by Black lets a draw be claimed, so the rest of Black's
+/// moves are searched against a value of nothing.
+const QUEENS_NEARLY_DRAWN: &str =
+    "5bnk/5ppp/8/QQQQQQQQ/QQQQQQQQ/QQQQQQQQ/QQQQQQQQ/KQQQQQQQ b - - 99 60";
+/// Thirty-two queens, several of which could mate at once.
+const QUEENS_WITH_A_MATE: &str = "6nk/6pp/8/Q7/QQQQQQQQ/QQQQQQQQ/QQQQQQQQ/QQQQKQQQ w - - 0 1";
 /// A knight out and back for each player: four half-moves that restore the
 /// position.
 const SHUFFLE: &str = "g1f3 g8f6 f3g1 f6g8";
@@ -115,15 +128,36 @@ fn settings_beyond_the_limits_are_brought_back_to_them() {
     assert!(job.memory_bytes() <= 65 << 20);
     job.run(u64::MAX);
     assert_eq!(job.decision().unwrap().nodes, 3_000);
+
+    // Asked for a deeper search than there is, with positions to spare, a
+    // search stops at the deepest. The pawns block each other and the kings
+    // cannot pass them, so the deepest search is soon done.
+    let blocked = self::game("8/8/8/k7/p7/P7/K7/8 w - - 0 1", "");
+    let deep = Settings {
+        depth: u8::MAX,
+        nodes: u64::MAX,
+        ..Level::Normal.settings()
+    };
+    let mut job = SearchJob::new(&blocked, deep, 0).unwrap();
+    job.run(u64::MAX);
+    assert_eq!(job.decision().unwrap().depth, MAX_DEPTH);
+
+    // Asked for no depth at all, it searches one half-move.
+    let shallow = Settings {
+        depth: 0,
+        ..Level::Easy.settings()
+    };
+    let mut job = SearchJob::new(&game, shallow, 0).unwrap();
+    job.run(u64::MAX);
+    assert_eq!(job.decision().unwrap().depth, 1);
 }
 
 #[test]
 fn the_search_leaves_the_game_alone_and_its_decision_goes_stale() {
+    // The job holds nothing of the game, which is free to change under it.
     let mut game = game(KIWIPETE, "");
-    let before = game.clone();
     let mut job = SearchJob::new(&game, Level::Normal.settings(), 5).unwrap();
     job.run(u64::MAX);
-    assert_eq!(game, before);
 
     // The game moves on before the decision arrives.
     let decision = *job.decision().unwrap();
@@ -156,6 +190,7 @@ fn a_search_may_be_stopped_before_it_starts_while_deepening_and_among_captures()
 
     // Among captures, past the full search.
     while !job.progress().quiescence {
+        assert!(!job.is_finished(), "the search never followed a capture");
         job.step();
     }
     assert!(!job.is_finished() && job.decision().is_none());
@@ -163,6 +198,7 @@ fn a_search_may_be_stopped_before_it_starts_while_deepening_and_among_captures()
 
     // Between two depths.
     while job.progress().depth < 2 {
+        assert!(!job.is_finished(), "the search never finished two depths");
         job.step();
     }
     let deepening = job.best_so_far();
@@ -390,6 +426,47 @@ fn the_fifty_move_rule_is_claimed_by_the_loser_and_avoided_by_the_winner() {
         assert_eq!(
             after.outcome(),
             Some(Outcome::Draw(DrawReason::FiftyMoveClaim))
+        );
+    }
+}
+
+#[test]
+fn a_board_full_of_queens_is_searched_like_any_other() {
+    for level in Level::ALL {
+        // A few thousand positions are enough to look two half-moves deep,
+        // where material this lopsided is met with either player to move.
+        let settings = Settings {
+            nodes: level.settings().nodes.min(20_000),
+            ..level.settings()
+        };
+        // The search answers, and the game accepts what it answers.
+        for fen in [
+            QUEENS_AGAINST_A_PAWN,
+            QUEENS_ROUND_A_KING,
+            QUEENS_NEARLY_DRAWN,
+        ] {
+            decide(&game(fen, ""), settings, 0);
+        }
+
+        // However much material stands on the board, it looks like less
+        // than a forced mate, so the mate is played.
+        let game = game(QUEENS_WITH_A_MATE, "");
+        let mut job = SearchJob::new(&game, settings, 0).unwrap();
+        job.run(u64::MAX);
+        let decision = *job.decision().unwrap();
+        assert_eq!(decision.score, Some(MATE - 1), "{level:?}");
+        let mut after = game.clone();
+        after
+            .apply(
+                decision.revision,
+                game.position().side_to_move(),
+                decision.action,
+            )
+            .unwrap();
+        assert!(
+            matches!(after.outcome(), Some(Outcome::Checkmate { .. })),
+            "{level:?}: {:?}",
+            decision.action
         );
     }
 }

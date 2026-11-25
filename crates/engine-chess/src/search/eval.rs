@@ -8,6 +8,8 @@ use crate::bitboard::{FILE_A, FILE_H, RANK_7, RANK_8, Squares};
 use crate::board::{Color, Piece, PieceKind, Square};
 use crate::position::Position;
 
+use super::MATE_BOUND;
+
 /// What each kind of piece is worth in centipawns. The king is never
 /// captured, so it has no value.
 pub(super) const VALUES: [i32; 6] = [100, 330, 350, 520, 980, 0];
@@ -190,6 +192,10 @@ pub(super) fn evaluate_placed(position: &Position, placement: i32) -> i32 {
     };
 
     let for_white = placement + king(Color::White) - king(Color::Black) + structure(position);
+    // No game reaches material worth half of this bound, but a position set
+    // up by hand may hold sixty queens. However it looks, it looks like less
+    // than a forced mate.
+    let for_white = for_white.clamp(1 - MATE_BOUND, MATE_BOUND - 1);
     match position.side_to_move() {
         Color::White => for_white,
         Color::Black => -for_white,

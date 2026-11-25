@@ -154,6 +154,13 @@ fn a_fen_that_no_game_could_reach_is_refused() {
             "rnbqkbnr/pppp1ppp/8/4p3/8/8/PPPPPPPP/RNBQKBNR w KQkq e3 0 2",
             FenError::EnPassant,
         ),
+        // No pawn stands beyond the square, so a capture there would take
+        // nothing off the board.
+        ("4k3/8/8/8/3p4/8/8/4K3 b - e3 0 1", FenError::EnPassant),
+        // A pawn stands beyond it, but could not have just crossed a square
+        // that holds a piece, or come from one that does.
+        ("4k3/8/8/8/3pP3/4N3/8/4K3 b - e3 0 1", FenError::EnPassant),
+        ("4k3/8/8/8/3pP3/8/4N3/4K3 b - e3 0 1", FenError::EnPassant),
         (
             "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - x 1",
             FenError::Counter,

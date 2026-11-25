@@ -237,6 +237,29 @@ fn a_claim_with_an_intended_move_draws_without_playing_the_move() {
 }
 
 #[test]
+fn a_move_that_ends_the_game_supports_no_claim() {
+    // Any quiet move by White is the hundredth quiet half-move, and the
+    // rook's move to the eighth rank is also checkmate.
+    let mut game = Game::new(
+        1,
+        Position::from_fen("6k1/5ppp/8/8/8/8/8/R3K3 w Q - 99 60").unwrap(),
+    );
+    assert!(game.can_claim_with(DrawClaim::FiftyMoves, mv("a1a2")));
+    assert!(!game.can_claim_with(DrawClaim::FiftyMoves, mv("a1a8")));
+
+    let before = game.clone();
+    assert_eq!(
+        game.apply(
+            game.revision(),
+            Color::White,
+            claim(DrawClaim::FiftyMoves, Some("a1a8")),
+        ),
+        Err(ActionError::ClaimNotValid)
+    );
+    assert_eq!(game, before);
+}
+
+#[test]
 fn the_fifty_move_claim_needs_a_hundredth_quiet_half_move() {
     let start = || Game::new(1, Position::from_fen(NEARLY_FIFTY).unwrap());
 

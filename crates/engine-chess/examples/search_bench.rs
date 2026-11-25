@@ -53,7 +53,7 @@ fn main() {
             let started = Instant::now();
             let mut job = SearchJob::new(&game, settings, 0).expect("the game is not over");
             let starting = started.elapsed();
-            memory = job.memory_bytes();
+            memory = memory.max(job.memory_bytes());
 
             // The longest a host waits for one step, which is how soon it
             // can stop a search.
@@ -88,6 +88,10 @@ fn main() {
                     .map_or("no score".to_string(), |score| score.to_string()),
             );
         }
-        println!("{:<7} holds {} KiB", format!("{level:?}"), memory / 1024);
+        println!(
+            "{:<7} holds up to {} KiB",
+            format!("{level:?}"),
+            memory / 1024
+        );
     }
 }

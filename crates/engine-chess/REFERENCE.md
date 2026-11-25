@@ -145,7 +145,7 @@ both kinds of draw claim.
 - One difference is deliberate and the comparison allows for it: the model
   accepts no claim that names a move which itself ends the game.
 - The model passes every perft count in the suite. The eight above 5,000,000
-  take about 26 seconds in a release build on the development workstation.
+  take about 14 seconds in a release build on the development workstation.
 
 ## What the suite does not cover
 
@@ -261,6 +261,30 @@ line is the point of them. They are tested in four other ways.
 Whether they make the engine play better is for [the
 benchmark](#the-benchmark) to say.
 
+Three more things are held to, each with tests of its own.
+
+- **The fifty-move rule and the table:** the same position is worth less to
+  the player ahead the nearer the hundredth quiet half-move is. From the
+  count where the deepest search could reach the hundredth, the table
+  therefore knows a position by that count as well as by its pieces and
+  rights, and what it holds at one count is not used at another. Nor is it
+  believed about a forced mate that would come after the count runs out.
+  Tests tell the table something untrue of a position at one count and
+  search it from others, and play out a mate announced ten half-moves from
+  the hundredth. In 200 endings of a queen or a rook, half of them with a
+  pawn, against a bare king, begun 11 to 40 half-moves from the hundredth
+  at 20,000 positions a move, the engine won 86 this way. It won 84 with a
+  table that took no notice of the count, and 82 with one that kept
+  nothing the rule could reach.
+- **The margin beside a mate:** however wide the margin, a move that gets
+  its player mated is not good enough beside one that does not. A position
+  where several moves do is compared with the plain search under the widest
+  margin there is.
+- **More material than a game can hold:** the rules accept a position set
+  up with sixty queens. Whatever a position holds, its evaluation stops
+  short of the scores kept for forced mates, and boards of more than thirty
+  queens are searched at every level.
+
 A search ends when its positions are spent, which is nearly always partway
 through a depth. It answers from the moves that depth had got to, and from
 the depth before while none of them is finished. After every step of
@@ -288,23 +312,32 @@ it finds. Each has a check of its own.
   whatever follows, and the exchange is not played out. The comparison
   with the exchange on a plain board covers it.
 
-`tests/search.rs` covers what a host relies on: a legal action after any
-number of steps, the same decision for the same game, settings, seed and
-steps, the budget and memory limits, mates, stalemate, and draw claims taken
-by the player who is losing and declined by the one who is winning.
+`tests/search.rs` covers what a host relies on: a legal action when a
+search is stopped before it starts, among captures and between depths, the
+same decision for the same game, settings, seed and steps, the budget and
+memory limits, mates, stalemate, and draw claims taken by the player who is
+losing and declined by the one who is winning. `src/search/tests.rs` asks
+for a legal action after every step of three searches.
 
 ### Checking the tests
 
-On 2026-11-24 the search was broken in 122 ways, one at a time, in a copy
+On 2026-11-25 the search was broken in 132 ways, one at a time, in a copy
 of the crate, and its tests were rerun. Every break failed at least one
 test.
 
 The sweep grew with the search. A first run of 42 breaks had missed seven,
-and a test was added for each. Of the 43 added with the exchange, the pass,
-the reductions and the ordering of quiet moves, the tests at first missed
-one: captures given marks that only quiet moves should have. The 32 added
-with the use of the whole budget, the work on speed and the terms for pawns
-and rooks were all noticed.
+and a test was added for each. It stood at 48 when the exchange, the pass,
+the reductions and the ordering of quiet moves added 43, of which the tests
+at first missed one: captures given marks that only quiet moves should
+have. The use of the whole budget, the work on speed and the terms for
+pawns and rooks added 32 and retired one with the rule it broke, and all
+were noticed.
+
+A review of the whole change then found four things that the sweep had
+never broken and no test would have noticed: the limits on a search's
+settings, the range of the evaluation, the margin beside a forced mate and
+the table beside the fifty-move rule. The last three were wrong as well. Ten
+breaks went in with the fixes and their tests.
 
 | What was broken | Breaks | Tests that noticed |
 | --- | --- | --- |
@@ -335,6 +368,10 @@ and rooks were all noticed.
 | Moves as numbers: promotions sharing one, the best move misread | 2 | `src/tests.rs`, order of moves |
 | A decision that names the wrong state of the game | 1 | A legal action after any step |
 | Evaluation for the wrong player, tables read from the far side, tables mirrored for White | 3 | Evaluation |
+| Settings beyond their limits: a search deeper than the deepest or of no depth, captures followed past their limit, a table larger than the largest | 4 | Limits of the settings |
+| A position that looks better than a forced mate | 1 | A board full of queens |
+| A mated move good enough under the widest margin | 1 | The margin beside a mate |
+| The table beside the fifty-move rule: the count left out of what it knows a position by, a mate believed though it would come too late, by one half-move, or at the hundredth | 4 | The table and the count |
 | Pawns and rooks: a pawn beside a passed pawn taken to stop it, or only a pawn on its file; both pawns on a file passed; doubled pawns rewarded; a file with the other player's pawn counted open; the seventh rank counted whatever stands there; Black's board not turned | 7 | Evaluation |
 
 A break that changes only the order in which moves are tried changes no
@@ -347,9 +384,10 @@ as a pass tried a half-move later, is for the benchmark to notice.
 
 ### How strong the levels are
 
-On 2026-11-24 the tooling outside the repository measured the three levels
-with their starting budgets, first with the search as first built and last
-with every change listed under [the benchmark](#the-benchmark). The figures
+On 2026-11-24 and 2026-11-25 the tooling outside the repository measured
+the three levels with their starting budgets, first with the search as
+first built and last with every change listed under [the
+benchmark](#the-benchmark). The figures
 here are the last ones. Nothing here is a rating, and a level that wins
 every game against a weaker level of the same search need not be as far
 ahead of a person.
@@ -364,10 +402,10 @@ ahead of a person.
   each opening twice with the colours exchanged. Normal beat Easy in all 100
   games, and so did Hard. Hard against Normal won 99 and lost one.
 - **A level against itself:** over the same 100 games, 94 ended in checkmate
-  at Easy, 80 at Normal and 90 at Hard, and the rest in a claimed draw or a
+  at Easy, 82 at Normal and 90 at Hard. Two games at Normal were stopped
+  undecided after 400 half-moves, and the rest ended in a claimed draw or a
   dead position. The median game lasted 103 half-moves at Easy, 169 at
-  Normal and 164 at Hard. Four games at Normal were stopped undecided after
-  400 half-moves.
+  Normal and 164 at Hard.
 
 Easy searches two half-moves deep, too shallow for a pass or a reduction, so
 only its evaluation and the order of its moves changed. The budgets of
@@ -415,12 +453,13 @@ chooses its weaker moves by a random sequence started from the clock. Its
 ratings are also wider apart than its play. Held to ratings 200 apart, it
 beat itself by 63 to 111 points.
 
-In about 20,000 games against Stockfish no game ended on a move that this
+In about 26,000 games against Stockfish no game ended on a move that this
 crate's rules refused.
 
 #### What each change was worth
 
-Each was measured on 2026-11-24 at 100,000 positions a move.
+Each was measured on 2026-11-24 at 100,000 positions a move, and the last
+on 2026-11-25.
 
 | The search | Rating | Against the baseline, in 200 games |
 | --- | --- | --- |
@@ -430,21 +469,26 @@ Each was measured on 2026-11-24 at 100,000 positions a move.
 | And the pass from two half-moves, quiet moves ordered by their marks, and late moves searched less deeply | 1863 ± 23 | +212 (+164 to +270) |
 | And every position of the budget used, with the answer taken from an unfinished depth | 1914 ± 23 | +319 (+262 to +394) |
 | And passed and doubled pawns counted, and rooks on open files and on the seventh rank | 1957 ± 23 | +531 (+445 to +691) |
+| And the table told apart by the count near the fifty-move rule | 1959 ± 23 | +531 (+445 to +691) |
 
-With all of them the engine rated 1735 at 10,000 positions a move and 2124
-at 1,000,000, each give or take about 30. That is 140 to 205 above the
+With all of them the engine rated 1734 at 10,000 positions a move and 2124
+at 1,000,000, each give or take about 30. That is 140 to 207 above the
 baseline at every budget. At 100,000 it plays level with Stockfish at about
 400 positions a move.
 
-| Positions a move | Baseline | With the pass and the reductions | With its whole budget used | With the terms for pawns and rooks |
-| --- | --- | --- | --- | --- |
-| 10,000 | 1592 | 1672 | 1688 | 1735 |
-| 100,000 | 1752 | 1863 | 1914 | 1957 |
-| 1,000,000 | 1924 | 2036 | 2045 | 2124 |
+| Positions a move | Baseline | With the pass and the reductions | With its whole budget used | With the terms for pawns and rooks | As it is |
+| --- | --- | --- | --- | --- | --- |
+| 10,000 | 1592 | 1672 | 1688 | 1735 | 1734 |
+| 100,000 | 1752 | 1863 | 1914 | 1957 | 1959 |
+| 1,000,000 | 1924 | 2036 | 2045 | 2124 | 2124 |
+
+The last column is the engine after a review of the whole change, which
+altered its play only close to the fifty-move rule: at least a dozen of
+the 3,500 games came out differently.
 
 Two builds of one engine beat each other by more than either gains against
 other programs: the 531 points won from the baseline at 100,000 positions a
-move are 205 on the field's scale.
+move are 207 on the field's scale.
 
 The settings were chosen by matches of 600 games between builds, at 100,000
 positions a move.
@@ -543,8 +587,10 @@ listed there.
 - Normal used 39,000 to 74,000 of its 100,000 positions and searched 4 or 5
   half-moves deep in full, 7 in a rook endgame. Hard used 431,000 to 755,000
   of its 1,000,000 and searched 6 or 7 deep, 10 in the endgame.
-- A search holds 88 KiB at Easy, 1.1 MiB at Normal and 16.1 MiB at Hard.
-- The fifth position has twenty queens and nothing but captures. Normal's
+- A search holds 88 KiB at Easy, 1.1 MiB at Normal and 16.1 MiB at Hard in
+  the fifth position, which has the most moves, and a little less in the
+  others.
+- The fifth position has eleven queens and captures on every side. Normal's
   budget runs out there before one half-move is searched in full, in 117 ms
   on the Pi 4, and the search answers with its first legal move. Hard takes
   1.06 s there.
@@ -593,10 +639,10 @@ as it had before. The kiosks have not been timed again.
   decision at each kind was 7% slower.
 - A search now takes its whole budget unless the depth limit or a forced
   mate ends it, so its time no longer varies with the position as much.
-- A search holds 105 KiB at Easy, 1.1 MiB at Normal and 16.1 MiB at Hard.
-  The 17 KiB more than at first hold the marks on quiet moves and each
-  position's count of pieces.
-- In the position with twenty queens, Normal searches one half-move in full
+- A search holds up to 105 KiB at Easy, 1.1 MiB at Normal and 16.1 MiB at
+  Hard. The 17 KiB more than at first hold the marks on quiet moves and
+  each position's count of pieces.
+- In the position with eleven queens, Normal searches one half-move in full
   in 29 ms, and Hard two in 302 ms.
 - At the speeds measured on the kiosks for the baseline, 100,000 positions
   take about 40 to 50 ms on the Pi 5 and 85 to 110 ms on the Pi 4, and

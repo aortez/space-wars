@@ -9,9 +9,10 @@
 //! same decision.
 //!
 //! Left to run, a search goes on until it has looked at as many positions as
-//! its settings allow. It ends sooner only at its deepest allowed search or
-//! at a forced mate that a deeper search could not better. Stopped partway
-//! through a depth, it answers from the moves that depth got to.
+//! its settings allow. It ends sooner only at its deepest allowed search, at
+//! a forced mate that a deeper search could not better, or at once where the
+//! player has one legal move and no draw to claim. Stopped partway through a
+//! depth, it answers from the moves that depth got to.
 //!
 //! The search is the usual one for chess. It tries all moves to a depth
 //! that grows by one half-move at a time, and past that depth follows only
@@ -57,6 +58,10 @@ pub const MAX_QUIESCENCE: u8 = 16;
 pub const MAX_TABLE_BITS: u8 = 22;
 
 const MAX_PLY: usize = MAX_DEPTH as usize + MAX_QUIESCENCE as usize;
+
+/// From this many quiet half-moves on, the deepest search there is could
+/// reach the hundredth, captures and all.
+const COUNT_IN_REACH: u32 = 100 - MAX_PLY as u32;
 
 /// The shallowest full search in which the player to move may pass.
 const PASS_DEPTH: u8 = 2;
@@ -468,15 +473,15 @@ impl SearchJob {
         })
     }
 
-    /// What a root move must beat: within the margin of the best so far.
-    /// Close to a forced mate there is no margin, so the quickest is chosen.
+    /// What a root move must be worth to be good enough: within the margin
+    /// of the best so far. Close to a forced mate there is no margin, so the
+    /// quickest is chosen. However wide the margin, a move that gets its
+    /// player mated is not good enough beside one that does not.
     fn margin_below(&self, best: i32) -> i32 {
-        let margin = if best.abs() >= MATE_BOUND {
-            0
-        } else {
-            i32::from(self.settings.margin)
-        };
-        best - margin
+        if best.abs() >= MATE_BOUND {
+            return best;
+        }
+        (best - i32::from(self.settings.margin)).max(1 - MATE_BOUND)
     }
 
     /// Starts the search of the root move at `index`.
@@ -484,7 +489,7 @@ impl SearchJob {
         self.floor = if self.best == -INFINITY {
             -INFINITY
         } else {
-            (self.margin_below(self.best) - 1).max(-INFINITY)
+            self.margin_below(self.best) - 1
         };
         // With nothing to beat, the move's value is wanted outright.
         self.probing = self.floor > -INFINITY;
@@ -640,7 +645,7 @@ impl SearchJob {
     fn enter_full(&mut self, ply: usize) {
         let frame = &mut self.frames[ply - 1];
         frame.table_move = None;
-        if let Some(entry) = self.table.probe(frame.position.hash()) {
+        if let Some(entry) = self.table.probe(table_key(&frame.position)) {
             frame.table_move = entry.mv;
             let deep_enough = if self.rules.deeper_entries {
                 entry.depth >= frame.depth
@@ -653,7 +658,8 @@ impl SearchJob {
                 Bound::Lower => score >= frame.beta,
                 Bound::Upper => score <= frame.alpha,
             };
-            if deep_enough && settles {
+            let in_time = count_allows(&frame.position, entry);
+            if deep_enough && settles && in_time {
                 frame.state = State::Done(score);
                 return;
             }
@@ -924,7 +930,7 @@ impl SearchJob {
             depth: frame.depth,
             bound,
         };
-        self.table.store(frame.position.hash(), entry);
+        self.table.store(table_key(&frame.position), entry);
         let (Bound::Lower, Some(mv)) = (bound, frame.best_move) else {
             return;
         };
@@ -1061,6 +1067,39 @@ fn proved_by_pass(score: i32, beta: i32) -> Option<i32> {
     }
 }
 
+/// What the table knows `position` by: its hash, and near the hundredth
+/// quiet half-move the count of them as well.
+///
+/// The fifty-move rule makes the same position worth less to the player who
+/// is ahead the nearer the hundredth is, so there the position at one count
+/// says nothing of the position at another. Further off no search can reach
+/// the rule, and one entry serves every count.
+fn table_key(position: &Position) -> u64 {
+    let count = position.halfmove_clock();
+    if count < COUNT_IN_REACH {
+        position.hash()
+    } else {
+        position.hash() ^ mix(u64::from(count))
+    }
+}
+
+/// Whether the fifty-move rule leaves a mate that the table gives for
+/// `position` time to be delivered. Any other score it allows.
+///
+/// An entry made far from the hundredth quiet half-move serves every count
+/// there, and a search that leans on the table can follow a mate further
+/// than it could search for one.
+fn count_allows(position: &Position, entry: Entry) -> bool {
+    let score = i32::from(entry.score);
+    if score.abs() < MATE_BOUND {
+        return true;
+    }
+    // The table keeps a mate as its distance from the position. The move
+    // that mates may itself be the hundredth.
+    let before_the_mate = ((MATE - score.abs()) as u32).saturating_sub(1);
+    position.halfmove_clock().saturating_add(before_the_mate) < 100
+}
+
 /// The score of the player to move `ply` half-moves below the root when that
 /// player has been checkmated.
 fn mated_at(ply: usize) -> i32 {
@@ -1113,6 +1152,8 @@ impl Favoured {
 /// valuable piece by the least valuable, then promotions to a queen, the
 /// killers, the other quiet moves by how well they have done lately,
 /// promotions to less than a queen, and last the captures that lose material.
+/// A pawn that captures as it promotes counts as a capture, whatever it
+/// becomes.
 fn order(position: &Position, mv: Move, favoured: Favoured, history: &History) -> i16 {
     let code = mv.code();
     if code == favoured.table_move {

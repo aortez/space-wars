@@ -284,11 +284,7 @@ fn assert_agrees(expected: &mut Expected, settings: Settings) {
 
     let expected = expected.at(decision.depth);
     let best = expected.iter().map(|&(_, value)| value).max().unwrap();
-    let margin = if best.abs() >= MATE_BOUND {
-        0
-    } else {
-        i32::from(settings.margin)
-    };
+    let enough = good_enough_beside(best, settings.margin);
     assert_eq!(decision.score, Some(best), "{context}: the best value");
 
     let mut good_enough = 0;
@@ -298,7 +294,7 @@ fn assert_agrees(expected: &mut Expected, settings: Settings) {
             .iter()
             .find(|entry| entry.mv == mv)
             .unwrap_or_else(|| panic!("{context}: {mv} was not searched"));
-        if value >= best - margin {
+        if value >= enough {
             good_enough += 1;
             assert!(entry.exact, "{context}: {mv} should have its value");
         }
@@ -307,7 +303,7 @@ fn assert_agrees(expected: &mut Expected, settings: Settings) {
         } else {
             // A move shown to be too weak has only a ceiling.
             assert!(
-                value <= entry.score && entry.score < best - margin,
+                value <= entry.score && entry.score < enough,
                 "{context}: {mv} is worth {value}, not at most {}",
                 entry.score
             );
@@ -322,7 +318,19 @@ fn assert_agrees(expected: &mut Expected, settings: Settings) {
         return;
     };
     let chosen = expected.iter().find(|&&(mv, _)| mv == chosen).unwrap().1;
-    assert!(chosen >= best - margin, "{context}: the chosen move");
+    assert!(chosen >= enough, "{context}: the chosen move");
+}
+
+/// The least a move may be worth and still be good enough to choose, where
+/// the best is worth `best`: within `margin` of it, with no margin beside a
+/// forced mate, and never a move that gets its player mated when the best
+/// does not.
+fn good_enough_beside(best: i32, margin: u16) -> i32 {
+    if best.abs() >= MATE_BOUND {
+        best
+    } else {
+        (best - i32::from(margin)).max(1 - MATE_BOUND)
+    }
 }
 
 /// Positions with the depth and the half-moves of captures to search them
@@ -576,20 +584,16 @@ fn assert_answers_from_what_it_searched(job: &SearchJob, expected: &mut Expected
     };
     let values: Vec<i32> = searched.iter().map(|&mv| value(expected, mv)).collect();
     let best = *values.iter().max().unwrap();
-    let margin = if best.abs() >= MATE_BOUND {
-        0
-    } else {
-        i32::from(job.settings.margin)
-    };
+    let enough = good_enough_beside(best, job.settings.margin);
 
     if let Some(at_least) = job.proved {
         // The move in hand has been shown good enough, and its value is
         // still being worked out.
         let mv = job.root_moves[job.index].mv;
         let value = value(expected, mv);
-        assert!(value >= best - margin, "{context}: {mv} is worth {value}");
+        assert!(value >= enough, "{context}: {mv} is worth {value}");
         assert!(
-            (best - margin..=value).contains(&at_least),
+            (enough..=value).contains(&at_least),
             "{context}: {mv} is worth {value}, not at least {at_least}"
         );
         assert_eq!(decision.choice, mv, "{context}");
@@ -598,7 +602,7 @@ fn assert_answers_from_what_it_searched(job: &SearchJob, expected: &mut Expected
         return;
     }
     assert_eq!(decision.score, Some(best), "{context}: the best value");
-    let good_enough = values.iter().filter(|&&value| value >= best - margin);
+    let good_enough = values.iter().filter(|&&value| value >= enough);
     assert_eq!(
         usize::from(decision.candidates),
         good_enough.count(),
@@ -606,10 +610,7 @@ fn assert_answers_from_what_it_searched(job: &SearchJob, expected: &mut Expected
     );
     let chosen = searched.iter().position(|&mv| mv == decision.choice);
     let chosen = chosen.unwrap_or_else(|| panic!("{context}: {} chosen", decision.choice));
-    assert!(
-        values[chosen] >= best - margin,
-        "{context}: the chosen move"
-    );
+    assert!(values[chosen] >= enough, "{context}: the chosen move");
 }
 
 #[test]
@@ -784,6 +785,193 @@ fn the_evaluation_counts_what_pawns_and_rooks_are_worth_beyond_their_placement()
     ] {
         assert_eq!(value(board), worth, "{what}: {board}");
     }
+}
+
+#[test]
+fn a_move_that_gets_its_player_mated_is_never_good_enough_beside_one_that_does_not() {
+    // White is a queen down. Several moves let Black mate at once, and the
+    // one tried first at the second depth is among them.
+    let fen = "5rk1/6pp/1p6/3b4/5q2/2N5/6PP/1R5K w - - 0 1";
+    let game = game(fen, "");
+    let mut expected = Expected::new("mated-if-careless", &game, 2, WITHOUT_TABLE);
+    for depth in 1..=2 {
+        for margin in [0, 40, u16::MAX] {
+            assert_agrees(&mut expected, settings(depth, 2, 0, margin));
+        }
+    }
+
+    // With the widest margin there is, every move is good enough but those.
+    let values = expected.at(2).to_vec();
+    let mated = values
+        .iter()
+        .filter(|&&(_, value)| value <= -MATE_BOUND)
+        .count();
+    assert!(
+        mated >= 2 && mated < values.len(),
+        "{mated} of {}",
+        values.len()
+    );
+    let job = searched(&game, settings(2, 2, 0, u16::MAX), WITHOUT_TABLE);
+    let candidates = usize::from(job.decision().unwrap().candidates);
+    assert_eq!(candidates, values.len() - mated);
+}
+
+/// A rook ending with `count` quiet half-moves behind it.
+fn rook_ending_at(count: u32) -> Position {
+    Position::from_fen(&format!("8/8/7k/8/1R2K3/8/8/8 w - - {count} 84")).unwrap()
+}
+
+#[test]
+fn near_the_hundredth_half_move_the_table_knows_a_position_by_its_count_too() {
+    // Far from it, one entry serves the position at every count.
+    let plain = rook_ending_at(0).hash();
+    for count in 0..COUNT_IN_REACH {
+        assert_eq!(table_key(&rook_ending_at(count)), plain, "count {count}");
+    }
+    // From the count where the deepest search could reach it, each count
+    // has an entry of its own.
+    let mut keys: Vec<u64> = (COUNT_IN_REACH..100)
+        .map(|count| table_key(&rook_ending_at(count)))
+        .collect();
+    keys.push(plain);
+    keys.sort_unstable();
+    keys.dedup();
+    assert_eq!(keys.len(), 100 - COUNT_IN_REACH as usize + 1);
+    // The deepest search there is cannot reach the hundredth from below it.
+    assert_eq!(COUNT_IN_REACH + u32::from(MAX_DEPTH + MAX_QUIESCENCE), 100);
+}
+
+/// Searches the rook ending two half-moves deep from `count`, after telling
+/// the table that the position after White's first move, as it would stand
+/// at the count `told_at`, has the value `score` for Black.
+fn score_with_the_table_told(count: u32, told_at: u32, score: i32) -> i32 {
+    let game = Game::new(1, rook_ending_at(count));
+    let mut job = SearchJob::new(&game, settings(2, 0, 4, 0), 0).unwrap();
+    job.rules = TABLE_AS_IN_PLAY;
+    let mut reply = job.root_moves[0].position.clone();
+    assert_eq!(reply.halfmove_clock(), count + 1);
+    reply.halfmove_clock = told_at;
+    let told = Entry {
+        score: score as i16,
+        mv: None,
+        depth: 9,
+        bound: Bound::Exact,
+    };
+    job.table.store(table_key(&reply), told);
+    job.run(u64::MAX);
+    job.decision().unwrap().score.unwrap()
+}
+
+#[test]
+fn what_the_table_holds_at_one_count_is_not_used_at_another_near_the_hundredth() {
+    // Black is said to be ten pawns behind after White's first move.
+    let behind = -1_000;
+    // Far from the hundredth the count makes no difference.
+    assert_eq!(score_with_the_table_told(10, 11, behind), -behind);
+    assert_eq!(score_with_the_table_told(10, 30, behind), -behind);
+    // Near it the entry is found at its own count and at no other.
+    assert_eq!(score_with_the_table_told(80, 81, behind), -behind);
+    assert_ne!(score_with_the_table_told(80, 85, behind), -behind);
+    assert_ne!(score_with_the_table_told(80, 30, behind), -behind);
+}
+
+#[test]
+fn the_table_is_not_believed_about_a_mate_that_would_come_too_late() {
+    // Black is said to be mated in two half-moves after White's first move,
+    // which is not so.
+    let mated = 2 - MATE;
+    // Where the count leaves room for it, the table is taken at its word.
+    assert_eq!(score_with_the_table_told(10, 11, mated), MATE - 3);
+    assert_eq!(score_with_the_table_told(97, 98, mated), MATE - 3);
+    // From a count of 98 the move before the mate would be the hundredth
+    // quiet half-move, so the mate proves nothing there.
+    assert!(score_with_the_table_told(98, 99, mated).abs() < MATE_BOUND);
+
+    let entry = |score: i32| Entry {
+        score: score as i16,
+        mv: None,
+        depth: 9,
+        bound: Bound::Exact,
+    };
+    for (count, score, holds, why) in [
+        // The eleventh half-move may be the hundredth and still mate.
+        (89, MATE - 11, true, "a mate just in time"),
+        (90, MATE - 11, false, "a mate one half-move late"),
+        (90, 11 - MATE, false, "being mated one half-move late"),
+        (99, MATE - 1, true, "a mate in one at the last"),
+        (99, -MATE, true, "a position that is mate"),
+        // A score that is no mate proves nothing the count could undo.
+        (99, 250, true, "any other score"),
+        // A mate made out far from the hundredth, further off than any
+        // search could follow it.
+        (40, MATE - 60, true, "a long mate just in time"),
+        (40, MATE - 61, false, "a long mate one half-move late"),
+    ] {
+        let position = rook_ending_at(count);
+        assert_eq!(
+            count_allows(&position, entry(score)),
+            holds,
+            "{why}: count {count}, score {score}"
+        );
+    }
+    // A count beyond anything a game reaches overflows nothing.
+    let fen = format!("8/8/7k/8/1R2K3/8/8/8 w - - {} 84", u32::MAX);
+    let position = Position::from_fen(&fen).unwrap();
+    assert!(!count_allows(&position, entry(MATE - 3)));
+}
+
+#[test]
+fn a_mate_announced_close_to_the_hundredth_half_move_is_real() {
+    // Ninety quiet half-moves have passed. A rook cannot force mate within
+    // the ten that are left, and a search that trusted its table across
+    // counts used to announce one in eleven.
+    let rook = game("8/8/7k/8/1R2K3/8/8/8 w - - 90 84", "");
+    let job = searched(&rook, Level::Normal.settings(), IN_PLAY);
+    let score = job.decision().unwrap().score.unwrap();
+    assert!(score.abs() < MATE_BOUND, "a mate was announced: {score}");
+
+    // A pawn move starts the count again, so with a pawn to move a mate in
+    // eleven is there to be found, and is delivered.
+    let start = game("3k4/8/8/8/8/8/P1Q1K3/8 w - - 90 82", "");
+    let job = searched(&start, Level::Hard.settings(), IN_PLAY);
+    let announced = MATE - job.decision().unwrap().score.unwrap();
+    assert_eq!(announced, 11);
+    let mut game = start.clone();
+    for _ in 0..announced {
+        let job = searched(&game, Level::Hard.settings(), IN_PLAY);
+        let decision = job.decision().unwrap();
+        let player = game.position().side_to_move();
+        game.apply(decision.revision, player, decision.action)
+            .unwrap();
+    }
+    let winner = Color::White;
+    assert_eq!(game.outcome(), Some(crate::Outcome::Checkmate { winner }));
+}
+
+#[test]
+fn settings_beyond_their_limits_are_brought_back_to_them() {
+    let game = game(START, "");
+    let beyond = Settings {
+        depth: u8::MAX,
+        nodes: 7,
+        quiescence: u8::MAX,
+        table_bits: u8::MAX,
+        margin: u16::MAX,
+    };
+    let within = Settings {
+        depth: MAX_DEPTH,
+        quiescence: MAX_QUIESCENCE,
+        table_bits: MAX_TABLE_BITS,
+        ..beyond
+    };
+    let job = SearchJob::new(&game, beyond, 0).unwrap();
+    assert_eq!(job.settings, within);
+    // The stack has a frame for every half-move a search may go down.
+    assert_eq!(job.frames.len(), usize::from(MAX_DEPTH + MAX_QUIESCENCE));
+
+    // A search of no depth at all is one of a single half-move.
+    let job = SearchJob::new(&game, settings(0, 0, 0, 0), 0).unwrap();
+    assert_eq!(job.settings.depth, 1);
 }
 
 #[test]
