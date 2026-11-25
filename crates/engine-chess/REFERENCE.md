@@ -427,7 +427,14 @@ What each setting costs and buys, as far as it was measured:
   takes is in proportion to them, about a millisecond for each thousand on
   the Pi 4 and 0.4 on the Pi 5.
 - **The table:** sixteen bytes an entry, and a search holds about 100 KiB
-  besides. What its size is worth by itself has not been measured.
+  besides. What its size is worth in strength has not been measured, but
+  its cost in time has. Up to 1 MiB it costs nothing that shows. A larger
+  table is cleared for every move, which on the Pi 4 adds up to 2 ms for
+  4 MiB and 4 to 8 ms for 16 MiB: nothing beside Hard's second, but half
+  as long again as Normal's whole search. The largest, 64 MiB, costs
+  nothing to make, and instead slows the search, by about a tenth of a
+  second at 1,000,000 positions. The Pi 5 pays about a quarter as
+  much. See [On the kiosks](#on-the-kiosks).
 - **The margin:** moves within it of the best are all good enough, and the
   seed chooses between them. A wider margin varies the play and weakens it.
   What it costs by itself has not been measured: each setting measured here
@@ -737,6 +744,38 @@ since a player may still choose it.
   once on each kiosk with Hard's other settings, by a program in the
   tooling outside the repository. Both kiosks made the same decisions, and
   each search looked at positions about as quickly as at 1,000,000.
+
+The same program then searched the five positions with each size of table,
+from none to the largest, at 1,000 to 1,000,000 positions. Each search was
+made afresh, as the game makes one for each move, and the five were
+searched three times over. Against no table, the table added this much to
+a move in the four ordinary positions on the Pi 4, taking the quicker of
+the second and third rounds:
+
+| Table | 1,000 positions | 10,000 | 100,000 | 1,000,000 |
+| --- | --- | --- | --- | --- |
+| 64 KiB to 1 MiB | nothing that shows | nothing that shows | nothing that shows | nothing that shows |
+| 4 MiB | 1.0 to 2.4 ms | 0.4 to 1.3 ms | nothing that shows | nothing that shows |
+| 16 MiB | 5.0 to 6.6 ms | 4.2 to 5.4 ms | up to 8 ms | nothing that shows |
+| 64 MiB | up to 1 ms | 3 to 12 ms | 32 to 76 ms | 44 to 113 ms |
+
+- Up to 16 MiB the cost is clearing the table as each search is made. The
+  C library clears memory it has handed out before, and it reuses that
+  memory from the second search on: making a 16 MiB table took 5 to 8 ms
+  each time. The first searches of the program took up to 21 ms, while
+  the memory was first taken from the system.
+- The C library maps a table of 64 MiB afresh for each search, so it comes
+  clear and costs nothing to make. The system clears each part of it as
+  the search first touches it, and a search over that much memory runs
+  more slowly besides. Against 16 MiB, which led to the same decisions in
+  most positions, it added 112 to 123 ms at 1,000,000 positions.
+- The Pi 5 paid about a quarter as much: 0.9 to 1.3 ms for 16 MiB at
+  10,000 positions, and 27 to 31 ms for 64 MiB against 16 MiB at
+  1,000,000.
+- Up to 1 MiB, the differences are those of a search that finds other
+  positions in its table, and so looks at others. They run both ways, by
+  up to a tenth at 1,000,000 positions.
+- Both kiosks made the same decisions with every size of table.
 - Easy answers in under a millisecond on both, and a search holds what it
   holds on the workstation.
 - The kiosks look at about as many positions a second as they did with the

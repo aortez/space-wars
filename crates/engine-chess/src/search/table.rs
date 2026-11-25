@@ -63,8 +63,9 @@ impl Entry {
 #[derive(Clone)]
 pub(super) struct Table {
     /// For each slot, the key of its position and its packed entry. Slots
-    /// of plain zeros let the allocator hand over memory that is already
-    /// clear, so a large table costs nothing to make.
+    /// of plain zeros let the allocator hand over memory that the system
+    /// has already cleared, where it can. Where it reuses memory it clears
+    /// it first, which takes 5 to 8 ms for 16 MiB on a Raspberry Pi 4.
     slots: Vec<[u64; 2]>,
 }
 
