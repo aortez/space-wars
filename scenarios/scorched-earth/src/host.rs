@@ -206,6 +206,9 @@ pub struct Impact {
     pub ledger: engine_material::SourceLedger,
     /// Work each tank's armor took from the shell, by slot.
     pub absorbed: [f32; 2],
+    /// Energy of each tank's push from the burst, by slot. It came out of the
+    /// tank's share of the payload, before the armor took the rest.
+    pub pushed: [f32; 2],
     /// Energy stopped by bodies outside the material model, reported rather
     /// than charged: the hit's, on terrain or any body that is not a tank,
     /// and the burst's shares on the host's bodies.

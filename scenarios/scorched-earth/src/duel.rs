@@ -644,6 +644,7 @@ impl Duel {
                     velocity: shell.velocity * self.placement.scale,
                     ledger: shell.source.ledger(),
                     absorbed: struck.absorbed,
+                    pushed: struck.pushed,
                     unmodeled: struck.unmodeled,
                 });
             }

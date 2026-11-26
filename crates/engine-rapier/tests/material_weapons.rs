@@ -8,6 +8,9 @@ use engine_material::{
     Region, SHELL, SOFT_TISSUE, Section, SourceError, Target, TissueIntegrity, TissueMaterial,
     TissueTable, WOOD, blast_reach, deposit, effective_mass, impact, patch_width_from_radii,
 };
+use engine_rapier::world::loading::charges::{
+    ContactCharge, ContactSurface, ContactSurfaces, Depth,
+};
 use engine_rapier::world::loading::response::ResponseRejection;
 use engine_rapier::world::loading::{CaptureConfig, ContactSource, RegionId, RegionToken};
 use engine_rapier::world::weapon::{
@@ -36,6 +39,10 @@ const BALL: u64 = 30;
 const BALL_HULL: u64 = 1001;
 const ROVER: u64 = 40;
 const ROVER_HULL: u64 = 1002;
+/// A wall a struck plate can be knocked into, and the key the host keeps its
+/// armor under.
+const WALL: u64 = 50;
+const WALL_HULL: u64 = 1003;
 /// Blades of moss stand at x = 2.5, 3.5 and 4.5, and the plate's face at 7.5.
 const BLADES: [f32; 3] = [2.5, 3.5, 4.5];
 const BLADE_RADIUS: f32 = 0.1;
@@ -1054,6 +1061,142 @@ fn a_hit_is_measured_from_both_bodies_motion_and_inertia() {
     let m_eff = 1.0 / (1.0 / m + 1.0 / big + 1.0 / inertia);
     let expected = 0.5 * m_eff * f64::from(SPEED).powi(2);
     assert!((f64::from(hit.ledger.available) / expected - 1.0).abs() < 1.0e-3);
+}
+
+/// The host's contact surfaces: the body behind each capture region, whose
+/// armor the field keeps under its key.
+struct Surfaces<'a> {
+    field: &'a mut Field,
+    keys: &'a [(RegionToken, u64)],
+}
+
+impl Surfaces<'_> {
+    fn key(&self, source: ContactSource) -> Option<u64> {
+        self.keys
+            .iter()
+            .find(|(token, _)| *token == source.region)
+            .map(|(_, key)| *key)
+    }
+}
+
+impl ContactSurfaces for Surfaces<'_> {
+    fn surface(&self, source: ContactSource) -> Option<ContactSurface> {
+        let (_, region) = self.field.bodies.get(&self.key(source)?)?;
+        Some(ContactSurface {
+            region: *region,
+            thickness: PLATE_SECTION.thickness,
+            depth: Depth::Fixed(PLATE_SECTION.depth),
+            radius: None,
+        })
+    }
+
+    fn absorb(&mut self, source: ContactSource, work: f32) {
+        let key = self.key(source).unwrap();
+        Recipients::absorb(self.field, key, work);
+    }
+}
+
+#[test]
+fn a_shot_and_contact_charges_in_one_world_spend_its_energy_once() {
+    // A world whose contacts are priced as the games' are, with a free plate
+    // in the shot's path and a wall behind it. The host keeps each one's armor
+    // for both the weapons and the charges.
+    let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+    world
+        .enable_loading_capture(CaptureConfig::default())
+        .unwrap();
+    world.enable_speculative_arrivals().unwrap();
+    let mut field = Field::new(&[]);
+    let mut keys = Vec::new();
+    for (entity, key, x, kind, half) in [
+        (PLATE, HULL, 8.0, BodyKind::Dynamic, 2.0),
+        (WALL, WALL_HULL, 12.0, BodyKind::Fixed, 3.0),
+    ] {
+        assert!(world.insert_body(
+            body(entity),
+            BodySpec {
+                kind,
+                position: Vec2::new(x, 0.0),
+                lock_rotation: true,
+                can_sleep: false,
+                ..Default::default()
+            },
+            &[ColliderSpec::cuboid(collider(entity, 0), 0.5, half)],
+        ));
+        let id = PhysicsId::new(entity);
+        field.bodies.insert(key, (id, armor()));
+        let token = world
+            .create_loading_region(
+                RegionId {
+                    entity: id,
+                    part: 0,
+                },
+                body(entity),
+            )
+            .unwrap();
+        world
+            .bind_loading_collider(
+                collider(entity, 0),
+                ContactSource {
+                    region: token,
+                    patch: 0,
+                },
+            )
+            .unwrap();
+        keys.push((token, key));
+    }
+    let mut weapons = Weapons::new();
+    fire(&mut world, &mut weapons, None);
+    let budget = 0.5 * f64::from(SHOT_MASS) * f64::from(SPEED).powi(2);
+    // Each step the weapons settle, then the charges price it.
+    let mut events = Vec::new();
+    let mut charges = Vec::new();
+    for _ in 0..240 {
+        let prepared = weapons.prepare(&world, DT);
+        world.step(DT);
+        weapons.settle(prepared, &mut world, DT, &mut field);
+        events.extend(weapons.take_events());
+        let mut surfaces = Surfaces {
+            field: &mut field,
+            keys: &keys,
+        };
+        charges.extend(world.charge_contact_impacts(&mut surfaces).unwrap());
+    }
+    // The shot charged the plate once. Its body has no capture region, so the
+    // charges never priced its hit again.
+    let plate = Recipient::Body {
+        key: HULL,
+        entity: PhysicsId::new(PLATE),
+    };
+    let hits = delivered(&events, Part::Kinetic, plate);
+    assert_eq!(hits.len(), 1);
+    let hit = hits[0];
+    // The charges priced the plate's one impact on the wall, on the motion the
+    // shot gave it.
+    let [(plate_region, _), (wall_region, _)] = [keys[0], keys[1]];
+    assert_eq!(charges.len(), 1, "{charges:?}");
+    let ContactCharge::Charged {
+        sources, outcome, ..
+    } = charges[0]
+    else {
+        panic!("unpriced: {:?}", charges[0]);
+    };
+    let slot = sources
+        .iter()
+        .position(|source| source.region == plate_region)
+        .unwrap();
+    assert_eq!(sources[1 - slot].region, wall_region);
+    assert!(outcome.ledger.available > 0.0);
+    // The plate lost what the hit and the impact consumed from it, and the two
+    // made no more energy available than the shot brought.
+    let lost = armor().remaining_precise() - field.left(HULL);
+    let consumed = f64::from(hit.consumed[1]) + f64::from(outcome.consumed[slot]);
+    assert!((lost - consumed).abs() < 1.0e-3 * consumed.max(1.0));
+    let available = f64::from(hit.ledger.available) + f64::from(outcome.ledger.available);
+    assert!(
+        available <= budget * (1.0 + 1.0e-3),
+        "{available} of {budget}"
+    );
 }
 
 #[test]

@@ -771,6 +771,10 @@ pub struct ShipState {
     queued_laser_fire: bool,
     queued_cannon_fire: bool,
     delta_time: f32,
+    /// The velocity change the hit that kills this ship gives its escape pod:
+    /// the hit's damage as a speed along it. It is a game rule, not energy the
+    /// hit carried, so the material ledger leaves it out. A weapon's source
+    /// charged the hull only for what it delivered.
     death_impulse: Vec2,
 }
 

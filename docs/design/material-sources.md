@@ -261,6 +261,8 @@ is one region the duel keeps.
 - Its payload bursts a shell's radius off the surface it struck, never inside a
   tank, and `blast_reach` divides it among the circles standing in for the tanks
   within 5 units of their surface. Terrain takes no share and shields nothing.
+  Each tank's share pays for the burst's push on it first, and its armor takes
+  the rest.
 - A host puts its own recipients in the way through the same `Recipients`
   trait. A shell passes the tissue it crosses, a burst reaches tissue in one
   front with the tanks, and other bodies stop the energy that meets them.

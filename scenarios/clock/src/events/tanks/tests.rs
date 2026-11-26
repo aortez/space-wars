@@ -1171,7 +1171,7 @@ fn a_loser_blows_apart_and_each_piece_turns_to_dirt_where_it_comes_to_rest() {
 
 #[test]
 fn a_fight_with_no_survivors_blows_up_both_tanks_then_withdraws() {
-    let mut state = ready(4.0 / 3.0, 69, ClockTimeFormat::TwentyFourHour);
+    let mut state = ready(4.0 / 3.0, 234, ClockTimeFormat::TwentyFourHour);
     start_fighting(&mut state);
     to_the_result(&mut state);
     assert_eq!(tanks(&state).result, Some(ResultKind::Neither));
@@ -1930,7 +1930,7 @@ fn a_survivor_draws_its_ending_evenly_from_those_that_fit_the_fight() {
     // A fight that leaves no winner gives a spaceling that drew an ending
     // with the winner the rescue beam, and waits no longer than a rescue
     // takes.
-    let mut state = ready(4.0 / 3.0, 69, ClockTimeFormat::TwentyFourHour);
+    let mut state = ready(4.0 / 3.0, 234, ClockTimeFormat::TwentyFourHour);
     start_fighting(&mut state);
     event(&mut state).survivors.rolls = [Some(Ejection::Thrown); 2];
     event(&mut state).survivors.ending_rolls =

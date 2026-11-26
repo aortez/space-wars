@@ -181,14 +181,44 @@ impl Duel {
         .apply(physics, bodies);
         // Combat damage is independent of whether the bounded material pool
         // admitted this edit. Capacity cannot make a tank invulnerable.
-        let released = self.release_payload(physics, recipients, center, source, keys);
-        RadialImpulse {
-            center: self.placement.point_to_world(point),
-            radius: 6.0 * self.placement.scale,
-            speed: 4.0 * self.placement.scale,
+        let pushes = self.tank_pushes(
+            physics,
+            RadialImpulse {
+                center: self.placement.point_to_world(point),
+                radius: 6.0 * self.placement.scale,
+                speed: 4.0 * self.placement.scale,
+            },
+        );
+        let released = self.release_payload(physics, recipients, center, source, keys, &pushes);
+        // A share too small to pay for a tank's whole push moves it as far as
+        // the share pays for.
+        for (slot, (push, paid)) in pushes.iter().zip(released.pushed).enumerate() {
+            if paid > 0.0 {
+                let delta = push.delta * (paid / push.energy).sqrt();
+                physics.apply_velocity_delta(self.tanks[slot].body, delta, true);
+            }
         }
-        .apply(physics, self.tanks.iter().map(|t| t.body));
         released
+    }
+
+    /// Each tank's push from `impulse`, by slot. A push's energy is the body's
+    /// mass times half its velocity change squared, in Scorched's units: a
+    /// world at another scale carries energies times the scale's fourth power.
+    fn tank_pushes(&self, physics: &PhysicsWorld, impulse: RadialImpulse) -> [armor::Push; 2] {
+        let scale = self.placement.scale;
+        self.tanks.each_ref().map(|tank| {
+            let (Some(center), Some(mass)) = (
+                physics.center_of_mass(tank.body),
+                physics.body_mass(tank.body),
+            ) else {
+                return armor::Push::default();
+            };
+            let delta = impulse.velocity_change(center);
+            armor::Push {
+                delta,
+                energy: 0.5 * mass * delta.length_squared() / scale.powi(4),
+            }
+        })
     }
 
     pub fn slumping_diagnostics(&self) -> engine_rapier::terrain::SlumpingDiagnostics {

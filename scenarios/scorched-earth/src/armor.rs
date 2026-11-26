@@ -160,9 +160,21 @@ fn outside(targets: &[Target], mut center: Vec2) -> Vec2 {
 pub(crate) struct Struck {
     /// Work each tank's armor absorbed, by slot.
     pub absorbed: [f32; 2],
+    /// Energy of each tank's push, by slot, which its share of the payload
+    /// paid for before its armor took the rest.
+    pub pushed: [f32; 2],
     /// Energy stopped by bodies outside the material model: the hard hit's,
     /// on what the shell struck, and the burst's shares on the host's bodies.
     pub unmodeled: f32,
+}
+
+/// A burst's push on one tank: the velocity change it gives the tank's body in
+/// the world, and that change's energy in the tank's own frame, in Scorched's
+/// units.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub(crate) struct Push {
+    pub delta: Vec2,
+    pub energy: f32,
 }
 
 /// The host has no recipients of its own: standalone Scorched, and hosts that
@@ -344,8 +356,10 @@ impl Duel {
 
     /// Releases `source`'s payload from `center` into the armor of the tanks
     /// and the host's tissue within reach. The host's bodies stop the energy
-    /// that meets them first. Returns what the tanks' armor took and what the
-    /// host's bodies stopped.
+    /// that meets them first. Each tank's share pays for its push in `pushes`
+    /// first, as far as it can, and its armor takes the rest. Returns what the
+    /// tanks' armor took, what their pushes were paid and what the host's
+    /// bodies stopped.
     pub(super) fn release_payload(
         &mut self,
         physics: &PhysicsWorld,
@@ -353,6 +367,7 @@ impl Duel {
         center: Vec2,
         source: &mut Source,
         keys: &mut Keys,
+        pushes: &[Push; 2],
     ) -> Struck {
         let mut released = Struck::default();
         let guests = guests(&self.placement, recipients, keys, center, BLAST_REACH);
@@ -381,13 +396,25 @@ impl Duel {
             }
         }
         let tanks = reaches.iter().filter(|reach| reach.key < 2);
+        let payload = source.ledger().payload.budget;
+        let mut pushed = [0.0; 2];
         let mut shares: Vec<Share> = tanks
             .clone()
-            .map(|reach| Share {
-                key: reach.key,
-                region: &self.tanks[reach.key as usize].armor,
-                face: Face::new(reach.width, ARMOR_SECTION),
-                coupling: reach.coupling,
+            .map(|reach| {
+                let slot = reach.key as usize;
+                let share = f64::from(reach.coupling) * payload;
+                let paid = f64::from(pushes[slot].energy).min(share);
+                pushed[slot] = paid as f32;
+                Share {
+                    key: reach.key,
+                    region: &self.tanks[slot].armor,
+                    face: Face::new(reach.width, ARMOR_SECTION),
+                    coupling: if payload > 0.0 {
+                        ((share - paid) / payload) as f32
+                    } else {
+                        reach.coupling
+                    },
+                }
             })
             .collect();
         shares.extend(tissue.iter().map(|(reach, (_, region, section, _))| Share {
@@ -399,7 +426,8 @@ impl Duel {
         let Ok(outcomes) = source.release(&shares) else {
             return released;
         };
-        released.unmodeled = source.ledger().payload.budget as f32 * blocked;
+        released.pushed = pushed;
+        released.unmodeled = payload as f32 * blocked;
         let mut outcomes = outcomes.into_iter();
         for (reach, outcome) in tanks.zip(outcomes.by_ref()) {
             let slot = reach.key as usize;
@@ -482,6 +510,7 @@ impl Duel {
         for (absorbed, released) in struck.absorbed.iter_mut().zip(released.absorbed) {
             *absorbed += released;
         }
+        struck.pushed = released.pushed;
         struck.unmodeled += released.unmodeled;
         struck
     }

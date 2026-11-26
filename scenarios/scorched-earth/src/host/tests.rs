@@ -1002,6 +1002,7 @@ fn a_burst_shares_its_payload_with_the_hosts_moss_and_stops_at_its_bodies() {
             center,
             &mut armor::charge(9, None),
             &mut armor::Keys::default(),
+            &[armor::Push::default(); 2],
         )
     };
     let open = release(&mut open, &mut Field::new(1.0));
