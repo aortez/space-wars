@@ -1,7 +1,7 @@
 //! The computer opponent through its public interface: what a host that runs
 //! a search may rely on.
 
-use engine_chess::search::{Level, MATE, MAX_DEPTH, SearchJob, Settings};
+use engine_chess::search::{Level, MATE, MAX_DEPTH, MAX_PLAY_NODES, SearchJob, Settings};
 use engine_chess::{Action, ActionError, DrawClaim, DrawReason, Game, Move, Outcome, Position};
 
 const START: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -128,6 +128,17 @@ fn settings_beyond_the_limits_are_brought_back_to_them() {
     assert!(job.memory_bytes() <= 65 << 20);
     job.run(u64::MAX);
     assert_eq!(job.decision().unwrap().nodes, 3_000);
+
+    // What a player asks for is also held to a number of positions, so that
+    // no choice of settings makes a move take unbounded time or memory.
+    let asked = Settings {
+        nodes: u64::MAX,
+        ..settings
+    }
+    .for_play();
+    assert_eq!(asked.nodes, MAX_PLAY_NODES);
+    let job = SearchJob::new(&game, asked, 0).unwrap();
+    assert!(job.memory_bytes() <= 65 << 20);
 
     // Asked for a deeper search than there is, with positions to spare, a
     // search stops at the deepest. The pawns block each other and the kings

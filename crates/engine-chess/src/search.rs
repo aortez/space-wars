@@ -56,6 +56,10 @@ pub const MAX_DEPTH: u8 = 32;
 pub const MAX_QUIESCENCE: u8 = 16;
 /// The largest table: two to this power entries of sixteen bytes, or 64 MiB.
 pub const MAX_TABLE_BITS: u8 = 22;
+/// The most positions a player may give a search for one move. A search of
+/// this many took 7 to 11 seconds on a Raspberry Pi 4, the slowest machine
+/// the game runs on, and 18 in the slowest position measured there.
+pub const MAX_PLAY_NODES: u64 = 10_000_000;
 
 const MAX_PLY: usize = MAX_DEPTH as usize + MAX_QUIESCENCE as usize;
 
@@ -92,6 +96,10 @@ const LOGARITHMS: [u16; 64] = [
 
 /// The limits of one search. They bound its work and memory whatever the
 /// position.
+///
+/// A player may set every one of them. The named [`Level`]s are settings to
+/// start from, and [`Settings::for_play`] keeps whatever is chosen within
+/// bounds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Settings {
     /// The deepest full search in half-moves, from 1 to [`MAX_DEPTH`].
@@ -105,15 +113,50 @@ pub struct Settings {
     pub quiescence: u8,
     /// The table of positions already searched holds two to this power
     /// entries of sixteen bytes, up to [`MAX_TABLE_BITS`]. Zero means no
-    /// table.
+    /// table. A table with an entry for every position or two of `nodes`
+    /// played as well as any larger one. Beyond 1 MiB a table also costs
+    /// time on every move: on a Raspberry Pi 4, 4 to 8 ms for 16 MiB, and
+    /// about a tenth of a second for 64 MiB at a million positions.
     pub table_bits: u8,
     /// Moves within this many centipawns of the best are all good enough,
     /// and the seed chooses between them.
     pub margin: u16,
 }
 
-/// The named opponents. They differ in how far they look and how exactly
-/// they choose, never in the rules.
+impl Settings {
+    /// These settings brought within what a player may ask for: each limit
+    /// within its range, and no more than [`MAX_PLAY_NODES`] positions, so
+    /// that a move always comes in bounded time and memory.
+    pub fn for_play(self) -> Self {
+        Self {
+            nodes: self.nodes.min(MAX_PLAY_NODES),
+            ..self.within_limits()
+        }
+    }
+
+    /// These settings with the depth, the captures followed and the table
+    /// brought within the limits that hold for every search.
+    fn within_limits(self) -> Self {
+        Self {
+            depth: self.depth.clamp(1, MAX_DEPTH),
+            quiescence: self.quiescence.min(MAX_QUIESCENCE),
+            table_bits: self.table_bits.min(MAX_TABLE_BITS),
+            ..self
+        }
+    }
+}
+
+/// The named opponents: settings to start from, each of which a player may
+/// then change. They differ in how far they look and how exactly they
+/// choose, never in the rules.
+///
+/// As measured on 2026-11-25, with the details in `REFERENCE.md`:
+///
+/// | Level | Looks at | Plays about as well as Stockfish held to | A move on a Raspberry Pi 4 |
+/// | --- | --- | --- | --- |
+/// | Easy | under 1,000 positions, two half-moves deep | far under 1320, its lowest | under a millisecond |
+/// | Normal | 10,000 positions | 1400 | about 10 ms |
+/// | Hard | 1,000,000 positions | 2160 | about a second |
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Level {
     Easy,
@@ -135,10 +178,10 @@ impl Level {
             },
             Self::Normal => Settings {
                 depth: MAX_DEPTH,
-                nodes: 100_000,
+                nodes: 10_000,
                 quiescence: 8,
                 table_bits: 16,
-                margin: 20,
+                margin: 30,
             },
             Self::Hard => Settings {
                 depth: MAX_DEPTH,
@@ -284,17 +327,13 @@ pub struct SearchJob {
 impl SearchJob {
     /// Starts a search for the action of the player to move, or returns
     /// `None` if the game is over. Settings beyond their limits are brought
-    /// back to them.
+    /// back to them. The number of positions has no limit here: a host
+    /// passes what a player chose through [`Settings::for_play`].
     pub fn new(game: &Game, settings: Settings, seed: u64) -> Option<Self> {
         if game.outcome().is_some() {
             return None;
         }
-        let settings = Settings {
-            depth: settings.depth.clamp(1, MAX_DEPTH),
-            quiescence: settings.quiescence.min(MAX_QUIESCENCE),
-            table_bits: settings.table_bits.min(MAX_TABLE_BITS),
-            ..settings
-        };
+        let settings = settings.within_limits();
         let root = game.position().clone();
         let mut root_moves: Vec<RootMove> = root
             .successors()
