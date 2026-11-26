@@ -150,6 +150,34 @@ fn blockers_remove_only_their_direct_contribution() {
     assert_eq!(r.first_blocker, Some(LightId(99, 1)));
 }
 #[test]
+fn a_translucent_occluder_passes_its_share_of_one_contribution() {
+    // Foliage passing a fifth of the light crosses the sun's ray, not the lamp's.
+    struct Foliage;
+    impl Visibility for Foliage {
+        fn blocker(&self, _: LightRay) -> Option<LightId> {
+            None
+        }
+        fn transmission(&self, ray: LightRay) -> (f32, Option<LightId>) {
+            if ray.endpoint.position == Vec2::ZERO {
+                (1.0, None)
+            } else {
+                (0.2, Some(LightId(99, 2)))
+            }
+        }
+    }
+    let s = snapshot(&[source(1)]);
+    let clear = s.query(10, 7, &[receiver(1.0)], &Clear).unwrap().remove(0);
+    let r = s
+        .query(10, 7, &[receiver(1.0)], &Foliage)
+        .unwrap()
+        .remove(0);
+    assert_eq!(r.directional, 25.0 * 0.2);
+    assert_eq!(r.local, clear.local);
+    assert_eq!(r.intensity, r.directional + r.local);
+    assert_eq!((r.rays, r.blocked_rays), (2, 1));
+    assert_eq!(r.first_blocker, Some(LightId(99, 2)));
+}
+#[test]
 fn publisher_is_atomic_monotonic_and_observable() {
     let mut publisher = LightingPublisher::default();
     let d = snapshot(&[]).directional;

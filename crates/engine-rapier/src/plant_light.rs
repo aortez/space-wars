@@ -1,7 +1,7 @@
 //! Bounded overhead-only environment publication for one support-local tissue set.
 use crate::{
     root_uptake::RootUptake,
-    world::{BodyMotion, OpaqueFootprint},
+    world::{BodyMotion, OpaqueFootprint, TranslucentFootprint},
 };
 use engine_core::{
     Color,
@@ -104,13 +104,16 @@ impl<'a, 'w> PlantLight<'a, 'w> {
             namespace,
             occluders,
             &[],
+            &|_| 0.0,
         )
     }
 
     /// Also measure light at up to MAX_PROBES distinct cells of the terrain,
     /// each sampled where a size-one blade there would sample; a cell inside
     /// solid geometry reads dark. Probes shade nothing; a tree reads them to
-    /// choose where to grow.
+    /// choose where to grow. `transmits` gives the share of the light each
+    /// tissue's disk lets through, below 1; 0 keeps it opaque, as the other
+    /// publications do.
     #[allow(clippy::too_many_arguments)]
     pub fn publish_with_probes(
         publisher: &mut LightingPublisher,
@@ -122,6 +125,7 @@ impl<'a, 'w> PlantLight<'a, 'w> {
         namespace: u64,
         occluders: WorldOccluders<'_>,
         probes: &[[i32; 2]],
+        transmits: &dyn Fn(&Tissue) -> f32,
     ) -> Result<Self, LightingError> {
         if occluders.tick != tick {
             return Err(LightingError::Stale);
@@ -164,6 +168,7 @@ impl<'a, 'w> PlantLight<'a, 'w> {
             .ok_or(LightingError::InvalidInput)?;
         let mut identities = std::collections::BTreeSet::new();
         let mut footprints = Vec::new();
+        let mut translucent = Vec::new();
         let mut receivers = Vec::new();
         let mut shoots = Vec::new();
         for tissue in tissues {
@@ -174,7 +179,20 @@ impl<'a, 'w> PlantLight<'a, 'w> {
                 return Err(LightingError::InvalidInput);
             }
             let (center, footprint) = disk(roots, &motion, tissue, namespace);
-            footprints.extend(footprint);
+            let share = transmits(tissue);
+            if !(0.0..1.0).contains(&share) {
+                return Err(LightingError::InvalidInput);
+            }
+            match footprint {
+                Some(d) if share > 0.0 => translucent.push(TranslucentFootprint {
+                    id: d.id,
+                    center: d.center,
+                    radius: d.radius,
+                    transmits: share,
+                }),
+                Some(d) => footprints.push(d),
+                None => {}
+            }
             if tissue.health == 0 {
                 continue;
             }
@@ -202,7 +220,9 @@ impl<'a, 'w> PlantLight<'a, 'w> {
             })
             .collect();
         let geometry = roots.world.query_snapshot();
-        let visibility = geometry.lighting_visibility(&footprints, &[])?;
+        let visibility = geometry
+            .lighting_visibility(&footprints, &[])?
+            .with_translucent(&translucent)?;
         let measured = if probes.is_empty() {
             Vec::new()
         } else {

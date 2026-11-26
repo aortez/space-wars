@@ -14,10 +14,18 @@ use std::cmp::Reverse;
 pub const TREE_MAX_TICKS: u64 = 1200;
 pub const TREE_ORIGIN: [i32; 2] = [12, 7];
 pub const TREE_GRASS_ORIGIN: [i32; 2] = [20, 7];
+/// Each sun's name and the direction toward it. The default, fifteen degrees
+/// off vertical from the left, casts the tree's shadow toward the grass. The
+/// sines and cosines are written out so every platform lights the bed alike.
+pub const SUNS: [(&str, [f32; 2]); 3] = [
+    ("from the left", [-0.258_819, 0.965_926]),
+    ("overhead", [0.0, 1.0]),
+    ("from the right", [0.258_819, 0.965_926]),
+];
 const WIDTH: i32 = 32;
 const HEIGHT: i32 = 26;
 const TOP_DIRT: i32 = 7;
-/// The shade hangs above the crown, so it darkens whole columns beneath it.
+/// The shade hangs above the crown and casts its shadow along the light.
 const SHADE_ROW: i32 = 24;
 const TREE_LIGHT: u64 = u64::MAX;
 const START_SPEED: u64 = 16;
@@ -29,13 +37,33 @@ const ROOT: RenderColor = RenderColor::rgb(0.75, 0.85, 1.0);
 const WON: RenderColor = RenderColor::rgb(1.0, 0.9, 0.2);
 const REFUSED: RenderColor = RenderColor::rgb(1.0, 0.25, 0.25);
 const OUTBID: RenderColor = RenderColor::rgb(0.6, 0.6, 0.6);
+/// A needle cell's spray, as the cosine and sine of each needle's turn from
+/// the direction it grows in: leaning 30 degrees outward, 40 either side.
+const LEANING: [[f32; 2]; 5] = [
+    [0.985, -0.174],
+    [0.985, 0.174],
+    [0.866, 0.5],
+    [0.643, 0.766],
+    [0.342, 0.940],
+];
+const UPRIGHT: [[f32; 2]; 5] = [
+    [0.766, -0.643],
+    [0.940, -0.342],
+    [1.0, 0.0],
+    [0.940, 0.342],
+    [0.766, 0.643],
+];
 
-pub const TREE_CONTROLS: [(&str, Command); 16] = [
+pub const TREE_CONTROLS: [(&str, Command); 17] = [
     ("Pause / resume", Command::Pause),
     ("Single step", Command::Step),
     ("Faster (max 64x)", Command::Faster),
     ("Slower (min 1x)", Command::Slower),
     ("Light: full sun / dim / 250 / 500 / dark", Command::Light),
+    (
+        "Sun: from the left / overhead / from the right",
+        Command::Sun,
+    ),
     ("Nutrients on/off", Command::Nutrients),
     ("Water on/off", Command::Water),
     ("Shade on/off", Command::Shade),
@@ -60,6 +88,8 @@ pub struct TreeBed {
     pub paused: bool,
     pub speed: u64,
     pub intensity: u16,
+    /// Which of `SUNS` shines.
+    pub sun: usize,
     pub availability: [u16; 2],
     pub shade: bool,
     pub shade_x: i32,
@@ -139,6 +169,7 @@ impl TreeBed {
             paused: false,
             speed: START_SPEED,
             intensity: 1000,
+            sun: 0,
             availability: [1000; 2],
             shade: false,
             shade_x: TREE_GRASS_ORIGIN[0],
@@ -177,7 +208,8 @@ impl TreeBed {
         if before.tick >= TREE_MAX_TICKS {
             return;
         }
-        let mut source = full_sun(Vec2::Y);
+        let [x, y] = SUNS[self.sun].1;
+        let mut source = full_sun(Vec2::new(x, y));
         source.strength = f32::from(self.intensity);
         let roots = uptake(
             &self.world,
@@ -206,6 +238,7 @@ impl TreeBed {
                 footprints: &[],
             },
             &probes,
+            &|t| self.tree.transmits(t),
         )
         .expect("bounded tree bed light");
         self.work = light.work;
@@ -265,6 +298,7 @@ impl TreeBed {
             Command::Faster => self.speed = (self.speed * 2).min(MAX_SPEED),
             Command::Slower => self.speed = (self.speed / 2).max(1),
             Command::Light => self.intensity = next_light(self.intensity),
+            Command::Sun => self.sun = (self.sun + 1) % SUNS.len(),
             Command::Nutrients => {
                 self.availability[0] = if self.availability[0] == 0 { 1000 } else { 0 }
             }
@@ -284,7 +318,22 @@ impl TreeBed {
             Command::Select => self.selected = self.selected.wrapping_add(1),
             Command::Bids => self.bids = !self.bids,
             Command::CutBranch => self.cut_branch(),
-            Command::PlantTree => *self = Self::new(self.seed),
+            Command::PlantTree => {
+                // Fresh seeds of each, under the same settings.
+                let mut fresh = Self::new(self.seed);
+                fresh.paused = self.paused;
+                fresh.speed = self.speed;
+                fresh.intensity = self.intensity;
+                fresh.sun = self.sun;
+                fresh.availability = self.availability;
+                fresh.shade = self.shade;
+                fresh.shade_x = self.shade_x;
+                fresh.inspect = self.inspect;
+                fresh.bids = self.bids;
+                fresh.control = self.control;
+                fresh.update_shade();
+                *self = fresh;
+            }
             _ => {}
         }
     }
@@ -536,23 +585,43 @@ impl TreeBed {
                         RenderPrimitive::Circle(RenderCircle::filled(center, width * 0.5, color)),
                     );
                 }
-                // A needle is a small spire that lengthens as it matures.
+                // A needle cell is a spray of thin needles from the wood it
+                // grows on, leaning away from the trunk as a conifer's do,
+                // which lengthen as it matures. On the trunk's line it
+                // stands upright.
                 (true, Role::Shoot) => {
                     let target = o.config.development_per_size.iter().sum::<u64>().max(1);
                     let progress = t.development.iter().sum::<u64>() as f32 / target as f32;
                     let grown = f32::from(t.size - 1) + progress;
-                    let (half, length) = (0.25 + 0.1 * grown, 0.6 + 0.3 * grown);
-                    f.push_primitive(
-                        3,
-                        RenderPrimitive::Polygon(RenderPolygon::filled(
-                            vec![
-                                RenderPoint::new(center.x - half, center.y - 0.45),
-                                RenderPoint::new(center.x + half, center.y - 0.45),
-                                RenderPoint::new(center.x, center.y - 0.45 + length),
-                            ],
-                            color,
-                        )),
-                    );
+                    let wood = parent(t.id);
+                    let from = wood.map_or(center, |q| p(q.cell));
+                    let (gx, gy) = if from == center {
+                        (0.0, 1.0)
+                    } else {
+                        (center.x - from.x, center.y - from.y)
+                    };
+                    let out = (t.cell[0] - TREE_ORIGIN[0]).signum() as f32;
+                    // Turned toward the trunk's outside, or up beside it.
+                    let (lx, ly, spray) = match (out == 0.0, gy == 0.0) {
+                        (true, _) => (1.0, 0.0, &UPRIGHT),
+                        (false, false) => (out, 0.0, &LEANING),
+                        (false, true) => (0.0, 1.0, &LEANING),
+                    };
+                    let surface = wood.map_or(0.0, |q| 0.25 * f32::from(q.size).sqrt());
+                    let base = RenderPoint::new(from.x + gx * surface, from.y + gy * surface);
+                    let length = 0.45 + 0.2 * grown;
+                    for (i, [c, s]) in spray.iter().enumerate() {
+                        let reach = if i == 0 || i == 4 {
+                            0.8 * length
+                        } else {
+                            length
+                        };
+                        let tip = RenderPoint::new(
+                            base.x + reach * (gx * c + lx * s),
+                            base.y + reach * (gy * c + ly * s),
+                        );
+                        f.push_primitive(3, garden_segment(base, tip, 0.08, color));
+                    }
                 }
                 // Blades as in the grass bed.
                 (false, Role::Shoot) => {
@@ -641,17 +710,22 @@ impl TreeBed {
                 ),
             );
         }
+        // The sun, up the light's direction from the tree's seed, between the
+        // grown tree's top and the lowest line of text.
+        let [x, y] = SUNS[self.sun].1;
+        let seed = p(TREE_ORIGIN);
+        let reach = (10.8 - seed.y) / y;
         f.push_primitive(
             3,
             RenderPrimitive::Circle(RenderCircle::filled(
-                RenderPoint::new(18.0, 11.5),
+                RenderPoint::new(seed.x + x * reach, seed.y + y * reach),
                 0.6,
                 RenderColor::rgb(1.0, 0.9, 0.3),
             )),
         );
         let mut lines = vec![
             format!(
-                "GARDEN LAB TREE BED | seed {} | {}s / {TREE_MAX_TICKS}s | {}x {} | light {} | nutrients {} water {}",
+                "GARDEN LAB TREE BED | seed {} | {}s / {TREE_MAX_TICKS}s | {}x {} | light {} sun {} | nutrients {} water {}",
                 self.seed,
                 o.tick,
                 self.speed,
@@ -663,6 +737,7 @@ impl TreeBed {
                     "physiology running"
                 },
                 self.intensity,
+                SUNS[self.sun].0,
                 self.availability[0],
                 self.availability[1]
             ),
@@ -810,7 +885,7 @@ mod tree_bed_contract {
     }
 
     #[test]
-    fn tree_bed_light_and_shade_reach_the_blades_beneath() {
+    fn tree_bed_light_and_shade_reach_the_blades_along_the_sun() {
         let mut bed = TreeBed::new(42);
         run(&mut bed, 100);
         // The grass's blades by column, with the light each measured last.
@@ -822,14 +897,26 @@ mod tree_bed_contract {
                 .map(|t| (t.cell[0], bed.exposure[&t.id].light))
                 .collect()
         };
+        let dark = |bed: &TreeBed| -> Vec<i32> {
+            lights(bed)
+                .into_iter()
+                .filter(|&(_, light)| light == 0)
+                .map(|(x, _)| x)
+                .collect()
+        };
         let open = lights(&bed);
         assert_eq!(
             open.keys().copied().collect::<Vec<_>>(),
             (17..=24).collect::<Vec<_>>()
         );
         assert!(open.values().all(|&l| l == 1000));
-        // The bar starts over the grass's seed; the blades under it go dark.
+        // The bar starts over the grass's seed, sixteen rows up. The sun
+        // from the left casts its shadow four cells to the right of it.
         bed.command(Command::Shade);
+        bed.tick();
+        assert_eq!(dark(&bed), [22, 23, 24]);
+        // Overhead, the shadow lies straight beneath the bar.
+        bed.command(Command::Sun);
         bed.tick();
         let under = |x: i32| (18..=22).contains(&x);
         for (x, light) in lights(&bed) {
@@ -843,7 +930,7 @@ mod tree_bed_contract {
     }
 
     #[test]
-    fn tree_bed_grows_a_conifer_that_shades_out_grass_and_replays() {
+    fn tree_bed_grows_a_conifer_lit_from_the_left_that_shades_the_grass_and_replays() {
         let mut bed = TreeBed::new(42);
         run(&mut bed, 600);
         let picture = draw(&bed);
@@ -859,25 +946,42 @@ mod tree_bed_contract {
                 .collect();
             assert_eq!(tiers, [6, 5, 4, 3, 2], "{picture}");
         }
-        // The tree measured light at the cells it asked about, and bid.
-        assert!(bed.probes > 0 && bed.probes <= tree::MAX_PROBES);
-        assert!(!bed.round.records.is_empty());
-        // Grass under the lowest tier died in its shade; beyond it, it lives.
+        // Needles cover both sides of the top tier, and the whole sunny side
+        // of the lowest. Its shaded side is lit enough only at its end.
         let o = bed.plants.observe();
-        let blades = |alive: bool, under: bool| {
+        let needles = |height: i32, side: i32| {
             o.tissues
                 .iter()
                 .filter(|t| {
-                    t.policy == grass::POLICY
+                    t.policy == tree::POLICY
                         && t.role == Role::Shoot
-                        && (t.health > 0) == alive
-                        && (t.cell[0] <= TREE_ORIGIN[0] + 6) == under
+                        && t.health > 0
+                        && t.cell[1] == TREE_ORIGIN[1] + height
+                        && (t.cell[0] - TREE_ORIGIN[0]).signum() == side
                 })
                 .count()
         };
-        assert_eq!(blades(true, true), 0, "{picture}");
-        assert!(blades(false, true) >= 2, "{picture}");
-        assert!(blades(true, false) >= 3, "{picture}");
+        assert_eq!((needles(12, -1), needles(12, 1)), (2, 2), "{picture}");
+        assert_eq!((needles(4, -1), needles(4, 1)), (6, 2), "{picture}");
+        // The tree measured light at the cells it asked about, and bid.
+        assert!(bed.probes > 0 && bed.probes <= tree::MAX_PROBES);
+        assert!(!bed.round.records.is_empty());
+        // The crown's shadow falls to the right, where the grass's nearest
+        // blade died in it; the others live.
+        let blades = |alive: bool| -> Vec<i32> {
+            let mut cells: Vec<i32> = o
+                .tissues
+                .iter()
+                .filter(|t| {
+                    t.policy == grass::POLICY && t.role == Role::Shoot && (t.health > 0) == alive
+                })
+                .map(|t| t.cell[0])
+                .collect();
+            cells.sort_unstable();
+            cells
+        };
+        assert_eq!(blades(false), [17], "{picture}");
+        assert_eq!(blades(true), (18..=24).collect::<Vec<_>>(), "{picture}");
         let mut again = TreeBed::new(42);
         run(&mut again, 600);
         assert_eq!(again.plants.observe(), o);
@@ -988,13 +1092,13 @@ mod tree_bed_contract {
         let (wood, needles) = (count(&bed, Role::Wood), count(&bed, Role::Shoot));
         let lost = bed.plants.observe().ledger.loss;
         // A root is selected, so the cut takes the lowest branch on the
-        // grass's side, with the needle on its tip, and their shares.
+        // grass's side, with the two needles at its end, and their shares.
         assert_eq!(bed.selection().unwrap().role, Role::Root);
         bed.command(Command::CutBranch);
         assert_eq!(reach(&bed, 3, 1), 0);
         assert_eq!(reach(&bed, 3, -1), 6);
         assert_eq!(count(&bed, Role::Wood), wood - 6);
-        assert_eq!(count(&bed, Role::Shoot), needles - 1);
+        assert_eq!(count(&bed, Role::Shoot), needles - 2);
         let after = bed.plants.observe().ledger.loss;
         assert!((0..3).all(|r| after[r] > lost[r]));
         assert_eq!(bed.cuts, 1);
@@ -1014,13 +1118,15 @@ mod tree_bed_contract {
         run(&mut bed, 1000);
         assert_eq!(reach(&bed, 11, 1), 2, "{}", draw(&bed));
         assert_eq!(bed.cuts, 2);
-        // Planting fresh starts over with the two seeds and default settings.
+        // Planting fresh starts over with the two seeds, under the same
+        // settings.
         bed.command(Command::Light);
+        bed.command(Command::Sun);
         bed.command(Command::PlantTree);
         let o = bed.plants.observe();
         assert_eq!(
-            (o.tick, o.tissues.len(), bed.cuts, bed.intensity),
-            (0, 2, 0, 1000)
+            (o.tick, o.tissues.len(), bed.cuts, bed.intensity, bed.sun),
+            (0, 2, 0, next_light(1000), 1)
         );
     }
 }
