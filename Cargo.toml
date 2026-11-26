@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "crates/engine-chess",
+    "crates/engine-chess-board",
     "crates/engine-common",
     "crates/engine-core",
     "crates/engine-gravity",
@@ -81,6 +82,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Internal.
+engine-chess = { path = "crates/engine-chess" }
+engine-chess-board = { path = "crates/engine-chess-board" }
 engine-common = { path = "crates/engine-common" }
 engine-core = { path = "crates/engine-core" }
 engine-agent = { path = "crates/engine-agent" }

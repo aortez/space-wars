@@ -9,6 +9,8 @@ mod aquarium_visual_tests;
 mod autostart;
 mod bluetooth;
 mod camera_probe;
+#[cfg(test)]
+mod chess_board_visual_tests;
 mod client_scenarios;
 mod clock_controls;
 mod clock_fonts;
