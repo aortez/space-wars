@@ -17,6 +17,11 @@
 //! found. Each search is seeded by the match and the number of actions the
 //! game has accepted, so a turn cut short is played the same way on the next
 //! visit.
+//!
+//! A pause holds the search instead of ending it: with no tick, the search
+//! takes at most the quota in hand and waits. Started over, it would have
+//! less time before the bird must reach, so the game would depend on where
+//! the pauses fell.
 
 use std::mem;
 
