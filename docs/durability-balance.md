@@ -107,14 +107,15 @@ The same probe on #330's material weapons, with seed 42 and the fixture above:
 
 Heat and planet impacts involve no weapon and measure as before. Every ship
 and pod exposure still leaves the pilot at 100 health, and the protected laser
-cases still first lose health at tick 180.
+cases still first lose health at tick 180. #332's run of 2026-11-25 measured
+every figure here and in the heat and impact rows above the same.
 
 The laser still makes each form last more than 1.8 times the next. A missile's
 cost now follows the energy it closes with: the ship takes four missiles where
 it took three, and the pod still breaks on its second. A missile closing at
 this fixture's 300 units/s kills a pilot on foot, but one closing slower than
 about 236 does not. The paired bot matches below ran under #154's rules, and
-#330 did not rerun them.
+#332 reran them on the material model.
 
 ## Paired bot matches
 
@@ -126,19 +127,19 @@ and Value bot v13 in swapped seats. Both retain `material_mission_v13` combat
 policy and 15s/4s combat breaks. The recovery seat explicitly selects
 `terrain_recovery_supported_hatch_ordinary_offsets_v1` from tick zero.
 
-There are 16 runs per build, 32 total, each ending at native pilot death or
-the ten-minute match limit. No reset, control override or terrain edit is
-applied during these matches. Per-tick work bounds, material conservation,
-finite motion and physical speed checks pass in every run.
+There are 16 runs per build, each ending at native pilot death or the
+ten-minute match limit. No reset, control override or terrain edit is applied
+during these matches. Per-tick work bounds, material conservation, finite
+motion and physical speed checks pass in every run.
 
-| Match group (8 runs per build) | Before | After |
-| --- | --- | --- |
-| Ordinary: deaths / ship losses / physical rebuilds / completed recovery tasks | 6 / 10 / 4 / 4 | 6 / 10 / 4 / 4 |
-| Heavy: deaths / ship losses / physical rebuilds / completed recovery tasks | 4 / 13 / 6 / 8 | 6 / 15 / 6 / 8 |
-| Ordinary: median round duration | 207.09s | 211.08s |
-| Heavy: median round duration | 439.19s | 258.23s |
-| Ordinary: P1 wins / P2 wins | 4 / 4 | 4 / 4 |
-| Heavy: P1 wins / P2 wins | 6 / 2 | 6 / 2 |
+| Match group (8 runs per build) | Before | After | Material model |
+| --- | --- | --- | --- |
+| Ordinary: deaths / ship losses / physical rebuilds / completed recovery tasks | 6 / 10 / 4 / 4 | 6 / 10 / 4 / 4 | 8 / 12 / 4 / 4 |
+| Heavy: deaths / ship losses / physical rebuilds / completed recovery tasks | 4 / 13 / 6 / 8 | 6 / 15 / 6 / 8 | 3 / 12 / 7 / 11 |
+| Ordinary: median round duration | 207.09s | 211.08s | 192.39s |
+| Heavy: median round duration | 439.19s | 258.23s | 600.00s |
+| Ordinary: P1 wins / P2 wins | 4 / 4 | 4 / 4 | 8 / 0 |
+| Heavy: P1 wins / P2 wins | 6 / 2 | 6 / 2 | 8 / 0 |
 
 Every pair retains its winner, physical rebuild counts and completed recovery
 counts. The revised version records four pod losses in ordinary matches and
@@ -158,6 +159,17 @@ pod destruction is followed by a lethal on-foot impact two ticks later. Full
 shielding does not guarantee that a high-speed trajectory becomes survivable
 once the hull is gone.
 
+The material model column is #332's rerun of 2026-11-25, with the same matrix
+and runner on main's code from #736 on, where material weapons and contact
+charges are on and asteroids wear by their charges
+([qualification](design/material-qualification.md#the-paired-bot-matches)).
+Player 1 wins all 16. Ordinary matches lose eight pods and heavy ones none,
+and five heavy matches reach the time limit. Every death is player 2's pilot
+on foot by impact: six on the sun at 37 to 39 units/s, and five on the
+universe's boundary at 50 to 156 units/s. The matches had already moved from
+the After column before #330's first PR, and its weapons and the asteroids'
+wear each moved them again.
+
 This small paired matrix does not establish overall win-rate balance or solve
 the known blocked-route cases. Aggression and pursuit changes remain under
 [#155](https://github.com/aortez/space-wars/issues/155).
@@ -173,6 +185,10 @@ action traces, snapshots and the retained baseline/tuned executables are under
 `target/durability-154/`. These desktop measurements use Rust 1.94.1 on the
 same machine; they are not Pi performance measurements. No device deployment
 or automatic Clock settings change is part of this work.
+
+#332's rerun, with the impacts each match priced and the same matrix at three
+earlier commits, is kept in
+`/home/data2/space-wars3-artifacts/material-qualification-332-20261125`.
 
 Run the native exposure probe with an absolute, new output path:
 

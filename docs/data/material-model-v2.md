@@ -2,6 +2,8 @@
 
 Law `material-law-v2`. Post-yield stiffness fraction 0.010. Tick 0.017 s, gravity 10 wu/s^2.
 
+Lengths are in `wu`, masses in `mu` and times in seconds, so energy is in `mu wu^2 / s^2`, force in `mu wu / s^2` and stress in `mu / (wu s^2)`, as [the law's units](../design/material-damage.md#units-and-geometry) define them. The values are calibration for play, not measured properties.
+
 ## Reference materials
 
 | material | mode | density | stiffness | strength | toughness | toughness / resilience | damping | identity |
@@ -12,6 +14,21 @@ Law `material-law-v2`. Post-yield stiffness fraction 0.010. Tick 0.017 s, gravit
 | shell | Ductile | 8 | 2.000e6 | 30000 | 3000 | 13.333 | 0.100 | `5ac27cd5aab7921e` |
 | soft_tissue | Ductile | 1 | 2000 | 200 | 60 | 6 | 0.500 | `1358cf7485e6d7e7` |
 | wood | Brittle | 0.600 | 2.000e5 | 3000 | 60 | 2.667 | 0.200 | `70015ff20430b02e` |
+
+## Reference bodies
+
+A case may vary a body's volume, thickness, mass or material, as its rows and their inputs say. A body without a mass is immovable, one without a radius is flat, and one without an extent is a half-space. In an impact's inputs, a body's inertia and lever arm count only where the hit turns it, and a dash for its inertia means it meets the contact translating freely.
+
+| body | material | mass | inertia | radius | volume | thickness | extent |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| tank | armor | 200 | 2000 | 4 | 20 | 1 | 0.200 |
+| ship | hull | 31.250 | 200 | 3 | 6 | 1 | 0.100 |
+| spaceling | soft_tissue | 2 | 0.200 | 0.500 | 0.180 | 0.600 | 1 |
+| branch | wood | 5 | 7 | 0.500 | 4 | 1 | 1 |
+| boulder | rock | 70 | 315 | 3 | 28 | 1 | 6 |
+| stone | rock | 2 | 0.250 | 0.500 | 0.800 | 1 | 1 |
+| shell | shell | 0.500 | 2.500e-3 | 0.100 | 0.062 | 2 | 0.200 |
+| planet | rock | - | - | - | 1000 | 1 | - |
 
 ## Acceptance cases
 
@@ -27,6 +44,16 @@ Repeated contacts below the safe limit. Every bump is fully recoverable: the sum
 | shell vs tank: 1000 bumps at 0.691 wu/s, half the safe-limit speed | 0.119 | 487.805 | 10000 | 10000 | 0 | 0 | 1 | 1 | - | 0 | 0 | 0 | 0.949 | 0 / 0 | yes |
 | ship vs planet: 1000 bumps at 0.437 wu/s, half the safe-limit speed | 2.989 | 4500 | 3000 | 3000 | 0 | 0 | 1 | 1 | - | 0 | 0 | 0 | 0.184 | 0 / 0 | yes |
 
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| branch vs tank: 1000 bumps at 0.352 wu/s, half the safe-limit speed | branch / tank | 4 / 20 | 5 / 200 | - / - | 0 / 0 | 0.222 | 1 / 1 | 0.222 / 0.200 | 0.352 | 4.878 |
+| stone vs ship: 1000 bumps at 0.437 wu/s, half the safe-limit speed | stone / ship | 0.800 / 6 | 2 / 31.250 | - / - | 0 / 0 | 0.214 | 1 / 1 | 0.214 / 0.100 | 0.437 | 1.880 |
+| spaceling vs branch: 1000 bumps at 0.182 wu/s, half the safe-limit speed | spaceling / branch | 0.180 / 4 | 2 / 5 | - / - | 0 / 0 | 0.125 | 0.600 / 1 | 0.125 / 0.125 | 0.182 | 1.429 |
+| shell vs tank: 1000 bumps at 0.691 wu/s, half the safe-limit speed | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 0.691 | 0.499 |
+| ship vs planet: 1000 bumps at 0.437 wu/s, half the safe-limit speed | ship / planet | 6 / 1000 | 31.250 / - | - / - | 0 / 0 | 1.500 | 1 / 1 | 0.100 / 1.500 | 0.437 | 31.250 |
+
 ### gentle_landings
 
 Provisional playtest hull (stiffness 35000, strength 6000, toughness 96000, damping 1) against reference rock (damping 0.95). Gentle contacts cost exactly zero; harder impacts accumulate damage. Rebound is a target for the solver, not a completed gameplay playtest.
@@ -40,6 +67,17 @@ Provisional playtest hull (stiffness 35000, strength 6000, toughness 96000, damp
 | candidate hull at 43.200 wu/s | 29160 | 19256.750 | 12837.833 | 12837.833 | 27326.111 | 1480.724 | 0.953 | 0.901 | - | 0 | 0 | 0 | 0 | - | yes |
 | candidate hull at 100 wu/s | 1.562e5 | 39729.898 | 26486.598 | 26486.598 | 1.412e5 | 13557.148 | 0.755 | 0.096 | - | 0 | 0 | 0 | 0 | - | yes |
 
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| candidate hull at 1 wu/s | ship / planet | 6 / 1000 | 31.250 / - | - / - | 0 / 0 | 1.500 | 1 / 1 | 0.100 / 1.500 | 1 | 31.250 |
+| candidate hull at 1.600 wu/s | ship / planet | 6 / 1000 | 31.250 / - | - / - | 0 / 0 | 1.500 | 1 / 1 | 0.100 / 1.500 | 1.600 | 31.250 |
+| candidate hull at 2.200 wu/s | ship / planet | 6 / 1000 | 31.250 / - | - / - | 0 / 0 | 1.500 | 1 / 1 | 0.100 / 1.500 | 2.200 | 31.250 |
+| candidate hull at 13.300 wu/s | ship / planet | 6 / 1000 | 31.250 / - | - / - | 0 / 0 | 1.500 | 1 / 1 | 0.100 / 1.500 | 13.300 | 31.250 |
+| candidate hull at 43.200 wu/s | ship / planet | 6 / 1000 | 31.250 / - | - / - | 0 / 0 | 1.500 | 1 / 1 | 0.100 / 1.500 | 43.200 | 31.250 |
+| candidate hull at 100 wu/s | ship / planet | 6 / 1000 | 31.250 / - | - / - | 0 / 0 | 1.500 | 1 / 1 | 0.100 / 1.500 | 100 | 31.250 |
+
 ### failure_allocation
 
 Explicit allocations of one failed branch impact: carry none, half or all of the excess, dissipating the rest. These are alternative host policies; the carry cases only prove accounting, not fragment velocities. The real-solver fixture tests the fully dissipative blocking policy.
@@ -49,6 +87,14 @@ Explicit allocations of one failed branch impact: carry none, half or all of the
 | 0% of excess assigned to motion | 35121.949 | 11441.426 | 51486.418 | 51486.418 | 240 | 2475.936 | 0 | 0.988 | a | 0 | 0 | 32376.559 | 0.027 | - | yes |
 | 50% of excess assigned to motion | 35121.949 | 11441.426 | 51486.418 | 51486.418 | 240 | 2475.936 | 0 | 0.988 | a | 0 | 16188.279 | 16188.279 | 0.027 | - | yes |
 | 100% of excess assigned to motion | 35121.949 | 11441.426 | 51486.418 | 51486.418 | 240 | 2475.936 | 0 | 0.988 | a | 0 | 32376.559 | 0 | 0.027 | - | yes |
+
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| 0% of excess assigned to motion | branch / tank | 4 / 20 | 5 / 200 | - / - | 0 / 0 | 0.222 | 1 / 1 | 0.222 / 0.200 | 120 | 4.878 |
+| 50% of excess assigned to motion | branch / tank | 4 / 20 | 5 / 200 | - / - | 0 / 0 | 0.222 | 1 / 1 | 0.222 / 0.200 | 120 | 4.878 |
+| 100% of excess assigned to motion | branch / tank | 4 / 20 | 5 / 200 | - / - | 0 / 0 | 0.222 | 1 / 1 | 0.222 / 0.200 | 120 | 4.878 |
 
 ### progressive_hits
 
@@ -75,6 +121,29 @@ Fresh identical shells hit a persistent plate. Both may yield. Damage per hit an
 | hit 17: shell vs tank at 300 wu/s | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 11124.065 | 0 | 0.054 | a | 10907.119 | 0 | 0 | - | - | yes |
 | hit 18: shell vs tank at 300 wu/s | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10890.888 | 0 | 0 | a, b | 11140.297 | 0 | 0 | - | - | yes |
 
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| hit 1: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 2: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 3: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 4: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 5: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 6: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 7: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 8: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 9: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 10: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 11: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 12: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 13: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 14: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 15: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 16: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 17: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| hit 18: shell vs tank at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+
 ### quantity_and_thickness
 
 Capacity scales with represented volume, so twice the plate takes about twice the hits. Doubling the represented thickness doubles the load-bearing area and halves the stress, so a hit that dents the thin plate stays recoverable on the thick one.
@@ -85,6 +154,15 @@ Capacity scales with represented volume, so twice the plate takes about twice th
 | plate volume 40 wu^3: fails after 36 hits at 300 wu/s | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10657.710 | 0 | 0 | a, b | 11373.475 | 0 | 0 | - | - | yes |
 | plate thickness 1 wu: one hit at 1.658 wu/s, 1.2x the thin plate's safe-limit speed | 0.685 | 979.851 | 20086.939 | 20086.939 | 0 | 0.205 | 1 | 1.000 | - | 0 | 0 | 0 | 0.794 | - | yes |
 | plate thickness 2 wu: one hit at 1.658 wu/s, 1.2x the thin plate's safe-limit speed | 0.685 | 1655.665 | 16970.562 | 16970.562 | 0 | 0 | 1 | 1 | - | 0 | 0 | 0 | 0.949 | - | yes |
+
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| plate volume 20 wu^3: fails after 18 hits at 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| plate volume 40 wu^3: fails after 36 hits at 300 wu/s | shell / tank | 0.062 / 40 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| plate thickness 1 wu: one hit at 1.658 wu/s, 1.2x the thin plate's safe-limit speed | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 1.658 | 0.499 |
+| plate thickness 2 wu: one hit at 1.658 wu/s, 1.2x the thin plate's safe-limit speed | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 2 | 0.049 / 0.049 | 1.658 | 0.499 |
 
 ### wood_vs_armor
 
@@ -98,6 +176,16 @@ A branch at ordinary speeds breaks without damaging armor. At high speed its ris
 | branch vs tank at 120 wu/s | 35121.949 | 11441.426 | 51486.418 | 51486.418 | 240 | 2475.936 | 0 | 0.988 | a | 32376.559 | 0 | 0 | - | - | yes |
 | branch vs tank at 240 wu/s | 1.405e5 | 22750.162 | 1.024e5 | 1.024e5 | 240 | 11088.869 | 0 | 0.945 | a | 1.290e5 | 0 | 0 | - | - | yes |
 
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| branch vs tank at 15 wu/s | branch / tank | 4 / 20 | 5 / 200 | - / - | 0 / 0 | 0.222 | 1 / 1 | 0.222 / 0.200 | 15 | 4.878 |
+| branch vs tank at 40 wu/s | branch / tank | 4 / 20 | 5 / 200 | - / - | 0 / 0 | 0.222 | 1 / 1 | 0.222 / 0.200 | 40 | 4.878 |
+| branch vs tank at 80 wu/s | branch / tank | 4 / 20 | 5 / 200 | - / - | 0 / 0 | 0.222 | 1 / 1 | 0.222 / 0.200 | 80 | 4.878 |
+| branch vs tank at 120 wu/s | branch / tank | 4 / 20 | 5 / 200 | - / - | 0 / 0 | 0.222 | 1 / 1 | 0.222 / 0.200 | 120 | 4.878 |
+| branch vs tank at 240 wu/s | branch / tank | 4 / 20 | 5 / 200 | - / - | 0 / 0 | 0.222 | 1 / 1 | 0.222 / 0.200 | 240 | 4.878 |
+
 ### tissue_vs_wood
 
 The same stone at the same speed against soft tissue and against wood. Both are weaker than rock and yield, but tissue's small strength and capacity lose a far larger integrity fraction.
@@ -106,6 +194,13 @@ The same stone at the same speed against soft tissue and against wood. Both are 
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- | --- |
 | stone vs spaceling at 10 wu/s | 50 | 37.719 | 502.924 | 502.924 | 0 | 10.800 | 1 | 0 | b | 38.607 | 0 | 0 | - | - | yes |
 | stone vs branch at 10 wu/s | 71.429 | 651.739 | 5213.908 | 5213.908 | 0 | 71.386 | 1 | 0.703 | - | 0 | 0 | 0 | 5.453e-3 | - | yes |
+
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| stone vs spaceling at 10 wu/s | stone / spaceling | 0.800 / 0.180 | 2 / 2 | - / - | 0 / 0 | 0.125 | 1 / 0.600 | 0.125 / 0.125 | 10 | 1 |
+| stone vs branch at 10 wu/s | stone / branch | 0.800 / 4 | 2 / 5 | - / - | 0 / 0 | 0.125 | 1 / 1 | 0.125 / 0.125 | 10 | 1.429 |
 
 ### equal_strength_tie
 
@@ -116,6 +211,13 @@ Two hulls of the same material: both reach the safe limit together and share the
 | ship vs ship at 20 wu/s | 3125.000 | 13568.714 | 18091.617 | 18091.617 | 1544.966 | 1544.966 | 0.871 | 0.871 | - | 0 | 0 | 0 | 0 | - | yes |
 | ship vs ship at 60 wu/s | 28124.998 | 38686.043 | 51581.391 | 51581.391 | 12000 | 12000 | 0 | 0 | a, b | 3839.930 | 0 | 0 | - | - | yes |
 
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| ship vs ship at 20 wu/s | ship / ship | 6 / 6 | 31.250 / 31.250 | - / - | 0 / 0 | 0.750 | 1 / 1 | 0.100 / 0.100 | 20 | 15.625 |
+| ship vs ship at 60 wu/s | ship / ship | 6 / 6 | 31.250 / 31.250 | - / - | 0 / 0 | 0.750 | 1 / 1 | 0.100 / 0.100 | 60 | 15.625 |
+
 ### severe_armor_failure
 
 A hardened shell with more energy than the plate can absorb. The plate's capacity is exhausted in one hit, the remainder is reported as excess requiring explicit host allocation, the ledger still closes and nothing is infinite.
@@ -124,6 +226,13 @@ A hardened shell with more energy than the plate can absorb. The plate's capacit
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- | --- |
 | shell vs tank at 600 wu/s | 89775.555 | 42391.535 | 8.690e5 | 8.690e5 | 187.500 | 44453.238 | 0 | 0.778 | a | 44236.293 | 0 | 0 | - | - | yes |
 | shell vs tank at 1800 wu/s | 8.080e5 | 1.271e5 | 2.606e6 | 2.606e6 | 187.500 | 2.000e5 | 0 | 0 | a, b | 5.997e5 | 0 | 0 | - | - | yes |
+
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| shell vs tank at 600 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 600 | 0.499 |
+| shell vs tank at 1800 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 1800 | 0.499 |
 
 ### glancing
 
@@ -136,6 +245,15 @@ Only the normal component of the approach loads the contact. The same speed at a
 | ship into planet at 20 wu/s, incidence 60 degrees: normal speed 10.000 wu/s | 1562.500 | 16810.998 | 11207.332 | 11207.332 | 950.445 | 598.596 | 0.921 | 0.960 | - | 0 | 0 | 0 | 0 | - | yes |
 | ship into planet at 20 wu/s, incidence 80 degrees: normal speed 3.473 wu/s | 188.461 | 10830.668 | 7220.445 | 7220.445 | 171.144 | 0 | 0.986 | 1 | - | 0 | 0 | 0 | 0.056 | - | yes |
 
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| ship into planet at 20 wu/s, incidence 0 degrees: normal speed 20 wu/s | ship / planet | 6 / 1000 | 31.250 / - | - / - | 0 / 0 | 1.500 | 1 / 1 | 0.100 / 1.500 | 20 | 31.250 |
+| ship into planet at 20 wu/s, incidence 30 degrees: normal speed 17.321 wu/s | ship / planet | 6 / 1000 | 31.250 / - | - / - | 0 / 0 | 1.500 | 1 / 1 | 0.100 / 1.500 | 17.321 | 31.250 |
+| ship into planet at 20 wu/s, incidence 60 degrees: normal speed 10.000 wu/s | ship / planet | 6 / 1000 | 31.250 / - | - / - | 0 / 0 | 1.500 | 1 / 1 | 0.100 / 1.500 | 10.000 | 31.250 |
+| ship into planet at 20 wu/s, incidence 80 degrees: normal speed 3.473 wu/s | ship / planet | 6 / 1000 | 31.250 / - | - / - | 0 / 0 | 1.500 | 1 / 1 | 0.100 / 1.500 | 3.473 | 31.250 |
+
 ### angular
 
 An off-center hit spends part of the approach on spinning the boulder. The lever arm lowers the contact-effective mass, the available energy and the damage; a central hit is the upper bound.
@@ -146,6 +264,15 @@ An off-center hit spends part of the approach on spinning the boulder. The lever
 | boulder vs tank at 3 wu/s, lever arm 1 wu: effective mass 44.523 mu | 200.353 | 9603.750 | 11204.375 | 11204.375 | 194.973 | 0 | 0.536 | 1 | - | 0 | 0 | 0 | 0.155 | - | yes |
 | boulder vs tank at 3 wu/s, lever arm 2 wu: effective mass 31.266 mu | 140.695 | 9289.820 | 10838.123 | 10838.123 | 135.661 | 0 | 0.677 | 1 | - | 0 | 0 | 0 | 0.179 | - | yes |
 | boulder vs tank at 3 wu/s, lever arm 3 wu: effective mass 20.896 mu | 94.030 | 9036.665 | 10542.776 | 10542.776 | 89.266 | 0 | 0.787 | 1 | - | 0 | 0 | 0 | 0.214 | - | yes |
+
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| boulder vs tank at 3 wu/s, lever arm 0 wu: effective mass 51.852 mu | boulder / tank | 28 / 20 | 70 / 200 | 315 / - | 0 / 0 | 0.857 | 1 / 1 | 0.857 / 0.200 | 3 | 51.852 |
+| boulder vs tank at 3 wu/s, lever arm 1 wu: effective mass 44.523 mu | boulder / tank | 28 / 20 | 70 / 200 | 315 / - | 1 / 0 | 0.857 | 1 / 1 | 0.857 / 0.200 | 3 | 44.523 |
+| boulder vs tank at 3 wu/s, lever arm 2 wu: effective mass 31.266 mu | boulder / tank | 28 / 20 | 70 / 200 | 315 / - | 2 / 0 | 0.857 | 1 / 1 | 0.857 / 0.200 | 3 | 31.266 |
+| boulder vs tank at 3 wu/s, lever arm 3 wu: effective mass 20.896 mu | boulder / tank | 28 / 20 | 70 / 200 | 315 / - | 3 / 0 | 0.857 | 1 / 1 | 0.857 / 0.200 | 3 | 20.896 |
 
 ### resting_support
 
@@ -158,6 +285,15 @@ A safe resting load charges nothing however long it rests. An overload yields an
 | press of force 9000, 1.5x the safe stress, fallback progression: fails after 2 ticks (0.033 s) | 245.000 | 9000 | 4500 | - | 40.000 | - | 0 | - | a | 160.000 | 0 | 0 | - | - | yes |
 | the 1.5x press with a measured 0.02 wu plastic displacement in one tick | 165 | 9000 | 4500 | - | 120 | - | 0.500 | - | - | 0 | 0 | 0 | - | - | yes |
 
+Inputs:
+
+| case | region | volume | force | patch width | thickness | depth | duration | measured plastic displacement |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| tank resting on a wood plank: force 2000 over 2 wu^2 for 1000 ticks | branch | 4 | 2000 | 2 | 1 | 1 | 0.017 | - |
+| press of force 6300, 1.05x the safe stress, fallback progression: fails after 12 ticks (0.200 s) | branch | 4 | 6300 | 2 | 1 | 1 | 0.017 | - |
+| press of force 9000, 1.5x the safe stress, fallback progression: fails after 2 ticks (0.033 s) | branch | 4 | 9000 | 2 | 1 | 1 | 0.017 | - |
+| the 1.5x press with a measured 0.02 wu plastic displacement in one tick | branch | 4 | 9000 | 2 | 1 | 1 | 0.017 | 0.020 |
+
 ### beam_connections
 
 Three wood connections along a cantilever under one tip load. Only the root connection exceeds its bending strength; it fails after a bounded number of ticks while the other two keep their full integrity and the assembly is not deleted.
@@ -168,6 +304,14 @@ Three wood connections along a cantilever under one tip load. Only the root conn
 | connection 2 at 4 wu from the tip, moment 400: intact after 400 ticks | 9.600 | 0 | 2400 | - | 0 | - | 1 | - | - | 0 | 0 | 0 | - | - | yes |
 | connection 3 at 2 wu from the tip, moment 200: intact after 400 ticks | 2.400 | 0 | 1200 | - | 0 | - | 1 | - | - | 0 | 0 | 0 | - | - | yes |
 
+Inputs:
+
+| case | material | beam thickness x height x length | moment | axial | duration | measured plastic rotation / extension |
+| --- | --- | --- | ---: | ---: | ---: | --- |
+| connection 1 at 6 wu from the tip, moment 600: fails after 5 ticks | wood | 1 x 1 x 2 | 600 | 0 | 0.017 | - / - |
+| connection 2 at 4 wu from the tip, moment 400: intact after 400 ticks | wood | 1 x 1 x 2 | 400 | 0 | 0.017 | - / - |
+| connection 3 at 2 wu from the tip, moment 200: intact after 400 ticks | wood | 1 x 1 x 2 | 200 | 0 | 0.017 | - / - |
+
 ### partition
 
 Splitting one contact into equivalent colliders must not multiply energy. Merged sub-contacts reproduce the single contact exactly; charging each part with the whole event would overstate the damage several times over.
@@ -177,6 +321,14 @@ Splitting one contact into equivalent colliders must not multiply energy. Merged
 | one contact: width 0.049 wu | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 11124.065 | 0 | 0.944 | a | 10907.119 | 0 | 0 | - | - | yes |
 | four equivalent sub-contacts merged: width 0.049 wu | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 11124.065 | 0 | 0.944 | a | 10907.119 | 0 | 0 | - | - | yes |
 | four sub-contacts each charged with the whole event, which an adapter must not do | 22443.889 | 10597.884 | 8.690e5 | 8.690e5 | 0 | 11113.310 | 0 | 0.778 | - | 11105.948 | 0 | 0 | - | 187.500 / 44453.238 | yes |
+
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| one contact: width 0.049 wu | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| four equivalent sub-contacts merged: width 0.049 wu | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| four sub-contacts each charged with the whole event, which an adapter must not do | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.012 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
 
 ### fixed_step
 
@@ -192,6 +344,22 @@ The plank press and a connection moment just past their safe limits, stepped at 
 | 1.08x moment on a connection at 60 Hz: fails after 12 ticks (0.200 s) | 25.667 | 0 | 3240 | - | 10.667 | - | 0.822 | - | - | 0 | 0 | 0 | - | 21.333 / - | yes |
 | 1.08x moment on a connection at 120 Hz: fails after 23 ticks (0.192 s) | 20.333 | 0 | 3240 | - | 5.333 | - | 0.822 | - | - | 0 | 0 | 0 | - | 21.333 / - | yes |
 | 1.08x moment on a connection at 240 Hz: fails after 45 ticks (0.188 s) | 17.667 | 0 | 3240 | - | 2.667 | - | 0.822 | - | - | 0 | 0 | 0 | - | 21.333 / - | yes |
+
+Inputs:
+
+| case | region | volume | force | patch width | thickness | depth | duration | measured plastic displacement |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1.05x press on the plank at 30 Hz: fails after 6 ticks (0.200 s) | branch | 4 | 6300 | 2 | 1 | 1 | 0.033 | - |
+| 1.05x press on the plank at 60 Hz: fails after 12 ticks (0.200 s) | branch | 4 | 6300 | 2 | 1 | 1 | 0.017 | - |
+| 1.05x press on the plank at 120 Hz: fails after 24 ticks (0.200 s) | branch | 4 | 6300 | 2 | 1 | 1 | 8.333e-3 | - |
+| 1.05x press on the plank at 240 Hz: fails after 48 ticks (0.200 s) | branch | 4 | 6300 | 2 | 1 | 1 | 4.167e-3 | - |
+
+| case | material | beam thickness x height x length | moment | axial | duration | measured plastic rotation / extension |
+| --- | --- | --- | ---: | ---: | ---: | --- |
+| 1.08x moment on a connection at 30 Hz: fails after 6 ticks (0.200 s) | wood | 1 x 1 x 2 | 540 | 0 | 0.033 | - / - |
+| 1.08x moment on a connection at 60 Hz: fails after 12 ticks (0.200 s) | wood | 1 x 1 x 2 | 540 | 0 | 0.017 | - / - |
+| 1.08x moment on a connection at 120 Hz: fails after 23 ticks (0.192 s) | wood | 1 x 1 x 2 | 540 | 0 | 8.333e-3 | - / - |
+| 1.08x moment on a connection at 240 Hz: fails after 45 ticks (0.188 s) | wood | 1 x 1 x 2 | 540 | 0 | 4.167e-3 | - / - |
 
 ## Parameter sweeps
 
@@ -211,6 +379,20 @@ Hardened shell into a fresh plate at increasing closing speed.
 | 900 wu/s | 2.020e5 | 63572.250 | 1.303e6 | 1.303e6 | 187.500 | 1.000e5 | 0 | 0.500 | a | 99784.922 | 0 | 0 | - | - | yes |
 | 1200 wu/s | 3.591e5 | 84755.977 | 1.737e6 | 1.737e6 | 187.500 | 1.778e5 | 0 | 0.111 | a | 1.776e5 | 0 | 0 | - | - | yes |
 
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| 50 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 50 | 0.499 |
+| 100 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 100 | 0.499 |
+| 150 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 150 | 0.499 |
+| 200 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 200 | 0.499 |
+| 300 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| 450 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 450 | 0.499 |
+| 600 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 600 | 0.499 |
+| 900 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 900 | 0.499 |
+| 1200 wu/s | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 1200 | 0.499 |
+
 ### effective_mass
 
 Shell mass at a fixed 300 wu/s into a fresh plate; the tank's 200 mu bounds the effective mass.
@@ -225,6 +407,18 @@ Shell mass at a fixed 300 wu/s into a fresh plate; the tank's 200 mu bounds the 
 | shell mass 4 mu: effective mass 3.922 mu | 1.765e5 | 59421.738 | 1.218e6 | 1.218e6 | 187.500 | 87367.281 | 0 | 0.563 | a | 87150.336 | 0 | 0 | - | - | yes |
 | shell mass 8 mu: effective mass 7.692 mu | 3.462e5 | 83214.227 | 1.706e6 | 1.706e6 | 187.500 | 1.714e5 | 0 | 0.143 | a | 1.711e5 | 0 | 0 | - | - | yes |
 
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| shell mass 0.100 mu: effective mass 0.100 mu | shell / tank | 0.062 / 20 | 0.100 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.100 |
+| shell mass 0.250 mu: effective mass 0.250 mu | shell / tank | 0.062 / 20 | 0.250 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.250 |
+| shell mass 0.500 mu: effective mass 0.499 mu | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| shell mass 1 mu: effective mass 0.995 mu | shell / tank | 0.062 / 20 | 1 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.995 |
+| shell mass 2 mu: effective mass 1.980 mu | shell / tank | 0.062 / 20 | 2 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 1.980 |
+| shell mass 4 mu: effective mass 3.922 mu | shell / tank | 0.062 / 20 | 4 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 3.922 |
+| shell mass 8 mu: effective mass 7.692 mu | shell / tank | 0.062 / 20 | 8 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 7.692 |
+
 ### patch_width
 
 Shell into a fresh plate at 300 wu/s with the patch width scaled around its default and the depth that follows from it. A wider patch changes compliance and peak stress, which may exceed either material's yield strength.
@@ -237,6 +431,16 @@ Shell into a fresh plate at 300 wu/s with the patch width scaled around its defa
 | patch width 0.098 wu, 2x the default | 22443.889 | 21330.793 | 2.186e5 | 2.186e5 | 187.500 | 11167.087 | 0 | 0.944 | a | 10861.800 | 0 | 0 | - | - | yes |
 | patch width 0.195 wu, 4x the default | 22443.889 | 21757.240 | 1.115e5 | 1.115e5 | 187.500 | 11339.174 | 0 | 0.943 | a | 10680.526 | 0 | 0 | - | - | yes |
 
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| patch width 0.012 wu, 0.250x the default | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.012 | 2 / 1 | 0.012 / 0.012 | 300 | 0.499 |
+| patch width 0.024 wu, 0.500x the default | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.024 | 2 / 1 | 0.024 / 0.024 | 300 | 0.499 |
+| patch width 0.049 wu, 1x the default | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| patch width 0.098 wu, 2x the default | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.098 | 2 / 1 | 0.098 / 0.098 | 300 | 0.499 |
+| patch width 0.195 wu, 4x the default | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.195 | 2 / 1 | 0.195 / 0.195 | 300 | 0.499 |
+
 ### toughness
 
 Plate toughness scaled around the reference value: hits to failure at 300 wu/s.
@@ -248,6 +452,16 @@ Plate toughness scaled around the reference value: hits to failure at 300 wu/s.
 | toughness x1: fails after 18 hits | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10890.888 | 0 | 0 | a, b | 11140.297 | 0 | 0 | - | - | yes |
 | toughness x2: fails after 36 hits | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10657.710 | 0 | 0 | a, b | 11373.475 | 0 | 0 | - | - | yes |
 | toughness x4: fails after 72 hits | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 10191.354 | 0 | 0 | a, b | 11839.830 | 0 | 0 | - | - | yes |
+
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| toughness x0.250: fails after 5 hits | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| toughness x0.500: fails after 9 hits | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| toughness x1: fails after 18 hits | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| toughness x2: fails after 36 hits | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| toughness x4: fails after 72 hits | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
 
 ### strength_ratio
 
@@ -263,3 +477,16 @@ Striker strength relative to the plate at 300 wu/s: both can yield, and work all
 | striker strength 1.250x plate strength | 22443.889 | 21215.209 | 4.349e5 | 4.349e5 | 187.500 | 11116.049 | 0 | 0.944 | a | 10915.298 | 0 | 0 | - | - | yes |
 | striker strength 1.500x plate strength | 22443.889 | 21222.842 | 4.351e5 | 4.351e5 | 187.500 | 11124.065 | 0 | 0.944 | a | 10907.119 | 0 | 0 | - | - | yes |
 | striker strength 2x plate strength | 22443.889 | 21242.258 | 4.355e5 | 4.355e5 | 187.500 | 11144.472 | 0 | 0.944 | a | 10886.300 | 0 | 0 | - | - | yes |
+
+Inputs:
+
+| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| striker strength 0.500x plate strength | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| striker strength 0.750x plate strength | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| striker strength 0.999x plate strength | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| striker strength 1x plate strength | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| striker strength 1.001x plate strength | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| striker strength 1.250x plate strength | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| striker strength 1.500x plate strength | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |
+| striker strength 2x plate strength | shell / tank | 0.062 / 20 | 0.500 / 200 | - / - | 0 / 0 | 0.049 | 2 / 1 | 0.049 / 0.049 | 300 | 0.499 |

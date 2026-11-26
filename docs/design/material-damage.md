@@ -107,6 +107,10 @@ This implementation is `material-law-v2`; its report is
 [`material-model-v2.json`](../data/material-model-v2.json). The superseded report
 is available in Git history. `Material::identity()` hashes the material
 parameters; records also carry `LAW_VERSION` and the fixed post-yield fraction.
+The report lists the reference bodies, and each row records what its event
+took: the regions and their materials' identities, each body's mass, and its
+inertia and lever arm where the hit turns it, the contact geometry, and the
+closing speed and effective mass, or the press or connection load.
 Spacewars, Scorched Earth, Material Lab and `engine-rapier` depend on this
 crate. Rapier is a test-only dependency used for the isolated response
 experiment.

@@ -77,6 +77,88 @@
       "toughness_over_resilience": 2.6666667
     }
   ],
+  "bodies": [
+    {
+      "name": "tank",
+      "material": "armor",
+      "mass": 200.0,
+      "inertia": 2000.0,
+      "radius": 4.0,
+      "volume": 20.0,
+      "thickness": 1.0,
+      "extent": 0.2
+    },
+    {
+      "name": "ship",
+      "material": "hull",
+      "mass": 31.25,
+      "inertia": 200.0,
+      "radius": 3.0,
+      "volume": 6.0,
+      "thickness": 1.0,
+      "extent": 0.1
+    },
+    {
+      "name": "spaceling",
+      "material": "soft_tissue",
+      "mass": 2.0,
+      "inertia": 0.2,
+      "radius": 0.5,
+      "volume": 0.18,
+      "thickness": 0.6,
+      "extent": 1.0
+    },
+    {
+      "name": "branch",
+      "material": "wood",
+      "mass": 5.0,
+      "inertia": 7.0,
+      "radius": 0.5,
+      "volume": 4.0,
+      "thickness": 1.0,
+      "extent": 1.0
+    },
+    {
+      "name": "boulder",
+      "material": "rock",
+      "mass": 70.0,
+      "inertia": 315.0,
+      "radius": 3.0,
+      "volume": 28.0,
+      "thickness": 1.0,
+      "extent": 6.0
+    },
+    {
+      "name": "stone",
+      "material": "rock",
+      "mass": 2.0,
+      "inertia": 0.25,
+      "radius": 0.5,
+      "volume": 0.8,
+      "thickness": 1.0,
+      "extent": 1.0
+    },
+    {
+      "name": "shell",
+      "material": "shell",
+      "mass": 0.5,
+      "inertia": 0.0025,
+      "radius": 0.1,
+      "volume": 0.0625,
+      "thickness": 2.0,
+      "extent": 0.2
+    },
+    {
+      "name": "planet",
+      "material": "rock",
+      "mass": null,
+      "inertia": null,
+      "radius": null,
+      "volume": 1000.0,
+      "thickness": 1.0,
+      "extent": null
+    }
+  ],
   "cases": [
     {
       "name": "safe_bumps",
@@ -84,6 +166,50 @@
       "rows": [
         {
           "label": "branch vs tank: 1000 bumps at 0.352 wu/s, half the safe-limit speed",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "branch",
+                "material": "wood",
+                "identity": "70015ff20430b02e",
+                "volume": 4.0
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 5.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.22222222,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.22222222
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.2
+              }
+            },
+            "load": {
+              "closing_speed": 0.3523335,
+              "effective_mass": 4.878049
+            }
+          },
           "available": 0.30277777,
           "peak_force": 333.3333,
           "peak_stress": [
@@ -123,6 +249,50 @@
         },
         {
           "label": "stone vs ship: 1000 bumps at 0.437 wu/s, half the safe-limit speed",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "stone",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 0.8
+              },
+              {
+                "body": "ship",
+                "material": "hull",
+                "identity": "c70cd862dcf7f56f",
+                "volume": 6.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 2.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 31.25,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.21428572,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.21428572
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.1
+              }
+            },
+            "load": {
+              "closing_speed": 0.43651217,
+              "effective_mass": 1.8796992
+            }
+          },
           "available": 0.17908165,
           "peak_force": 642.8572,
           "peak_stress": [
@@ -162,6 +332,50 @@
         },
         {
           "label": "spaceling vs branch: 1000 bumps at 0.182 wu/s, half the safe-limit speed",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "spaceling",
+                "material": "soft_tissue",
+                "identity": "1358cf7485e6d7e7",
+                "volume": 0.18
+              },
+              {
+                "body": "branch",
+                "material": "wood",
+                "identity": "70015ff20430b02e",
+                "volume": 4.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 2.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 5.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.125,
+              "a": {
+                "thickness": 0.6,
+                "depth": 0.125
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.125
+              }
+            },
+            "load": {
+              "closing_speed": 0.18204568,
+              "effective_mass": 1.4285715
+            }
+          },
           "available": 0.023671879,
           "peak_force": 7.5000005,
           "peak_stress": [
@@ -201,6 +415,50 @@
         },
         {
           "label": "shell vs tank: 1000 bumps at 0.691 wu/s, half the safe-limit speed",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 0.6907221,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 0.11897682,
           "peak_force": 487.8049,
           "peak_stress": [
@@ -240,6 +498,50 @@
         },
         {
           "label": "ship vs planet: 1000 bumps at 0.437 wu/s, half the safe-limit speed",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "ship",
+                "material": "hull",
+                "identity": "c70cd862dcf7f56f",
+                "volume": 6.0
+              },
+              {
+                "body": "planet",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 1000.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 31.25,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": null,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 1.5,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.1
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 1.5
+              }
+            },
+            "load": {
+              "closing_speed": 0.4373949,
+              "effective_mass": 31.249998
+            }
+          },
           "available": 2.9892857,
           "peak_force": 4500.0,
           "peak_stress": [
@@ -285,6 +587,50 @@
       "rows": [
         {
           "label": "candidate hull at 1 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "ship",
+                "material": "hull",
+                "identity": "fb108241b203025d",
+                "volume": 6.0
+              },
+              {
+                "body": "planet",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 1000.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 31.25,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": null,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 1.5,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.1
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 1.5
+              }
+            },
+            "load": {
+              "closing_speed": 1.0,
+              "effective_mass": 31.249998
+            }
+          },
           "available": 15.624999,
           "peak_force": 3853.2173,
           "peak_stress": [
@@ -321,6 +667,50 @@
         },
         {
           "label": "candidate hull at 1.600 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "ship",
+                "material": "hull",
+                "identity": "fb108241b203025d",
+                "volume": 6.0
+              },
+              {
+                "body": "planet",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 1000.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 31.25,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": null,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 1.5,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.1
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 1.5
+              }
+            },
+            "load": {
+              "closing_speed": 1.6,
+              "effective_mass": 31.249998
+            }
+          },
           "available": 39.999996,
           "peak_force": 6165.1475,
           "peak_stress": [
@@ -357,6 +747,50 @@
         },
         {
           "label": "candidate hull at 2.200 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "ship",
+                "material": "hull",
+                "identity": "fb108241b203025d",
+                "volume": 6.0
+              },
+              {
+                "body": "planet",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 1000.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 31.25,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": null,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 1.5,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.1
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 1.5
+              }
+            },
+            "load": {
+              "closing_speed": 2.2,
+              "effective_mass": 31.249998
+            }
+          },
           "available": 75.625,
           "peak_force": 8477.078,
           "peak_stress": [
@@ -393,6 +827,50 @@
         },
         {
           "label": "candidate hull at 13.300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "ship",
+                "material": "hull",
+                "identity": "fb108241b203025d",
+                "volume": 6.0
+              },
+              {
+                "body": "planet",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 1000.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 31.25,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": null,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 1.5,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.1
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 1.5
+              }
+            },
+            "load": {
+              "closing_speed": 13.3,
+              "effective_mass": 31.249998
+            }
+          },
           "available": 2763.906,
           "peak_force": 10444.925,
           "peak_stress": [
@@ -429,6 +907,50 @@
         },
         {
           "label": "candidate hull at 43.200 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "ship",
+                "material": "hull",
+                "identity": "fb108241b203025d",
+                "volume": 6.0
+              },
+              {
+                "body": "planet",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 1000.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 31.25,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": null,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 1.5,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.1
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 1.5
+              }
+            },
+            "load": {
+              "closing_speed": 43.2,
+              "effective_mass": 31.249998
+            }
+          },
           "available": 29160.0,
           "peak_force": 19256.75,
           "peak_stress": [
@@ -465,6 +987,50 @@
         },
         {
           "label": "candidate hull at 100 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "ship",
+                "material": "hull",
+                "identity": "fb108241b203025d",
+                "volume": 6.0
+              },
+              {
+                "body": "planet",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 1000.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 31.25,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": null,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 1.5,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.1
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 1.5
+              }
+            },
+            "load": {
+              "closing_speed": 100.0,
+              "effective_mass": 31.249998
+            }
+          },
           "available": 156249.98,
           "peak_force": 39729.9,
           "peak_stress": [
@@ -507,6 +1073,50 @@
       "rows": [
         {
           "label": "0% of excess assigned to motion",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "branch",
+                "material": "wood",
+                "identity": "70015ff20430b02e",
+                "volume": 4.0
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 5.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.22222222,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.22222222
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.2
+              }
+            },
+            "load": {
+              "closing_speed": 120.0,
+              "effective_mass": 4.878049
+            }
+          },
           "available": 35121.95,
           "peak_force": 11441.426,
           "peak_stress": [
@@ -543,6 +1153,50 @@
         },
         {
           "label": "50% of excess assigned to motion",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "branch",
+                "material": "wood",
+                "identity": "70015ff20430b02e",
+                "volume": 4.0
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 5.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.22222222,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.22222222
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.2
+              }
+            },
+            "load": {
+              "closing_speed": 120.0,
+              "effective_mass": 4.878049
+            }
+          },
           "available": 35121.95,
           "peak_force": 11441.426,
           "peak_stress": [
@@ -579,6 +1233,50 @@
         },
         {
           "label": "100% of excess assigned to motion",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "branch",
+                "material": "wood",
+                "identity": "70015ff20430b02e",
+                "volume": 4.0
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 5.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.22222222,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.22222222
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.2
+              }
+            },
+            "load": {
+              "closing_speed": 120.0,
+              "effective_mass": 4.878049
+            }
+          },
           "available": 35121.95,
           "peak_force": 11441.426,
           "peak_stress": [
@@ -621,6 +1319,50 @@
       "rows": [
         {
           "label": "hit 1: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -657,6 +1399,50 @@
         },
         {
           "label": "hit 2: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -693,6 +1479,50 @@
         },
         {
           "label": "hit 3: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -729,6 +1559,50 @@
         },
         {
           "label": "hit 4: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -765,6 +1639,50 @@
         },
         {
           "label": "hit 5: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -801,6 +1719,50 @@
         },
         {
           "label": "hit 6: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -837,6 +1799,50 @@
         },
         {
           "label": "hit 7: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -873,6 +1879,50 @@
         },
         {
           "label": "hit 8: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -909,6 +1959,50 @@
         },
         {
           "label": "hit 9: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -945,6 +2039,50 @@
         },
         {
           "label": "hit 10: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -981,6 +2119,50 @@
         },
         {
           "label": "hit 11: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -1017,6 +2199,50 @@
         },
         {
           "label": "hit 12: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -1053,6 +2279,50 @@
         },
         {
           "label": "hit 13: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -1089,6 +2359,50 @@
         },
         {
           "label": "hit 14: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -1125,6 +2439,50 @@
         },
         {
           "label": "hit 15: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -1161,6 +2519,50 @@
         },
         {
           "label": "hit 16: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -1197,6 +2599,50 @@
         },
         {
           "label": "hit 17: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -1233,6 +2679,50 @@
         },
         {
           "label": "hit 18: shell vs tank at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -1275,6 +2765,50 @@
       "rows": [
         {
           "label": "plate volume 20 wu^3: fails after 18 hits at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -1311,6 +2845,50 @@
         },
         {
           "label": "plate volume 40 wu^3: fails after 36 hits at 300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 40.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -1347,6 +2925,50 @@
         },
         {
           "label": "plate thickness 1 wu: one hit at 1.658 wu/s, 1.2x the thin plate's safe-limit speed",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 1.6577331,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 0.68530643,
           "peak_force": 979.85077,
           "peak_stress": [
@@ -1383,6 +3005,50 @@
         },
         {
           "label": "plate thickness 2 wu: one hit at 1.658 wu/s, 1.2x the thin plate's safe-limit speed",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 1.6577331,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 0.68530643,
           "peak_force": 1655.6648,
           "peak_stress": [
@@ -1425,6 +3091,50 @@
       "rows": [
         {
           "label": "branch vs tank at 15 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "branch",
+                "material": "wood",
+                "identity": "70015ff20430b02e",
+                "volume": 4.0
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 5.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.22222222,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.22222222
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.2
+              }
+            },
+            "load": {
+              "closing_speed": 15.0,
+              "effective_mass": 4.878049
+            }
+          },
           "available": 548.78046,
           "peak_force": 1622.5758,
           "peak_stress": [
@@ -1461,6 +3171,50 @@
         },
         {
           "label": "branch vs tank at 40 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "branch",
+                "material": "wood",
+                "identity": "70015ff20430b02e",
+                "volume": 4.0
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 5.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.22222222,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.22222222
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.2
+              }
+            },
+            "load": {
+              "closing_speed": 40.0,
+              "effective_mass": 4.878049
+            }
+          },
           "available": 3902.439,
           "peak_force": 4004.413,
           "peak_stress": [
@@ -1497,6 +3251,50 @@
         },
         {
           "label": "branch vs tank at 80 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "branch",
+                "material": "wood",
+                "identity": "70015ff20430b02e",
+                "volume": 4.0
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 5.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.22222222,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.22222222
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.2
+              }
+            },
+            "load": {
+              "closing_speed": 80.0,
+              "effective_mass": 4.878049
+            }
+          },
           "available": 15609.756,
           "peak_force": 7700.7695,
           "peak_stress": [
@@ -1533,6 +3331,50 @@
         },
         {
           "label": "branch vs tank at 120 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "branch",
+                "material": "wood",
+                "identity": "70015ff20430b02e",
+                "volume": 4.0
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 5.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.22222222,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.22222222
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.2
+              }
+            },
+            "load": {
+              "closing_speed": 120.0,
+              "effective_mass": 4.878049
+            }
+          },
           "available": 35121.95,
           "peak_force": 11441.426,
           "peak_stress": [
@@ -1569,6 +3411,50 @@
         },
         {
           "label": "branch vs tank at 240 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "branch",
+                "material": "wood",
+                "identity": "70015ff20430b02e",
+                "volume": 4.0
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 5.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.22222222,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.22222222
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.2
+              }
+            },
+            "load": {
+              "closing_speed": 240.0,
+              "effective_mass": 4.878049
+            }
+          },
           "available": 140487.8,
           "peak_force": 22750.162,
           "peak_stress": [
@@ -1611,6 +3497,50 @@
       "rows": [
         {
           "label": "stone vs spaceling at 10 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "stone",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 0.8
+              },
+              {
+                "body": "spaceling",
+                "material": "soft_tissue",
+                "identity": "1358cf7485e6d7e7",
+                "volume": 0.18
+              }
+            ],
+            "contact": [
+              {
+                "mass": 2.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 2.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.125,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.125
+              },
+              "b": {
+                "thickness": 0.6,
+                "depth": 0.125
+              }
+            },
+            "load": {
+              "closing_speed": 10.0,
+              "effective_mass": 1.0
+            }
+          },
           "available": 50.0,
           "peak_force": 37.719284,
           "peak_stress": [
@@ -1647,6 +3577,50 @@
         },
         {
           "label": "stone vs branch at 10 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "stone",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 0.8
+              },
+              {
+                "body": "branch",
+                "material": "wood",
+                "identity": "70015ff20430b02e",
+                "volume": 4.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 2.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 5.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.125,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.125
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.125
+              }
+            },
+            "load": {
+              "closing_speed": 10.0,
+              "effective_mass": 1.4285715
+            }
+          },
           "available": 71.42857,
           "peak_force": 651.7385,
           "peak_stress": [
@@ -1689,6 +3663,50 @@
       "rows": [
         {
           "label": "ship vs ship at 20 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "ship",
+                "material": "hull",
+                "identity": "c70cd862dcf7f56f",
+                "volume": 6.0
+              },
+              {
+                "body": "ship",
+                "material": "hull",
+                "identity": "c70cd862dcf7f56f",
+                "volume": 6.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 31.25,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 31.25,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.75,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.1
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.1
+              }
+            },
+            "load": {
+              "closing_speed": 20.0,
+              "effective_mass": 15.624999
+            }
+          },
           "available": 3124.9998,
           "peak_force": 13568.714,
           "peak_stress": [
@@ -1725,6 +3743,50 @@
         },
         {
           "label": "ship vs ship at 60 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "ship",
+                "material": "hull",
+                "identity": "c70cd862dcf7f56f",
+                "volume": 6.0
+              },
+              {
+                "body": "ship",
+                "material": "hull",
+                "identity": "c70cd862dcf7f56f",
+                "volume": 6.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 31.25,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 31.25,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.75,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.1
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.1
+              }
+            },
+            "load": {
+              "closing_speed": 60.0,
+              "effective_mass": 15.624999
+            }
+          },
           "available": 28124.998,
           "peak_force": 38686.043,
           "peak_stress": [
@@ -1767,6 +3829,50 @@
       "rows": [
         {
           "label": "shell vs tank at 600 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 600.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 89775.555,
           "peak_force": 42391.535,
           "peak_stress": [
@@ -1803,6 +3909,50 @@
         },
         {
           "label": "shell vs tank at 1800 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 1800.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 807980.0,
           "peak_force": 127126.44,
           "peak_stress": [
@@ -1845,6 +3995,50 @@
       "rows": [
         {
           "label": "ship into planet at 20 wu/s, incidence 0 degrees: normal speed 20 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "ship",
+                "material": "hull",
+                "identity": "c70cd862dcf7f56f",
+                "volume": 6.0
+              },
+              {
+                "body": "planet",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 1000.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 31.25,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": null,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 1.5,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.1
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 1.5
+              }
+            },
+            "load": {
+              "closing_speed": 20.0,
+              "effective_mass": 31.249998
+            }
+          },
           "available": 6249.9995,
           "peak_force": 24497.959,
           "peak_stress": [
@@ -1881,6 +4075,50 @@
         },
         {
           "label": "ship into planet at 20 wu/s, incidence 30 degrees: normal speed 17.321 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "ship",
+                "material": "hull",
+                "identity": "c70cd862dcf7f56f",
+                "volume": 6.0
+              },
+              {
+                "body": "planet",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 1000.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 31.25,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": null,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 1.5,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.1
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 1.5
+              }
+            },
+            "load": {
+              "closing_speed": 17.320507,
+              "effective_mass": 31.249998
+            }
+          },
           "available": 4687.499,
           "peak_force": 22232.93,
           "peak_stress": [
@@ -1917,6 +4155,50 @@
         },
         {
           "label": "ship into planet at 20 wu/s, incidence 60 degrees: normal speed 10.000 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "ship",
+                "material": "hull",
+                "identity": "c70cd862dcf7f56f",
+                "volume": 6.0
+              },
+              {
+                "body": "planet",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 1000.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 31.25,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": null,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 1.5,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.1
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 1.5
+              }
+            },
+            "load": {
+              "closing_speed": 9.999999,
+              "effective_mass": 31.249998
+            }
+          },
           "available": 1562.4995,
           "peak_force": 16810.998,
           "peak_stress": [
@@ -1953,6 +4235,50 @@
         },
         {
           "label": "ship into planet at 20 wu/s, incidence 80 degrees: normal speed 3.473 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "ship",
+                "material": "hull",
+                "identity": "c70cd862dcf7f56f",
+                "volume": 6.0
+              },
+              {
+                "body": "planet",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 1000.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 31.25,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": null,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 1.5,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.1
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 1.5
+              }
+            },
+            "load": {
+              "closing_speed": 3.4729645,
+              "effective_mass": 31.249998
+            }
+          },
           "available": 188.46066,
           "peak_force": 10830.668,
           "peak_stress": [
@@ -1995,6 +4321,50 @@
       "rows": [
         {
           "label": "boulder vs tank at 3 wu/s, lever arm 0 wu: effective mass 51.852 mu",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "boulder",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 28.0
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 70.0,
+                "inertia": 315.0,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.85714287,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.85714287
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.2
+              }
+            },
+            "load": {
+              "closing_speed": 3.0,
+              "effective_mass": 51.851852
+            }
+          },
           "available": 233.33334,
           "peak_force": 9772.967,
           "peak_stress": [
@@ -2031,6 +4401,50 @@
         },
         {
           "label": "boulder vs tank at 3 wu/s, lever arm 1 wu: effective mass 44.523 mu",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "boulder",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 28.0
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 70.0,
+                "inertia": 315.0,
+                "lever": 1.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.85714287,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.85714287
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.2
+              }
+            },
+            "load": {
+              "closing_speed": 3.0,
+              "effective_mass": 44.522964
+            }
+          },
           "available": 200.35333,
           "peak_force": 9603.75,
           "peak_stress": [
@@ -2067,6 +4481,50 @@
         },
         {
           "label": "boulder vs tank at 3 wu/s, lever arm 2 wu: effective mass 31.266 mu",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "boulder",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 28.0
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 70.0,
+                "inertia": 315.0,
+                "lever": 2.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.85714287,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.85714287
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.2
+              }
+            },
+            "load": {
+              "closing_speed": 3.0,
+              "effective_mass": 31.265507
+            }
+          },
           "available": 140.6948,
           "peak_force": 9289.82,
           "peak_stress": [
@@ -2103,6 +4561,50 @@
         },
         {
           "label": "boulder vs tank at 3 wu/s, lever arm 3 wu: effective mass 20.896 mu",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "boulder",
+                "material": "rock",
+                "identity": "79fca58d13414368",
+                "volume": 28.0
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 70.0,
+                "inertia": 315.0,
+                "lever": 3.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.85714287,
+              "a": {
+                "thickness": 1.0,
+                "depth": 0.85714287
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.2
+              }
+            },
+            "load": {
+              "closing_speed": 3.0,
+              "effective_mass": 20.895523
+            }
+          },
           "available": 94.029854,
           "peak_force": 9036.665,
           "peak_stress": [
@@ -2145,6 +4647,25 @@
       "rows": [
         {
           "label": "tank resting on a wood plank: force 2000 over 2 wu^2 for 1000 ticks",
+          "input": {
+            "kind": "sustained",
+            "region": {
+              "body": "branch",
+              "material": "wood",
+              "identity": "70015ff20430b02e",
+              "volume": 4.0
+            },
+            "load": {
+              "force": 2000.0,
+              "width": 2.0,
+              "section": {
+                "thickness": 1.0,
+                "depth": 1.0
+              },
+              "duration": 0.016666668,
+              "measured_plastic_displacement": null
+            }
+          },
           "available": 5.0,
           "peak_force": 2000.0,
           "peak_stress": [
@@ -2184,6 +4705,25 @@
         },
         {
           "label": "press of force 6300, 1.05x the safe stress, fallback progression: fails after 12 ticks (0.200 s)",
+          "input": {
+            "kind": "sustained",
+            "region": {
+              "body": "branch",
+              "material": "wood",
+              "identity": "70015ff20430b02e",
+              "volume": 4.0
+            },
+            "load": {
+              "force": 6300.0,
+              "width": 2.0,
+              "section": {
+                "thickness": 1.0,
+                "depth": 1.0
+              },
+              "duration": 0.016666668,
+              "measured_plastic_displacement": null
+            }
+          },
           "available": 65.0,
           "peak_force": 6300.0,
           "peak_stress": [
@@ -2220,6 +4760,25 @@
         },
         {
           "label": "press of force 9000, 1.5x the safe stress, fallback progression: fails after 2 ticks (0.033 s)",
+          "input": {
+            "kind": "sustained",
+            "region": {
+              "body": "branch",
+              "material": "wood",
+              "identity": "70015ff20430b02e",
+              "volume": 4.0
+            },
+            "load": {
+              "force": 9000.0,
+              "width": 2.0,
+              "section": {
+                "thickness": 1.0,
+                "depth": 1.0
+              },
+              "duration": 0.016666668,
+              "measured_plastic_displacement": null
+            }
+          },
           "available": 245.00002,
           "peak_force": 9000.0,
           "peak_stress": [
@@ -2256,6 +4815,25 @@
         },
         {
           "label": "the 1.5x press with a measured 0.02 wu plastic displacement in one tick",
+          "input": {
+            "kind": "sustained",
+            "region": {
+              "body": "branch",
+              "material": "wood",
+              "identity": "70015ff20430b02e",
+              "volume": 4.0
+            },
+            "load": {
+              "force": 9000.0,
+              "width": 2.0,
+              "section": {
+                "thickness": 1.0,
+                "depth": 1.0
+              },
+              "duration": 0.016666668,
+              "measured_plastic_displacement": 0.02
+            }
+          },
           "available": 165.0,
           "peak_force": 9000.0,
           "peak_stress": [
@@ -2298,6 +4876,27 @@
       "rows": [
         {
           "label": "connection 1 at 6 wu from the tip, moment 600: fails after 5 ticks",
+          "input": {
+            "kind": "connection",
+            "region": {
+              "body": "connection",
+              "material": "wood",
+              "identity": "70015ff20430b02e",
+              "volume": 2.0
+            },
+            "beam": {
+              "thickness": 1.0,
+              "height": 1.0,
+              "length": 2.0
+            },
+            "load": {
+              "moment": 600.0,
+              "axial": 0.0,
+              "duration": 0.016666668,
+              "measured_plastic_rotation": null,
+              "measured_plastic_extension": null
+            }
+          },
           "available": 41.666664,
           "peak_force": 0.0,
           "peak_stress": [
@@ -2334,6 +4933,27 @@
         },
         {
           "label": "connection 2 at 4 wu from the tip, moment 400: intact after 400 ticks",
+          "input": {
+            "kind": "connection",
+            "region": {
+              "body": "connection",
+              "material": "wood",
+              "identity": "70015ff20430b02e",
+              "volume": 2.0
+            },
+            "beam": {
+              "thickness": 1.0,
+              "height": 1.0,
+              "length": 2.0
+            },
+            "load": {
+              "moment": 400.0,
+              "axial": 0.0,
+              "duration": 0.016666668,
+              "measured_plastic_rotation": null,
+              "measured_plastic_extension": null
+            }
+          },
           "available": 9.599999,
           "peak_force": 0.0,
           "peak_stress": [
@@ -2370,6 +4990,27 @@
         },
         {
           "label": "connection 3 at 2 wu from the tip, moment 200: intact after 400 ticks",
+          "input": {
+            "kind": "connection",
+            "region": {
+              "body": "connection",
+              "material": "wood",
+              "identity": "70015ff20430b02e",
+              "volume": 2.0
+            },
+            "beam": {
+              "thickness": 1.0,
+              "height": 1.0,
+              "length": 2.0
+            },
+            "load": {
+              "moment": 200.0,
+              "axial": 0.0,
+              "duration": 0.016666668,
+              "measured_plastic_rotation": null,
+              "measured_plastic_extension": null
+            }
+          },
           "available": 2.3999999,
           "peak_force": 0.0,
           "peak_stress": [
@@ -2412,6 +5053,50 @@
       "rows": [
         {
           "label": "one contact: width 0.049 wu",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -2448,6 +5133,50 @@
         },
         {
           "label": "four equivalent sub-contacts merged: width 0.049 wu",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -2484,6 +5213,50 @@
         },
         {
           "label": "four sub-contacts each charged with the whole event, which an adapter must not do",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.012195122,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 10597.884,
           "peak_stress": [
@@ -2529,6 +5302,25 @@
       "rows": [
         {
           "label": "1.05x press on the plank at 30 Hz: fails after 6 ticks (0.200 s)",
+          "input": {
+            "kind": "sustained",
+            "region": {
+              "body": "branch",
+              "material": "wood",
+              "identity": "70015ff20430b02e",
+              "volume": 4.0
+            },
+            "load": {
+              "force": 6300.0,
+              "width": 2.0,
+              "section": {
+                "thickness": 1.0,
+                "depth": 1.0
+              },
+              "duration": 0.033333335,
+              "measured_plastic_displacement": null
+            }
+          },
           "available": 85.0,
           "peak_force": 6300.0,
           "peak_stress": [
@@ -2568,6 +5360,25 @@
         },
         {
           "label": "1.05x press on the plank at 60 Hz: fails after 12 ticks (0.200 s)",
+          "input": {
+            "kind": "sustained",
+            "region": {
+              "body": "branch",
+              "material": "wood",
+              "identity": "70015ff20430b02e",
+              "volume": 4.0
+            },
+            "load": {
+              "force": 6300.0,
+              "width": 2.0,
+              "section": {
+                "thickness": 1.0,
+                "depth": 1.0
+              },
+              "duration": 0.016666668,
+              "measured_plastic_displacement": null
+            }
+          },
           "available": 65.0,
           "peak_force": 6300.0,
           "peak_stress": [
@@ -2607,6 +5418,25 @@
         },
         {
           "label": "1.05x press on the plank at 120 Hz: fails after 24 ticks (0.200 s)",
+          "input": {
+            "kind": "sustained",
+            "region": {
+              "body": "branch",
+              "material": "wood",
+              "identity": "70015ff20430b02e",
+              "volume": 4.0
+            },
+            "load": {
+              "force": 6300.0,
+              "width": 2.0,
+              "section": {
+                "thickness": 1.0,
+                "depth": 1.0
+              },
+              "duration": 0.008333334,
+              "measured_plastic_displacement": null
+            }
+          },
           "available": 55.0,
           "peak_force": 6300.0,
           "peak_stress": [
@@ -2646,6 +5476,25 @@
         },
         {
           "label": "1.05x press on the plank at 240 Hz: fails after 48 ticks (0.200 s)",
+          "input": {
+            "kind": "sustained",
+            "region": {
+              "body": "branch",
+              "material": "wood",
+              "identity": "70015ff20430b02e",
+              "volume": 4.0
+            },
+            "load": {
+              "force": 6300.0,
+              "width": 2.0,
+              "section": {
+                "thickness": 1.0,
+                "depth": 1.0
+              },
+              "duration": 0.004166667,
+              "measured_plastic_displacement": null
+            }
+          },
           "available": 50.0,
           "peak_force": 6300.0,
           "peak_stress": [
@@ -2685,6 +5534,27 @@
         },
         {
           "label": "1.08x moment on a connection at 30 Hz: fails after 6 ticks (0.200 s)",
+          "input": {
+            "kind": "connection",
+            "region": {
+              "body": "connection",
+              "material": "wood",
+              "identity": "70015ff20430b02e",
+              "volume": 2.0
+            },
+            "beam": {
+              "thickness": 1.0,
+              "height": 1.0,
+              "length": 2.0
+            },
+            "load": {
+              "moment": 540.0,
+              "axial": 0.0,
+              "duration": 0.033333335,
+              "measured_plastic_rotation": null,
+              "measured_plastic_extension": null
+            }
+          },
           "available": 36.333332,
           "peak_force": 0.0,
           "peak_stress": [
@@ -2724,6 +5594,27 @@
         },
         {
           "label": "1.08x moment on a connection at 60 Hz: fails after 12 ticks (0.200 s)",
+          "input": {
+            "kind": "connection",
+            "region": {
+              "body": "connection",
+              "material": "wood",
+              "identity": "70015ff20430b02e",
+              "volume": 2.0
+            },
+            "beam": {
+              "thickness": 1.0,
+              "height": 1.0,
+              "length": 2.0
+            },
+            "load": {
+              "moment": 540.0,
+              "axial": 0.0,
+              "duration": 0.016666668,
+              "measured_plastic_rotation": null,
+              "measured_plastic_extension": null
+            }
+          },
           "available": 25.666664,
           "peak_force": 0.0,
           "peak_stress": [
@@ -2763,6 +5654,27 @@
         },
         {
           "label": "1.08x moment on a connection at 120 Hz: fails after 23 ticks (0.192 s)",
+          "input": {
+            "kind": "connection",
+            "region": {
+              "body": "connection",
+              "material": "wood",
+              "identity": "70015ff20430b02e",
+              "volume": 2.0
+            },
+            "beam": {
+              "thickness": 1.0,
+              "height": 1.0,
+              "length": 2.0
+            },
+            "load": {
+              "moment": 540.0,
+              "axial": 0.0,
+              "duration": 0.008333334,
+              "measured_plastic_rotation": null,
+              "measured_plastic_extension": null
+            }
+          },
           "available": 20.333332,
           "peak_force": 0.0,
           "peak_stress": [
@@ -2802,6 +5714,27 @@
         },
         {
           "label": "1.08x moment on a connection at 240 Hz: fails after 45 ticks (0.188 s)",
+          "input": {
+            "kind": "connection",
+            "region": {
+              "body": "connection",
+              "material": "wood",
+              "identity": "70015ff20430b02e",
+              "volume": 2.0
+            },
+            "beam": {
+              "thickness": 1.0,
+              "height": 1.0,
+              "length": 2.0
+            },
+            "load": {
+              "moment": 540.0,
+              "axial": 0.0,
+              "duration": 0.004166667,
+              "measured_plastic_rotation": null,
+              "measured_plastic_extension": null
+            }
+          },
           "available": 17.666664,
           "peak_force": 0.0,
           "peak_stress": [
@@ -2849,6 +5782,50 @@
       "rows": [
         {
           "label": "50 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 50.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 623.44135,
           "peak_force": 3741.665,
           "peak_stress": [
@@ -2885,6 +5862,50 @@
         },
         {
           "label": "100 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 100.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 2493.7654,
           "peak_force": 7169.8354,
           "peak_stress": [
@@ -2921,6 +5942,50 @@
         },
         {
           "label": "150 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 150.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 5610.972,
           "peak_force": 10665.396,
           "peak_stress": [
@@ -2957,6 +6022,50 @@
         },
         {
           "label": "200 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 200.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 9975.062,
           "peak_force": 14178.592,
           "peak_stress": [
@@ -2993,6 +6102,50 @@
         },
         {
           "label": "300 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -3029,6 +6182,50 @@
         },
         {
           "label": "450 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 450.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 50498.75,
           "peak_force": 31804.186,
           "peak_stress": [
@@ -3065,6 +6262,50 @@
         },
         {
           "label": "600 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 600.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 89775.555,
           "peak_force": 42391.535,
           "peak_stress": [
@@ -3101,6 +6342,50 @@
         },
         {
           "label": "900 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 900.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 201995.0,
           "peak_force": 63572.25,
           "peak_stress": [
@@ -3137,6 +6422,50 @@
         },
         {
           "label": "1200 wu/s",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 1200.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 359102.22,
           "peak_force": 84755.98,
           "peak_stress": [
@@ -3179,6 +6508,50 @@
       "rows": [
         {
           "label": "shell mass 0.100 mu: effective mass 0.100 mu",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.1,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.09995002
+            }
+          },
           "available": 4497.751,
           "peak_force": 9564.845,
           "peak_stress": [
@@ -3215,6 +6588,50 @@
         },
         {
           "label": "shell mass 0.250 mu: effective mass 0.250 mu",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.25,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.24968788
+            }
+          },
           "available": 11235.955,
           "peak_force": 15041.62,
           "peak_stress": [
@@ -3251,6 +6668,50 @@
         },
         {
           "label": "shell mass 0.500 mu: effective mass 0.499 mu",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -3287,6 +6748,50 @@
         },
         {
           "label": "shell mass 1 mu: effective mass 0.995 mu",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 1.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.99502486
+            }
+          },
           "available": 44776.117,
           "peak_force": 29950.852,
           "peak_stress": [
@@ -3323,6 +6828,50 @@
         },
         {
           "label": "shell mass 2 mu: effective mass 1.980 mu",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 2.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 1.980198
+            }
+          },
           "available": 89108.91,
           "peak_force": 42233.984,
           "peak_stress": [
@@ -3359,6 +6908,50 @@
         },
         {
           "label": "shell mass 4 mu: effective mass 3.922 mu",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 4.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 3.9215686
+            }
+          },
           "available": 176470.6,
           "peak_force": 59421.74,
           "peak_stress": [
@@ -3395,6 +6988,50 @@
         },
         {
           "label": "shell mass 8 mu: effective mass 7.692 mu",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 8.0,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 7.692308
+            }
+          },
           "available": 346153.84,
           "peak_force": 83214.23,
           "peak_stress": [
@@ -3437,6 +7074,50 @@
       "rows": [
         {
           "label": "patch width 0.012 wu, 0.250x the default",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.012195122,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.012195122
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.012195122
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21188.994,
           "peak_stress": [
@@ -3473,6 +7154,50 @@
         },
         {
           "label": "patch width 0.024 wu, 0.500x the default",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.024390245,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.024390245
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.024390245
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21195.768,
           "peak_stress": [
@@ -3509,6 +7234,50 @@
         },
         {
           "label": "patch width 0.049 wu, 1x the default",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -3545,6 +7314,50 @@
         },
         {
           "label": "patch width 0.098 wu, 2x the default",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.09756098,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.09756098
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.09756098
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21330.793,
           "peak_stress": [
@@ -3581,6 +7394,50 @@
         },
         {
           "label": "patch width 0.195 wu, 4x the default",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.19512196,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.19512196
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.19512196
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21757.24,
           "peak_stress": [
@@ -3623,6 +7480,50 @@
       "rows": [
         {
           "label": "toughness x0.250: fails after 5 hits",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "120ef07fd12a6a19",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -3659,6 +7560,50 @@
         },
         {
           "label": "toughness x0.500: fails after 9 hits",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "5d9a937cb9675a99",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -3695,6 +7640,50 @@
         },
         {
           "label": "toughness x1: fails after 18 hits",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -3731,6 +7720,50 @@
         },
         {
           "label": "toughness x2: fails after 36 hits",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "0cfbd1a57306beca",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -3767,6 +7800,50 @@
         },
         {
           "label": "toughness x4: fails after 72 hits",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6edc3182188b916b",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -3809,6 +7886,50 @@
       "rows": [
         {
           "label": "striker strength 0.500x plate strength",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "f7aa63f96e9e8bb4",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21200.629,
           "peak_stress": [
@@ -3845,6 +7966,50 @@
         },
         {
           "label": "striker strength 0.750x plate strength",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "4be2bca872064c9e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21204.102,
           "peak_stress": [
@@ -3881,6 +8046,50 @@
         },
         {
           "label": "striker strength 0.999x plate strength",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "29518f0035f93f6c",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21208.94,
           "peak_stress": [
@@ -3917,6 +8126,50 @@
         },
         {
           "label": "striker strength 1x plate strength",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "ac9e89d7819b0f34",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21208.96,
           "peak_stress": [
@@ -3953,6 +8206,50 @@
         },
         {
           "label": "striker strength 1.001x plate strength",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "51ee34ce4cda2c7c",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21208.984,
           "peak_stress": [
@@ -3989,6 +8286,50 @@
         },
         {
           "label": "striker strength 1.250x plate strength",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "e4c1f644955c412d",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21215.209,
           "peak_stress": [
@@ -4025,6 +8366,50 @@
         },
         {
           "label": "striker strength 1.500x plate strength",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "5ac27cd5aab7921e",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21222.842,
           "peak_stress": [
@@ -4061,6 +8446,50 @@
         },
         {
           "label": "striker strength 2x plate strength",
+          "input": {
+            "kind": "impact",
+            "regions": [
+              {
+                "body": "shell",
+                "material": "shell",
+                "identity": "8c7b7013f2996e15",
+                "volume": 0.0625
+              },
+              {
+                "body": "tank",
+                "material": "armor",
+                "identity": "6e7a2e9ebacc784a",
+                "volume": 20.0
+              }
+            ],
+            "contact": [
+              {
+                "mass": 0.5,
+                "inertia": null,
+                "lever": 0.0
+              },
+              {
+                "mass": 200.0,
+                "inertia": null,
+                "lever": 0.0
+              }
+            ],
+            "geometry": {
+              "width": 0.04878049,
+              "a": {
+                "thickness": 2.0,
+                "depth": 0.04878049
+              },
+              "b": {
+                "thickness": 1.0,
+                "depth": 0.04878049
+              }
+            },
+            "load": {
+              "closing_speed": 300.0,
+              "effective_mass": 0.4987531
+            }
+          },
           "available": 22443.889,
           "peak_force": 21242.258,
           "peak_stress": [

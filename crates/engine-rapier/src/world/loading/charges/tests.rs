@@ -325,6 +325,35 @@ fn a_head_on_impact_is_priced_on_the_energy_its_approach_brings() {
 }
 
 #[test]
+fn a_charge_reports_the_geometry_and_load_it_was_priced_with() {
+    let mut host = Host::default();
+    let (mut world, sources) = balls(&mut host, [Some(0.5); 2]);
+    let fresh = host.surfaces.clone();
+    let charges = first_charges(&mut world, &mut host);
+    let ContactCharge::Charged {
+        geometry,
+        load,
+        outcome,
+        ..
+    } = &charges[0]
+    else {
+        panic!("{charges:?}");
+    };
+    // Head on, the balls bring their reduced mass at their closing speed.
+    let [a, b] = [1, 2].map(|n| world.body_mass(body(n)).unwrap());
+    assert!(
+        close(load.effective_mass, a * b / (a + b), 1.0e-4),
+        "{load:?}"
+    );
+    assert!(close(load.closing_speed, 20.0, 1.0e-6), "{load:?}");
+    let width = patch_width_from_radii(0.5, Some(0.5)).unwrap();
+    assert!(close(geometry.width, width, 1.0e-6), "{geometry:?}");
+    // The law on the fresh regions with them gives the charge's outcome.
+    let [region_a, region_b] = sources.map(|source| fresh[&source].region);
+    assert_eq!(impact(&region_a, &region_b, *geometry, *load), Ok(*outcome));
+}
+
+#[test]
 fn a_spinning_bar_is_priced_on_the_mass_its_end_brings() {
     // A bar spinning clockwise just above a floor strikes it with its right
     // end, which falls at 5 while the left end rises.
@@ -1168,10 +1197,9 @@ fn a_share_too_small_for_the_law_costs_nothing() {
         speed: 1.0,
         ..Default::default()
     };
-    assert_eq!(
-        price(surface(HULL, Some(0.5)), surface(ROCK, None), &tiny),
-        Ok(Outcome::default())
-    );
+    let (_, load, outcome) = price(surface(HULL, Some(0.5)), surface(ROCK, None), &tiny).unwrap();
+    assert_eq!(outcome, Outcome::default());
+    assert!(load.effective_mass < MIN_EFFECTIVE_MASS, "{load:?}");
 }
 
 #[test]

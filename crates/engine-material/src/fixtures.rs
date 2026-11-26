@@ -316,10 +316,128 @@ fn material_record(material: &Material) -> MaterialRecord {
     }
 }
 
+/// A reference body as the report lists it.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct BodyRecord {
+    pub name: &'static str,
+    pub material: &'static str,
+    /// `None` is immovable.
+    pub mass: Option<f32>,
+    pub inertia: Option<f32>,
+    /// `None` is a flat surface.
+    pub radius: Option<f32>,
+    pub volume: f32,
+    pub thickness: f32,
+    /// `None` is a half-space.
+    pub extent: Option<f32>,
+}
+
+fn body_record(body: &Body) -> BodyRecord {
+    BodyRecord {
+        name: body.name,
+        material: body.material.name,
+        mass: body.mass,
+        inertia: body.inertia,
+        radius: body.radius,
+        volume: body.volume,
+        thickness: body.thickness,
+        extent: body.extent,
+    }
+}
+
+/// A region an event loads, as it was before the event.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct RegionInput {
+    /// The reference body, or `connection`.
+    pub body: &'static str,
+    pub material: &'static str,
+    /// `Material::identity_hex`, which tells a material a case varies from the
+    /// reference material of the same name.
+    pub identity: String,
+    pub volume: f32,
+}
+
+fn region_input(body: &Body) -> RegionInput {
+    RegionInput {
+        body: body.name,
+        material: body.material.name,
+        identity: body.material.identity_hex(),
+        volume: body.volume,
+    }
+}
+
+/// What an event took: the regions it loaded and its load.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Input {
+    /// Two regions in contact. `contact` is how each body meets the other:
+    /// its mass, and its inertia and lever arm when the hit turns it.
+    Impact {
+        regions: [RegionInput; 2],
+        contact: [ContactBody; 2],
+        geometry: ContactGeometry,
+        load: Impact,
+    },
+    /// A sustained load on one region.
+    Sustained {
+        region: RegionInput,
+        load: SustainedLoad,
+    },
+    /// A load on one connection with the beam's section.
+    Connection {
+        region: RegionInput,
+        beam: Beam,
+        load: ConnectionLoad,
+    },
+}
+
+impl Input {
+    fn regions(&self) -> usize {
+        match self {
+            Self::Impact { .. } => 2,
+            Self::Sustained { .. } | Self::Connection { .. } => 1,
+        }
+    }
+}
+
+/// `a` striking `b` over `geometry`, both translating freely.
+fn head_on_input(a: &Body, b: &Body, geometry: ContactGeometry, load: Impact) -> Input {
+    impact_input(a, b, [a.contact(), b.contact()], geometry, load)
+}
+
+fn impact_input(
+    a: &Body,
+    b: &Body,
+    contact: [ContactBody; 2],
+    geometry: ContactGeometry,
+    load: Impact,
+) -> Input {
+    Input::Impact {
+        regions: [region_input(a), region_input(b)],
+        contact,
+        geometry,
+        load,
+    }
+}
+
+fn connection_input(material: Material, beam: Beam, load: ConnectionLoad) -> Input {
+    Input::Connection {
+        region: RegionInput {
+            body: "connection",
+            material: material.name,
+            identity: material.identity_hex(),
+            volume: beam.volume(),
+        },
+        beam,
+        load,
+    }
+}
+
 /// One table row: the ledger of an event and the regions' integrity after it.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Row {
     pub label: String,
+    pub input: Input,
     pub available: f32,
     pub peak_force: f32,
     pub peak_stress: [f32; 2],
@@ -341,9 +459,11 @@ pub struct Row {
 }
 
 impl Row {
-    fn from_outcome(label: String, outcome: &Outcome, integrity: [f32; 2], regions: usize) -> Self {
+    fn from_outcome(label: String, input: Input, outcome: &Outcome, integrity: [f32; 2]) -> Self {
+        let regions = input.regions();
         Self {
             label,
+            input,
             available: outcome.ledger.available,
             peak_force: outcome.ledger.peak_force,
             peak_stress: outcome.ledger.peak_stress,
@@ -364,12 +484,14 @@ impl Row {
         }
     }
 
-    fn pair(label: String, outcome: &Outcome, a: &Region, b: &Region) -> Self {
-        Self::from_outcome(label, outcome, [a.integrity(), b.integrity()], 2)
+    fn pair(label: String, input: Input, outcome: &Outcome, a: &Region, b: &Region) -> Self {
+        assert_eq!(input.regions(), 2, "{label}");
+        Self::from_outcome(label, input, outcome, [a.integrity(), b.integrity()])
     }
 
-    fn single(label: String, outcome: &Outcome, region: &Region) -> Self {
-        Self::from_outcome(label, outcome, [region.integrity(), 1.0], 1)
+    fn single(label: String, input: Input, outcome: &Outcome, region: &Region) -> Self {
+        assert_eq!(input.regions(), 1, "{label}");
+        Self::from_outcome(label, input, outcome, [region.integrity(), 1.0])
     }
 }
 
@@ -387,6 +509,7 @@ pub struct Report {
     pub tick: f32,
     pub gravity: f32,
     pub materials: Vec<MaterialRecord>,
+    pub bodies: Vec<BodyRecord>,
     pub cases: Vec<Case>,
     pub sweeps: Vec<Case>,
 }
@@ -398,6 +521,19 @@ pub fn report() -> Report {
         tick: TICK,
         gravity: GRAVITY,
         materials: crate::ALL_REFERENCE.iter().map(material_record).collect(),
+        bodies: [
+            tank(),
+            ship(),
+            spaceling(),
+            branch(),
+            boulder(),
+            stone(),
+            shell(),
+            planet(),
+        ]
+        .iter()
+        .map(body_record)
+        .collect(),
         cases: vec![
             safe_bumps(),
             gentle_landings(),
@@ -426,9 +562,22 @@ pub fn report() -> Report {
 }
 
 fn one_strike(a: &Body, b: &Body, load: Impact, label: String) -> Row {
+    one_strike_with(a, b, [a.contact(), b.contact()], load, label)
+}
+
+/// One strike of `a` on `b`, each meeting the other as `contact` says.
+fn one_strike_with(
+    a: &Body,
+    b: &Body,
+    contact: [ContactBody; 2],
+    load: Impact,
+    label: String,
+) -> Row {
     let (mut region_a, mut region_b) = (a.region(), b.region());
-    let outcome = strike(&mut region_a, &mut region_b, geometry(a, b), load);
-    Row::pair(label, &outcome, &region_a, &region_b)
+    let geometry = geometry(a, b);
+    let outcome = strike(&mut region_a, &mut region_b, geometry, load);
+    let input = impact_input(a, b, contact, geometry, load);
+    Row::pair(label, input, &outcome, &region_a, &region_b)
 }
 
 fn safe_bumps() -> Case {
@@ -460,6 +609,7 @@ fn safe_bumps() -> Case {
                     b.name,
                     num(speed)
                 ),
+                head_on_input(a, b, geometry, load),
                 &last,
                 &region_a,
                 &region_b,
@@ -487,6 +637,7 @@ fn progressive_hits() -> Case {
         let outcome = strike(&mut region_a, &mut region_b, geometry, load);
         rows.push(Row::pair(
             format!("hit {hit}: shell vs tank at {} wu/s", num(speed)),
+            head_on_input(&a, &b, geometry, load),
             &outcome,
             &region_a,
             &region_b,
@@ -513,6 +664,7 @@ fn quantity_and_thickness() -> Case {
                 "plate volume {} wu^3: fails after {hits} hits at 300 wu/s",
                 num(volume)
             ),
+            head_on_input(&a, &b, geometry(&a, &b), head_on(&a, &b, 300.0)),
             &last,
             &region_a,
             &region_b,
@@ -662,9 +814,10 @@ fn angular() -> Case {
                 lever,
             );
             let mass = effective_mass(striker, b.contact()).expect("reference masses");
-            one_strike(
+            one_strike_with(
                 &a,
                 &b,
+                [striker, b.contact()],
                 Impact {
                     closing_speed: speed,
                     effective_mass: mass,
@@ -709,6 +862,10 @@ fn resting_support() -> Case {
                 num(rest.force),
                 num(rest.width * plank.thickness)
             ),
+            Input::Sustained {
+                region: region_input(&plank),
+                load: rest,
+            },
             &last,
             &region,
         );
@@ -731,22 +888,28 @@ fn resting_support() -> Case {
                 tick_count(ticks),
                 num(ticks as f32 * TICK)
             ),
+            Input::Sustained {
+                region: region_input(&plank),
+                load: overload,
+            },
             &last,
             &region,
         ));
     }
     {
         let mut region = plank.region();
-        let outcome = press(
-            &mut region,
-            SustainedLoad {
-                force: 9000.0,
-                measured_plastic_displacement: Some(0.02),
-                ..rest
-            },
-        );
+        let load = SustainedLoad {
+            force: 9000.0,
+            measured_plastic_displacement: Some(0.02),
+            ..rest
+        };
+        let outcome = press(&mut region, load);
         rows.push(Row::single(
             "the 1.5x press with a measured 0.02 wu plastic displacement in one tick".to_string(),
+            Input::Sustained {
+                region: region_input(&plank),
+                load,
+            },
             &outcome,
             &region,
         ));
@@ -763,6 +926,13 @@ fn beam_connections() -> Case {
     let mut joints = [Connection::new(WOOD, beam).expect("reference beam"); 3];
     let arms = [6.0_f32, 4.0, 2.0];
     let tip_load = 100.0;
+    let load = |index: usize| ConnectionLoad {
+        moment: tip_load * arms[index],
+        axial: 0.0,
+        duration: TICK,
+        measured_plastic_rotation: None,
+        measured_plastic_extension: None,
+    };
     let mut last = [Outcome::default(); 3];
     let mut failed_at = [None; 3];
     for tick in 1..=400 {
@@ -771,16 +941,7 @@ fn beam_connections() -> Case {
             if failed_at[index].is_some() {
                 continue;
             }
-            last[index] = bend(
-                joint,
-                ConnectionLoad {
-                    moment: tip_load * arms[index],
-                    axial: 0.0,
-                    duration: TICK,
-                    measured_plastic_rotation: None,
-                    measured_plastic_extension: None,
-                },
-            );
+            last[index] = bend(joint, load(index));
             if joint.failed() {
                 failed_at[index] = Some(tick);
             }
@@ -801,6 +962,7 @@ fn beam_connections() -> Case {
                     num(arms[index]),
                     num(tip_load * arms[index])
                 ),
+                connection_input(WOOD, beam, load(index)),
                 &last[index],
                 joint.region(),
             )
@@ -831,6 +993,7 @@ fn partition() -> Case {
         let outcome = strike(&mut region_a, &mut region_b, geometry, load);
         rows.push(Row::pair(
             format!("{label}: width {} wu", num(geometry.width)),
+            head_on_input(&a, &b, geometry, load),
             &outcome,
             &region_a,
             &region_b,
@@ -848,6 +1011,7 @@ fn partition() -> Case {
         let mut row = Row::pair(
             "four sub-contacts each charged with the whole event, which an adapter must not do"
                 .to_string(),
+            head_on_input(&a, &b, parts[0], load),
             &last,
             &region_a,
             &region_b,
@@ -866,7 +1030,12 @@ fn partition() -> Case {
 /// and returns its outcome, the integrity after it and whether the material
 /// has failed. The row shows the tick that ends at `COMMON_TIME`, with the
 /// work consumed by then and the integrity then.
-fn stepped(rate: f32, load: &str, mut tick: impl FnMut() -> (Outcome, f32, bool)) -> Row {
+fn stepped(
+    rate: f32,
+    load: &str,
+    input: Input,
+    mut tick: impl FnMut() -> (Outcome, f32, bool),
+) -> Row {
     let common = (rate * COMMON_TIME).round() as usize;
     let mut row = None;
     let mut consumed = 0.0;
@@ -879,9 +1048,9 @@ fn stepped(rate: f32, load: &str, mut tick: impl FnMut() -> (Outcome, f32, bool)
             consumed += outcome.consumed[0];
             row = Some(Row::from_outcome(
                 String::new(),
+                input.clone(),
                 &outcome,
                 [integrity, 1.0],
-                1,
             ));
         }
         if failed && failed_after.is_none() {
@@ -913,7 +1082,11 @@ fn fixed_step() -> Case {
             measured_plastic_displacement: None,
         };
         let mut region = plank.region();
-        rows.push(stepped(rate, "1.05x press on the plank", || {
+        let input = Input::Sustained {
+            region: region_input(&plank),
+            load,
+        };
+        rows.push(stepped(rate, "1.05x press on the plank", input, || {
             let outcome = press(&mut region, load);
             (outcome, region.integrity(), region.failed())
         }));
@@ -927,7 +1100,8 @@ fn fixed_step() -> Case {
             measured_plastic_extension: None,
         };
         let mut joint = Connection::new(WOOD, beam).expect("reference beam");
-        rows.push(stepped(rate, "1.08x moment on a connection", || {
+        let input = connection_input(WOOD, beam, load);
+        rows.push(stepped(rate, "1.08x moment on a connection", input, || {
             let outcome = bend(&mut joint, load);
             (outcome, joint.integrity(), joint.failed())
         }));
@@ -1005,18 +1179,15 @@ fn patch_width_sweep() -> Case {
         |factor| {
             let width = factor * default;
             let (mut region_a, mut region_b) = (a.region(), b.region());
-            let outcome = strike(
-                &mut region_a,
-                &mut region_b,
-                ContactGeometry::new(width, a.section(width), b.section(width)),
-                load,
-            );
+            let geometry = ContactGeometry::new(width, a.section(width), b.section(width));
+            let outcome = strike(&mut region_a, &mut region_b, geometry, load);
             Row::pair(
                 format!(
                     "patch width {} wu, {}x the default",
                     num(width),
                     num(factor)
                 ),
+                head_on_input(&a, &b, geometry, load),
                 &outcome,
                 &region_a,
                 &region_b,
@@ -1039,6 +1210,7 @@ fn toughness_sweep() -> Case {
             let (hits, region_a, region_b, last) = hits_to_failure(&a, &b, 300.0, 400);
             Row::pair(
                 format!("toughness x{}: fails after {hits} hits", num(factor)),
+                head_on_input(&a, &b, geometry(&a, &b), head_on(&a, &b, 300.0)),
                 &last,
                 &region_a,
                 &region_b,
@@ -1068,6 +1240,103 @@ fn strength_ratio_sweep() -> Case {
     )
 }
 
+/// A value that may be absent, as a table cell.
+fn opt(value: Option<f32>) -> String {
+    value.map(num).unwrap_or_else(|| "-".into())
+}
+
+/// Each row's inputs, in a table for each kind of event the rows hold.
+fn render_inputs(out: &mut String, rows: &[Row]) {
+    let mut impacts = Vec::new();
+    let mut sustained = Vec::new();
+    let mut connections = Vec::new();
+    let mut led = false;
+    for row in rows {
+        match &row.input {
+            Input::Impact {
+                regions,
+                contact,
+                geometry,
+                load,
+            } => impacts.push(format!(
+                "| {} | {} / {} | {} / {} | {} / {} | {} / {} | {} / {} | {} | {} / {} | {} / {} | {} | {} |",
+                row.label,
+                regions[0].body,
+                regions[1].body,
+                num(regions[0].volume),
+                num(regions[1].volume),
+                opt(contact[0].mass),
+                opt(contact[1].mass),
+                opt(contact[0].inertia),
+                opt(contact[1].inertia),
+                num(contact[0].lever),
+                num(contact[1].lever),
+                num(geometry.width),
+                num(geometry.a.thickness),
+                num(geometry.b.thickness),
+                num(geometry.a.depth),
+                num(geometry.b.depth),
+                num(load.closing_speed),
+                num(load.effective_mass)
+            )),
+            Input::Sustained { region, load } => sustained.push(format!(
+                "| {} | {} | {} | {} | {} | {} | {} | {} | {} |",
+                row.label,
+                region.body,
+                num(region.volume),
+                num(load.force),
+                num(load.width),
+                num(load.section.thickness),
+                num(load.section.depth),
+                num(load.duration),
+                opt(load.measured_plastic_displacement)
+            )),
+            Input::Connection { region, beam, load } => connections.push(format!(
+                "| {} | {} | {} x {} x {} | {} | {} | {} | {} / {} |",
+                row.label,
+                region.material,
+                num(beam.thickness),
+                num(beam.height),
+                num(beam.length),
+                num(load.moment),
+                num(load.axial),
+                num(load.duration),
+                opt(load.measured_plastic_rotation),
+                opt(load.measured_plastic_extension)
+            )),
+        }
+    }
+    for (lines, header, alignment) in [
+        (
+            impacts,
+            "| case | bodies a / b | volume a / b | mass a / b | inertia a / b | lever a / b | patch width | thickness a / b | depth a / b | closing speed | effective mass |",
+            "| --- | --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: |",
+        ),
+        (
+            sustained,
+            "| case | region | volume | force | patch width | thickness | depth | duration | measured plastic displacement |",
+            "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ),
+        (
+            connections,
+            "| case | material | beam thickness x height x length | moment | axial | duration | measured plastic rotation / extension |",
+            "| --- | --- | --- | ---: | ---: | ---: | --- |",
+        ),
+    ] {
+        if lines.is_empty() {
+            continue;
+        }
+        if !led {
+            let _ = writeln!(out, "\nInputs:");
+            led = true;
+        }
+        let _ = writeln!(out, "\n{header}\n{alignment}");
+        for line in lines {
+            let _ = writeln!(out, "{line}");
+        }
+    }
+}
+
 fn failed_label(failed: [bool; 2]) -> &'static str {
     match failed {
         [true, true] => "a, b",
@@ -1092,6 +1361,10 @@ pub fn render_markdown(report: &Report) -> String {
         num(report.tick),
         num(report.gravity)
     );
+    let _ = writeln!(
+        out,
+        "Lengths are in `wu`, masses in `mu` and times in seconds, so energy is in `mu wu^2 / s^2`, force in `mu wu / s^2` and stress in `mu / (wu s^2)`, as [the law's units](../design/material-damage.md#units-and-geometry) define them. The values are calibration for play, not measured properties.\n"
+    );
     let _ = writeln!(out, "## Reference materials\n");
     let _ = writeln!(
         out,
@@ -1114,6 +1387,33 @@ pub fn render_markdown(report: &Report) -> String {
             num(material.toughness_over_resilience),
             num(material.damping),
             material.identity
+        );
+    }
+    let _ = writeln!(out, "\n## Reference bodies\n");
+    let _ = writeln!(
+        out,
+        "A case may vary a body's volume, thickness, mass or material, as its rows and their inputs say. A body without a mass is immovable, one without a radius is flat, and one without an extent is a half-space. In an impact's inputs, a body's inertia and lever arm count only where the hit turns it, and a dash for its inertia means it meets the contact translating freely.\n"
+    );
+    let _ = writeln!(
+        out,
+        "| body | material | mass | inertia | radius | volume | thickness | extent |"
+    );
+    let _ = writeln!(
+        out,
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |"
+    );
+    for body in &report.bodies {
+        let _ = writeln!(
+            out,
+            "| {} | {} | {} | {} | {} | {} | {} | {} |",
+            body.name,
+            body.material,
+            opt(body.mass),
+            opt(body.inertia),
+            opt(body.radius),
+            num(body.volume),
+            num(body.thickness),
+            opt(body.extent)
         );
     }
     for (heading, cases) in [
@@ -1163,6 +1463,7 @@ pub fn render_markdown(report: &Report) -> String {
                     if row.closes { "yes" } else { "no" }
                 );
             }
+            render_inputs(&mut out, &case.rows);
         }
     }
     out
@@ -1204,12 +1505,14 @@ fn failure_allocation() -> Case {
     let mut rows = Vec::new();
     for fraction in [0.0, 0.5, 1.0] {
         let (mut ra, mut rb) = (a.region(), b.region());
-        let mut hit = strike(&mut ra, &mut rb, geometry(&a, &b), head_on(&a, &b, 120.0));
+        let (geometry, load) = (geometry(&a, &b), head_on(&a, &b, 120.0));
+        let mut hit = strike(&mut ra, &mut rb, geometry, load);
         hit.ledger
             .resolve_excess(hit.ledger.excess * fraction)
             .unwrap();
         rows.push(Row::pair(
             format!("{}% of excess assigned to motion", num(100.0 * fraction)),
+            head_on_input(&a, &b, geometry, load),
             &hit,
             &ra,
             &rb,
