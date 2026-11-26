@@ -1,8 +1,8 @@
 use super::*;
-use crate::crow::{CrowVisit, Phase};
+use crate::crow::{Crow, Phase};
 
 /// Code-native pixel silhouette, shared by raster and vector adapters.
-pub(super) fn render(frame: &mut RenderFrame, crow: &CrowVisit, layout: Layout) {
+pub(super) fn render(frame: &mut RenderFrame, crow: &Crow, layout: Layout) {
     let pixel = layout.pitch * 0.105;
     let mirror = if crow.facing_right { 1.0 } else { -1.0 };
     let rows = if crow.phase == Phase::Pecking && (12..20).contains(&(crow.phase_tick % 28)) {

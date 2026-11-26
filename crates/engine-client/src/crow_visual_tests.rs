@@ -1,7 +1,7 @@
 //! Production Clock/render captures. The HTML viewer only plays recorded frames.
 use crate::{
     render::Viewport,
-    thruster_visual_tests::{raster, svg, write_png},
+    thruster_visual_tests::{changed_pixels, raster, svg, write_png},
 };
 use engine_common::{ClockEventKind, ClockEventProfile, Scenario};
 use scenario_clock::{ClockAction, ClockConfig, ClockReading, ClockScenario};
@@ -99,5 +99,67 @@ fn crow_flight_renders_and_exports_playback() {
             include_str!("crow_visual_tests/flight.html"),
         )
         .unwrap();
+    }
+}
+
+/// The layer the Clock draws its creatures on.
+const CREATURE_LAYER: i32 = 8;
+
+/// Visits of none to four crows render through both the raster and the
+/// vector adapters. Each frame is drawn again without its creatures, and
+/// the crows' share of each, their paths and their pixels, grows with each
+/// further crow (#370).
+#[test]
+fn crow_visits_of_up_to_four_render_on_both_paths() {
+    let viewport = Viewport::new(1024.0, 768.0);
+    let (mut crow_paths, mut crow_pixels) = (Vec::new(), Vec::new());
+    for size in 0..=engine_common::CLOCK_MAX_CROWS {
+        let mut state = ClockScenario::init(
+            ClockConfig {
+                aspect_ratio: viewport.aspect_ratio(),
+                event_profile: ClockEventProfile::Off,
+                ..Default::default()
+            },
+            42,
+        );
+        ClockScenario::step(
+            &mut state,
+            &[ClockAction::set_reading(
+                ClockReading::new(12, 34, 0).unwrap(),
+            )],
+            Duration::ZERO,
+        );
+        assert!(size == 0 || state.preview_crows(size));
+        for _ in 0..240 {
+            ClockScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        }
+        assert_eq!(state.crow_states().len(), size);
+        let frame = ClockScenario::render_frame(&state);
+        let mut bare = frame.clone();
+        bare.layers.retain(|layer| layer.z != CREATURE_LAYER);
+        let shapes: usize = frame
+            .layers
+            .iter()
+            .filter(|layer| layer.z == CREATURE_LAYER)
+            .map(|layer| layer.primitives.len())
+            .sum();
+        assert_eq!(shapes > 0, size > 0, "{size} crows");
+        let paths = |frame| {
+            let vector = svg(frame, viewport);
+            assert!(!vector.contains("NaN") && !vector.contains("inf"));
+            vector.matches("<path").count()
+        };
+        crow_paths.push(paths(&frame) - paths(&bare));
+        crow_pixels.push(changed_pixels(
+            &raster(&bare, viewport),
+            &raster(&frame, viewport),
+        ));
+    }
+    for share in [&crow_paths, &crow_pixels] {
+        assert_eq!(share[0], 0);
+        assert!(
+            share.windows(2).all(|pair| pair[1] > pair[0]),
+            "the crows' paths {crow_paths:?} and pixels {crow_pixels:?}"
+        );
     }
 }

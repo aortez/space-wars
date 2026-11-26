@@ -15,10 +15,11 @@ use std::time::Duration;
 /// crow, its perches, and a floor across the view, flat or the panels given.
 struct Rig {
     world: PhysicsWorld,
+    perches: body::Perches,
 }
 
 impl Rig {
-    fn new(crow: &CrowVisit, panels: Option<&ResponsiveFloor>) -> Self {
+    fn new(crow: &Crow, panels: Option<&ResponsiveFloor>) -> Self {
         let layout = crow.layout;
         let mut world = PhysicsWorld::new(mechanics_config(layout));
         match panels {
@@ -45,17 +46,24 @@ impl Rig {
             }
         }
         crow.enter(&mut world);
-        Self { world }
+        Self {
+            world,
+            perches: body::Perches::default(),
+        }
     }
 
-    /// One tick of the crow's, around a step of its world.
-    fn step(
-        &mut self,
-        crow: &mut CrowVisit,
-        segments: &[SegmentState],
-        env: Environment<'_>,
-    ) -> bool {
-        crow.drive(&mut self.world, segments, None);
+    /// One tick of the crow's, around a step of its world, with the perches
+    /// its visit would place for it alone.
+    fn step(&mut self, crow: &mut Crow, segments: &[SegmentState], env: Environment<'_>) -> bool {
+        let mut feet = [None; MAX_CROWS];
+        feet[usize::from(crow.member)] = Some(crow.position);
+        self.perches.place(
+            &mut self.world,
+            &perches(crow.layout, segments, None),
+            &feet,
+            crow.layout,
+        );
+        crow.drive(&mut self.world);
         self.world.step(flight::DT);
         crow.step(segments, None, env, &self.world)
     }
@@ -125,7 +133,7 @@ fn hardy_crows_finish_hops_through_rain_puddles_on_digit_tops() {
                     {
                         depths.push(depth_at(p.feet));
                     }
-                    if let Some(crow) = &state.crow_visit {
+                    if let Some(crow) = state.crow_visit.as_ref().map(CrowVisit::first) {
                         max_hops = max_hops.max(crow.hops);
                         max_escapes = max_escapes.max(crow.escapes);
                         if let Some(Target::Digit(p)) = crow.target
@@ -160,7 +168,7 @@ fn hardy_crows_finish_hops_through_rain_puddles_on_digit_tops() {
     );
 }
 
-fn fixture() -> (ClockState, CrowVisit, Environment<'static>) {
+fn fixture() -> (ClockState, Crow, Environment<'static>) {
     let mut state = ClockScenario::init(
         ClockConfig {
             event_profile: ClockEventProfile::Off,
@@ -177,10 +185,12 @@ fn fixture() -> (ClockState, CrowVisit, Environment<'static>) {
         ],
         Duration::ZERO,
     );
-    let mut crow = state.crow_visit.take().unwrap();
+    let mut visit = state.crow_visit.take().unwrap();
+    let mut crow = visit.crows[0].take().unwrap();
     let env = Environment {
         ground_available: true,
         water: None,
+        ..Default::default()
     };
     let feet = env.ground_spots(crow.layout, crow.water_tolerance)[0].unwrap();
     crow.target = Some(Target::Ground(feet));
@@ -419,21 +429,23 @@ fn ground_excursion_is_an_occasional_seeded_choice_and_is_not_retried() {
     let (state, original, env) = fixture();
     let mut selected = 0;
     for seed in 0..1000 {
-        let mut crow = CrowVisit::new(
+        let mut crow = Crow::new(
             original.layout,
             seed,
             1,
+            0,
             ClockCrowWaterTolerance::Shy,
-            &state.segments,
-            None,
+            &perches(original.layout, &state.segments, None),
+            Environment::default(),
         );
-        let mut replay = CrowVisit::new(
+        let mut replay = Crow::new(
             original.layout,
             seed,
             1,
+            0,
             ClockCrowWaterTolerance::Shy,
-            &state.segments,
-            None,
+            &perches(original.layout, &state.segments, None),
+            Environment::default(),
         );
         for visit in [&mut crow, &mut replay] {
             visit.position = visit.target.unwrap().feet();

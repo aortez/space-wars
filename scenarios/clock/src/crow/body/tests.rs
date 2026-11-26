@@ -1,8 +1,18 @@
 use super::*;
 use crate::{arena::mechanics_config, crow::flight::DT};
 
+/// The first crow of a visit, which most of these tests fly alone.
+const CROW: Bird = crow(0);
+
 fn world(layout: Layout) -> PhysicsWorld {
     PhysicsWorld::new(mechanics_config(layout))
+}
+
+/// The feet of a visit's crows when its first crow, at `feet`, is alone.
+fn alone(feet: Vec2) -> [Option<Vec2>; MAX_CROWS] {
+    let mut crows = [None; MAX_CROWS];
+    crows[0] = Some(feet);
+    crows
 }
 
 /// One perch, in the first column, whose top is at `feet`.
@@ -52,7 +62,7 @@ fn a_hard_touchdown_stops_on_top_of_the_perch() {
     // nearly a step's travel into it.
     let start = feet + Vec2::new(0.0, layout.pitch * 0.02);
     let mut perches = Perches::default();
-    perches.place(&mut world, &one_perch(feet), start, layout);
+    perches.place(&mut world, &one_perch(feet), &alone(start), layout);
     CROW.insert(&mut world, start, Vec2::ZERO, layout);
     let dive = Vec2::new(0.0, -layout.pitch * DIVE);
     for tick in 0..20 {
@@ -104,7 +114,7 @@ fn footing_is_a_surface_under_the_feet_that_the_bird_is_not_leaving() {
     let mut world = world(layout);
     let feet = Vec2::ZERO;
     let mut perches = Perches::default();
-    perches.place(&mut world, &one_perch(feet), feet, layout);
+    perches.place(&mut world, &one_perch(feet), &alone(feet), layout);
     CROW.insert(&mut world, feet, Vec2::ZERO, layout);
     let pull = Vec2::new(0.0, -crate::crow::flight::gravity(layout) * DT);
     for _ in 0..3 {
@@ -171,7 +181,7 @@ fn perches_follow_the_face() {
             feet: Vec2::new(column as f32 * layout.pitch, 0.0),
         });
     }
-    perches.place(&mut world, &wanted, above, layout);
+    perches.place(&mut world, &wanted, &alone(above), layout);
     assert_eq!((perches.count(), world.body_count()), (3, 3));
     let top = |world: &PhysicsWorld, column: usize| {
         world
@@ -183,7 +193,7 @@ fn perches_follow_the_face() {
         feet: Vec2::new(layout.pitch, -layout.pitch * 2.0),
     });
     wanted[2] = None;
-    perches.place(&mut world, &wanted, above, layout);
+    perches.place(&mut world, &wanted, &alone(above), layout);
     assert_eq!((perches.count(), world.body_count()), (2, 2));
     for (column, perch) in wanted.iter().enumerate().take(2) {
         let feet = perch.unwrap().feet;
@@ -191,7 +201,7 @@ fn perches_follow_the_face() {
         assert!((top - feet).length() < 1e-3, "column {column}: {top:?}");
     }
     assert_eq!(top(&world, 2), None);
-    perches.place(&mut world, &[None; PERCH_COLUMNS], above, layout);
+    perches.place(&mut world, &[None; PERCH_COLUMNS], &alone(above), layout);
     assert_eq!((perches.count(), world.body_count()), (0, 0));
 }
 
@@ -208,7 +218,7 @@ fn a_perch_holds_the_crow_from_above_only() {
     CROW.insert(&mut world, feet, Vec2::ZERO, layout);
     let up = Vec2::new(0.0, layout.pitch * 3.0);
     for _ in 0..60 {
-        perches.place(&mut world, &one_perch(top), feet, layout);
+        perches.place(&mut world, &one_perch(top), &alone(feet), layout);
         feet = step(&mut world, up).0;
     }
     assert!(
@@ -217,7 +227,7 @@ fn a_perch_holds_the_crow_from_above_only() {
         (feet.y - top.y) / layout.pitch
     );
     for _ in 0..60 {
-        perches.place(&mut world, &one_perch(top), feet, layout);
+        perches.place(&mut world, &one_perch(top), &alone(feet), layout);
         feet = step(&mut world, up * -1.0).0;
     }
     assert!(
@@ -226,4 +236,47 @@ fn a_perch_holds_the_crow_from_above_only() {
         (feet.y - top.y) / layout.pitch
     );
     assert!(CROW.footing(&world, layout));
+}
+
+/// The crows of a visit share the perches, and each perch holds a crow only
+/// from above: one crow stands on a perch while another flies up into it
+/// from under it.
+#[test]
+fn a_perch_holds_a_crow_on_it_while_another_flies_up_into_it() {
+    let layout = Layout::new(4.0 / 3.0);
+    let mut world = world(layout);
+    let top = Vec2::ZERO;
+    let (standing, climbing) = (crow(0), crow(1));
+    standing.insert(&mut world, top, Vec2::ZERO, layout);
+    let start = top - Vec2::new(0.0, layout.pitch * 2.0);
+    climbing.insert(&mut world, start, Vec2::ZERO, layout);
+    let mut perches = Perches::default();
+    let up = Vec2::new(0.0, layout.pitch * 3.0);
+    // 22 steps take the climbing crow 1.1 pitches up: into the perch, whose
+    // bottom is 0.8 pitches under its top, and short of the crow on it.
+    for _ in 0..22 {
+        let mut feet = [None; MAX_CROWS];
+        for (member, bird) in [standing, climbing].into_iter().enumerate() {
+            feet[member] = bird.motion(&world).map(|(feet, _)| feet);
+        }
+        perches.place(&mut world, &one_perch(top), &feet, layout);
+        standing.drive(&mut world, up * -1.0);
+        climbing.drive(&mut world, up);
+        world.step(DT);
+    }
+    let (stood, _) = standing.motion(&world).expect("the standing crow");
+    assert!(
+        (stood.y - top.y).abs() < layout.pitch * 0.02,
+        "the standing crow is {} pitches from the perch's top",
+        (stood.y - top.y) / layout.pitch
+    );
+    assert!(standing.footing(&world, layout));
+    // Held under the perch, the climbing crow's feet would be 1.6 pitches
+    // under its top.
+    let (climbed, _) = climbing.motion(&world).expect("the climbing crow");
+    assert!(
+        climbed.y > top.y - layout.pitch * 1.3,
+        "the climbing crow stopped {} pitches under the perch's top",
+        (top.y - climbed.y) / layout.pitch
+    );
 }

@@ -52,9 +52,7 @@ fn temperament_does_not_change_dry_flight_or_perch_randomness() {
             });
             assert_eq!(snapshots[0], snapshots[1], "seed={seed}");
             assert_eq!(snapshots[1], snapshots[2], "seed={seed}");
-            let flights = states
-                .each_ref()
-                .map(|s| s.crow_visit.as_ref().map(|c| c.flight));
+            let flights = states.each_ref().map(|s| s.crow().map(|c| c.flight));
             assert_eq!(flights[0], flights[1]);
             assert_eq!(flights[1], flights[2]);
             for state in &mut states {
@@ -173,15 +171,12 @@ fn crow_visits_replay_hop_and_depart_as_bodies_at_all_supported_aspects() {
             let mut flights = 0;
             for t in 0..=crow::CROW_TICKS {
                 assert_eq!(a.crow_state(), b.crow_state());
-                assert_eq!(
-                    a.crow_visit.as_ref().map(|c| c.flight),
-                    b.crow_visit.as_ref().map(|c| c.flight)
-                );
+                assert_eq!(a.crow().map(|c| c.flight), b.crow().map(|c| c.flight));
                 assert_eq!(a.floor_mode(), engine_common::ClockFloorMode::Closed);
                 if let Some(visit) = &a.crow_visit {
                     assert_eq!(a.arena.owners(), [arena::Owner::Crow]);
                     let world = a.arena.world().expect("the crow's claim keeps a world");
-                    assert!(world.body_ids().any(|id| id == crow::body::CROW.id()));
+                    assert!(world.body_ids().any(|id| id == crow::body::crow(0).id()));
                     let perches = visit.perch_count();
                     let floor = a.arena.state().floor.bodies;
                     assert_eq!(a.body_count(), 1 + perches + floor);
@@ -196,7 +191,7 @@ fn crow_visits_replay_hop_and_depart_as_bodies_at_all_supported_aspects() {
                     saw_perch |= crow.phase == crow::Phase::Perched;
                     saw_hop |= crow.hops > 0;
                     assert!(crow.position_milli.iter().all(|v| v.abs() < 2_000_000));
-                    let position = a.crow_visit.as_ref().unwrap().position;
+                    let position = a.crow().unwrap().position;
                     assert!(position.x.is_finite() && position.y.is_finite());
                     if t % 60 == 0 {
                         assert!(
@@ -216,14 +211,14 @@ fn crow_visits_replay_hop_and_depart_as_bodies_at_all_supported_aspects() {
                         crow::Phase::Entering | crow::Phase::Flying | crow::Phase::Leaving
                     )
                 });
-                let before = a.crow_visit.as_ref().map(|crow| crow.position);
+                let before = a.crow().map(|crow| crow.position);
                 tick(&mut a);
                 tick(&mut b);
                 // In the air, touching nothing, the step moves the body by
                 // the velocity it ends the step with.
                 if let (true, Some(before), Some(world)) = (flying, before, a.arena.world())
-                    && let Some(motion) = world.motion(crow::body::CROW.id())
-                    && world.body_contact_push(crow::body::CROW.id()).is_none()
+                    && let Some(motion) = world.motion(crow::body::crow(0).id())
+                    && world.body_contact_push(crow::body::crow(0).id()).is_none()
                 {
                     let moved = (motion.position - before) * FIXED_HZ as f32;
                     assert!(
@@ -462,12 +457,12 @@ fn crow_pause_resize_disable_and_readmission_remain_bounded() {
         tick(&mut state);
     }
     let before = state.crow_state();
-    let flight_before = state.crow_visit.as_ref().unwrap().flight;
+    let flight_before = state.crow().unwrap().flight;
     for _ in 0..100 {
         ClockScenario::step(&mut state, &[], Duration::ZERO);
     }
     assert_eq!(state.crow_state(), before);
-    assert_eq!(state.crow_visit.as_ref().unwrap().flight, flight_before);
+    assert_eq!(state.crow().unwrap().flight, flight_before);
     let mut settings = state.settings();
     settings.events.crow = false;
     let action = ClockAction::configure(settings);
@@ -502,12 +497,12 @@ fn crow_flight_lands_and_clears_the_frame_across_fonts_and_layouts() {
                 let mut state = fixture_with_font(aspect, seed, font);
                 let layout = Layout::new(aspect);
                 let mut first_landing = None;
-                let mut last_position = state.crow_visit.as_ref().unwrap().position;
+                let mut last_position = state.crow().unwrap().position;
                 let mut entered = false;
                 let mut visited_ground = false;
                 let mut departed_after_pecks = false;
                 for _ in 0..crow::CROW_TICKS {
-                    if let Some(visit) = &state.crow_visit {
+                    if let Some(visit) = state.crow() {
                         let p = visit.position;
                         entered |= p.x > layout.bounds_min.x && p.x < layout.bounds_max.x;
                         if matches!(
@@ -627,12 +622,13 @@ fn crow_avoids_wet_landings_in_real_rain_without_changing_the_water() {
                 {
                     assert_eq!(rain.water.stats(), other.water.stats());
                     assert_eq!(rain.water.parcels(), other.water.parcels());
-                    if let Some(crow) = &state.crow_visit {
+                    if let Some(crow) = state.crow() {
                         wet_departure |= crow.diagnostics().wet_departures > 0;
                         if matches!(crow.phase, crow::Phase::Perched | crow::Phase::Pecking) {
                             let env = crow::Environment {
                                 water: Some(&rain.water),
                                 ground_available: false,
+                                ..Default::default()
                             };
                             assert!(
                                 !env.wet_feet(

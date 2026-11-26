@@ -187,7 +187,7 @@ impl Owner {
                     joints: 1,
                 }
             }
-            // Its body and its perches, each with one collider.
+            // Its crows' bodies and their perches, each with one collider.
             Self::Crow => {
                 let bodies = count(&ids::canonical::CROW) + count(&ids::canonical::CROW_PERCHES);
                 Population::new(bodies, bodies)
@@ -480,12 +480,31 @@ pub(crate) fn mechanics_config(layout: Layout) -> PhysicsWorldConfig {
     world_config(Vec2::new(0.0, -MECHANICS_GRAVITY), layout.pitch)
 }
 
-/// The collision group the birds belong to, and nothing else does.
-const BIRDS: u32 = 1 << 1;
+/// The collision group of a visit's first crow. The magpie shares it: it
+/// comes only for the coins, when the crows have no perches.
+const FIRST_CROW: u32 = 1 << 1;
 
-/// A bird, the crow or the magpie: it meets everything there is but the
-/// frame.
-pub(crate) const BIRD: CollisionGroups = CollisionGroups::new(BIRDS, u32::MAX);
+/// The collision groups the birds belong to, and nothing else does: one for
+/// each crow a visit may hold.
+const BIRDS: u32 = ((1 << crate::crow::MAX_CROWS) - 1) * FIRST_CROW;
+
+/// A bird, the magpie or a visit's first crow: it meets everything there is
+/// but the frame.
+pub(crate) const BIRD: CollisionGroups = crow(0);
+
+/// Crow `member` of a visit, which meets everything there is but the frame.
+/// Each crow has a group of its own, so that a perch can hold one crow while
+/// another flies up through it.
+pub(crate) const fn crow(member: usize) -> CollisionGroups {
+    assert!(member < crate::crow::MAX_CROWS, "a visit's crow");
+    CollisionGroups::new(FIRST_CROW << member, u32::MAX)
+}
+
+/// What meets everything but the birds, except the crows whose groups are in
+/// `crows`: a perch that holds only those crows.
+pub(crate) const fn holding(crows: u32) -> CollisionGroups {
+    CollisionGroups::new(u32::MAX, !BIRDS | crows)
+}
 
 /// What stands for the edges of the view: the walls at its sides and the
 /// frame the spider climbs. It holds in view whatever meets it but the
@@ -1445,8 +1464,8 @@ pub(crate) mod ids {
         /// index.
         pub(crate) const SPIDER_SURFACES: Range<u64> =
             8100..8100 + crate::spider::MAX_PROXIES as u64;
-        /// The crow's body.
-        pub(crate) const CROW: Range<u64> = 8501..8502;
+        /// The crows' bodies, by member.
+        pub(crate) const CROW: Range<u64> = 8501..8501 + crate::crow::MAX_CROWS as u64;
         /// The crow's perches, one on top of each digit column, by column.
         pub(crate) const CROW_PERCHES: Range<u64> = 8510..8510 + crate::crow::PERCH_COLUMNS as u64;
         /// The magpie's body, which comes for the coins.

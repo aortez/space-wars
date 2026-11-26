@@ -566,7 +566,9 @@ pub(crate) fn plant_actor_polygons(state: &ClockState) -> Vec<Vec<Vec2>> {
     let mut frame = RenderFrame::default();
     let layout = Layout::new(state.aspect_ratio());
     if let Some(visit) = &state.crow_visit {
-        crow::render(&mut frame, visit, layout);
+        for crow in visit.crows() {
+            crow::render(&mut frame, crow, layout);
+        }
     }
     if let Some(crate::events::ActiveEvent::Coins(event)) = &state.active_event
         && let Some(magpie) = event.magpie().filter(|magpie| magpie.in_view())
@@ -666,7 +668,9 @@ fn filled_polygons(frame: RenderFrame, z: i32) -> Vec<Vec<Vec2>> {
 
 fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
     if let Some(visit) = &state.crow_visit {
-        crow::render(frame, visit, layout);
+        for crow in visit.crows() {
+            crow::render(frame, crow, layout);
+        }
     }
     stranded::render(frame, &state.stranded, state.simulation_tick(), layout);
     if let Some(fixture) = &state.spider {
@@ -981,6 +985,88 @@ mod tests {
 
     use super::*;
     use crate::{ClockAction, ClockConfig, ClockReading, ClockScenario};
+
+    /// Every crow of a visit draws itself, in member order, in the frame and
+    /// in the shapes the plants' light meets: visits of none to four crows,
+    /// and a visit of four as its first, middle and last crows leave (#370).
+    #[test]
+    fn every_crow_of_a_visit_draws_in_member_order() {
+        // The frame lights the creatures it draws, so only their shapes and
+        // their order are a crow's own.
+        let creatures = |frame: &RenderFrame| -> Vec<Vec<RenderPoint>> {
+            frame
+                .layers
+                .iter()
+                .filter(|layer| layer.z == CREATURE_LAYER)
+                .flat_map(|layer| &layer.primitives)
+                .map(|primitive| match primitive {
+                    RenderPrimitive::Polygon(polygon) => polygon.points.clone(),
+                    other => panic!("a crow draws polygons: {other:?}"),
+                })
+                .collect()
+        };
+        let check = |state: &ClockState, members: &[u8]| {
+            let layout = Layout::new(state.aspect_ratio());
+            let mut alone = RenderFrame::default();
+            let crows: Vec<_> = state
+                .crow_visit
+                .iter()
+                .flat_map(crate::crow::CrowVisit::crows)
+                .collect();
+            assert_eq!(
+                state
+                    .crow_states()
+                    .iter()
+                    .map(|crow| crow.member)
+                    .collect::<Vec<_>>(),
+                members
+            );
+            for crow in crows {
+                crow::render(&mut alone, crow, layout);
+            }
+            assert_eq!(creatures(&alone).is_empty(), members.is_empty());
+            assert_eq!(creatures(&render_frame(state)), creatures(&alone));
+            assert_eq!(
+                plant_actor_polygons(state),
+                filled_polygons(alone, CREATURE_LAYER)
+            );
+        };
+        let tick = |state: &mut ClockState| {
+            ClockScenario::step(state, &[], std::time::Duration::from_millis(16));
+        };
+        for size in 0..=crate::crow::MAX_CROWS {
+            let mut state = ClockScenario::init(
+                ClockConfig {
+                    aspect_ratio: 5.0 / 3.0,
+                    event_profile: engine_common::ClockEventProfile::Off,
+                    ..ClockConfig::default()
+                },
+                7,
+            );
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::set_reading(
+                    ClockReading::new(12, 34, 0).unwrap(),
+                )],
+                std::time::Duration::ZERO,
+            );
+            assert!(size == 0 || state.preview_crows(size));
+            for _ in 0..120 {
+                tick(&mut state);
+            }
+            let mut members: Vec<u8> = (0..size as u8).collect();
+            check(&state, &members);
+            if size < crate::crow::MAX_CROWS {
+                continue;
+            }
+            for member in [0, 2, 3] {
+                state.crow_visit.as_mut().unwrap().send_home(member);
+                tick(&mut state);
+                members.retain(|other| usize::from(*other) != member);
+                check(&state, &members);
+            }
+        }
+    }
 
     fn rendered_at(aspect_ratio: f32) -> RenderFrame {
         let mut state = ClockScenario::init(

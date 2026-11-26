@@ -665,9 +665,9 @@ fn a_body_held_against_a_pull_takes_no_knock_and_a_thrown_one_only_its_blow() {
 /// crow in the arena's world, and the magpie in the coins' own.
 #[test]
 fn the_lamps_see_the_birds_fly() {
-    use crate::crow::body::{CROW, MAGPIE, RADIUS_PITCH};
+    use crate::crow::body::{MAGPIE, RADIUS_PITCH, crow};
     for (kind, bird, world) in [
-        (ClockEventKind::Crow, CROW, 0),
+        (ClockEventKind::Crow, crow(0), 0),
         (ClockEventKind::Coins, MAGPIE, 1),
     ] {
         let mut state = clock(ClockEventProfile::Off, 7);

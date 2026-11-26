@@ -732,7 +732,7 @@ fn clock_grass_contract_crow_silhouette_damage_respects_pause_and_roots() {
         &[ClockAction::preview_event(ClockEventKind::Crow)],
         Duration::ZERO,
     );
-    s.crow_visit.as_mut().unwrap().position = center - engine_core::Vec2::Y * 3.0;
+    s.crow_mut().unwrap().position = center - engine_core::Vec2::Y * 3.0;
     let polygons = crate::render::plant_actor_polygons(&s);
     assert!(!polygons.is_empty());
     assert!(polygons.len() <= 160);

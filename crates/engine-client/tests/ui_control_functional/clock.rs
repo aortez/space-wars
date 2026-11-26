@@ -722,7 +722,12 @@ fn crow_trigger_pause_settings_and_restart_preserve_the_resident_contract() {
             .client
             .wait_for_clock_state(&predicate, TRANSITION_TIMEOUT);
         let admitted = harness.require_clock("crow admission", result);
-        let visit_id = admitted.crow.unwrap().visit_id;
+        // An admission brings a visit of one crow, which `crow` shows too.
+        let [first] = admitted.crows.as_slice() else {
+            panic!("a visit of one crow: {:?}", admitted.crows);
+        };
+        assert_eq!((first.member, Some(*first)), (0, admitted.crow));
+        let visit_id = first.visit_id;
         assert_eq!(admitted.event_kind, None);
         // The crow is a body in the arena, with a perch for each column it
         // may land on and the floor the arena keeps under it. Its claim alone
@@ -754,14 +759,16 @@ fn crow_trigger_pause_settings_and_restart_preserve_the_resident_contract() {
         harness.capture_screenshot("clock-crow-controls.png");
         harness.activate_guarded("pause.clock.crow.play", &page);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
-        assert_eq!(harness.clock_state().crow.unwrap().visit_id, visit_id);
+        let resumed = harness.clock_state();
+        assert_eq!(resumed.crow.unwrap().visit_id, visit_id);
+        assert_eq!(resumed.crows.len(), 1);
         harness.pause_guarded(&gameplay);
         let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
         harness.activate_guarded("pause.restart", &menu);
         harness.wait_clock_screen(UiScreen::Gameplay, menu.revision);
         let restarted = harness.clock_state();
         assert_ne!(restarted.scenario_revision, initial.scenario_revision);
-        assert!(restarted.crow.is_none());
+        assert!(restarted.crow.is_none() && restarted.crows.is_empty());
         assert_eq!((restarted.body_count, restarted.collider_count), (0, 0));
         assert_eq!(restarted.settings, configured.settings);
         let saved: engine_common::Settings = toml::from_str(

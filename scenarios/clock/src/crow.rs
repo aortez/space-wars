@@ -1,6 +1,7 @@
-//! One cheap resident visitor, with a body in the run's arena. No wall-clock
-//! sampling. Perch feet use the same lit-cell geometry as rendering, and the
-//! crow brings a perch body for each column it may land on.
+//! Cheap resident visitors: a visit of up to [`MAX_CROWS`] crows, each with a
+//! body in the run's arena. No wall-clock sampling. Perch feet use the same
+//! lit-cell geometry as rendering, and a visit brings a perch body for each
+//! column its crows may land on.
 pub(crate) mod body;
 mod environment;
 pub(crate) mod flight;
@@ -19,6 +20,8 @@ use rand::{Rng, SeedableRng, rngs::StdRng};
 use crate::{DIGIT_SLOT_COUNT, SegmentRepresentation, SegmentState, layout::Layout};
 
 pub const CROW_TICKS: u64 = 22 * 60;
+/// The most crows one visit holds.
+pub const MAX_CROWS: usize = engine_common::CLOCK_MAX_CROWS;
 const MAX_FLIGHT_TICKS: u64 = 8 * 60;
 const EXIT_TICKS: u64 = 5 * 60;
 const PECK_TICKS: u64 = 56;
@@ -58,6 +61,44 @@ impl Target {
             Self::Digit(p) => Some(p.key),
             Self::Ground(_) => None,
         }
+    }
+}
+
+/// The perches and spots on the ground that a visit's other crows stand on
+/// or are going to. A crow chooses none of them, so no two crows of a visit
+/// come down on the same spot.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct Claimed {
+    targets: [Option<Target>; MAX_CROWS],
+}
+
+impl Claimed {
+    /// What the crows of `crows` other than `member` have claimed.
+    fn by_others(crows: &[Option<Crow>; MAX_CROWS], member: usize) -> Self {
+        Self {
+            targets: std::array::from_fn(|other| {
+                crows[other]
+                    .as_ref()
+                    .filter(|_| other != member)
+                    .and_then(|crow| crow.target)
+            }),
+        }
+    }
+
+    /// Whether another crow has claimed the perch `key`.
+    fn perch(self, key: [u8; 3]) -> bool {
+        self.targets
+            .iter()
+            .flatten()
+            .any(|target| target.key() == Some(key))
+    }
+
+    /// Whether another crow has claimed the spot on the ground at `feet`.
+    fn spot(self, feet: Vec2) -> bool {
+        self.targets
+            .iter()
+            .flatten()
+            .any(|target| matches!(target, Target::Ground(spot) if *spot == feet))
     }
 }
 
@@ -101,9 +142,16 @@ fn perches(
     result
 }
 
-pub(crate) struct CrowVisit {
+/// One crow of a visit: where it is, what it is doing, and its own random
+/// stream, temperament and wetness.
+pub(crate) struct Crow {
     layout: Layout,
     visit_id: u64,
+    /// The crow's identity in its visit, which it keeps when others leave.
+    member: u8,
+    body: body::Bird,
+    /// Ticks since the visit was admitted. Every crow comes with its visit
+    /// and steps with it, so this is the visit's age too.
     age: u64,
     pub phase: Phase,
     pub phase_tick: u64,
@@ -123,17 +171,19 @@ pub(crate) struct CrowVisit {
     wetness: f32,
     water_tolerance: WaterTolerance,
     wet_departures: u32,
-    perches: body::Perches,
 }
 
-impl CrowVisit {
+impl Crow {
+    /// Crow `member` of a visit, setting out for one of `candidates` that
+    /// `environment` leaves it.
     pub fn new(
         layout: Layout,
         seed: u64,
         visit_id: u64,
+        member: usize,
         water_tolerance: ClockCrowWaterTolerance,
-        segments: &[SegmentState],
-        event: Option<ClockEventKind>,
+        candidates: &[Option<Perch>; PERCH_COLUMNS],
+        environment: Environment<'_>,
     ) -> Self {
         let mut rng = StdRng::seed_from_u64(seed);
         let facing_right = rng.random_bool(0.5);
@@ -148,6 +198,8 @@ impl CrowVisit {
         let mut visit = Self {
             layout,
             visit_id,
+            member: u8::try_from(member).expect("a visit's crow"),
+            body: body::crow(member),
             age: 0,
             phase: Phase::Entering,
             phase_tick: 0,
@@ -167,10 +219,8 @@ impl CrowVisit {
             wetness: 0.0,
             water_tolerance: WaterTolerance::new(water_tolerance, seed),
             wet_departures: 0,
-            perches: body::Perches::default(),
         };
-        let candidates = perches(layout, segments, event);
-        let target = visit.choose(&candidates, false, Environment::default());
+        let target = visit.choose(candidates, false, environment);
         if let Some(target) = target {
             visit.travel(Target::Digit(target), Phase::Entering);
         } else {
@@ -195,6 +245,7 @@ impl CrowVisit {
         let mut selected = None;
         for candidate in candidates.iter().flatten().copied() {
             if self.target.and_then(Target::key) == Some(candidate.key)
+                || environment.claimed.perch(candidate.key)
                 || environment.wet_feet(candidate.feet, self.layout, self.water_tolerance)
             {
                 continue;
@@ -298,7 +349,10 @@ impl CrowVisit {
                     .iter()
                     .flatten()
                     .copied()
-                    .filter(|p| !environment.wet_feet(p.feet, self.layout, self.water_tolerance))
+                    .filter(|p| {
+                        !environment.claimed.perch(p.key)
+                            && !environment.wet_feet(p.feet, self.layout, self.water_tolerance)
+                    })
                     .min_by(|a, b| {
                         let cost = |p: Perch| {
                             (p.feet.x - self.position.x).abs()
@@ -335,11 +389,16 @@ impl CrowVisit {
             return false;
         }
         let spots = environment.ground_spots(self.layout, self.water_tolerance);
-        if let Some(target) = spots.into_iter().flatten().min_by(|a, b| {
-            (a.x - self.position.x)
-                .abs()
-                .total_cmp(&(b.x - self.position.x).abs())
-        }) {
+        if let Some(target) = spots
+            .into_iter()
+            .flatten()
+            .filter(|spot| !environment.claimed.spot(*spot))
+            .min_by(|a, b| {
+                (a.x - self.position.x)
+                    .abs()
+                    .total_cmp(&(b.x - self.position.x).abs())
+            })
+        {
             self.travel(Target::Ground(target), Phase::Flying);
             return true;
         }
@@ -352,32 +411,22 @@ impl CrowVisit {
         self.target.map(Target::feet)
     }
 
-    /// How many perches the crow has placed in the arena.
-    #[cfg(test)]
-    pub fn perch_count(&self) -> usize {
-        self.perches.count()
-    }
-
     /// Puts the crow's body in the arena where the visit starts.
     pub fn enter(&self, world: &mut PhysicsWorld) {
-        body::CROW.insert(world, self.position, self.flight.velocity, self.layout);
+        self.body
+            .insert(world, self.position, self.flight.velocity, self.layout);
     }
 
-    /// The crow's part of the tick before the arena's step: its perches take
-    /// the face as it is now, and its body the velocity the crow chose.
-    pub fn drive(
-        &mut self,
-        world: &mut PhysicsWorld,
-        segments: &[SegmentState],
-        event: Option<ClockEventKind>,
-    ) {
-        self.perches.place(
-            world,
-            &perches(self.layout, segments, event),
-            self.position,
-            self.layout,
-        );
-        body::CROW.drive(world, self.flight.velocity);
+    /// Takes the crow's body out of the arena, when it has left before the
+    /// rest of its visit.
+    fn exit(&self, world: &mut PhysicsWorld) {
+        self.body.remove(world);
+    }
+
+    /// The crow's part of the tick before the arena's step: its body takes
+    /// the velocity the crow chose.
+    pub fn drive(&self, world: &mut PhysicsWorld) {
+        self.body.drive(world, self.flight.velocity);
     }
 
     /// The crow's tick after the arena's step. It reads its body back, reacts
@@ -391,11 +440,11 @@ impl CrowVisit {
         environment: Environment<'_>,
         world: &PhysicsWorld,
     ) -> bool {
-        if let Some((position, velocity)) = body::CROW.motion(world) {
+        if let Some((position, velocity)) = self.body.motion(world) {
             self.position = position;
             self.flight.velocity = velocity;
         }
-        let footing = body::CROW.footing(world, self.layout);
+        let footing = self.body.footing(world, self.layout);
         self.synchronize(segments, event, environment);
         self.age += 1;
         if self.age >= CROW_TICKS {
@@ -561,6 +610,7 @@ impl CrowVisit {
     pub fn diagnostics(&self) -> ClockCrowState {
         ClockCrowState {
             visit_id: self.visit_id,
+            member: self.member,
             water_tolerance: self.water_tolerance.kind,
             phase: self.phase,
             phase_tick: self.phase_tick,
@@ -580,4 +630,210 @@ impl CrowVisit {
             escapes: self.escapes,
         }
     }
+}
+
+/// A visit of crows: one admission of up to [`MAX_CROWS`] birds, and the
+/// perches they share. Each crow has its own body, flight, target, random
+/// stream, temperament and wetness, and leaves when it is done, and a crow
+/// that has left is not replaced. The crows come with the visit and step
+/// with it, so all that remain start for home by its deadline and none
+/// outlasts it. The visit is over when its last crow has left.
+pub(crate) struct CrowVisit {
+    layout: Layout,
+    /// The crows by member, which stays a crow's identity when others leave:
+    /// a crow that has left leaves its place empty.
+    crows: [Option<Crow>; MAX_CROWS],
+    perches: body::Perches,
+}
+
+impl CrowVisit {
+    /// A visit of `size` crows. Its first crow takes `seed`, so that a visit
+    /// of one is the crow that has always come, and each other crow takes a
+    /// seed of its own derived from it.
+    pub fn new(
+        layout: Layout,
+        seed: u64,
+        visit_id: u64,
+        size: usize,
+        water_tolerance: ClockCrowWaterTolerance,
+        segments: &[SegmentState],
+        event: Option<ClockEventKind>,
+    ) -> Self {
+        assert!(
+            (1..=MAX_CROWS).contains(&size),
+            "a visit of one to {MAX_CROWS} crows, not {size}"
+        );
+        let candidates = perches(layout, segments, event);
+        let mut crows = [const { None }; MAX_CROWS];
+        for member in 0..size {
+            let environment = Environment {
+                claimed: Claimed::by_others(&crows, member),
+                ..Environment::default()
+            };
+            crows[member] = Some(Crow::new(
+                layout,
+                member_seed(seed, member),
+                visit_id,
+                member,
+                water_tolerance,
+                &candidates,
+                environment,
+            ));
+        }
+        Self {
+            layout,
+            crows,
+            perches: body::Perches::default(),
+        }
+    }
+
+    /// The crows that have not left, by member.
+    pub fn crows(&self) -> impl Iterator<Item = &Crow> {
+        self.crows.iter().flatten()
+    }
+
+    /// The crow with the lowest member of those that have not left.
+    pub fn first(&self) -> &Crow {
+        self.crows()
+            .next()
+            .expect("a visit holds a crow until it is over")
+    }
+
+    /// The crow with the lowest member of those that have not left, to
+    /// change.
+    #[cfg(test)]
+    pub fn first_mut(&mut self) -> &mut Crow {
+        self.crows
+            .iter_mut()
+            .flatten()
+            .next()
+            .expect("a visit holds a crow until it is over")
+    }
+
+    /// How many perches the visit has placed in the arena.
+    #[cfg(test)]
+    pub fn perch_count(&self) -> usize {
+        self.perches.count()
+    }
+
+    /// Sends crow `member` home at once: at its next step it has left, as a
+    /// crow does at the end of its departure.
+    #[cfg(test)]
+    pub fn send_home(&mut self, member: usize) {
+        let crow = self.crows[member].as_mut().expect("a crow of the visit");
+        crow.leave();
+        crow.phase_tick = crow.duration;
+    }
+
+    /// Puts the crows' bodies in the arena where the visit starts.
+    pub fn enter(&self, world: &mut PhysicsWorld) {
+        for crow in self.crows() {
+            crow.enter(world);
+        }
+    }
+
+    /// Each crow reacts to support changes, as [`Crow::synchronize`] does,
+    /// in turn, so that each knows what those before it have claimed.
+    pub fn synchronize(
+        &mut self,
+        segments: &[SegmentState],
+        event: Option<ClockEventKind>,
+        environment: Environment<'_>,
+    ) {
+        for member in 0..MAX_CROWS {
+            let environment = self.around(member, environment);
+            if let Some(crow) = &mut self.crows[member] {
+                crow.synchronize(segments, event, environment);
+            }
+        }
+    }
+
+    /// `environment` as crow `member` finds it, with what the visit's other
+    /// crows have claimed.
+    fn around<'a>(&self, member: usize, environment: Environment<'a>) -> Environment<'a> {
+        Environment {
+            claimed: Claimed::by_others(&self.crows, member),
+            ..environment
+        }
+    }
+
+    /// The visit's part of the tick before the arena's step: its perches take
+    /// the face as it is now, each holding the crows that stand on it, and
+    /// each crow's body the velocity the crow chose.
+    pub fn drive(
+        &mut self,
+        world: &mut PhysicsWorld,
+        segments: &[SegmentState],
+        event: Option<ClockEventKind>,
+    ) {
+        let feet = self
+            .crows
+            .each_ref()
+            .map(|crow| crow.as_ref().map(|crow| crow.position));
+        self.perches.place(
+            world,
+            &perches(self.layout, segments, event),
+            &feet,
+            self.layout,
+        );
+        for crow in self.crows() {
+            crow.drive(world);
+        }
+    }
+
+    /// The visit's tick after the arena's step: each crow's in turn, so that
+    /// each knows what those before it have claimed. A crow that leaves
+    /// before the others takes its body out of the arena. Returns true when
+    /// the visit is over, as its last crows leave; their bodies go with the
+    /// visit's claim on the arena.
+    pub fn step(
+        &mut self,
+        segments: &[SegmentState],
+        event: Option<ClockEventKind>,
+        environment: Environment<'_>,
+        world: &mut PhysicsWorld,
+    ) -> bool {
+        let mut left = [false; MAX_CROWS];
+        for (member, left) in left.iter_mut().enumerate() {
+            let environment = self.around(member, environment);
+            if let Some(crow) = &mut self.crows[member] {
+                *left = crow.step(segments, event, environment, world);
+            }
+        }
+        if self
+            .crows
+            .iter()
+            .zip(left)
+            .all(|(crow, left)| crow.is_none() || left)
+        {
+            return true;
+        }
+        for (crow, left) in self.crows.iter_mut().zip(left) {
+            if left && let Some(crow) = crow.take() {
+                crow.exit(world);
+            }
+        }
+        false
+    }
+
+    /// Each crow's diagnostics, by member.
+    pub fn diagnostics(&self) -> Vec<ClockCrowState> {
+        self.crows().map(Crow::diagnostics).collect()
+    }
+}
+
+/// The seed of crow `member` of a visit whose seed is `seed`. The first
+/// crow's is the visit's, so a visit of one draws as a crow alone always has.
+/// Each other crow's is the visit's mixed with a salt of its own, "FLOCK!",
+/// and the member, so it draws nothing from the first crow's streams.
+fn member_seed(seed: u64, member: usize) -> u64 {
+    if member == 0 {
+        return seed;
+    }
+    // SplitMix64's finalizer.
+    let mut z =
+        (seed ^ 0x464c_4f43_4b21).wrapping_add((member as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15));
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    z ^ (z >> 31)
 }
