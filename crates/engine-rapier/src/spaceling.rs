@@ -298,6 +298,14 @@ impl SpacelingAssembly {
         true
     }
 
+    /// Leaves it limp, as a knockdown does, with the ordinary contact
+    /// friction a limp body settles by, without counting a knockdown. Only
+    /// its control raises it again, so a caller that stops driving it, as
+    /// when it has died, leaves it to lie where it comes to rest.
+    pub fn go_limp(&mut self, physics: &mut PhysicsWorld) {
+        self.set_balance(physics, SpacelingBalance::KnockedDown);
+    }
+
     /// Call once before each world step. The caller applies the supplied gravity
     /// acceleration over that same `dt`. The previous commanded velocity plus
     /// gravity is a disturbance reference only, never a second pose integrator.

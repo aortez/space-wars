@@ -1734,6 +1734,10 @@ pub enum ClockStrandedPhase {
     GettingUp,
     /// Lifted out by its beam.
     BeamedUp,
+    /// Running along the floor from Falling's bars as they come down.
+    Dodging,
+    /// Killed by a blow, lying where it fell until it turns to dirt.
+    Dead,
 }
 
 impl ClockStrandedPhase {
@@ -1747,6 +1751,8 @@ impl ClockStrandedPhase {
             Self::Sheltering => "sheltering",
             Self::GettingUp => "getting-up",
             Self::BeamedUp => "beamed-up",
+            Self::Dodging => "dodging",
+            Self::Dead => "dead",
         }
     }
 }
@@ -1796,6 +1802,9 @@ pub struct ClockStrandedSpaceling {
     pub flights: u32,
     /// The times something has knocked it down.
     pub knockdowns: u32,
+    /// The times it has run from Falling's bars.
+    #[serde(default)]
+    pub dodges: u32,
     /// Why its beam came, once it has.
     pub leaving: Option<ClockStrandedDeparture>,
 }
@@ -1828,6 +1837,9 @@ pub struct ClockStrandedAccounting {
     pub cleared: u32,
     /// Those that left the view.
     pub lost: u32,
+    /// Those a blow killed.
+    #[serde(default)]
+    pub died: u32,
 }
 
 /// The spaceling a Tanks fight's hills left behind, the flag one planted,
