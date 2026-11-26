@@ -1477,3 +1477,65 @@ fn retired_tanks_and_duels_leave_no_region_behind() {
     assert_eq!(duel.contact_diagnostics().refused_bindings, 0);
     assert_eq!(duel.contact_diagnostics().rejected_batches, 0);
 }
+
+#[test]
+fn a_rebuilt_tank_is_bound_afresh_and_its_contacts_charge_its_armor() {
+    for suspension in [false, true] {
+        let (mut duel, mut world) = quiet_gear(1.0, suspension, true);
+        let hull_region = |duel: &HostedDuel, world: &PhysicsWorld| {
+            let hull = duel.duel.tanks[0].body;
+            world
+                .collider_ids()
+                .find(|&collider| world.collider_body(collider) == Some(hull))
+                .and_then(|collider| world.loading_binding(collider))
+                .map(|source| source.region)
+        };
+        let retired = hull_region(&duel, &world).unwrap();
+        let x = tank_at(&duel, &world, 0).x;
+        let at = duel
+            .placement()
+            .point_to_world(Vec2::new(x, duel.placement().hill(x, 42) + 2.0));
+        // Retiring the tank removes its entity, which retires its regions,
+        // so the rebuilt tank in the same entity can take new ones.
+        duel.retire_tank(&mut world, 0).unwrap();
+        assert!(!world.loading_region_is_live(retired));
+        duel.rebuild_tank(&mut world, 0, at, 100.0).unwrap();
+        let mut landings = Vec::new();
+        for _ in 0..90 {
+            step(&mut duel, &mut world);
+            landings.extend_from_slice(duel.contacts());
+        }
+        // Its hull and wheels are bound to new regions, and its landing is
+        // listed against it and costs nothing.
+        let rebuilt = hull_region(&duel, &world).unwrap();
+        assert!(rebuilt != retired && world.loading_region_is_live(rebuilt));
+        for body in duel.tank_bodies(0) {
+            assert!(
+                world
+                    .collider_ids()
+                    .filter(|&collider| world.collider_body(collider) == Some(body))
+                    .all(|collider| world.loading_binding(collider).is_some())
+            );
+        }
+        assert!(
+            landings
+                .iter()
+                .any(|contact| contact.tanks.contains(&Some(0)))
+        );
+        assert_eq!(listed_work(&landings), [0.0; 2]);
+        // The other tank thrown into it costs both alike, and each tank's
+        // health falls by the work listed against it.
+        let contacts = knock(&mut duel, &mut world);
+        let blow = blow(&contacts);
+        assert!(blow.absorbed[0] > 0.0 && blow.absorbed[0] == blow.absorbed[1]);
+        let lost = duel.tanks(&world).map(|tank| 100.0 - tank.health);
+        let work = listed_work(&contacts);
+        for slot in 0..2 {
+            let listed = 100.0 * work[slot] / armor::armor().capacity();
+            assert!((lost[slot] - listed).abs() < 1.0e-3, "{lost:?} {work:?}");
+            assert!(lost[slot] > 0.05, "{lost:?}");
+        }
+        assert_eq!(duel.contact_diagnostics().refused_bindings, 0);
+        assert_eq!(duel.contact_diagnostics().rejected_batches, 0);
+    }
+}
