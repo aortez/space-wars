@@ -582,8 +582,9 @@ contacts cost in play.
 - **Capture's bounds** are the defaults with room for 8,192 bindings, 4,096
   episodes, 65,536 visits and 8,192 contacts a batch, and 32,768 records a
   step. A world that already captures keeps its own. In 96 CPU duels no batch
-  or binding was refused, and 30 of the 3,511 tank impacts were unpriced, each
-  a sprung tank's whose budget did not converge. In a world with room for
+  or binding was refused, and 30 of the 3,524 tank impacts were unpriced, each
+  a sprung tank's whose budget did not converge
+  ([qualification](material-qualification.md#scorched-earth)). In a world with room for
   only two contacts open at once, a knock between the tanks loses one of its
   two blows to a refused batch, and the duel counts every batch refused.
 

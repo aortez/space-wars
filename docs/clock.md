@@ -1263,8 +1263,9 @@ The tanks' contacts charge their armor as a standalone duel's do
 ([Scorched Earth](scorched-earth.md#armor-and-contacts)): the event turns
 contact capture on in the arena's world before the duel moves in. On the
 hills' rock a sprung tank's landings and driving cost nothing. In 48 fights,
-24 seeds each at 16:9 and 4:3, the tanks' 4,935 impacts cost none of them
-anything, the fastest at 6.6 u/s in the duel's units, and 18 went unpriced.
+24 seeds each at 16:9 and 4:3, the tanks' 4,487 impacts cost none of them
+anything, the fastest at 6.6 u/s in the duel's units, and 17 went unpriced
+([qualification](design/material-qualification.md#clocks-tanks-event)).
 The face, the wrecks' pieces and the spacelings have no region, so the tanks'
 contacts with them are not priced.
 

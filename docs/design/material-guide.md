@@ -5,8 +5,8 @@ damage. Their weapons charge it, and so do the contacts each game has moved
 onto it. This guide is its entry point: what the model is and isn't, the
 values each game uses, how a host adopts it, what has moved onto it and what
 it leaves out. The documents it links hold the contracts and the evidence. The
-model is the shared material damage epic's, #325, and #332 qualifies it
-across the games.
+model is the shared material damage epic's, #325, and #332
+[qualifies it](material-qualification.md) across the games.
 
 ## What it is
 
@@ -185,8 +185,9 @@ the model replaced or left in place.
   ([game worlds](material-contact-charges.md#game-worlds)).
 - **Budgets.** An impact whose budget has more than 32 rows, the ends of its
   patches, or doesn't converge goes unpriced. In 96 of Scorched's duels, 30 of
-  the tanks' 3,511 impacts went unpriced, each a sprung tank's whose budget
-  didn't converge.
+  the tanks' 3,524 impacts went unpriced, each a sprung tank's whose budget
+  didn't converge, and in 48 of Clock's fights 17 of 4,487
+  ([qualification](material-qualification.md#what-the-games-impacts-took)).
 - **Folded impacts.** Capture folds a distinct impact into its pair's episode
   while that episode is still open, such as a hull that lands flat and then
   rocks onto its corners. That impact isn't priced. In Scorched's duels such
@@ -229,6 +230,7 @@ the model replaced or left in place.
 | --- | --- |
 | [Material damage](material-damage.md) | the law, its units, the ledger and the rules it replaced |
 | [The model's report](../data/material-model-v2.md) | the reference materials, bodies and acceptance cases, with what each event took, which `reference_cases` regenerates |
+| [Qualification](material-qualification.md) | #332's pinned run: what each game's impacts took, the paired bot matches on the model, and where the rest of #332's evidence is |
 | [Shared energy](material-shared-energy.md) | the coupled budget that charges solve |
 | [Contact records](material-contact-records.md) | capture, episodes, speculative arrivals and capture's bounds |
 | [Contact charges](material-contact-charges.md) | pricing after each step, the host contract and both games' hosts |
