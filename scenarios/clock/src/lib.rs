@@ -12,6 +12,7 @@ mod calendar_tests;
 pub mod ceiling;
 #[cfg(test)]
 mod cell_swap_tests;
+pub mod chess;
 #[cfg(test)]
 mod coins_tests;
 mod crow;
@@ -586,6 +587,11 @@ pub struct ClockState {
     spider_visit: Option<spider::visit::SpiderVisit>,
     spider_accounting: spider::SpiderAccounting,
     crow_visit: Option<crow::CrowVisit>,
+    // The match the crow and the duck play over their visits, kept for the
+    // run.
+    chess: chess::Exhibition,
+    // Play at the board, begun only on request until the birds can stage it.
+    chess_play: Option<chess::Play>,
     // The spaceling a Tanks fight's hills left behind, the flag one planted,
     // and what became of those the run has had.
     stranded: stranded::Scene,
@@ -1117,6 +1123,7 @@ impl ClockState {
         // new view if they can come in as they are.
         self.finish_duck_visit();
         self.finish_crow_visit();
+        self.end_chess_play();
         self.clear_stranded();
         if self.active_event.is_some() {
             self.finish_event();
@@ -1343,6 +1350,36 @@ impl ClockState {
         self.spider
             .as_ref()
             .map(|spider| spider.state(&self.arena, &self.published))
+    }
+
+    /// The run's chess: the match the crow and the duck play over their
+    /// visits.
+    pub fn chess(&self) -> &chess::Exhibition {
+        &self.chess
+    }
+
+    /// Play at the board, while a visit is there.
+    pub fn chess_play(&self) -> Option<&chess::Play> {
+        self.chess_play.as_ref()
+    }
+
+    /// Admits a visit to the board and begins play there at once, as though
+    /// the birds had set it up. The visit plays the run's unfinished match,
+    /// or a new one. Refused, changing nothing, while play is under way.
+    pub fn admit_chess_play(&mut self) -> bool {
+        if self.chess_play.is_some() {
+            return false;
+        }
+        let current = self.chess.admit();
+        self.chess_play = Some(chess::Play::begin(current, chess::Pace::CLOCK));
+        true
+    }
+
+    /// Ends play at the board, as packing up or a cancellation does. The
+    /// match keeps every action its game accepted. False when there is no
+    /// play.
+    pub fn end_chess_play(&mut self) -> bool {
+        self.chess_play.take().is_some()
     }
 
     pub fn spider_accounting(&self) -> spider::SpiderAccounting {
@@ -2309,6 +2346,10 @@ impl ClockState {
         }
         self.update_crow(true);
         self.update_stranded(true);
+        // Play at the board takes its tick of the visit.
+        if let Some(play) = &mut self.chess_play {
+            play.tick(&mut self.chess);
+        }
         let (view, facts) = self.lamp_sight(&layout);
         self.lamps.perceive(
             &Self::scene_worlds(&self.arena, self.active_event.as_ref()),
@@ -2696,6 +2737,8 @@ impl Scenario for ClockScenario {
             spider_visit: None,
             spider_accounting: spider::SpiderAccounting::default(),
             crow_visit: None,
+            chess: chess::Exhibition::new(seed ^ 0x4348_4553_5300_0000),
+            chess_play: None,
             stranded: stranded::Scene::default(),
             lamps: lamps::Lamps::new(seed),
             floor_light: Vec::new(),

@@ -7,6 +7,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+engine-chess = { workspace = true }
 engine-common = { workspace = true }
 engine-core = { workspace = true }
 engine-rapier = { workspace = true }
