@@ -2,10 +2,10 @@
 
 Revision of the first delivery for the shared material damage epic #325: the bounded reference
 model that #326 asked for, as the pure crate `engine-material`, with its
-calibration fixtures and evidence. Nothing is integrated into a host yet. The
-load adapter (#327), persistent region storage and failure lifecycle (#328),
-weapon sources (#329) and the Spacewars and Scorched migrations (#330, #331)
-build on the contract below.
+calibration fixtures and evidence. The load adapter (#327), persistent region
+storage and failure lifecycle (#328), weapon sources (#329) and the Spacewars
+and Scorched migrations (#330, #331) build on the contract below. The
+[guide](material-guide.md) says what each game takes from it.
 
 The model replaces speed-times-scalar damage with one law: a material has a
 stiffness, a safe strength and a toughness; loads below the safe limit cause
@@ -107,8 +107,9 @@ This implementation is `material-law-v2`; its report is
 [`material-model-v2.json`](../data/material-model-v2.json). The superseded report
 is available in Git history. `Material::identity()` hashes the material
 parameters; records also carry `LAW_VERSION` and the fixed post-yield fraction.
-No production scenario depends on this crate yet. Rapier is a test-only
-dependency used for the isolated response experiment.
+Spacewars, Scorched Earth, Material Lab and `engine-rapier` depend on this
+crate. Rapier is a test-only dependency used for the isolated response
+experiment.
 
 ## The material law
 
@@ -418,8 +419,9 @@ restitution is deliberately 1 so the hook must replace it.
 This is an isolated-contact experiment without gravity, friction, initial
 penetration or simultaneous independent contacts. It is not the production
 adapter and does not prove partition invariance, fragment allocation, constrained
-assemblies, driven supports, or replay of authoritative episode state. Those
-remain #327/#328 acceptance work.
+assemblies, driven supports, or replay of authoritative episode state.
+[Contact charges](material-contact-charges.md#acceptance) and #328's regions
+took those up, with the limits the [guide](material-guide.md#limits) lists.
 
 ### Landing calibration
 

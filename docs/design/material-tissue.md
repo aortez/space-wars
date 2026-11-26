@@ -147,7 +147,8 @@ the [#326 cases'](../data/material-model-v2.md).
   measures each contact's width, sections, speed and force for its tissue.
 - **One region per tissue:** a tissue's whole cell takes the load, with no
   partial cut within a cell.
-- **Existing hosts unchanged:** no host uses the adapter yet, and
+- **Existing hosts unchanged:** only Material Lab uses the adapter, for its
+  [shell through moss](material-lab.md#shell-through-moss), and
   `Plants::damage` keeps its current callers.
 - **The law's limits:** shear, fatigue and rate effects are not modelled; see
   [material damage](material-damage.md#limits-and-verification).

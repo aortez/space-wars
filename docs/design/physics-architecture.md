@@ -42,8 +42,9 @@ The engine or scenario owns:
 Damage from physical loads uses the shared material law in `engine-material`:
 stiffness, strength and toughness per material, one energy ledger per event
 and persistent integrity per region. Hosts still measure the loads and own
-death, debris and cleanup. See [Material damage](material-damage.md); the
-first host migrations are planned under #325.
+death, debris and cleanup. The [material damage guide](material-guide.md)
+says what each game takes from it, and [Material damage](material-damage.md)
+has the law.
 
 A physical entity may be an assembly of several bodies, colliders, and joints.
 Collider roles distinguish gameplay meaning within an assembly, for example a

@@ -119,4 +119,4 @@ provide additional physical checks.
 
 These are bounded cardinal scenes. General oblique orientations, freely rotating
 faces, moving supports, broader geometry/CCD and measured overloaded deformation
-remain outside this operation. Gameplay defaults are unchanged; #327 is open.
+remain outside this operation. Gameplay defaults are unchanged.
