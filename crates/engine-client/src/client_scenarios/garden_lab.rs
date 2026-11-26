@@ -102,7 +102,7 @@ impl ClientScenario for GardenLabClientScenario {
                 "id":t.id,"organism":t.organism,"role":format!("{:?}",t.role),
                 "cell":t.cell,"health":t.health,"shade":t.shade_ticks,"shortage":t.shortage_ticks,
                 "stores":t.stores,"size":t.size,"development":t.development,"invested":t.invested,
-                "next_cost":if t.role == Role::Shoot && t.size < 3 { std::array::from_fn::<_,3,_>(|i|u64::from(t.development[i] < o.config.development_per_size[i])) } else { [0;3] },"policy":t.policy,"allocation":t.allocation,"support":format!("{:?}",t.support),
+                "next_cost":o.config.development_target(t.role, t.size).map_or([0;3], |target| std::array::from_fn::<_,3,_>(|i|u64::from(t.development[i] < target[i]))),"policy":t.policy,"allocation":t.allocation,"support":format!("{:?}",t.support),
             });
             if t.role == Role::Moss {
                 let surface = o.ledger.surfaces.get(&t.id).map(|r| {

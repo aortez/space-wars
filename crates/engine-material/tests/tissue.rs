@@ -69,7 +69,7 @@ fn table() -> TissueTable {
     };
     TissueTable {
         identity: 7,
-        roles: [wood, soft, soft, soft],
+        roles: [wood, soft, soft, soft, wood],
     }
 }
 

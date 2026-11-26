@@ -24,11 +24,11 @@ pub struct TissueMaterial {
 }
 
 /// Tissue materials in the plant `Config` tables' role order: root, runner,
-/// shoot, moss. Saves carry the caller-assigned `identity`.
+/// shoot, moss, wood. Saves carry the caller-assigned `identity`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TissueTable {
     pub identity: u64,
-    pub roles: [TissueMaterial; 4],
+    pub roles: [TissueMaterial; 5],
 }
 
 impl TissueTable {

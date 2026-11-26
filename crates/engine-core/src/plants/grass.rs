@@ -126,7 +126,7 @@ impl Grass {
                         (side, Role::Runner, self.traits.runner_size),
                         (side.map(|v| -v), Role::Runner, self.traits.runner_size),
                     ],
-                    Role::Shoot | Role::Moss => vec![],
+                    Role::Shoot | Role::Moss | Role::Wood => vec![],
                 };
                 for (delta, role, size) in candidates
                     .into_iter()

@@ -11,7 +11,8 @@ A host owns `Plants`. A brain receives an owned `Observation` and returns
 `Intent`s; it cannot mutate authoritative state. The host submits those intents
 with the observation's tick. Old ticks reject atomically. `Allocate` sets a
 relative maintenance priority for subsequent ticks; `Grow` purchases one adjacent
-cell from the parent's living component. The runtime checks size, living parent,
+cell from the parent's living component; `Shed` drops a tissue and what grew
+from it (see Wood below). The runtime checks size, living parent,
 Manhattan adjacency, occupied cells, host space/support, total tissue limit and
 all three costs before changing stores or biomass. Requests execute in supplied
 order; one rejection does not undo earlier valid requests. Batch work-limit
@@ -220,13 +221,12 @@ all other relevant supports, tagged with this exact tick and geometry revision.
 `publish` is the convenience form for scenes with no external lightweight
 occluders. At most 256 local tissues plus external disks combined (including
 local roots and dead elements) are admitted atomically, before allocation or
-query work. External disks do not add receivers or root supply. Shoot and runner
-elements declare opaque world-space disks:
+query work. External disks do not add receivers or root supply. Shoot, runner
+and wood elements declare opaque world-space disks:
 center = support pose applied to terrain cell center; radius =
 `cell_size * 0.25 * sqrt(size)`. Roots have no optical footprint. These declared
 disks are the initial blade/leaf/structural approximation, not colliders or a
 second physics world. Dead above-ground tissue stays opaque until removed.
-A future woody role must explicitly supply its geometry before integration.
 All attached elements must name the assembly's current generational support.
 A caller-reserved surface namespace plus never-reused tissue ID identifies each
 disk; reserve that namespace from physical entity IDs and other tissue sets.
@@ -538,3 +538,65 @@ bridge that splits a patch, damaged parents waiting, and paid reclamation of the
 cleared cell. `moss_policy_contract` covers the headless policy and runtime
 accounting. Clock moss on digits (#223), succession on the retained Clock floor
 (#518), spores, seeds and fragment dispersal remain separate work.
+
+## Wood (#743)
+
+`Role::Wood` is a fifth runtime role, for a tree's trunk and branches, and the
+role-ordered `Config` tables now hold a wood entry. Wood gathers nothing: it
+takes no contact supply and no energy, and it has no local light threshold, so
+it lives on its component's pool in shade or darkness. It pays upkeep as other
+tissue does, its rate times its size, and its capacity stores reserves at the
+same scale, so full reserves last as long at every size. Defaults, per size per
+fixed one-second tick:
+
+| Quantity | Wood | Grass shoot |
+| --- | --- | --- |
+| Capacity, each resource | 20 | 20 |
+| Maintenance (N,W,E) | 1,1,1 | 1,2,2 |
+| Construction (N,W,E) | 2,2,6 | 4,4,4 |
+| Intake | none | energy from light |
+| Local light threshold | none | 250 |
+
+Building wood costs mostly energy. Wood thickens through `Intent::Develop`, as
+a blade matures: each intent pays at most one unit of each resource the step
+still needs, and a completed step raises its size by one, up to `max_size`. Its
+target per step is its own construction rate rather than
+`development_per_size`, so a segment thickened to size n has cost what building
+it at size n would have. At the defaults a step takes six intents: the first
+two pay all three resources and the other four energy alone.
+`Config::development_target` gives a tissue's target for its next size, or
+`None` when it cannot develop: shoots stop at size three, and roots, runners
+and moss never develop.
+
+Wood is placed as blades are, in air and never in solid geometry, under
+`GrassEnvironment`, `RootUptake` and `MaterialUptake` alike. Root and moss
+contact report it `NotAbsorbing`. In `PlantLight` it declares an opaque disk by
+the shoots' and runners' rule, radius `cell_size * 0.25 * sqrt(size)`, so it
+shades what lies behind it and widens as it thickens. It is not a receiver, and
+its exposure carries no light. `footprints` includes it for other supports'
+publications. Dead wood keeps its cell and its disk until removed, as other
+dead tissue does.
+
+`Intent::Shed` lets a brain drop a tissue, living or dead, with everything that
+grew from it, as a tree drops a bare branch with its dead needles. It applies
+to every role. Growth always joins a new, higher ID to its parent, so the
+runtime finds what grew from a tissue by walking only to higher IDs. Shedding
+removes them as `remove_many` does, and their shares of the stores are lost, in
+that tick's `loss`. A tissue with no parent, such as a seed or the base of a
+severed fragment, cannot be shed, so a brain can never drop its whole plant.
+
+Wood stays lightweight tissue on cells, with no bodies, colliders or loads.
+Bending and breaking are #224's, anchorage #225's. `engine-material`'s
+`TissueTable` gains a wood entry in the same role order. The grass and moss
+policies act only on their own tissue, so wood in a shared runtime counts only
+toward the runtime's ceilings.
+
+Non-ignored `plants::` fixtures cover wood's zero intake and its lack of a
+shade deficit in darkness, its upkeep by size and how long full reserves last,
+thickening's payments per intent, the reset at each completed step, the
+investment equal to construction at that size, the capacity at each size and
+the size limit, and the development targets by role and size. They also shed
+a branch with its dead needle and check the lost share, the refusals for a seed
+and for unknown tissue, and a dead needle shed in a balanced tick.
+`plant_light_contract` covers a blade shaded by wood above it, wood's missing
+sample, its disk radius by size and its placement in air.

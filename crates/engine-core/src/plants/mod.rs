@@ -17,6 +17,9 @@ pub enum Role {
     /// Thin photosynthetic surface tissue with capped passive supply from an
     /// eligible solid surface instead of roots.
     Moss,
+    /// Trunk and branch tissue: it gathers nothing and needs no light, stores
+    /// reserves, shades like a blade and thickens by paid development.
+    Wood,
 }
 impl Role {
     /// Position in the role-ordered `Config` tables.
@@ -26,6 +29,7 @@ impl Role {
             Self::Runner => 1,
             Self::Shoot => 2,
             Self::Moss => 3,
+            Self::Wood => 4,
         }
     }
 }
@@ -66,10 +70,13 @@ pub struct Config {
     pub max_organisms: usize,
     pub max_intents: usize,
     pub max_size: u16,
-    /// Role-ordered tables: root, runner, shoot, moss.
-    pub capacity_per_size: [Resources; 4],
-    pub maintenance_per_size: [Resources; 4],
-    pub growth_per_size: [Resources; 4],
+    /// Role-ordered tables: root, runner, shoot, moss, wood.
+    pub capacity_per_size: [Resources; 5],
+    pub maintenance_per_size: [Resources; 5],
+    pub growth_per_size: [Resources; 5],
+    /// A shoot's development target per added size. Wood thickens toward its
+    /// own `growth_per_size` instead, so a thickened segment has cost what
+    /// building it at that size would have.
     pub development_per_size: Resources,
     pub root_intake_per_size: Resources,
     pub shoot_energy_per_size: u64,
@@ -93,9 +100,9 @@ impl Default for Config {
             max_organisms: 64,
             max_intents: 16,
             max_size: 16,
-            capacity_per_size: [[20; 3], [10; 3], [20; 3], [24; 3]],
-            maintenance_per_size: [[1, 1, 1], [1, 1, 1], [1, 2, 2], [1, 1, 1]],
-            growth_per_size: [[3; 3], [2; 3], [4; 3], [20; 3]],
+            capacity_per_size: [[20; 3], [10; 3], [20; 3], [24; 3], [20; 3]],
+            maintenance_per_size: [[1, 1, 1], [1, 1, 1], [1, 2, 2], [1, 1, 1], [1, 1, 1]],
+            growth_per_size: [[3; 3], [2; 3], [4; 3], [20; 3], [2, 2, 6]],
             development_per_size: [4; 3],
             root_intake_per_size: [4, 3, 0],
             shoot_energy_per_size: 8,
@@ -107,6 +114,20 @@ impl Default for Config {
             grace_ticks: 3,
             damage_per_tick: 20,
             recovery_per_tick: 10,
+        }
+    }
+}
+impl Config {
+    /// The paid target for a tissue's next size, or `None` when it cannot
+    /// develop: shoots mature to size three and wood thickens to `max_size`.
+    pub fn development_target(&self, role: Role, size: u16) -> Option<Resources> {
+        if size >= self.max_size {
+            return None;
+        }
+        match role {
+            Role::Shoot if size < 3 => Some(self.development_per_size),
+            Role::Wood => Some(self.growth_per_size[Role::Wood.index()]),
+            _ => None,
         }
     }
 }
@@ -173,10 +194,15 @@ pub enum Intent {
         cell: [i32; 2],
         support: Option<Support>,
     },
-    /// Pay at most one unit of each resource toward the next shoot size.
+    /// Pay at most one unit of each resource toward the tissue's next size: a
+    /// shoot's maturation, up to size three, or wood's thickening.
     Develop { tissue: TissueId },
     /// Relative maintenance priority inside a living component; does not waive costs.
     Allocate { tissue: TissueId, priority: u16 },
+    /// Drop a tissue, living or dead, and everything that grew from it; their
+    /// shares of the stores are lost, as a removal's are. A tissue joined to
+    /// nothing it grew from, such as a seed, cannot be shed.
+    Shed { tissue: TissueId },
 }
 
 /// Inputs come from bounded host adapters, never from the plant brain. Light is
@@ -553,9 +579,10 @@ impl Plants {
                 if t.health == 0 {
                     return Err(Rejection::Dead);
                 }
-                if t.role != Role::Shoot || t.size >= 3 || t.size >= self.config.max_size {
-                    return Err(Rejection::Invalid);
-                }
+                let target = self
+                    .config
+                    .development_target(t.role, t.size)
+                    .ok_or(Rejection::Invalid)?;
                 // Use this tick's physiology result: no additional exposure query,
                 // and connected sunlight cannot waive the shoot's local deficit.
                 if t.shade_ticks != 0 {
@@ -570,7 +597,6 @@ impl Plants {
                 if !env.space_available(t.cell, t.role, t.size + 1) {
                     return Err(Rejection::Space);
                 }
-                let target = self.config.development_per_size;
                 let cost = std::array::from_fn(|i| u64::from(t.development[i] < target[i]));
                 let group = self
                     .components()
@@ -599,6 +625,27 @@ impl Plants {
                 }
                 t.allocation = priority;
                 Ok(())
+            }
+            Intent::Shed { tissue } => {
+                // Growth joins each new, higher ID to its parent, so a tissue's
+                // parent is its one lower-ID neighbor, and walking only to higher
+                // IDs visits exactly what grew from it.
+                if !self.edges.iter().any(|&(_, child)| child == tissue) {
+                    return Err(Rejection::Invalid);
+                }
+                let mut shed = vec![tissue];
+                let mut cursor = 0;
+                while cursor < shed.len() {
+                    let id = shed[cursor];
+                    cursor += 1;
+                    shed.extend(
+                        self.edges
+                            .iter()
+                            .filter(|&&(parent, _)| parent == id)
+                            .map(|&(_, child)| child),
+                    );
+                }
+                self.remove_many(&shed)
             }
             Intent::Grow {
                 parent,
@@ -713,7 +760,7 @@ impl Plants {
                 let contact = match t.role {
                     Role::Root => Some((e.dirt_contact, self.config.root_intake_per_size)),
                     Role::Moss => Some((e.surface_contact, self.config.moss_intake_per_size)),
-                    Role::Runner | Role::Shoot => None,
+                    Role::Runner | Role::Shoot | Role::Wood => None,
                 };
                 let mut intake = [0; 3];
                 if let Some((true, rates)) = contact {
@@ -760,7 +807,7 @@ impl Plants {
                             * u64::from(e.light).min(saturation)
                             / saturation
                     }
-                    Role::Root | Role::Runner => 0,
+                    Role::Root | Role::Runner | Role::Wood => 0,
                 };
                 add(&mut pool, intake);
                 add(&mut self.ledger.intake, intake);
@@ -789,7 +836,7 @@ impl Plants {
                 let threshold = match t.role {
                     Role::Shoot => Some(self.config.local_light_threshold),
                     Role::Moss => Some(self.config.moss_light_threshold),
-                    Role::Root | Role::Runner => None,
+                    Role::Root | Role::Runner | Role::Wood => None,
                 };
                 let shade = threshold.is_some_and(|limit| samples[&id].light < limit);
                 t.shade_ticks = if shade {

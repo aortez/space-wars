@@ -641,3 +641,178 @@ fn development_refusals_are_atomic_and_shade_retains_paid_work() {
     assert_eq!(p.apply(&intent, &Env::default()), Err(Rejection::Dead));
     assert_eq!(p, before);
 }
+
+#[test]
+fn wood_gathers_nothing_needs_no_light_and_pays_upkeep_by_size() {
+    let mut p = plant();
+    let dark = Env {
+        light: 0,
+        ..Env::default()
+    };
+    let thin = seed(&mut p, Role::Wood, [0, 0], [20; 3]);
+    let thick = p
+        .seed(42, Role::Wood, 4, [5, 0], None, [80; 3], &dark)
+        .unwrap();
+    for tick in 1..=20u64 {
+        step(&mut p, &dark, &[]);
+        // Contact and light are offered to every tissue here; wood takes neither.
+        assert_eq!(p.ledger.intake, [0; 3]);
+        assert!(p.ledger.roots.is_empty() && p.ledger.surfaces.is_empty());
+        assert_eq!(p.ledger.maintenance, [5; 3]);
+        assert_eq!(p.tissues[&thin].stores, [20 - tick; 3]);
+        assert_eq!(p.tissues[&thick].stores, [80 - 4 * tick; 3]);
+        for id in [thin, thick] {
+            assert_eq!(p.tissues[&id].shade_ticks, 0);
+            assert_eq!(p.ledger.waiting[&id], WaitReason::Idle);
+        }
+    }
+    // Full reserves last as long at every size: capacity and upkeep both scale.
+    step(&mut p, &dark, &[]);
+    for id in [thin, thick] {
+        assert_eq!(p.ledger.waiting[&id], WaitReason::Shortage);
+    }
+}
+
+#[test]
+fn wood_thickens_toward_its_construction_rate_to_the_size_limit() {
+    let mut p = plant();
+    p.config.max_size = 3;
+    let env = Env::default();
+    let root = p
+        .seed(42, Role::Root, 3, [0, 0], None, [60; 3], &env)
+        .unwrap();
+    step(&mut p, &env, &[grow(root, Role::Wood, [0, 1])]);
+    let rate = p.config.growth_per_size[Role::Wood.index()];
+    assert_eq!(
+        (p.ledger.results.clone(), p.ledger.growth),
+        (vec![Ok(())], rate)
+    );
+    let wood = 2;
+    let develop = Intent::Develop { tissue: wood };
+    // Nutrients and water complete their part of a step before energy does.
+    let paid = [
+        [1, 1, 1],
+        [1, 1, 1],
+        [0, 0, 1],
+        [0, 0, 1],
+        [0, 0, 1],
+        [0, 0, 1],
+    ];
+    for size in 2..=3u16 {
+        for (n, cost) in paid.iter().enumerate() {
+            let (before, growth) = (sum(&p), p.ledger.growth);
+            assert_eq!(p.apply(&develop, &env), Ok(()));
+            for i in 0..3 {
+                assert_eq!(p.ledger.growth[i], growth[i] + cost[i]);
+                assert_eq!(sum(&p)[i], before[i] - cost[i]);
+            }
+            let t = &p.tissues[&wood];
+            let complete = n + 1 == paid.len();
+            assert_eq!(t.size, if complete { size } else { size - 1 });
+            if complete {
+                assert_eq!(t.development, [0; 3]);
+            }
+        }
+        // Thickened to `size`, the segment has cost what building it there would.
+        let t = &p.tissues[&wood];
+        assert_eq!(t.invested, rate.map(|v| v * u64::from(size - 1)));
+        assert_eq!(p.capacity(wood), [20 * u64::from(size); 3]);
+    }
+    let before = p.clone();
+    assert_eq!(p.apply(&develop, &env), Err(Rejection::Invalid));
+    assert_eq!(p, before);
+    // New size takes effect in the next tick's upkeep.
+    step(&mut p, &env, &[]);
+    assert_eq!(p.ledger.maintenance, [3 + 3; 3]);
+}
+
+#[test]
+fn development_targets_by_role_and_size() {
+    let config = Config::default();
+    let wood = config.growth_per_size[Role::Wood.index()];
+    for (role, size, target) in [
+        (Role::Shoot, 1, Some(config.development_per_size)),
+        (Role::Shoot, 2, Some(config.development_per_size)),
+        (Role::Shoot, 3, None),
+        (Role::Wood, 1, Some(wood)),
+        (Role::Wood, 15, Some(wood)),
+        (Role::Wood, 16, None),
+        (Role::Root, 1, None),
+        (Role::Runner, 1, None),
+        (Role::Moss, 1, None),
+    ] {
+        assert_eq!(
+            config.development_target(role, size),
+            target,
+            "{role:?} {size}"
+        );
+    }
+    let mut p = plant();
+    for (role, cell) in [
+        (Role::Root, [0, 0]),
+        (Role::Runner, [1, 0]),
+        (Role::Moss, [2, 0]),
+    ] {
+        let id = seed(&mut p, role, cell, [10; 3]);
+        let before = p.clone();
+        assert_eq!(
+            p.apply(&Intent::Develop { tissue: id }, &Env::default()),
+            Err(Rejection::Invalid)
+        );
+        assert_eq!(p, before);
+    }
+}
+
+#[test]
+fn shedding_drops_a_tissue_and_what_grew_from_it_and_loses_their_shares() {
+    let mut p = plant();
+    let env = Env::default();
+    let root = p
+        .seed(42, Role::Root, 3, [0, 0], None, [60; 3], &env)
+        .unwrap();
+    // A trunk of two wood cells, a branch of one with a needle at its end, and
+    // a needle on the trunk.
+    for intent in [
+        grow(root, Role::Wood, [0, 1]),
+        grow(2, Role::Wood, [0, 2]),
+        grow(3, Role::Wood, [1, 2]),
+        grow(4, Role::Shoot, [2, 2]),
+        grow(3, Role::Shoot, [-1, 2]),
+    ] {
+        step(&mut p, &env, &[intent]);
+        assert_eq!(p.ledger.results, vec![Ok(())]);
+    }
+    p.damage(5, 100).unwrap();
+    // Neither a seed nor unknown tissue can be shed.
+    for tissue in [root, 99] {
+        let before = p.clone();
+        assert_eq!(
+            p.apply(&Intent::Shed { tissue }, &env),
+            Err(Rejection::Invalid)
+        );
+        assert_eq!(p, before);
+    }
+    // The branch goes with its dead needle, and its share is lost.
+    let (before, loss, share) = (sum(&p), p.ledger.loss, p.tissues[&4].stores);
+    assert_ne!(share, [0; 3]);
+    assert_eq!(p.apply(&Intent::Shed { tissue: 4 }, &env), Ok(()));
+    assert_eq!(
+        p.tissues.keys().copied().collect::<Vec<_>>(),
+        vec![1, 2, 3, 6]
+    );
+    assert_eq!(p.edges, BTreeSet::from([(1, 2), (2, 3), (3, 6)]));
+    for i in 0..3 {
+        assert_eq!(p.ledger.loss[i], loss[i] + share[i]);
+        assert_eq!(sum(&p)[i], before[i] - share[i]);
+    }
+    // Dead tissue can be shed on its own, in a tick, with the ledger balanced.
+    p.damage(6, 100).unwrap();
+    let before = sum(&p);
+    step(&mut p, &env, &[Intent::Shed { tissue: 6 }]);
+    assert_eq!(p.ledger.results, vec![Ok(())]);
+    assert_eq!(p.tissues.keys().copied().collect::<Vec<_>>(), vec![1, 2, 3]);
+    let (after, l) = (sum(&p), &p.ledger);
+    let spent: Resources =
+        std::array::from_fn(|i| after[i] + l.maintenance[i] + l.growth[i] + l.loss[i]);
+    assert_eq!(spent, std::array::from_fn(|i| before[i] + l.intake[i]));
+}
