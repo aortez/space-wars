@@ -17,6 +17,8 @@ pub mod chess;
 mod coins_tests;
 mod crow;
 #[cfg(test)]
+mod crow_group_tests;
+#[cfg(test)]
 mod crow_tests;
 pub use calendar::ClockDate;
 #[cfg(test)]
@@ -587,6 +589,9 @@ pub struct ClockState {
     spider_visit: Option<spider::visit::SpiderVisit>,
     spider_accounting: spider::SpiderAccounting,
     crow_visit: Option<crow::CrowVisit>,
+    // How many crows the next crow visit brings: one, as every admission
+    // brings, unless `preview_crows` asks for more.
+    crow_visit_size: usize,
     // The match the crow and the duck play over their visits, kept for the
     // run.
     chess: chess::Exhibition,
@@ -1519,8 +1524,50 @@ impl ClockState {
         self.lamps.preview(activity, lamp);
     }
 
+    /// The crow with the lowest member of a visit's crows that have not
+    /// left, for readers that know of only one crow.
     pub fn crow_state(&self) -> Option<engine_common::ClockCrowState> {
-        self.crow_visit.as_ref().map(crow::CrowVisit::diagnostics)
+        self.crow_visit
+            .as_ref()
+            .map(|visit| visit.first().diagnostics())
+    }
+
+    /// The first crow of the visit that has not left, if a crow visits.
+    #[cfg(test)]
+    pub(crate) fn crow(&self) -> Option<&crow::Crow> {
+        self.crow_visit.as_ref().map(crow::CrowVisit::first)
+    }
+
+    /// The first crow of the visit that has not left, to change.
+    #[cfg(test)]
+    pub(crate) fn crow_mut(&mut self) -> Option<&mut crow::Crow> {
+        self.crow_visit.as_mut().map(crow::CrowVisit::first_mut)
+    }
+
+    /// Each crow of a visit that has not left, by member.
+    pub fn crow_states(&self) -> Vec<engine_common::ClockCrowState> {
+        self.crow_visit
+            .as_ref()
+            .map_or_else(Vec::new, crow::CrowVisit::diagnostics)
+    }
+
+    /// Previews a visit of `size` crows, as previewing the Crow event does
+    /// for a visit of one, and refused as that preview would be. True when the
+    /// visit came. This is the fixture for visits of several crows, which no
+    /// admission brings yet.
+    pub fn preview_crows(&mut self, size: usize) -> bool {
+        assert!(
+            (1..=crow::MAX_CROWS).contains(&size),
+            "a visit of one to {} crows, not {size}",
+            crow::MAX_CROWS
+        );
+        if self.crow_visit.is_some() {
+            return false;
+        }
+        self.crow_visit_size = size;
+        self.preview_event(ClockEventKind::Crow);
+        self.crow_visit_size = 1;
+        self.crow_visit.is_some()
     }
 
     /// The spaceling a Tanks fight's hills left behind, the flag one planted
@@ -1677,10 +1724,16 @@ impl ClockState {
             falling: self
                 .arena
                 .holds(arena::Owner::Event(ClockEventKind::Falling)),
-            birds: self
-                .crow_visit
-                .as_ref()
-                .map_or([None; 2], |crow| [Some(crow.position), crow.destination()]),
+            birds: {
+                let mut birds = [None; 2 * crow::MAX_CROWS];
+                if let Some(visit) = &self.crow_visit {
+                    for (bird, crow) in birds.chunks_exact_mut(2).zip(visit.crows()) {
+                        bird[0] = Some(crow.position);
+                        bird[1] = crow.destination();
+                    }
+                }
+                birds
+            },
             digits: self.display.digits,
             tick: self.schedule.tick,
         }
@@ -1972,6 +2025,7 @@ impl ClockState {
                         layout,
                         seed,
                         self.schedule.event_id,
+                        self.crow_visit_size,
                         self.config.crow_water_tolerance,
                         &self.segments,
                         self.event_kind(),
@@ -2289,8 +2343,8 @@ impl ClockState {
         self.arena
             .bind_floor(self.active_event.as_ref(), self.floor.geometry(fitted));
         self.arena.bind_settings(fitted);
-        // The crow's perches take the face as the step will find it, and its
-        // body the velocity it chose after the last step.
+        // The crows' perches take the face as the step will find it, and each
+        // crow's body the velocity it chose after the last step.
         if let Some(crow) = &mut self.crow_visit {
             let world = self
                 .arena
@@ -2503,12 +2557,14 @@ impl ClockState {
                     || matches!(&self.active_event, Some(ActiveEvent::Aquarium(event)) if event.floor.opening <= 1e-6)
                     || matches!(&self.active_event, Some(ActiveEvent::Rain(rain))
                         if rain.responsive_floor().is_some_and(|floor| floor.opening <= 1e-6))),
+            // The visit adds what each crow's companions have claimed.
+            claimed: crow::Claimed::default(),
         };
         if let Some(crow) = &mut self.crow_visit {
             if advance {
                 let world = self
                     .arena
-                    .held(arena::Owner::Crow)
+                    .held_mut(arena::Owner::Crow)
                     .expect("the crow's claim keeps a world");
                 if crow.step(&self.segments, kind, environment, world) {
                     self.finish_crow_visit();
@@ -2737,6 +2793,7 @@ impl Scenario for ClockScenario {
             spider_visit: None,
             spider_accounting: spider::SpiderAccounting::default(),
             crow_visit: None,
+            crow_visit_size: 1,
             chess: chess::Exhibition::new(seed ^ 0x4348_4553_5300_0000),
             chess_play: None,
             stranded: stranded::Scene::default(),

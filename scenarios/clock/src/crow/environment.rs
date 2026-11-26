@@ -1,5 +1,6 @@
-//! Read-only water sensing and two clear approaches beside the digit face.
-use super::WaterTolerance;
+//! What a crow finds around it: read-only water sensing, two clear approaches
+//! beside the digit face, and what the other crows of its visit have claimed.
+use super::{Claimed, WaterTolerance};
 use crate::layout::Layout;
 use engine_core::Vec2;
 use engine_water::WaterWorld;
@@ -9,6 +10,9 @@ pub(crate) struct Environment<'a> {
     pub water: Option<&'a WaterWorld>,
     /// Only the ordinary floor or fully closed rain panels support this slice.
     pub ground_available: bool,
+    /// What the other crows of the visit have claimed, which this crow leaves
+    /// to them.
+    pub claimed: Claimed,
 }
 
 impl Environment<'_> {

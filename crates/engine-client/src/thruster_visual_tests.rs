@@ -23,7 +23,10 @@ pub(crate) fn raster(frame: &RenderFrame, viewport: Viewport) -> SharedPixelBuff
         .unwrap()
 }
 
-fn changed_pixels(a: &SharedPixelBuffer<Rgb8Pixel>, b: &SharedPixelBuffer<Rgb8Pixel>) -> usize {
+pub(crate) fn changed_pixels(
+    a: &SharedPixelBuffer<Rgb8Pixel>,
+    b: &SharedPixelBuffer<Rgb8Pixel>,
+) -> usize {
     a.as_slice()
         .iter()
         .zip(b.as_slice())

@@ -419,8 +419,8 @@ pub(crate) struct Surroundings<'a> {
     /// Whether Falling's bars fall in the world it stands in, where they can
     /// meet it.
     pub falling: bool,
-    /// Where a crow is, and where it is going.
-    pub birds: [Option<Vec2>; 2],
+    /// Where each crow of a visit is, and where it is going.
+    pub birds: [Option<Vec2>; 2 * crate::crow::MAX_CROWS],
     /// The digits the face shows.
     pub digits: [Option<u8>; DIGIT_SLOT_COUNT],
     /// The run's tick.

@@ -407,10 +407,11 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
             println!("{}", lamp_line("Right", &lamps.right));
             println!("{}", perceived_line(&lamps.perceived));
         }
-        if let Some(crow) = &state.crow {
+        for crow in state.visiting_crows() {
             println!(
-                "Crow #{}: {}, age={} phase tick={}, position={:?}, target={:?}, hops={}, escapes={}, ground={:?} visits={} pecks={}, water={} wet={}/1000 departures={}",
+                "Crow #{} member {}: {}, age={} phase tick={}, position={:?}, target={:?}, hops={}, escapes={}, ground={:?} visits={} pecks={}, water={} wet={}/1000 departures={}",
                 crow.visit_id,
+                crow.member,
                 crow.phase.as_str(),
                 crow.age_ticks,
                 crow.phase_tick,

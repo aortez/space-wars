@@ -482,8 +482,8 @@ Falling's, Exploding digits' and Coins' before a player joins, Meltdown's
 water lab, and Rain's floats while its duck is in the water. A body is known
 by its world's place in that list and by its id, since two worlds may use the
 same ids. When a player joins, the arena adopts the event's world, and the
-lamps take its bodies for new ones. The crow and the magpie are bodies
-(#633), the crow in the arena's world and the magpie in the world the coins
+lamps take its bodies for new ones. The crows and the magpie are bodies
+(#633), each crow in the arena's world and the magpie in the world the coins
 lie in, so the lamps see them as they see anything else that moves.
 Aquarium's fish, the water, Tanks' shells, which the duel casts as rays, and
 Meltdown's melting cells unless a duck's visit shares the arena are not
@@ -2719,7 +2719,22 @@ Time/format changes revalidate the target even while paused, without advancing
 its position or age. Falling, Meltdown, Explosion, Coins, Digit Slide and Marquee withdraw the
 perches and make it depart. Rain and Color Cycle can coexist, as can a player or
 automatic duck. Resize/restart clears the visit. A hard 22-second envelope and
-one-resident admission limit prevent lingering or accumulating birds.
+one admitted visit at a time prevent lingering or accumulating birds.
+
+A visit holds up to four crows (#370), though every admission brings one
+until flocks come. Its crows come with it and share its identity, its perches
+and its 22 seconds. Each has its member number, 0 to 3, which it keeps when
+others leave, and its own body, flight, target, random stream, temperament
+and wetness. The first crow draws from the visit's seed as a crow alone
+always has, and each other crow from a seed of its own derived from it, so a
+visit of one is the crow that has always come. No crow chooses a perch or a
+spot on the ground that another crow of its visit stands on or is going to.
+A crow that is done leaves on its own, taking its body, and nothing replaces
+it. The others go on, and every crow still there starts for home by the
+17-second deadline. The visit ends when its last crow has gone: only then
+does it let go of the arena and start the Crow cooldown, and until then it
+blocks what a crow blocks and refuses another crow. Tests bring visits of
+several crows with `ClockState::preview_crows`.
 
 Flight uses a small Clock-local motion controller: gravity, drag, bounded lateral
 steering and lift during visible wing downstrokes, with gliding gaps between
@@ -2748,19 +2763,21 @@ falling water without consuming it or adding collisions. Rain's presence alone
 does not make the bird flee. See the [ground and water study](design/crow-ground-water.md)
 for the behavior rules, paired simulation checks, and native preview.
 
-While it visits, the crow is a body in the run's arena (#633): a disc as wide
-as a lit cell whose bottom is its feet, held upright, that holds the arena's
-`crow` claim. Its controller brings the pull it flies against, so neither the
-world's gravity nor a visit's acts on it. It brings a fixed perch on top of
-each of the at most 24 exposed digit columns, placed where the face draws
-that column's top lit cell before each step and solid for whatever meets it,
-as that cell would be, though it holds the crow only from above: a crow
-beside or under it, knocked off its spot or under a cell the face has just
-lit, flies up through it as through the column's other cells. The floor
+While it visits, each crow is a body in the run's arena (#633): a disc as
+wide as a lit cell whose bottom is its feet, held upright. Its visit holds the
+arena's `crow` claim. Its controller brings the pull it flies against, so
+neither the world's gravity nor a visit's acts on it. The visit brings a
+fixed perch on top of each of the at most 24 exposed digit columns, placed
+where the face draws that column's top lit cell before each step and solid
+for whatever meets it, as that cell would be, though it holds a crow only
+from above: a crow beside or under it, knocked off its spot or under a cell
+the face has just lit, flies up through it as through the column's other
+cells, while the perch still holds a crow standing on it. The floor
 under it is the one the arena keeps, or a visit's course. It lands when its
 feet are down on its spot and something
-holds it up. It meets the duck, the fixture's balls and the panels as bodies,
-and a push that knocks it off its spot counts as an escape. It passes
+holds it up. It meets the duck, the fixture's balls, the panels and the other crows of
+its visit as bodies, and a push that knocks it off its spot counts as an
+escape. It passes
 over the walls at the view's edges, which hold everything else in view, and
 it displaces no water. Its room in the arena is kept for it, so it comes
 beside a full arena and no other claim is refused because it is about. The
@@ -2771,11 +2788,17 @@ to five seconds for departure; a failed eight-second approach also prompts
 departure. Moving-obstacle avoidance and player control remain future work. See the [flight study](design/crow-flight.md) for the motion
 model, comparison gallery and reproduction steps.
 
-`clock state` exposes `crow` separately from the timed `event_kind`: visit ID,
+`clock state` exposes the visit's crows separately from the timed
+`event_kind`. `crows` lists each crow that has not left, in order of its
+`member`, with the visit ID,
 phase (`entering`, `perched`, `pecking`, `hopping`, `flying`, `leaving`), phase/age ticks,
 position, facing, target `[digit slot, column, row]`, hop and support-loss counts.
 It also reports the resolved `water_tolerance`, ground target/visits, pecks,
 wet departures and `wetness_milli` (the fraction of that bird's spray tolerance used).
+`crow` is the first of them, for readers that know of one crow, and is absent
+only when no crow remains. Payloads older than schema 31 have no `crows` and
+no `member`, and their `crow` is the visit's one crow. Text `clock state`
+prints a line for each crow.
 The catalog's `blocked_by_crow` identifies a duplicate admission. From idle:
 
 ```sh
@@ -2785,7 +2808,9 @@ spacewars-cli screenshot /tmp/clock-crow.png
 ```
 
 With `--event crow`, an optional `--event-id` matches its stable **visit ID**,
-even if a later timed animation increments the global admission counter.
+even if a later timed animation increments the global admission counter. A
+wait for a phase and a minimum phase tick matches when one crow of the visit
+meets all of it, never one crow's phase with another's tick.
 As with other events, the guarded CLI trigger requires idle/unpaused gameplay;
 menu Preview or Next Event can add a crow during an existing animation.
 
@@ -4813,9 +4838,9 @@ Its module comment states the rules, and `arena_contract.rs` holds them:
   while no visit holds it, for its bars and two walls of its own at the
   sides of the view. The spider claims it for its stay, with its body, its
   line, the frame it climbs and a proxy for each digit cell
-  ([below](#the-spider-on-the-digits)). The crow claims it for its visit, with
-  its body and a perch on top of each exposed digit column
-  ([above](#crow-visitor)). A spaceling a Tanks fight left stranded claims
+  ([below](#the-spider-on-the-digits)). A crow visit claims it, with each
+  crow's body and a perch on top of each exposed digit column, which its
+  crows share ([above](#crow-visitor)). A spaceling a Tanks fight left stranded claims
   it for its stay, with its body and one perch
   ([above](#stranded-spaceling)). Residents keep it for the rest of the
   run: retained soil, and the development arena fixtures. The first claim
@@ -4825,9 +4850,11 @@ Its module comment states the rules, and `arena_contract.rs` holds them:
   scale while it holds the arena, and the residents' own return once it has
   gone.
 - **Claims are bounded.** Each owner declares a budget of bodies, colliders
-  and joints. The arena holds at most **283 bodies / 315 colliders** and one
-  joint, the spider's line: a visit, the largest event, the crow, a stranded
-  spaceling, soil and one fixture together, so everything Clock ships fits.
+  and joints. The arena holds at most **286 bodies / 318 colliders** and one
+  joint, the spider's line: a visit, the largest event, a crow visit, a
+  stranded spaceling, soil and one fixture together, so everything Clock
+  ships fits. A crow visit's room is four crows' bodies and their 24 perches
+  (#370).
   The spider takes no more room than the largest event, so beside a visit and
   the residents it fits where an event would, and it never shares the arena
   with an event that has bodies. The crow's room, and the floor kept under
@@ -4840,9 +4867,10 @@ Its module comment states the rules, and `arena_contract.rs` holds them:
   changes, as `residents` or `capacity`. So is a visit, an event, the spider
   or the crow that uses the floor while the residents do not fit the view, as
   `layout-incompatible`. The walls at the view's edges and the spider's frame
-  hold everything in view but the birds, which are in a collision group of
-  their own (`arena::BIRD`) that the frame (`arena::FRAME`) filters out, so
-  they come and go over it. Debug builds audit every step: each body belongs to
+  hold everything in view but the birds, so they come and go over it.
+  Each crow of a visit is in a collision group of its own (`arena::crow`),
+  the magpie in the first crow's (`arena::BIRD`), and the frame
+  (`arena::FRAME`) filters them all out. Debug builds audit every step: each body belongs to
   exactly one owner holding the arena, or to the floor kept under whoever
   rests on it, and no owner exceeds its budget, joints included.
 - **Residents rest on real support.** Soil is fixed in place. A fixture's
@@ -5372,7 +5400,7 @@ arena's counts, claims, run totals and last step, and `clock events` shows each
 event's refusal.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 30, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 31, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -5389,7 +5417,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 30, `event`
+tick. A raw `clock trigger` request must include schema version 31, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, `cell-swap`, `grass`, `slot-machine`, `spider`, `coins`, or `tanks`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 

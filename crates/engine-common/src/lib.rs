@@ -1681,10 +1681,20 @@ pub struct ClockLampImpact {
     pub strength_milli: i32,
 }
 
-/// Bounded Crow visitor diagnostics, independent of the timed animation.
+/// The most crows one Clock crow visit holds.
+pub const CLOCK_MAX_CROWS: usize = 4;
+
+/// Bounded diagnostics of one crow of a Crow visit, independent of the timed
+/// animation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockCrowState {
+    /// The visit's identity, which all its crows share.
     pub visit_id: u64,
+    /// The crow's identity in its visit, below [`CLOCK_MAX_CROWS`], which it
+    /// keeps when others leave. Older payloads described a visit's only crow,
+    /// the first.
+    #[serde(default)]
+    pub member: u8,
     /// Resolved temperament, fixed for this visit. Older crows were all rain-shy.
     #[serde(default = "shy_crow_water_tolerance")]
     pub water_tolerance: ClockCrowWaterTolerance,

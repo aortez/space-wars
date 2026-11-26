@@ -1,4 +1,5 @@
 use super::*;
+use crate::crow::MAX_CROWS;
 use crate::{
     ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState,
     arena::Owner,
@@ -991,8 +992,17 @@ fn with_no_block_to_shelter_under_it_waits_out_the_rain_on_top_of_a_block() {
     }
 }
 
+/// The birds the spaceling sees when a visit's only crow is `at`, going to
+/// `going`.
+fn one_crow(at: Option<Vec2>, going: Option<Vec2>) -> [Option<Vec2>; 2 * MAX_CROWS] {
+    let mut birds = [None; 2 * MAX_CROWS];
+    birds[0] = at;
+    birds[1] = going;
+    birds
+}
+
 /// What is around the spaceling in `state`, with `birds` there.
-fn around(state: &ClockState, birds: [Option<Vec2>; 2]) -> Surroundings<'_> {
+fn around(state: &ClockState, birds: [Option<Vec2>; 2 * MAX_CROWS]) -> Surroundings<'_> {
     Surroundings {
         surfaces: &state.published,
         birds,
@@ -1011,9 +1021,9 @@ fn it_keeps_clear_of_a_crow_and_of_where_a_crow_is_going() {
         let own = spaceling(&state).place.feet();
         let far = Vec2::new(layout.bounds_max.x, layout.canopy_y);
         let birds = if coming {
-            [Some(far), Some(own)]
+            one_crow(Some(far), Some(own))
         } else {
-            [Some(own), None]
+            one_crow(Some(own), None)
         };
         spaceling_mut(&mut state).wary = 0;
         let published = state.published.clone();
@@ -1048,7 +1058,7 @@ fn it_keeps_clear_of_a_crow_and_of_where_a_crow_is_going() {
     let published = state.published.clone();
     let view = Surroundings {
         surfaces: &published,
-        birds: [Some(beside), None],
+        birds: one_crow(Some(beside), None),
         ..state.stranded_view()
     };
     let world = state.arena.held_mut(Owner::Stranded).unwrap();
@@ -1063,7 +1073,7 @@ fn it_keeps_clear_of_a_crow_and_of_where_a_crow_is_going() {
     );
     // With nowhere clear of it, it stays where it is.
     let own = spaceling(&state).place;
-    let everywhere = [Some(own.feet()), None];
+    let everywhere = one_crow(Some(own.feet()), None);
     let crowd: Vec<Block> = blocks_of(&state);
     assert!(crowd.len() > 1);
     let published: Vec<_> = state
@@ -1083,7 +1093,7 @@ fn it_keeps_clear_of_a_crow_and_of_where_a_crow_is_going() {
     let visitor = state.stranded.spaceling.as_mut().unwrap();
     visitor.synchronize(world, view);
     assert_eq!((visitor.phase, visitor.place), (Phase::Standing, own));
-    let _ = around(&state, [None; 2]);
+    let _ = around(&state, one_crow(None, None));
 }
 
 #[test]
@@ -1095,7 +1105,7 @@ fn a_real_crow_visit_never_finds_it_within_reach() {
         assert!(state.crow_state().is_some());
         let layout = Layout::new(state.aspect_ratio());
         let mut nearest = f32::INFINITY;
-        while let Some(crow) = &state.crow_visit {
+        while let Some(crow) = state.crow() {
             let visitor = spaceling(&state);
             if visitor.phase != Phase::Flying {
                 nearest = nearest.min(crow.position.distance_to(visitor.feet));

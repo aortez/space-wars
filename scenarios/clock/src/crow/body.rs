@@ -1,4 +1,4 @@
-//! A bird's body in a physics world, and the crow's perches.
+//! A bird's body in a physics world, and the perches of a visit of crows.
 //!
 //! A bird is a dynamic disc about as wide as its body, whose bottom is at its
 //! feet, so the body's origin is where the bird stands. It keeps upright,
@@ -9,16 +9,19 @@
 //! body back, contacts and all, and decides from there.
 //!
 //! A bird flies in and out of the view over its frame, so the frame's walls
-//! do not stop it: it is in the arena's `BIRD` group, which they filter out.
+//! do not stop it: it is in one of the arena's bird groups, each crow of a
+//! visit in its own and the magpie in the first crow's, which they filter
+//! out.
 //!
 //! The digit cells are bodies only during the events that make them so, so
-//! the crow brings a perch for each column it may land on: a fixed square
-//! where the column's top lit cell is drawn. The perches follow the face
-//! before each step. Like any body in the arena they are solid for whatever
-//! meets them, as the cells they stand for would be, but they hold the crow
-//! only from above: a crow beside or under one, knocked off its spot or under
-//! a cell the face has just lit, flies up through it as through the column's
-//! other cells. The floor is the one the arena keeps under whoever rests on
+//! a visit of crows brings a perch for each column they may land on: a fixed
+//! square where the column's top lit cell is drawn. The crows share them, and
+//! the perches follow the face before each step. Like any body in the arena
+//! they are solid for whatever meets them, as the cells they stand for would
+//! be, but each holds a crow only from above: a crow beside or under one,
+//! knocked off its spot or under a cell the face has just lit, flies up
+//! through it as through the column's other cells, while a crow standing on
+//! it is held. The floor is the one the arena keeps under whoever rests on
 //! it, or a visit's terrain.
 use engine_core::Vec2;
 use engine_rapier::world::{
@@ -26,7 +29,7 @@ use engine_rapier::world::{
     PhysicsId, PhysicsWorld,
 };
 
-use super::{PERCH_COLUMNS, Perch};
+use super::{MAX_CROWS, PERCH_COLUMNS, Perch};
 use crate::{arena::ids::canonical, layout::Layout};
 
 #[cfg(test)]
@@ -51,29 +54,36 @@ const HELD: f32 = 0.25;
 /// step's travel at the fastest it comes down, so its feet stop on what
 /// they reach instead of sinking into it for a step.
 const PREDICTION_PITCH: f32 = 0.25;
-/// How far below a perch's top the crow's feet may be, sunk into it or
+/// How far below a perch's top a crow's feet may be, sunk into it or
 /// slipping off its edge, for the perch still to hold them, in pitches.
 /// Lower than that, the crow is beside or under the cell.
 const HELD_BELOW_TOP: f32 = 0.1;
-/// A perch the crow is beside or under: it holds whatever else meets it, as
-/// the frame does, and the crow passes through it.
-const UNDER: CollisionGroups = crate::arena::FRAME;
 
-/// A bird's body, by its identity in the world it flies in.
+/// A bird's body, by its identity in the world it flies in, and what it
+/// meets there.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Bird {
     id: BodyId,
+    groups: CollisionGroups,
 }
 
-/// The crow's body in the arena.
-pub(crate) const CROW: Bird = Bird::new(canonical::CROW.start);
+/// The body of crow `member` of a visit, in the arena.
+pub(crate) const fn crow(member: usize) -> Bird {
+    assert!(member < MAX_CROWS, "a visit's crow");
+    Bird::new(
+        canonical::CROW.start + member as u64,
+        crate::arena::crow(member),
+    )
+}
+
 /// The magpie's body, in whichever world the coins lie in.
-pub(crate) const MAGPIE: Bird = Bird::new(canonical::MAGPIE.start);
+pub(crate) const MAGPIE: Bird = Bird::new(canonical::MAGPIE.start, crate::arena::BIRD);
 
 impl Bird {
-    const fn new(entity: u64) -> Self {
+    const fn new(entity: u64, groups: CollisionGroups) -> Self {
         Self {
             id: BodyId::new(PhysicsId::new(entity), BodyRole::PRIMARY),
+            groups,
         }
     }
 
@@ -95,7 +105,7 @@ impl Bird {
         disc.density = DENSITY;
         disc.friction = FRICTION;
         disc.restitution = 0.0;
-        disc.collision_groups = crate::arena::BIRD;
+        disc.collision_groups = self.groups;
         assert!(
             world.insert_body(
                 self.id,
@@ -145,20 +155,21 @@ impl Bird {
     }
 }
 
-/// The crow's perches in the arena, by column.
+/// A visit's perches in the arena, by column, which its crows share.
 #[derive(Clone, Debug)]
 pub(crate) struct Perches {
     placed: [Option<Perch>; PERCH_COLUMNS],
-    /// Whether each placed perch holds the crow, as it does while the crow's
-    /// feet are at its top or above it.
-    holding: [bool; PERCH_COLUMNS],
+    /// What each placed perch meets: everything while it holds every crow of
+    /// the visit, as a new perch does, and otherwise everything but the crows
+    /// it does not hold.
+    groups: [CollisionGroups; PERCH_COLUMNS],
 }
 
 impl Default for Perches {
     fn default() -> Self {
         Self {
             placed: [None; PERCH_COLUMNS],
-            holding: [true; PERCH_COLUMNS],
+            groups: [CollisionGroups::ALL; PERCH_COLUMNS],
         }
     }
 }
@@ -170,19 +181,21 @@ fn perch_entity(column: usize) -> PhysicsId {
 
 impl Perches {
     /// Gives each column the perch the face has for it now, and takes away
-    /// the perches it no longer has. Each holds the crow, whose feet are at
-    /// `feet`, only if they are at its top or above it.
+    /// the perches it no longer has. Each holds a crow of the visit, whose
+    /// feet are in `crows` by member, only if they are at its top or above
+    /// it.
     pub fn place(
         &mut self,
         world: &mut PhysicsWorld,
         wanted: &[Option<Perch>; PERCH_COLUMNS],
-        feet: Vec2,
+        crows: &[Option<Vec2>; MAX_CROWS],
         layout: Layout,
     ) {
-        for (column, ((placed, holding), wanted)) in self
+        let present = crows_where(crows, |_| true);
+        for (column, ((placed, groups), wanted)) in self
             .placed
             .iter_mut()
-            .zip(&mut self.holding)
+            .zip(&mut self.groups)
             .zip(wanted)
             .enumerate()
         {
@@ -214,18 +227,24 @@ impl Perches {
                         &[cell],
                     ));
                     *placed = Some(*perch);
-                    *holding = true;
+                    *groups = CollisionGroups::ALL;
                 }
             }
             if let Some(perch) = placed {
-                let holds = feet.y >= perch.feet.y - layout.pitch * HELD_BELOW_TOP;
-                if holds != *holding {
-                    let groups = if holds { CollisionGroups::ALL } else { UNDER };
+                let held = crows_where(crows, |feet| {
+                    feet.y >= perch.feet.y - layout.pitch * HELD_BELOW_TOP
+                });
+                let meets = if held == present {
+                    CollisionGroups::ALL
+                } else {
+                    crate::arena::holding(held)
+                };
+                if meets != *groups {
                     assert!(
-                        world.set_collision_groups(collider, groups),
+                        world.set_collision_groups(collider, meets),
                         "a placed perch"
                     );
-                    *holding = holds;
+                    *groups = meets;
                 }
             }
         }
@@ -235,4 +254,16 @@ impl Perches {
     pub fn count(&self) -> usize {
         self.placed.iter().flatten().count()
     }
+}
+
+/// The union of the collision groups of the visit's crows whose feet, in
+/// `crows` by member, pass `test`.
+fn crows_where(crows: &[Option<Vec2>; MAX_CROWS], test: impl Fn(Vec2) -> bool) -> u32 {
+    crows
+        .iter()
+        .enumerate()
+        .filter(|(_, feet)| feet.is_some_and(&test))
+        .fold(0, |groups, (member, _)| {
+            groups | crate::arena::crow(member).memberships
+        })
 }

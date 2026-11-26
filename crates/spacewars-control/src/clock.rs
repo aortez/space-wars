@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 30;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 31;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -72,8 +72,15 @@ pub struct ClockState {
     pub digit_surfaces: Option<engine_common::ClockDigitSurfaceState>,
     pub meltdown: Option<engine_common::ClockMeltdownState>,
     pub duck: Option<engine_common::ClockDuckState>,
+    /// The first crow of a crow visit, of those that have not left, for
+    /// readers that know of one crow.
     #[serde(default)]
     pub crow: Option<engine_common::ClockCrowState>,
+    /// Each crow of a crow visit that has not left, by member: up to
+    /// [`engine_common::CLOCK_MAX_CROWS`], all of one visit. Older payloads
+    /// have only `crow`.
+    #[serde(default)]
+    pub crows: Vec<engine_common::ClockCrowState>,
     /// The spaceling a Tanks fight's hills left behind, the flag one planted
     /// and what became of those the run has had, once it has had one.
     #[serde(default)]
@@ -137,6 +144,13 @@ impl ClockState {
     pub fn to_json(&self) -> Result<String, ProtocolError> {
         validate_version(self.schema_version)?;
         Ok(serde_json::to_string(self)?)
+    }
+
+    /// Each crow of a crow visit that has not left, by member: `crows`, or in
+    /// an older payload without them, its one `crow`.
+    pub fn visiting_crows(&self) -> impl Iterator<Item = &engine_common::ClockCrowState> {
+        let older = self.crow.as_ref().filter(|_| self.crows.is_empty());
+        self.crows.iter().chain(older)
     }
 }
 
@@ -247,46 +261,58 @@ impl ClockStatePredicate {
             if kind == ClockEventKind::Duck {
                 duck.is_some()
             } else if kind == ClockEventKind::Crow {
-                state.crow.is_some()
+                state.visiting_crows().next().is_some()
             } else if kind == ClockEventKind::Spider {
                 state.spider.is_some()
             } else {
                 Some(kind) == state.event_kind
             }
         });
-        // A visitor's own phase, tick and identity, as the crow's and the
+        // A visitor's own phase, tick and identity, as each crow's and the
         // spider's are, so a later animation never invalidates a wait for it.
-        let visitor = match self.event_kind {
+        // A wait for the crows matches when one crow matches all of it.
+        let visitors: Vec<_> = match self.event_kind {
             Some(ClockEventKind::Crow) => state
-                .crow
-                .as_ref()
-                .map(|crow| (crow.phase.as_str(), crow.phase_tick, crow.visit_id)),
+                .visiting_crows()
+                .map(|crow| (Some(crow.phase.as_str()), crow.phase_tick, crow.visit_id))
+                .collect(),
             Some(ClockEventKind::Spider) => state
                 .spider
-                .as_ref()
-                .map(|spider| (spider.phase.as_str(), spider.phase_tick, spider.visit_id)),
-            _ => None,
+                .iter()
+                .map(|spider| {
+                    (
+                        Some(spider.phase.as_str()),
+                        spider.phase_tick,
+                        spider.visit_id,
+                    )
+                })
+                .collect(),
+            _ => Vec::new(),
         };
-        let phase = visitor.map(|(phase, _, _)| phase).or(duck
-            .map(|duck| duck.phase.as_str())
-            .or(state.phase.as_deref()));
-        let phase_tick = visitor.map_or_else(
-            || duck.map_or(state.phase_tick, |duck| duck.phase_tick),
-            |(_, tick, _)| tick,
+        let event = (
+            duck.map(|duck| duck.phase.as_str())
+                .or(state.phase.as_deref()),
+            duck.map_or(state.phase_tick, |duck| duck.phase_tick),
+            state.event_id,
         );
-        let event_id = visitor.map_or(state.event_id, |(_, _, id)| id);
+        let candidates = if visitors.is_empty() {
+            std::slice::from_ref(&event)
+        } else {
+            &visitors[..]
+        };
         state.scenario_revision == self.scenario_revision
             && self
                 .lifecycle
                 .as_ref()
                 .is_none_or(|lifecycle| *lifecycle == state.lifecycle)
             && kind_matches
-            && self
-                .phase
-                .as_ref()
-                .is_none_or(|expected| Some(expected.as_str()) == phase)
-            && self.event_id.is_none_or(|id| id == event_id)
-            && phase_tick >= self.min_phase_tick
+            && candidates.iter().any(|&(phase, phase_tick, event_id)| {
+                self.phase
+                    .as_ref()
+                    .is_none_or(|expected| Some(expected.as_str()) == phase)
+                    && self.event_id.is_none_or(|id| id == event_id)
+                    && phase_tick >= self.min_phase_tick
+            })
     }
 }
 
@@ -481,6 +507,7 @@ mod tests {
             meltdown: None,
             duck: None,
             crow: None,
+            crows: Vec::new(),
             stranded: None,
             spider: None,
             explosion: None,
@@ -1204,6 +1231,7 @@ mod tests {
         state.event_id += 1;
         state.crow = Some(engine_common::ClockCrowState {
             visit_id: state.event_id,
+            member: 0,
             phase: engine_common::ClockCrowPhase::Entering,
             water_tolerance: engine_common::ClockCrowWaterTolerance::Shy,
             phase_tick: 0,
@@ -1283,6 +1311,83 @@ mod tests {
                 .crow
                 .is_none()
         );
+    }
+
+    #[test]
+    fn crow_waits_match_one_crow_of_the_visit_and_older_payloads_hold_one() {
+        use engine_common::ClockCrowPhase::{Hopping, Perched};
+        let mut state = clock_state();
+        let started = ClockTriggerRequest::new(&state, ClockEventKind::Crow).started_predicate();
+        state.event_id += 1;
+        let crow = |member, phase, phase_tick| engine_common::ClockCrowState {
+            visit_id: state.event_id,
+            member,
+            water_tolerance: engine_common::ClockCrowWaterTolerance::Shy,
+            phase,
+            phase_tick,
+            age_ticks: 300,
+            position_milli: [10_000 * i32::from(member), 120_000],
+            facing_right: true,
+            target: None,
+            ground_target_milli: None,
+            ground_visits: 0,
+            pecks: 0,
+            wetness_milli: 0,
+            wet_departures: 0,
+            hops: 0,
+            escapes: 0,
+        };
+        // Crow 1 has left: the others keep their members.
+        state.crows = vec![
+            crow(0, Perched, 5),
+            crow(2, Hopping, 40),
+            crow(3, Perched, 30),
+        ];
+        state.crow = Some(state.crows[0]);
+        assert!(started.matches(&state));
+        let perched = ClockStatePredicate {
+            phase: Some("perched".into()),
+            min_phase_tick: 20,
+            ..started.clone()
+        };
+        assert!(perched.matches(&state), "crow 3 is perched long enough");
+        // No crow has been perched for 40 ticks, though one has been hopping
+        // that long.
+        let longer = ClockStatePredicate {
+            min_phase_tick: 40,
+            ..perched.clone()
+        };
+        assert!(!longer.matches(&state));
+        assert!(
+            !ClockStatePredicate {
+                event_id: Some(state.event_id + 1),
+                ..perched.clone()
+            }
+            .matches(&state)
+        );
+        state.crows.pop();
+        assert!(!perched.matches(&state), "crow 3 has left");
+        assert_eq!(
+            ClockState::from_json(&state.to_json().unwrap()).unwrap(),
+            state
+        );
+        // An older payload has neither the crows nor their members: its one
+        // crow is the visit's first.
+        let mut older = serde_json::to_value(&state).unwrap();
+        older.as_object_mut().unwrap().remove("crows");
+        older["crow"].as_object_mut().unwrap().remove("member");
+        let older = ClockState::from_json(&older.to_string()).unwrap();
+        assert!(older.crows.is_empty());
+        assert_eq!(
+            older.visiting_crows().copied().collect::<Vec<_>>(),
+            [state.crows[0]]
+        );
+        assert!(started.matches(&older));
+        assert!(!perched.matches(&older));
+        state.crows.clear();
+        state.crow = None;
+        assert!(!started.matches(&state));
+        assert_eq!(state.visiting_crows().count(), 0);
     }
 
     #[test]
