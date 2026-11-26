@@ -280,3 +280,19 @@ fn growth_first_samples_next_tick_and_invalid_controls_are_atomic() {
     );
     assert_eq!(p, before);
 }
+
+#[test]
+fn soil_reads_the_supply_a_root_would_take_at_a_dirt_cell() {
+    let (w, t, g, a) = fixture();
+    let mut e = env(&w, &t, &g, &a);
+    assert_eq!(e.soil([2, 2]), Some([1000, 1000]));
+    // Another material, air and cells off the terrain supply nothing.
+    for cell in [[4, 2], [6, 2], [2, 9]] {
+        assert_eq!(e.soil(cell), None);
+    }
+    e.availability = [500, 250];
+    e.tick_ms = 500;
+    assert_eq!(e.soil([2, 2]), Some([250, 125]));
+    e.tick_ms = 0;
+    assert_eq!(e.soil([2, 2]), None);
+}

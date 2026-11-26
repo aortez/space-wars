@@ -12,6 +12,8 @@ use engine_terrain::CellCoord;
 use std::collections::BTreeMap;
 
 pub const MAX_TISSUES: usize = 256;
+/// Empty cells measured per publication, one query batch.
+pub const MAX_PROBES: usize = lighting::MAX_RECEIVERS;
 pub const DIM_ROOM: f32 = 50.0;
 
 /// Direction is already in the simulation's world frame, independent of gravity.
@@ -45,6 +47,7 @@ pub struct WorldOccluders<'a> {
 pub struct PlantLight<'a, 'w> {
     roots: &'a RootUptake<'w>,
     samples: BTreeMap<u64, (Tissue, lighting::Exposure)>,
+    probes: BTreeMap<[i32; 2], lighting::Exposure>,
     tick: u64,
     geometry_generation: u64,
     pub work: crate::world::VisibilityCounters,
@@ -91,6 +94,35 @@ impl<'a, 'w> PlantLight<'a, 'w> {
         namespace: u64,
         occluders: WorldOccluders<'_>,
     ) -> Result<Self, LightingError> {
+        Self::publish_with_probes(
+            publisher,
+            tick,
+            geometry_generation,
+            source,
+            roots,
+            tissues,
+            namespace,
+            occluders,
+            &[],
+        )
+    }
+
+    /// Also measure light at up to MAX_PROBES distinct cells of the terrain,
+    /// each sampled where a size-one blade there would sample; a cell inside
+    /// solid geometry reads dark. Probes shade nothing; a tree reads them to
+    /// choose where to grow.
+    #[allow(clippy::too_many_arguments)]
+    pub fn publish_with_probes(
+        publisher: &mut LightingPublisher,
+        tick: u64,
+        geometry_generation: u64,
+        source: DirectionalSource,
+        roots: &'a RootUptake<'w>,
+        tissues: &[Tissue],
+        namespace: u64,
+        occluders: WorldOccluders<'_>,
+        probes: &[[i32; 2]],
+    ) -> Result<Self, LightingError> {
         if occluders.tick != tick {
             return Err(LightingError::Stale);
         }
@@ -102,8 +134,22 @@ impl<'a, 'w> PlantLight<'a, 'w> {
         }) {
             return Err(LightingError::Stale);
         }
-        if tissues.len() > MAX_TISSUES || occluders.footprints.len() > MAX_TISSUES - tissues.len() {
+        if tissues.len() > MAX_TISSUES
+            || occluders.footprints.len() > MAX_TISSUES - tissues.len()
+            || probes.len() > MAX_PROBES
+        {
             return Err(LightingError::Capacity);
+        }
+        let distinct: std::collections::BTreeSet<_> = probes.iter().collect();
+        if distinct.len() != probes.len()
+            || probes.iter().any(|cell| {
+                roots
+                    .terrain
+                    .cell(CellCoord::new(cell[0], cell[1]))
+                    .is_none()
+            })
+        {
+            return Err(LightingError::InvalidInput);
         }
         if !roots.valid_controls()
             || !roots.support_valid(Some(roots.assembly.plant_support()), [0, 0])
@@ -147,8 +193,22 @@ impl<'a, 'w> PlantLight<'a, 'w> {
             shoots.push(tissue);
         }
         footprints.extend_from_slice(occluders.footprints);
+        let blade = roots.terrain.cell_size() * 0.25;
+        let probe_receivers: Vec<Receiver> = probes
+            .iter()
+            .map(|&cell| Receiver {
+                position: center(roots, &motion, cell) + source.toward_source * blade,
+                surface: None,
+            })
+            .collect();
         let geometry = roots.world.query_snapshot();
         let visibility = geometry.lighting_visibility(&footprints, &[])?;
+        let measured = if probes.is_empty() {
+            Vec::new()
+        } else {
+            snapshot.query(tick, geometry_generation, &probe_receivers, &visibility)?
+        };
+        let probes = probes.iter().copied().zip(measured).collect();
         let mut samples = BTreeMap::new();
         for (batch, tissue_batch) in receivers
             .chunks(lighting::MAX_RECEIVERS)
@@ -168,6 +228,7 @@ impl<'a, 'w> PlantLight<'a, 'w> {
         Ok(Self {
             roots,
             samples,
+            probes,
             tick,
             geometry_generation,
             work: visibility.counters(),
@@ -200,6 +261,14 @@ impl<'a, 'w> PlantLight<'a, 'w> {
         Ok(exposure)
     }
 
+    /// Light this tick at a cell probed in this publication.
+    pub fn probe(&self, cell: [i32; 2], tick: u64) -> Result<&lighting::Exposure, LightingError> {
+        if tick != self.tick {
+            return Err(LightingError::Stale);
+        }
+        self.probes.get(&cell).ok_or(LightingError::InvalidInput)
+    }
+
     /// Enforce zero exposure age at the physiology boundary.
     pub fn environment(&self, tick: u64) -> Result<impl Environment + '_, LightingError> {
         if tick != self.tick {
@@ -208,6 +277,15 @@ impl<'a, 'w> PlantLight<'a, 'w> {
         Ok(LitEnvironment(self))
     }
 }
+/// World center of a support-local cell.
+fn center(roots: &RootUptake<'_>, motion: &BodyMotion, cell: [i32; 2]) -> engine_core::Vec2 {
+    motion.position
+        + roots
+            .terrain
+            .cell_center(CellCoord::new(cell[0], cell[1]))
+            .rotate_radians(motion.angle)
+}
+
 /// World center of a tissue's cell and its declared opaque disk, if any.
 fn disk(
     roots: &RootUptake<'_>,
@@ -215,11 +293,7 @@ fn disk(
     tissue: &Tissue,
     namespace: u64,
 ) -> (engine_core::Vec2, Option<OpaqueFootprint>) {
-    let center = motion.position
-        + roots
-            .terrain
-            .cell_center(CellCoord::new(tissue.cell[0], tissue.cell[1]))
-            .rotate_radians(motion.angle);
+    let center = center(roots, motion, tissue.cell);
     // A declared opaque disk, not a collider or a physiological size rule.
     // Roots are underground and thin moss is flat against its surface. Wood
     // shades as a blade does but samples no light of its own.
