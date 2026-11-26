@@ -17,6 +17,8 @@ pub mod chess;
 mod coins_tests;
 mod crow;
 #[cfg(test)]
+mod crow_flock_tests;
+#[cfg(test)]
 mod crow_group_tests;
 #[cfg(test)]
 mod crow_tests;
@@ -589,9 +591,9 @@ pub struct ClockState {
     spider_visit: Option<spider::visit::SpiderVisit>,
     spider_accounting: spider::SpiderAccounting,
     crow_visit: Option<crow::CrowVisit>,
-    // How many crows the next crow visit brings: one, as every admission
-    // brings, unless `preview_crows` asks for more.
-    crow_visit_size: usize,
+    // How many crows the next crow visit brings, when `preview_crows` asks
+    // for a number. Otherwise the admission draws it from the visit's seed.
+    crow_visit_size: Option<usize>,
     // The match the crow and the duck play over their visits, kept for the
     // run.
     chess: chess::Exhibition,
@@ -1551,10 +1553,10 @@ impl ClockState {
             .map_or_else(Vec::new, crow::CrowVisit::diagnostics)
     }
 
-    /// Previews a visit of `size` crows, as previewing the Crow event does
-    /// for a visit of one, and refused as that preview would be. True when the
-    /// visit came. This is the fixture for visits of several crows, which no
-    /// admission brings yet.
+    /// Previews a visit of `size` crows, as previewing the Crow event does,
+    /// and refused as that preview would be, but with as many crows as asked
+    /// for instead of as many as the visit's seed draws. True when the visit
+    /// came. This is the fixture for a visit of a known size.
     pub fn preview_crows(&mut self, size: usize) -> bool {
         assert!(
             (1..=crow::MAX_CROWS).contains(&size),
@@ -1564,9 +1566,9 @@ impl ClockState {
         if self.crow_visit.is_some() {
             return false;
         }
-        self.crow_visit_size = size;
+        self.crow_visit_size = Some(size);
         self.preview_event(ClockEventKind::Crow);
-        self.crow_visit_size = 1;
+        self.crow_visit_size = None;
         self.crow_visit.is_some()
     }
 
@@ -2025,7 +2027,8 @@ impl ClockState {
                         layout,
                         seed,
                         self.schedule.event_id,
-                        self.crow_visit_size,
+                        self.crow_visit_size
+                            .unwrap_or_else(|| crow::visit_size(seed)),
                         self.config.crow_water_tolerance,
                         &self.segments,
                         self.event_kind(),
@@ -2793,7 +2796,7 @@ impl Scenario for ClockScenario {
             spider_visit: None,
             spider_accounting: spider::SpiderAccounting::default(),
             crow_visit: None,
-            crow_visit_size: 1,
+            crow_visit_size: None,
             chess: chess::Exhibition::new(seed ^ 0x4348_4553_5300_0000),
             chess_play: None,
             stranded: stranded::Scene::default(),

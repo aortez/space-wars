@@ -29,12 +29,15 @@ fn fixture_with_tolerance(
     );
     ClockScenario::step(
         &mut state,
-        &[
-            ClockAction::set_reading(ClockReading::new(12, 34, 0).unwrap()),
-            ClockAction::preview_event(ClockEventKind::Crow),
-        ],
+        &[ClockAction::set_reading(
+            ClockReading::new(12, 34, 0).unwrap(),
+        )],
         Duration::ZERO,
     );
+    // These are a crow alone's contracts, so the visit brings one crow
+    // whatever its seed draws. A flock's are in `crow_flock_tests`.
+    assert!(state.preview_crows(1));
+    ClockScenario::step(&mut state, &[], Duration::ZERO);
     state
 }
 
@@ -421,11 +424,8 @@ fn crow_admission_and_departure_preserve_rain_material_and_duck_visit() {
     let duck = state.player_duck_state();
     let phase_tick = state.phase_tick();
     let counts = (state.body_count(), state.collider_count());
-    ClockScenario::step(
-        &mut state,
-        &[ClockAction::preview_event(ClockEventKind::Crow)],
-        Duration::ZERO,
-    );
+    assert!(state.preview_crows(1));
+    ClockScenario::step(&mut state, &[], Duration::ZERO);
     assert_eq!(state.event_kind(), Some(ClockEventKind::Rain));
     assert_eq!(state.rain_state(), rain);
     assert_eq!(state.player_duck_state(), duck);

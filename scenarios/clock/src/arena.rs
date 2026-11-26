@@ -489,15 +489,16 @@ const FIRST_CROW: u32 = 1 << 1;
 const BIRDS: u32 = ((1 << crate::crow::MAX_CROWS) - 1) * FIRST_CROW;
 
 /// A bird, the magpie or a visit's first crow: it meets everything there is
-/// but the frame.
+/// but the frame and a visit's later crows.
 pub(crate) const BIRD: CollisionGroups = crow(0);
 
-/// Crow `member` of a visit, which meets everything there is but the frame.
-/// Each crow has a group of its own, so that a perch can hold one crow while
-/// another flies up through it.
+/// Crow `member` of a visit, which meets everything there is but the frame
+/// and the visit's other crows: they keep out of its room on the face, and
+/// pass it in the air. Each crow has a group of its own, so that a perch can
+/// hold one crow while another flies up through it.
 pub(crate) const fn crow(member: usize) -> CollisionGroups {
     assert!(member < crate::crow::MAX_CROWS, "a visit's crow");
-    CollisionGroups::new(FIRST_CROW << member, u32::MAX)
+    CollisionGroups::new(FIRST_CROW << member, !BIRDS | FIRST_CROW)
 }
 
 /// What meets everything but the birds, except the crows whose groups are in

@@ -2703,8 +2703,9 @@ second.
 
 Set **Crow** to **Varied**, **Shy**, or **Hardy** in Clock settings, or press Crow's **Play** in
 **Clock Controls → Events**. Next Event includes it in the normal enabled-event cycle.
-Previewing a crow adds one visitor without cancelling an active animation;
-previewing it again leaves the existing visit and its deadline unchanged.
+Previewing a crow adds a visit, of one crow or now and then a flock, without
+cancelling an active animation; previewing it again leaves the existing visit
+and its deadline unchanged.
 Choosing **Off** prevents future automatic admissions, not the current visit.
 **Varied** is the default: 90% of visitors are rain-shy and 10% are hardy. **Shy**
 forces the familiar water avoidance; **Hardy** forces the occasional tolerant
@@ -2721,20 +2722,46 @@ perches and make it depart. Rain and Color Cycle can coexist, as can a player or
 automatic duck. Resize/restart clears the visit. A hard 22-second envelope and
 one admitted visit at a time prevent lingering or accumulating birds.
 
-A visit holds up to four crows (#370), though every admission brings one
-until flocks come. Its crows come with it and share its identity, its perches
-and its 22 seconds. Each has its member number, 0 to 3, which it keeps when
-others leave, and its own body, flight, target, random stream, temperament
-and wetness. The first crow draws from the visit's seed as a crow alone
-always has, and each other crow from a seed of its own derived from it, so a
-visit of one is the crow that has always come. No crow chooses a perch or a
-spot on the ground that another crow of its visit stands on or is going to.
+A visit holds up to four crows (#370). One admission in four brings a flock
+(#371) of two, three or four crows, each size as likely, whether the schedule,
+Preview or Next Event admits it; the rest bring one crow. The size is drawn
+from the visit's seed by a stream of its own, so it changes nothing else the
+visit or the Clock draws. Its crows come with it and share its identity, its
+perches and its 22 seconds. Each has its member number, 0 to 3, which it
+keeps when others leave, and its own body, flight, target, random stream,
+temperament and wetness. The first crow draws from the visit's seed as a crow
+alone always has, and each other crow from a seed of its own derived from it,
+so a visit of one is the crow that has always come. **Shy** and **Hardy** hold
+for every crow of a flock, and **Varied** draws each crow's own.
+
+A flock comes in together from the side its first crow drew, in a loose line
+led by the crow going furthest. Each crow is 2.4 pitches behind the one before
+it and, where the canopy leaves room, up to 0.9 pitches higher in a lane of
+its own, and none overtakes another on the way in. Coming from further back
+gives a crow no more time: each has its eight-second approach from the
+visit's start. From then on each crow goes its own way. It chooses its own
+perches, hops and ground excursion, reads the water for itself, and leaves
+when it is done, wet or out of time, while the others stay.
+
+No crow chooses a perch or a spot on the ground within 1.6 pitches across of
+where another crow of its visit is going or is, at any height: a crow's
+silhouette is 1.47 pitches wide, and each climbs out of its spot and comes
+down to it through the column above. A crow's body keeps that room until it
+has gone, and a crow that has gone keeps none. The rule holds for a flock's
+first perches, hops, flights and ground trips, and when a new reading, font
+or event moves the perches. A perched crow whose other perches are all in
+another's room stays and looks again, and a crow with nowhere to go leaves as
+a crow alone would. The crows do not meet as bodies: they pass in the air.
+A crow keeps two pitches behind another cruising ahead of it in its lane,
+the same way, and passes one slowing to come down, so crows cross briefly
+but none flies in another's shadow.
+
 A crow that is done leaves on its own, taking its body, and nothing replaces
 it. The others go on, and every crow still there starts for home by the
 17-second deadline. The visit ends when its last crow has gone: only then
 does it let go of the arena and start the Crow cooldown, and until then it
-blocks what a crow blocks and refuses another crow. Tests bring visits of
-several crows with `ClockState::preview_crows`.
+blocks what a crow blocks and refuses another crow. Tests bring visits of a
+known size with `ClockState::preview_crows`.
 
 Flight uses a small Clock-local motion controller: gravity, drag, bounded lateral
 steering and lift during visible wing downstrokes, with gliding gaps between
@@ -2775,9 +2802,9 @@ the face has just lit, flies up through it as through the column's other
 cells, while the perch still holds a crow standing on it. The floor
 under it is the one the arena keeps, or a visit's course. It lands when its
 feet are down on its spot and something
-holds it up. It meets the duck, the fixture's balls, the panels and the other crows of
-its visit as bodies, and a push that knocks it off its spot counts as an
-escape. It passes
+holds it up. It meets the duck, the fixture's balls and the panels as bodies, though
+not the other crows of its visit, and a push that knocks it off its spot
+counts as an escape. It passes
 over the walls at the view's edges, which hold everything else in view, and
 it displaces no water. Its room in the arena is kept for it, so it comes
 beside a full arena and no other claim is refused because it is about. The

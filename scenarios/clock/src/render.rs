@@ -1068,6 +1068,86 @@ mod tests {
         }
     }
 
+    /// The crows of a flock that have come down draw apart: no crow's shapes
+    /// reach into another's, at layouts from tall to wide (#371).
+    #[test]
+    fn the_crows_of_a_flock_that_have_come_down_draw_apart() {
+        let extent = |crow: &crate::crow::Crow, layout: Layout| {
+            let mut frame = RenderFrame::default();
+            crow::render(&mut frame, crow, layout);
+            let points: Vec<_> = frame
+                .layers
+                .iter()
+                .flat_map(|layer| &layer.primitives)
+                .flat_map(|primitive| match primitive {
+                    RenderPrimitive::Polygon(polygon) => polygon.points.clone(),
+                    other => panic!("a crow draws polygons: {other:?}"),
+                })
+                .collect();
+            let fold = |pick: fn(f32, f32) -> f32, start: f32| {
+                points
+                    .iter()
+                    .fold(RenderPoint::new(start, start), |at, point| {
+                        RenderPoint::new(pick(at.x, point.x), pick(at.y, point.y))
+                    })
+            };
+            (
+                fold(f32::min, f32::INFINITY),
+                fold(f32::max, -f32::INFINITY),
+            )
+        };
+        let mut pairs = 0;
+        for aspect_ratio in [0.6, 5.0 / 3.0, 2.4] {
+            let layout = Layout::new(aspect_ratio);
+            for seed in 0..4 {
+                let mut state = ClockScenario::init(
+                    ClockConfig {
+                        aspect_ratio,
+                        event_profile: engine_common::ClockEventProfile::Off,
+                        ..ClockConfig::default()
+                    },
+                    seed,
+                );
+                ClockScenario::step(
+                    &mut state,
+                    &[ClockAction::set_reading(
+                        ClockReading::new(12, 34, 0).unwrap(),
+                    )],
+                    std::time::Duration::ZERO,
+                );
+                assert!(state.preview_crows(crate::crow::MAX_CROWS));
+                for _ in 0..17 * 60 {
+                    ClockScenario::step(&mut state, &[], std::time::Duration::from_millis(16));
+                    let drawn: Vec<_> = state
+                        .crow_visit
+                        .iter()
+                        .flat_map(crate::crow::CrowVisit::crows)
+                        .filter(|crow| {
+                            matches!(
+                                crow.phase,
+                                crate::crow::Phase::Perched | crate::crow::Phase::Pecking
+                            )
+                        })
+                        .map(|crow| extent(crow, layout))
+                        .collect();
+                    for (index, (low, high)) in drawn.iter().enumerate() {
+                        for (other_low, other_high) in &drawn[index + 1..] {
+                            pairs += 1;
+                            assert!(
+                                high.x <= other_low.x
+                                    || other_high.x <= low.x
+                                    || high.y <= other_low.y
+                                    || other_high.y <= low.y,
+                                "aspect={aspect_ratio} seed={seed}: {drawn:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        assert!(pairs > 0);
+    }
+
     fn rendered_at(aspect_ratio: f32) -> RenderFrame {
         let mut state = ClockScenario::init(
             ClockConfig {

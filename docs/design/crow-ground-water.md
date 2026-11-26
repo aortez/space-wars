@@ -23,6 +23,10 @@ fixed simulation tick, seeded decisions, and native renderer.
   before the normal 17-second departure deadline. A climb/crossing estimate
   rejects floors too far below the face for the five-second exit window.
   The 22-second hard visit cap remains.
+- In a flock (#371), each crow considers its own excursion. A crow takes no
+  spot within 1.6 pitches across of where another crow of its visit is or is
+  going, so two crows on the ground use both lanes, and a crow that finds
+  both in another's room stays on the digits.
 - A last-moment abandoned descent still respects the surviving floor, including
   the actual tilted panel surface and its open drain gap.
   Ground trips add no Rapier bodies, colliders, food actors, or physics world.
@@ -35,10 +39,11 @@ The Clock **Crow** control cycles **Off → Varied → Shy → Hardy** in the
 launcher and paused Clock controls. It combines the existing admission switch
 with a saved `crow_water_tolerance` setting (`varied`, `shy`, or `hardy`).
 Older saved settings default to Varied and retain their existing Crow on/off
-choice. Varied selects Shy on 90% of admissions and Hardy on 10%. The draw uses a
-separate stream derived from the visit seed, without advancing perch, water or
-event randomness. Each visitor keeps its resolved temperament until departure;
-live preference changes apply to the next admission.
+choice. Varied selects Shy for 90% of crows and Hardy for 10%. The draw uses a
+separate stream derived from the crow's seed, without advancing perch, water or
+event randomness, so each crow of a flock draws its own. Each visitor keeps its
+resolved temperament until departure; live preference changes apply to the
+next admission.
 
 The environment is a borrowed read-only view of the current Rain/Meltdown water.
 It is sampled after the existing water step, with no extra water simulation.

@@ -722,22 +722,29 @@ fn crow_trigger_pause_settings_and_restart_preserve_the_resident_contract() {
             .client
             .wait_for_clock_state(&predicate, TRANSITION_TIMEOUT);
         let admitted = harness.require_clock("crow admission", result);
-        // An admission brings a visit of one crow, which `crow` shows too.
-        let [first] = admitted.crows.as_slice() else {
-            panic!("a visit of one crow: {:?}", admitted.crows);
-        };
-        assert_eq!((first.member, Some(*first)), (0, admitted.crow));
+        // An admission brings a crow alone or a flock, as this run's first
+        // visit draws: four crows, listed by member, the first of which
+        // `crow` shows too.
+        let members: Vec<u8> = admitted.crows.iter().map(|crow| crow.member).collect();
+        assert_eq!(members, [0, 1, 2, 3], "{:?}", admitted.crows);
+        let first = admitted.crows[0];
+        assert_eq!(Some(first), admitted.crow);
         let visit_id = first.visit_id;
+        assert!(admitted.crows.iter().all(|crow| crow.visit_id == visit_id));
         assert_eq!(admitted.event_kind, None);
-        // The crow is a body in the arena, with a perch for each column it
-        // may land on and the floor the arena keeps under it. Its claim alone
-        // holds the arena, and its body and perches have a collider each.
+        // Each crow is a body in the arena, with a perch for each column the
+        // crows may land on and the floor the arena keeps under them. Their
+        // claim alone holds the arena, and their bodies and perches have a
+        // collider each.
         let arena = admitted.arena.as_ref().expect("Clock publishes its arena");
         let [crow] = arena.claims.as_slice() else {
             panic!("the crow's claim alone holds the arena: {:?}", arena.claims);
         };
         assert_eq!(crow.owner, engine_common::ClockArenaOwner::Crow);
-        assert!(crow.population.bodies >= 1, "the crow's body: {crow:?}");
+        assert!(
+            crow.population.bodies > members.len(),
+            "the crows' bodies and their perches: {crow:?}"
+        );
         assert_eq!(crow.population.colliders, crow.population.bodies);
         assert_eq!(
             (admitted.body_count, admitted.collider_count),
@@ -761,7 +768,14 @@ fn crow_trigger_pause_settings_and_restart_preserve_the_resident_contract() {
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let resumed = harness.clock_state();
         assert_eq!(resumed.crow.unwrap().visit_id, visit_id);
-        assert_eq!(resumed.crows.len(), 1);
+        assert!(
+            resumed
+                .crows
+                .iter()
+                .all(|crow| crow.visit_id == visit_id && members.contains(&crow.member)),
+            "{:?}",
+            resumed.crows
+        );
         harness.pause_guarded(&gameplay);
         let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
         harness.activate_guarded("pause.restart", &menu);

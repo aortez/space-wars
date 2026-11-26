@@ -437,6 +437,7 @@ fn ground_excursion_is_an_occasional_seeded_choice_and_is_not_retried() {
             ClockCrowWaterTolerance::Shy,
             &perches(original.layout, &state.segments, None),
             Environment::default(),
+            None,
         );
         let mut replay = Crow::new(
             original.layout,
@@ -446,6 +447,7 @@ fn ground_excursion_is_an_occasional_seeded_choice_and_is_not_retried() {
             ClockCrowWaterTolerance::Shy,
             &perches(original.layout, &state.segments, None),
             Environment::default(),
+            None,
         );
         for visit in [&mut crow, &mut replay] {
             visit.position = visit.target.unwrap().feet();
@@ -699,4 +701,36 @@ fn opening_panels_still_catch_an_aborted_descent_at_the_real_surface() {
     );
     assert!(crow.flight.velocity.y > 0.0);
     assert_eq!(crow.pecks, 0);
+}
+
+/// A crow keeps its gap behind another cruising ahead of it in its lane, the
+/// same way: no faster than that crow once at the gap, and slower inside it.
+/// It passes a crow slowing to come down, one coming the other way, one
+/// behind it, one too far ahead to matter and one out of its lane.
+#[test]
+fn a_crow_follows_only_a_crow_cruising_ahead_in_its_lane() {
+    let layout = Layout::new(16.0 / 9.0);
+    let pitch = layout.pitch;
+    let me = Vec2::new(0.0, 130.0);
+    let speed = Vec2::new(pitch * 10.0, 0.0);
+    let ahead = |by: Vec2, moving: Vec2| {
+        Claimed {
+            positions: [None, Some(me + by), None, None],
+            velocities: [None, Some(moving), None, None],
+            ..Claimed::default()
+        }
+        .following(me, speed * 1.5, layout)
+    };
+    let at_gap = ahead(Vec2::new(pitch * FOLLOW_GAP, 0.0), speed);
+    assert!((at_gap - speed.x).abs() < 1e-3, "{at_gap}");
+    assert!(ahead(Vec2::new(pitch * 1.5, pitch * 0.5), speed) < speed.x);
+    for (by, moving) in [
+        (Vec2::new(pitch, 0.0), Vec2::new(pitch * 2.0, -pitch * 3.0)),
+        (Vec2::new(pitch, 0.0), -speed),
+        (Vec2::new(-pitch, 0.0), speed),
+        (Vec2::new(pitch * (FOLLOW_RANGE + 0.5), 0.0), speed),
+        (Vec2::new(pitch, pitch * (ROOM_UP + 0.1)), speed),
+    ] {
+        assert_eq!(ahead(by, moving), f32::INFINITY, "{by:?} {moving:?}");
+    }
 }
