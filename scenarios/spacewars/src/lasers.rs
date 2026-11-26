@@ -15,7 +15,8 @@
 //!
 //! A ship's hull lasts about as long in the beam as it did in the old laser,
 //! about 14 seconds from 40 units off. A pod's thinner hull lasts about 6
-//! seconds and a pilot on foot about 3, where they lasted about 7 and 4.
+//! seconds and a pilot on foot about 3, where they lasted about 7 and 4. A
+//! tank's armor lasts about 29.
 //!
 //! The beam passes through its own ship. In a match, pods and pilots on foot
 //! take hits unless their ejection protection covers them. Outside a match,
@@ -89,6 +90,7 @@ pub(super) fn fire(
         return Vec::new();
     }
     let exposed = match_rules::exposed(state, pilots);
+    let tanks = state.physics.tanks.healths();
     let SpacewarsState {
         ships,
         debris,
@@ -97,7 +99,7 @@ pub(super) fn fire(
         ..
     } = state;
     // One view for every beam, so two beams on one body share what it has.
-    let mut bodies = Bodies::new(ships, debris, rovers, exposed);
+    let mut bodies = Bodies::new(ships, debris, rovers, tanks, exposed);
     let mut fired = Vec::new();
     for (shooter, beam) in beams {
         let length = beam.length();

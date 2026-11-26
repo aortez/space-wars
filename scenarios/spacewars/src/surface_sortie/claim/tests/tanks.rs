@@ -2,8 +2,9 @@ use super::*;
 use crate::{
     Allegiance,
     surface_sortie::surface_forces::{SURFACE_DEPARTURE_DISTANCE, SurfaceForceId},
-    tanks::{TankCommand, TankId},
+    tanks::{TankCommand, TankDamage, TankDamageCause, TankId},
 };
+use engine_common::{RenderLine, RenderPoint};
 use engine_rapier::{rover::RoverSpawnPose, world::RayCastOptions};
 use engine_terrain::{Brush, CellCoord, EditMode, TerrainEdit};
 
@@ -207,7 +208,8 @@ fn tank_allegiance_is_claimant_relative_readable_and_adds_no_seat() {
         .iter()
         .map(|p| render_color(p.color))
         .collect();
-    assert!(!colors.contains(&GOVERNMENT_TANK_COLOR));
+    let olive = render_color(GOVERNMENT_TANK_COLOR);
+    assert!(!colors.contains(&olive));
     let frame = SurfaceSortieScenario::player_frame(&state, 1);
     let fills: Vec<_> = frame
         .layers
@@ -219,7 +221,70 @@ fn tank_allegiance_is_claimant_relative_readable_and_adds_no_seat() {
             _ => None,
         })
         .collect();
-    assert_eq!(fills, [GOVERNMENT_TANK_COLOR, colors[0], colors[1]]);
+    assert_eq!(fills, [olive, colors[0], colors[1]]);
+}
+
+/// Each tank's health bar floats above it against its gravity, even with the
+/// tank on its back, and the bar's fill shows the health the tank has left.
+#[test]
+fn a_tank_health_bar_shows_what_is_left_above_it_even_on_its_back() {
+    let mut state = garrison(1);
+    let upright = place(&mut state, Vec2::X, GOVERNMENT);
+    let flipped = overturned(&mut state, -Vec2::Y, GOVERNMENT);
+    idle(&mut state, 60);
+    let hit = TankDamage {
+        tick: state.world.tick,
+        cause: TankDamageCause::Laser,
+        amount: 25.0,
+        source: Some(FIRST),
+    };
+    state.world.physics.tanks.damage(upright, hit);
+    let frame = SurfaceSortieScenario::player_frame(&state, 0);
+    let lines: Vec<&RenderLine> = frame
+        .layers
+        .iter()
+        .filter(|layer| layer.z == ROVER_LAYER + 1)
+        .flat_map(|layer| &layer.primitives)
+        .filter_map(|primitive| match primitive {
+            RenderPrimitive::Line(line) => Some(line),
+            _ => None,
+        })
+        .collect();
+    let point = |p: RenderPoint| Vec2::new(p.x, p.y);
+    let length = |line: &RenderLine| point(line.start).distance_to(point(line.end));
+    // A bar is a track and a fill drawn from the same end: the middle of the
+    // longer, and how much of it the shorter fills.
+    let bars: Vec<(Vec2, f32)> = lines
+        .iter()
+        .enumerate()
+        .flat_map(|(at, a)| lines[at + 1..].iter().map(move |b| (a, b)))
+        .filter(|(a, b)| a.start == b.start)
+        .map(|(a, b)| {
+            let (track, fill) = if length(a) >= length(b) {
+                (a, b)
+            } else {
+                (b, a)
+            };
+            let middle = (point(track.start) + point(track.end)) * 0.5;
+            (middle, length(fill) / length(track))
+        })
+        .collect();
+    assert_eq!(bars.len(), 2, "{bars:?}");
+    let center = state.world.planets[0].position;
+    for (tank, left) in [(upright, 0.75), (flipped, 1.0)] {
+        let chassis = state.world.tank_snapshot(tank).unwrap().assembly.chassis;
+        let (middle, filled) = bars
+            .iter()
+            .copied()
+            .min_by(|a, b| {
+                let a = a.0.distance_to(chassis.position);
+                a.total_cmp(&b.0.distance_to(chassis.position))
+            })
+            .unwrap();
+        assert!((filled - left).abs() < 1.0e-5, "{tank:?}: {filled}");
+        let above = middle.distance_to(center) - chassis.position.distance_to(center);
+        assert!(above > 2.0, "{tank:?}: {above}");
+    }
 }
 
 #[test]

@@ -1,15 +1,17 @@
 //! The host for the engine's contact charges (#330). Each body a crash can
 //! harm, or that a crash strikes, has a material region: ships and pods,
-//! pilots on foot, rovers, asteroids, the sun and the planets. After each
-//! step, charges price every new impact between two of them against the
+//! pilots on foot, rovers, tanks, asteroids, the sun and the planets. After
+//! each step, charges price every new impact between two of them against the
 //! surfaces here, and the step lists them in
 //! [`SpacewarsState::contact_hits`]. Pricing moves nothing, so Rapier's
 //! restitution still sets the bounce.
 //!
-//! Charges wear asteroids. Just after the contact rules deal damage, each
-//! asteroid loses the health its impacts consumed, and the rules no longer
-//! wear it. Every other body takes the contact rules' damage as before. See
-//! `docs/design/material-contact-charges.md`.
+//! Charges wear asteroids and tanks. Just after the contact rules deal damage,
+//! each asteroid loses the health its impacts consumed, and the rules no
+//! longer wear it. A tank has no contact rule, so its charges are all that its
+//! contacts cost it (#238). Every other body takes the contact rules' damage as
+//! before.
+//! See `docs/design/material-contact-charges.md`.
 
 use super::*;
 use engine_material::{ROCK, Region};
@@ -24,6 +26,7 @@ use integrity::{HealthMap, THICKNESS};
 use physics::SpacewarsPhysics;
 use shots::Bodies;
 use surface_sortie::{SurfacePilot, match_rules};
+use tanks::{TankDamage, TankDamageCause};
 
 /// A hull's radius of curvature where it meets others, `wu`, about that of a
 /// ship's nose or wingtip. An estimate: four times it costs a crashing ship a
@@ -251,8 +254,8 @@ pub(super) fn bind(physics: &mut SpacewarsPhysics) {
 }
 
 /// Whether charges price the body `entity` stands for: a ship or a pod, a
-/// pilot on foot, a rover, an asteroid, the sun or a planet. The rest, such
-/// as shells, chips, breakup fragments, wreckage, tanks, loose terrain and
+/// pilot on foot, a rover, a tank, an asteroid, the sun or a planet. The
+/// rest, such as shells, chips, breakup fragments, wreckage, loose terrain and
 /// the universe's boundary, have no region, so charges price none of their
 /// contacts.
 fn priced(physics: &SpacewarsPhysics, entity: PhysicsId) -> bool {
@@ -261,7 +264,8 @@ fn priced(physics: &SpacewarsPhysics, entity: PhysicsId) -> bool {
             MechanicalEntity::Body(_)
             | MechanicalEntity::Ship(_)
             | MechanicalEntity::Spaceling(_)
-            | MechanicalEntity::Rover(_),
+            | MechanicalEntity::Rover(_)
+            | MechanicalEntity::Tank(_),
         ) => true,
         Some(MechanicalEntity::Debris(id)) => physics.debris_kind(id) == Some(DebrisKind::Asteroid),
         _ => false,
@@ -294,6 +298,7 @@ pub(super) fn price(state: &mut SpacewarsState, pilots: &[SurfacePilot]) {
         return;
     }
     let exposed = match_rules::exposed(state, pilots);
+    let tanks = state.physics.tanks.healths();
     let SpacewarsState {
         ships,
         debris,
@@ -318,7 +323,7 @@ pub(super) fn price(state: &mut SpacewarsState, pilots: &[SurfacePilot]) {
         }
     }
     let mut surfaces = Surfaces {
-        bodies: Bodies::new(ships, debris, rovers, exposed),
+        bodies: Bodies::new(ships, debris, rovers, tanks, exposed),
         ships,
         sun: *sun,
         planets,
@@ -407,6 +412,7 @@ impl Surfaces<'_> {
             MechanicalEntity::Rover(_) => {
                 Some(body(health?, physics::spacewars_rover_spec().wheel_radius))
             }
+            MechanicalEntity::Tank(_) => Some(body(health?, physics::tank_spec().wheel_radius)),
             MechanicalEntity::Debris(id) => {
                 let radius = self.bodies.debris(id)?.radius.max(MIN_DEBRIS_RADIUS);
                 Some(body(health?, radius))
@@ -546,6 +552,31 @@ pub(super) fn wear_asteroids(state: &mut SpacewarsState) {
         }
     }
     state.contact_hits = hits;
+}
+
+/// Wears each tank by the health its impacts consumed in the step. A tank has
+/// no crash rule, so its charges are all that its contacts cost it. Runs with
+/// [`wear_asteroids`], just after the contact rules.
+pub(super) fn wear_tanks(state: &mut SpacewarsState) {
+    let SpacewarsState {
+        contact_hits,
+        physics,
+        tick,
+        ..
+    } = state;
+    for hit in contact_hits.iter().filter(|hit| hit.unpriced.is_none()) {
+        for (&entity, &amount) in hit.entities.iter().zip(&hit.health) {
+            if let Some(id) = physics.tanks.by_entity(entity) {
+                let damage = TankDamage {
+                    tick: *tick + 1,
+                    cause: TankDamageCause::Contact,
+                    amount,
+                    source: None,
+                };
+                physics.tanks.damage(id, damage);
+            }
+        }
+    }
 }
 
 /// The entity value of the body behind `source`.

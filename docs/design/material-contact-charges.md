@@ -354,18 +354,18 @@ those of the rule above in
 
 `scenarios/spacewars/src/contact_charges.rs` is Spacewars' host, and every
 game world has it on. It lists each step's impacts, as priced, in
-`SpacewarsState::contact_hits`, and it charges asteroids for theirs. Every
-other body keeps today's contact damage: what charges price for ships, pods,
-pilots and rovers is listed and not charged. That is a gameplay policy, and
-the probe below gives its reasons.
+`SpacewarsState::contact_hits`, and it charges asteroids and tanks for theirs.
+Every other body keeps today's contact damage: what charges price for ships,
+pods, pilots and rovers is listed and not charged. That is a gameplay policy,
+and the probe below gives its reasons.
 
 - **Regions.** Each body a crash can harm, or that a crash strikes, has a
-  region: a ship or a pod, a pilot on foot, each of a rover's three bodies, an
-  asteroid, the sun and each planet. Every collider of such a body is bound to
-  its region, sensors included, which never touch. A landing foot is a patch
-  of its own. Shells, chips, breakup fragments, wreckage, tanks, loose terrain
-  and the universe's boundary have no region, so none of their contacts is
-  priced.
+  region: a ship or a pod, a pilot on foot, each of a rover's or a tank's
+  three bodies, an asteroid, the sun and each planet. Every collider of such a
+  body is bound to its region, sensors included, which never touch. A landing
+  foot is a patch of its own. Shells, chips, breakup fragments, wreckage,
+  loose terrain and the universe's boundary have no region, so none of their
+  contacts is priced.
 - **Binding.** Before each step the host binds each unbound collider of such
   a body: a new body's, or one whose colliders were replaced. A sortie's wing
   sweep replaces a ship's colliders, and its region outlives them. Removing a
@@ -383,16 +383,16 @@ the probe below gives its reasons.
   [weapon sources](material-sources.md#spacewars-bodies), at a fixed depth:
   the health it brought into the step, less what the step's earlier impacts
   consumed. A hull meets others with a radius of 1, an estimate. A pilot meets
-  them with the capsule's radius, each of a rover's bodies with its wheels'
-  0.75, and debris with its own radius. The sun and the planets are rock as a
-  half-space, with their own radius, holding as much as a region can so that
-  nothing wears them.
+  them with the capsule's radius, each of a rover's or a tank's bodies with
+  its wheels' 0.75, and debris with its own radius. The sun and the planets
+  are rock as a half-space, with their own radius, holding as much as a
+  region can so that nothing wears them.
 - **Shielding.** The sun and the planets are always shielded. So are a pod
   and a pilot outside a match, priced at full health since only a match
   harms them, and a pod or a pilot under ejection protection.
 - **Supports** go unpriced. The host never calls `charge_contact_supports`,
-  so the steady load of a ship, pod, pilot or rover resting on a planet costs
-  nothing, and only impacts are listed.
+  so the steady load of a ship, pod, pilot, rover or tank resting on a planet
+  costs nothing, and only impacts are listed.
 - **Ejection.** The hit that kills a ship throws its escape pod at the hit's
   damage as a speed along it. That kick is a game rule outside the ledger: a
   weapon's source charged the hull only for what it delivered, and the pod's
@@ -424,6 +424,13 @@ the probe below gives its reasons.
   up to 200 u/s and about a thousandth of a radius-2 asteroid's health at
   300 u/s. A shot still charges it, and an impact charges leave unpriced
   wears nothing.
+- **Tank wear.** A tank loses the health its impacts consumed, just after
+  today's rules, which have none for tanks
+  ([#238](https://github.com/aortez/space-wars/issues/238)). Its record of
+  the last hit names a contact and no side. Its armor is twice as strong as
+  planet rock, so the rock gives way first, and its settling, driving, bumps
+  and ordinary landings cost it nothing, as
+  [Spacewars bodies](material-sources.md#spacewars-bodies) measures.
 - **Capture's bounds** are 4,096 regions, 16,384 bindings, 4,096 episodes,
   65,536 visits and 8,192 contacts a batch, and 32,768 records a step, to
   hold `MAX_ASTEROIDS` asteroids beside the rest. In 15 seconds at the

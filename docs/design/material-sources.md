@@ -293,6 +293,7 @@ around its collision shape's perimeter.
 | Asteroid, chip or breakup fragment | asteroid rock | what the body weighed when made, giving way 1 deep behind a struck face | 4,398 per unit of radius | 1,400 |
 | Cannon shell | shell | what the shell weighed when fired | 375 for a round, or 4,712 for a classic shell, for 1 health | 375 or 4,712 |
 | Rover hull | hull | plate around the chassis's 11.2 perimeter, 2 deep | 8,960, for 25 health | 358.4 |
+| Tank armor | tank armor | plate around the chassis's 11.2 perimeter, 2 deep | 58,240, for 100 health | 582.4 |
 
 The game still stores health, and a body's region is a view of it: the
 region's integrity is the body's health over its full health. Contacts, solar
@@ -314,13 +315,13 @@ energy would need ([#246](https://github.com/aortez/space-wars/issues/246)).
   weigh more than its body. A hit takes the body's mass from the physics, not
   from the region.
 
-The ship hull, the pod hull and asteroid rock are the reference hull and rock
-with only their toughness raised. The match tests' fixture sets it: a still
-target, struck every two seconds by a supplied round closing at 300. There a
-round fails a fresh ship's hull on the 4th hit, a fresh pod's on the 2nd and a
-pilot on foot on the 1st, the survival #330 set. In open space a still ship
-takes a 5th. Pilot tissue is soft tissue with only its toughness raised, for
-the laser, as [Lasers as beams](#lasers-as-beams) says.
+The ship hull, the pod hull, tank armor and asteroid rock are the reference
+hull, armor and rock with only their toughness raised. The match tests'
+fixture sets it: a still target, struck every two seconds by a supplied round
+closing at 300. There a round fails a fresh ship's hull on the 4th hit, a fresh
+pod's on the 2nd and a pilot on foot on the 1st, the survival #330 set. In
+open space a still ship takes a 5th. Pilot tissue is soft tissue with only its
+toughness raised, for the laser, as [Lasers as beams](#lasers-as-beams) says.
 
 - **Rock.** Rock gives way 1 deep behind the face it is struck on, about the
   width of the patch a shell strikes. Were the whole asteroid to give way, rock
@@ -336,6 +337,19 @@ the laser, as [Lasers as beams](#lasers-as-beams) says.
 - **Estimates.** The rover keeps the reference hull, and a round still
   destroys one. The plate depths and the depths into the screen are estimates
   from each body's size, which the toughness absorbs.
+- **Tank armor.** A tank's armor is plate 0.2 deep around its chassis, as a
+  hull's is, in the reference armor with only its toughness raised
+  ([#238](https://github.com/aortez/space-wars/issues/238)). A round shoves a
+  tank about 40 u/s, so the fixture holds the tank still before each round.
+  There each round costs a fresh tank 13.19, and the 8th fails it, twice a
+  ship's 4. At the reference armor's toughness a round costs 17.14, and the
+  6th fails it. A round's work grows with the depth of plate behind the face
+  it strikes, and a beam's does not, so the laser fails a tank in 9.33 seconds
+  from 40 units off, sooner than a ship's 13.87. Armor is twice as strong as
+  planet rock, so the rock gives way first. A tank's settling, driving and
+  braking cost it nothing, and neither does a bump from another tank or a hop
+  that lands at up to 16 u/s. Thrown down onto the planet at 50 u/s, a tank
+  loses 1.99.
 
 ### Cannon shells as shots
 
@@ -420,6 +434,8 @@ keep their old size.
     3.7 in the old laser.
   - Rock takes 0.64 times the old damage from each pulse, so an asteroid lasts
     about 1.6 times as long in the beam.
+  - A tank's armor holds 582.4 work per point of health, so a tank 40 units
+    off lasts 9.33 seconds in the beam.
   - A round's 1 health stands for 375, so the beam destroys one about as fast
     as the old laser did: in 1 tick from 40 units off and 10 from 300, where
     the old laser took 2 and 12. A classic shell's stands for 4,712, so the

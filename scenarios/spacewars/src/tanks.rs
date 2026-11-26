@@ -15,6 +15,8 @@ use engine_rapier::{
 use crate::Allegiance;
 
 pub const MAX_TANKS: usize = 16;
+/// A tank's health when placed, with its armor whole.
+pub const TANK_HEALTH: f32 = 100.0;
 const CONTACT_BUDGET: usize = 128;
 const SPATIAL_BUDGET: usize = 8192;
 const ADMISSION_BUDGET: usize = 8192;
@@ -22,6 +24,45 @@ pub(super) const ENTITY_BASE: u64 = 1 << 60;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TankId(u64);
+
+impl TankId {
+    /// The value of the tank's physics entity.
+    pub(crate) fn entity(self) -> u64 {
+        ENTITY_BASE + self.0
+    }
+
+    /// The tank whose physics entity has the value `entity`, if the value is
+    /// in the tanks' range.
+    fn of_entity(entity: u64) -> Option<Self> {
+        entity
+            .checked_sub(ENTITY_BASE)
+            .filter(|&id| id > 0)
+            .map(Self)
+    }
+}
+
+/// What cost a tank health.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TankDamageCause {
+    /// An impact its contact charges priced, such as a crash or a rock's
+    /// strike.
+    Contact,
+    Laser,
+    Round,
+}
+
+/// The last hit that cost a tank health.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TankDamage {
+    /// The world's tick once the step that dealt it ends.
+    pub tick: u64,
+    pub cause: TankDamageCause,
+    /// The health it cost.
+    pub amount: f32,
+    /// The side whose round or laser it was. A contact has none, and neither
+    /// does a round no player fired.
+    pub source: Option<Allegiance>,
+}
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct TankCommand {
@@ -36,6 +77,9 @@ struct Tank {
     assembly: RoverAssembly,
     /// Fixed when the tank is placed. Planet ownership never changes it.
     allegiance: Allegiance,
+    /// What is left of its armor, out of [`TANK_HEALTH`].
+    health: f32,
+    last_damage: Option<TankDamage>,
     command: TankCommand,
     blocked: bool,
     gravity: [Vec2; 3],
@@ -45,6 +89,9 @@ struct Tank {
 pub struct TankSnapshot {
     pub id: TankId,
     pub allegiance: Allegiance,
+    /// Out of [`TANK_HEALTH`].
+    pub health: f32,
+    pub last_damage: Option<TankDamage>,
     pub command: TankCommand,
     pub assembly: RoverSnapshot,
     pub mount_position: Vec2,
@@ -143,6 +190,46 @@ impl Tanks {
         self.actors.keys().copied()
     }
 
+    /// The live tank whose physics entity has the value `entity`.
+    pub(crate) fn by_entity(&self, entity: u64) -> Option<TankId> {
+        TankId::of_entity(entity).filter(|id| self.actors.contains_key(id))
+    }
+
+    /// Where tank `id`'s chassis is, and the side it fights for: what its hits
+    /// need to draw their sparks.
+    pub(crate) fn chassis(&self, physics: &PhysicsWorld, id: TankId) -> Option<(Vec2, Allegiance)> {
+        let tank = self.actors.get(&id)?;
+        let chassis = physics.motion(tank.assembly.bodies()[0])?;
+        Some((chassis.position, tank.allegiance))
+    }
+
+    /// Each live tank's entity value and health, in entity order, for the
+    /// weapons and contact charges to read while they hold the physics.
+    pub(crate) fn healths(&self) -> Vec<(u64, f32)> {
+        self.actors
+            .iter()
+            .map(|(id, tank)| (id.entity(), tank.health))
+            .collect()
+    }
+
+    /// Takes `hit.amount` from tank `id`'s health, never more than it has,
+    /// and records the hit with what it took. A hit that takes nothing, or
+    /// whose amount is not a finite number, records nothing.
+    pub(crate) fn damage(&mut self, id: TankId, hit: TankDamage) {
+        let Some(tank) = self.actors.get_mut(&id) else {
+            return;
+        };
+        if !hit.amount.is_finite() {
+            return;
+        }
+        let amount = hit.amount.min(tank.health);
+        if amount <= 0.0 {
+            return;
+        }
+        tank.health -= amount;
+        tank.last_damage = Some(TankDamage { amount, ..hit });
+    }
+
     /// Each live tank's chassis, its colliders with the chassis's first, and
     /// its allegiance: what the surface presence gate needs to count it (#234).
     pub(crate) fn ground_forces(
@@ -186,6 +273,8 @@ impl Tanks {
             Tank {
                 assembly,
                 allegiance,
+                health: TANK_HEALTH,
+                last_damage: None,
                 command: TankCommand::default(),
                 blocked: false,
                 gravity: [Vec2::ZERO; 3],
@@ -235,6 +324,8 @@ impl Tanks {
         Some(TankSnapshot {
             id,
             allegiance: tank.allegiance,
+            health: tank.health,
+            last_damage: tank.last_damage,
             command: tank.command,
             drive_blocked: tank.blocked,
             local_gravity: tank.gravity[0],

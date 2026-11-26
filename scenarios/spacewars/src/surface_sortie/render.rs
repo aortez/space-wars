@@ -165,7 +165,8 @@ pub(super) fn frame_with_storage(
     // Tanks draw as in Spacewars, beneath pilots and ships.
     for id in state.world.tank_ids() {
         if let Some(tank) = state.world.tank_snapshot(id) {
-            render_tank(&mut frame, &tank, tank_color(&state.world, tank.allegiance));
+            let color = render_color(tank_color(&state.world, tank.allegiance));
+            render_tank(&mut frame, &tank, color);
         }
     }
     for player in 0..state.player_count() {
