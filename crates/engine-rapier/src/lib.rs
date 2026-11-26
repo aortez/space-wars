@@ -19,3 +19,5 @@ pub mod plant_light;
 pub mod grass;
 
 pub mod moss;
+
+pub mod tree;

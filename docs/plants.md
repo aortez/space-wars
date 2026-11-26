@@ -600,3 +600,178 @@ a branch with its dead needle and check the lost share, the refusals for a seed
 and for unknown tissue, and a dead needle shed in a balanced tick.
 `plant_light_contract` covers a blade shaded by wood above it, wood's missing
 sample, its disk radius by size and its placement in air.
+
+## Tree (#743)
+
+`engine_core::plants::tree` grows a conifer in the shared runtime, under the
+rules grass lives by. Its roots gather from dirt as grass roots do, its needles
+are shoots that earn energy under the same light rule and die back in shade,
+its trunk and branches are wood, and every tissue pays upkeep from its
+component's pool. The policy is `0x7472656500000001` (tree version 1).
+`Tree::plant` seeds one size-two root at the origin with `[40,40,40]`, as a
+host action; the policy never plants.
+
+### Growth points and bids
+
+At each decision, every tissue of the tree is a growth point and bids, living
+or dead, affordable or not. A brain sees one point's `View` and returns a
+`Bid`, so the hand-written `Conifer` and a later trained model use the same
+interface. The view holds:
+
+- **The whole tree:** living stores and capacity, this tick's intake and
+  upkeep, counts of short tissue, shaded needles, needles, foliage (the summed
+  sizes of living needles), wood, roots and dead tissue, the trait's tissue
+  limit, and the highest wood and deepest root.
+- **The point:** its kind (leader, trunk, branch tip, branch, root tip, root
+  or needle, from where it sits), whether it lives and whether it grew from
+  another tissue, its height along up and offset across from the trunk's axis,
+  size, health, shade and shortage ticks, a needle's light, the needles,
+  foliage and dead tissue beyond it, what wood carries and the headroom on the
+  way back to the seed, and its paid development and target.
+- **Four candidates,** its neighbors up, down and to either side in the tree's
+  frame. Each says which way the step goes, what holds the cell (nothing, the
+  tree's own wood, needle or root, or another plant), whether the world would
+  place wood, a needle or a root there now before cost, the light the host
+  measured there and the supply a root would take there.
+
+A bid is an action, `Wait`, `Grow(role)`, `Thicken` or `Shed`, with a priority
+and a ranking of the candidates. The world takes the bids from the highest
+priority down, ties to the lower tissue ID, and refuses one when:
+
+- growth or thickening comes from a dead point;
+- the point cannot grow that role, or the tree is at its population;
+- no ranked candidate is open, or every open one was claimed earlier in the
+  decision;
+- a new tissue would pass the runtime's size limit, or the point cannot
+  develop further;
+- a thicker segment would have no room;
+- the point is shaded or short, for thickening;
+- the wood behind a new or maturing needle cannot carry it;
+- the bid sheds the seed, or a higher bid has already shed the point;
+- the component's pool, less what higher bids spent, cannot pay.
+
+A refused bid takes nothing, and lower bids still get their turn. Each winning
+bid becomes one ordinary intent, and once `bids_per_decision` (default 4) have
+won, the rest are outbid. Every view, bid and outcome is recorded in the
+`Round`, for inspection and training. Costs here are advisory; the runtime's
+own admission after upkeep is final.
+
+The world's rules for what grows: needles grow nothing, roots grow only roots,
+only the seed starts a trunk, and wood grows wood and needles. `Thicken` pays
+toward a wood segment's next size, or matures a needle. `Shed` drops a point
+with everything beyond it; it costs nothing but takes one of the decision's
+bids.
+
+As in the pipe model, a stem's cross-section follows the foliage it feeds: each
+size of wood supplies `foliage_per_wood_size` (default 6) sizes of living
+needles beyond it. A new or maturing needle needs headroom in every wood
+segment back to the seed, so the tree must thicken its trunk and branches to
+grow its crown, and they taper toward the tips.
+
+### Senses
+
+Light at an empty cell and soil supply come through `Senses`, from the host.
+`Tree::probes` lists the empty air cells beside the tree's living wood and
+roots, at most `MAX_PROBES` (64, one lighting query batch) and rotating with
+the tick when there are more. A candidate the host did not measure carries
+`None`.
+
+In `engine-rapier`, `PlantLight::publish_with_probes` also measures those
+cells. Each probe samples where a size-one blade in that cell would, adds no
+disk and shades nothing, and `PlantLight::probe` reads it for that tick only.
+More than 64 probes is a capacity error; a repeated cell or one off the
+terrain is invalid input. `RootUptake::soil` gives a dirt cell's supply
+fractions, and `None` for other material, air, cells off the terrain or invalid
+controls. `TreeSenses` joins the two, and `GrassEnvironment` places the tree's
+tissue and runs its physiology, as it does for grass.
+
+### Encoder
+
+`encode` turns a view into `INPUTS` (102) numbers in -1..=1 for a model, under
+`ENCODER` version 1. A reading the world did not take is zero beside a zero
+"known" flag, never darkness or drought. Ratios with a zero denominator are
+zero.
+
+| Inputs | Meaning |
+| --- | --- |
+| 0–2 | Stores over capacity: nutrients, water, energy |
+| 3–5 | Intake less upkeep, over upkeep |
+| 6, 7 | Short over living tissue; shaded over needles |
+| 8–12 | Needles, wood, roots, dead and all tissue, over the tissue limit |
+| 13 | Foliage over three times the needles: how mature they are |
+| 14, 15 | Height over 32; depth over 16 |
+| 16–22 | The point's kind, one-hot: leader, trunk, branch tip, branch, root tip, root, needle |
+| 23, 24 | Alive; attached |
+| 25–28 | Height over 32; distance across over 16; size over 16; health over 100 |
+| 29, 30 | Shaded; short |
+| 31, 32 | Light known; light over 1000 |
+| 33–35 | Needles beyond over 64; foliage beyond over three times those needles; dead beyond over 64 |
+| 36, 37 | Is wood; foliage beyond over what it carries |
+| 38, 39 | Headroom known; headroom over 32 |
+| 40, 41 | Can develop; paid development over its target |
+| 42 + 15c, for candidates c = 0–3 | Holder one-hot: empty, own wood, own needle, own root, other (5); open for wood, needle, root (3); step along up and outward (2); light known and light (2); soil known, nutrients and water (3) |
+
+### The hand-written conifer
+
+`Conifer` bids from fixed rules, with its shape in its fields: the first tier
+at height 3, a tier every 2 cells, a leader that stops at 14, roots no deeper
+than 6, new needles only where the light is at least 400, and shaded needles
+dropped after 5 ticks.
+
+- **Start.** The seed starts the trunk straight up, and the trunk grows the
+  first needle.
+- **Needles** go into the brightest candidate lit enough, beside the leader
+  away from tier heights, above branch wood, and on top of the leader at full
+  height, while the wood can carry them. They bid higher when energy runs
+  short, and they mature while lit.
+- **The leader** climbs only once the needles beside it have matured and the
+  energy surplus is at least 6 plus a quarter of upkeep, because climbing adds
+  no light and the next leader's needles shade the ones below. At full height
+  it tops itself with a needle.
+- **Branches.** A tier's sides are kept for branches, which sprout once the
+  leader is a tier above and energy has a surplus of 3. A branch tip extends
+  outward, lower tiers first, while the surplus lasts, the branch is short of
+  its reach, and the cell, if measured, has at least half the needle light. A
+  tier reaches one cell, plus one for each tier spacing of trunk above it.
+- **Wood** thickens when the foliage beyond it fills what it carries.
+- **Roots** grow down or sideways, richest soil first, when water or nutrients
+  run short and energy can keep another root. When both are plentiful and
+  energy is tight, root tips are dropped.
+- **Shedding.** Shaded needles, dead tissue and bare branch tips in the dark
+  with nowhere to reach are shed.
+
+Under overhead light a cell is lit only when nothing lies above it, so the
+needles that live are the ones on the cone's outer edge, and the shaded ones
+inside are shed as the tiers above extend over them. In the 25-cell test bed
+in full sun, the seed reaches full height at tick 386. By tick 600 it has a
+trunk 14 cells tall, thickened from size 7 at its base to 2 at the top,
+branch tiers reaching 6, 5, 4, 3 and 2 cells to each side, 13 mature needles
+and 16 roots down to depth 5, after 36 sheds. It takes in 312 energy a tick
+and pays 213.
+
+### Verification
+
+`tree_policy_contract`, in `engine-core`, uses a bed with straight-down light,
+in which a cell is dark when wood, a blade or a runner lies above it. Its
+tests:
+
+- **The conifer:** the trunk, its taper, the tiers on both sides, the shaded
+  needles inside the crown shed (34 of its 36 sheds), every needle left lit and
+  nothing dead, the budget per decision, foliage within what wood carries, and
+  an exact replay.
+- **Limits and recovery:** light at 400, water at 300 or nutrients at 300 for
+  300 ticks each hold the seedling to at most a quarter of the wood a tree in
+  full supply has by then, and in as many ticks after full supply returns it
+  builds at least three quarters of that. Each limit holds it to one segment
+  against 40, and it reaches 40 by tick 600.
+- **Grass:** a grass patch beside the tree grows in light under the coming
+  crown, then dies back in its shade, while grass beyond the crown lives.
+- **The interface:** every point bids even when broke, the cadence, priority
+  order with claims and the budget, each refusal, the role and foliage rules,
+  the views' frame and counts, the probes, and the encoder's layout, ranges
+  and unknowns.
+
+`tree_growth_contract`, in `engine-rapier`, grows the same conifer beside
+grass on a terrain support through `PlantLight` with probes and `RootUptake`,
+and replays it. `plant_light_contract` and `root_uptake_contract` cover probes
+and soil readings.

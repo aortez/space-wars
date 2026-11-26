@@ -655,3 +655,57 @@ fn plant_light_contract_wood_shades_by_size_samples_nothing_and_stands_in_air() 
         assert_eq!(env.space_available(cell, Role::Wood, 1), open, "{cell:?}");
     }
 }
+
+#[test]
+fn plant_light_contract_probes_measure_empty_cells_and_shade_nothing() {
+    let (mut w, t, g, a) = fixture();
+    // A blade sits below the open probed cell; a solid hangs above the other.
+    let blade = shoot(&a, 1, [5, 2]);
+    let (open, covered) = ([5, 3], [3, 3]);
+    solid(
+        &mut w,
+        t.cell_center(engine_terrain::CellCoord::new(3, 3)) + Vec2::Y * 2.0,
+        false,
+    );
+    let r = roots(&w, &t, &g, &a);
+    let publish = |publisher: &mut LightingPublisher, tick: u64, probes: &[[i32; 2]]| {
+        PlantLight::publish_with_probes(
+            publisher,
+            tick,
+            tick,
+            full_sun(Vec2::Y),
+            &r,
+            std::slice::from_ref(&blade),
+            u64::MAX,
+            WorldOccluders {
+                tick,
+                geometry_generation: tick,
+                footprints: &[],
+            },
+            probes,
+        )
+    };
+    let mut publisher = LightingPublisher::default();
+    // Probes are distinct cells of the terrain, at most one query batch.
+    let many: Vec<[i32; 2]> = (0..=MAX_PROBES as i32).map(|i| [i % 8, i / 8]).collect();
+    assert_eq!(
+        publish(&mut publisher, 0, &many).err(),
+        Some(LightingError::Capacity)
+    );
+    for probes in [[open, open], [open, [8, 3]]] {
+        assert_eq!(
+            publish(&mut publisher, 0, &probes).err(),
+            Some(LightingError::InvalidInput)
+        );
+    }
+    let light = publish(&mut publisher, 0, &[covered, open]).unwrap();
+    assert_eq!(light.probe(open, 0).unwrap().intensity, 1000.0);
+    assert_eq!(light.probe(covered, 0).unwrap().intensity, 0.0);
+    // A probe shades nothing: the blade below the open cell keeps full sun.
+    assert_eq!(light.diagnostic(&blade, 0).unwrap().intensity, 1000.0);
+    assert_eq!(light.probe(open, 1).err(), Some(LightingError::Stale));
+    assert_eq!(
+        light.probe([6, 6], 0).err(),
+        Some(LightingError::InvalidInput)
+    );
+}

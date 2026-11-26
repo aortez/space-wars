@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub mod grass;
 pub mod moss;
+pub mod tree;
 
 pub type TissueId = u64;
 pub type OrganismId = u64;

@@ -86,6 +86,19 @@ impl RootUptake<'_> {
         // proximity tolerance or world-position cache admits air samples.
         material_contact(self.terrain, self.geometry, self.dirt, t.cell)
     }
+    /// The nutrient and water supply fractions a root at this cell would
+    /// take, when the cell is dirt on the current support.
+    pub fn soil(&self, cell: [i32; 2]) -> Option<[u16; 2]> {
+        let current = self.valid_controls()
+            && self.world.contains_body(self.assembly.body())
+            && self
+                .assembly
+                .plant_current(self.world, self.terrain, self.geometry);
+        (current
+            && material_contact(self.terrain, self.geometry, self.dirt, cell)
+                == ContactReason::Eligible)
+            .then(|| supply_fractions(self.rates, self.availability, self.tick_ms))
+    }
     pub fn valid_controls(&self) -> bool {
         (1..=1000).contains(&self.tick_ms)
             && self
