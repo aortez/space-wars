@@ -228,7 +228,7 @@ the model replaced or left in place.
 | Document | What it covers |
 | --- | --- |
 | [Material damage](material-damage.md) | the law, its units, the ledger and the rules it replaced |
-| [The model's report](../data/material-model-v2.md) | the reference materials and acceptance cases, which `reference_cases` regenerates |
+| [The model's report](../data/material-model-v2.md) | the reference materials, bodies and acceptance cases, with what each event took, which `reference_cases` regenerates |
 | [Shared energy](material-shared-energy.md) | the coupled budget that charges solve |
 | [Contact records](material-contact-records.md) | capture, episodes, speculative arrivals and capture's bounds |
 | [Contact charges](material-contact-charges.md) | pricing after each step, the host contract and both games' hosts |

@@ -1113,6 +1113,22 @@ fn committed_report_matches_the_regenerated_report() {
 }
 
 #[test]
+fn each_impact_records_the_masses_its_effective_mass_comes_from() {
+    let report = fixtures::report();
+    let mut impacts = 0;
+    for case in report.cases.iter().chain(&report.sweeps) {
+        for row in &case.rows {
+            if let fixtures::Input::Impact { contact, load, .. } = &row.input {
+                let mass = effective_mass(contact[0], contact[1]).unwrap();
+                assert_eq!(mass, load.effective_mass, "{}: {}", case.name, row.label);
+                impacts += 1;
+            }
+        }
+    }
+    assert!(impacts > 80, "{impacts}");
+}
+
+#[test]
 fn markdown_render_lists_every_case_and_material() {
     let report = fixtures::report();
     let markdown = fixtures::render_markdown(&report);
