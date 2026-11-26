@@ -78,7 +78,7 @@ impl Environment for MaterialUptake<'_> {
             Role::Root | Role::Runner => {
                 solid && material == self.dirt && material != MaterialId::VOID
             }
-            Role::Shoot => !solid,
+            Role::Shoot | Role::Wood => !solid,
             Role::Moss => crate::moss::site(self.terrain, self.geometry, cell),
         }
     }

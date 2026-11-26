@@ -23,8 +23,8 @@ read or change health. So:
   not revive it. It stays dead and cannot develop or grow.
 
 `TissueTable` gives each role, in the plant `Config` tables' order of root,
-runner, shoot and moss, a material and the represented volume each unit of
-size holds. Every size up to the plant world's `max_size` must make a valid
+runner, shoot, moss and wood, a material and the represented volume each unit
+of size holds. Every size up to the plant world's `max_size` must make a valid
 region. Its `identity` is caller-assigned, and saves carry it.
 
 `Plants::damage` stays the hosts' existing cut and crush path, as it is in

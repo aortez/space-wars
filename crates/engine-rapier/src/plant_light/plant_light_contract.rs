@@ -608,3 +608,50 @@ fn plant_light_contract_subsecond_intensity_shade_and_per_tick_energy() {
     assert_eq!(duration_results[0], duration_results[1]);
     assert_eq!(duration_results[1], duration_results[2]);
 }
+#[test]
+fn plant_light_contract_wood_shades_by_size_samples_nothing_and_stands_in_air() {
+    let (w, t, g, a) = fixture();
+    let r = roots(&w, &t, &g, &a);
+    let wood = |id, cell, size| Tissue {
+        role: Role::Wood,
+        size,
+        ..shoot(&a, id, cell)
+    };
+    let blade = shoot(&a, 1, [5, 3]);
+    let stem = wood(2, [5, 4], 1);
+    let mut publisher = LightingPublisher::default();
+    let light = PlantLight::publish(
+        &mut publisher,
+        0,
+        0,
+        full_sun(Vec2::Y),
+        &r,
+        &[blade.clone(), stem.clone()],
+        u64::MAX,
+    )
+    .unwrap();
+    assert_eq!(
+        light.diagnostic(&blade, 0).unwrap().first_blocker,
+        Some(LightId(u64::MAX, 2))
+    );
+    // Wood takes no sample and reports no light of its own.
+    assert_eq!(
+        light.diagnostic(&stem, 0).err(),
+        Some(LightingError::InvalidInput)
+    );
+    assert_eq!(light.environment(0).unwrap().exposure(&stem).light, 0);
+    // Its disk widens with size, as a blade's does.
+    let disks = footprints(&r, &[wood(3, [6, 4], 1), wood(4, [6, 6], 16)], 7).unwrap();
+    assert_eq!(
+        disks.iter().map(|d| (d.id, d.radius)).collect::<Vec<_>>(),
+        vec![(LightId(7, 3), 0.25), (LightId(7, 4), 1.0)]
+    );
+    // Like a blade it stands in air within the terrain, never in dirt.
+    let env = crate::grass::GrassEnvironment {
+        roots: &r,
+        physiology: &r,
+    };
+    for (cell, open) in [([5, 4], true), ([1, 4], false), ([8, 4], false)] {
+        assert_eq!(env.space_available(cell, Role::Wood, 1), open, "{cell:?}");
+    }
+}

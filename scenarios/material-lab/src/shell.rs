@@ -177,6 +177,10 @@ impl Field {
                 soft,
                 soft,
                 soft,
+                TissueMaterial {
+                    material: WOOD,
+                    ..soft
+                },
             ],
         };
         let mut circles: Vec<Reachable> = tufts

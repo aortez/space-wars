@@ -958,6 +958,8 @@ impl Scenario for GardenLabScenario {
                 STRESSED
             } else if t.role == Role::Shoot {
                 RenderColor::rgb(0.25, 1.0, 0.3)
+            } else if t.role == Role::Wood {
+                RenderColor::rgb(0.55, 0.36, 0.2)
             } else {
                 RenderColor::rgb(0.75, 0.85, 1.0)
             };
@@ -977,8 +979,18 @@ impl Scenario for GardenLabScenario {
                     RenderPoint::new(center.x - 0.35, center.y),
                     RenderPoint::new(center.x + 0.35, center.y),
                 ),
+                Role::Wood => (
+                    RenderPoint::new(center.x, center.y - 0.5),
+                    RenderPoint::new(center.x, center.y + 0.5),
+                ),
             };
-            f.push_primitive(2, garden_segment(start, end, 0.18, color));
+            // Wood is as wide as the disk it shades with.
+            let width = if t.role == Role::Wood {
+                0.5 * f32::from(t.size).sqrt()
+            } else {
+                0.18
+            };
+            f.push_primitive(2, garden_segment(start, end, width, color));
         }
         let rock_frame = s.standing_rock().map(|rock| {
             let motion = s.world.motion(rock.assembly.body()).unwrap();
@@ -1369,8 +1381,10 @@ mod garden_lab_contract {
     #[test]
     fn admission_is_historical_and_shortages_do_not_bypass_costs() {
         let mut s = GardenLabScenario::init((), 42);
-        let mut config = plants::Config::default();
-        config.maintenance_per_size = [[30; 3]; 4];
+        let config = plants::Config {
+            maintenance_per_size: [[30; 3]; 5],
+            ..plants::Config::default()
+        };
         let mut plants = Plants::new(config, 42).unwrap();
         let roots = s.roots();
         let env = GrassEnvironment {

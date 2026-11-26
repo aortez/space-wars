@@ -590,7 +590,7 @@ fn meadow() -> (Plants, TissueIntegrity, Vec<TissueId>) {
     };
     let table = TissueTable {
         identity: 1,
-        roles: [wood, soft, soft, soft],
+        roles: [wood, soft, soft, soft, wood],
     };
     let integrity = TissueIntegrity::new(table, &plants).unwrap();
     (plants, integrity, blades)

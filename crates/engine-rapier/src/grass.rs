@@ -36,7 +36,7 @@ impl<E: Environment> Environment for GrassEnvironment<'_, E> {
             Role::Root | Role::Runner => {
                 solid && material == self.roots.dirt && material != MaterialId::VOID
             }
-            Role::Shoot => !solid,
+            Role::Shoot | Role::Wood => !solid,
             Role::Moss => crate::moss::site(self.roots.terrain, self.roots.geometry, cell),
         }
     }

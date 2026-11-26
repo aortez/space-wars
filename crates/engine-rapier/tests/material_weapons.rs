@@ -113,6 +113,10 @@ impl Field {
                 soft,
                 soft,
                 soft,
+                TissueMaterial {
+                    material: WOOD,
+                    ..soft
+                },
             ],
         };
         let circles = ids

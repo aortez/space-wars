@@ -221,12 +221,14 @@ fn disk(
             .cell_center(CellCoord::new(tissue.cell[0], tissue.cell[1]))
             .rotate_radians(motion.angle);
     // A declared opaque disk, not a collider or a physiological size rule.
-    // Roots are underground and thin moss is flat against its surface.
-    let footprint = matches!(tissue.role, Role::Runner | Role::Shoot).then(|| OpaqueFootprint {
-        id: LightId(namespace, tissue.id),
-        center,
-        radius: roots.terrain.cell_size() * 0.25 * f32::from(tissue.size).sqrt(),
-    });
+    // Roots are underground and thin moss is flat against its surface. Wood
+    // shades as a blade does but samples no light of its own.
+    let footprint =
+        matches!(tissue.role, Role::Runner | Role::Shoot | Role::Wood).then(|| OpaqueFootprint {
+            id: LightId(namespace, tissue.id),
+            center,
+            radius: roots.terrain.cell_size() * 0.25 * f32::from(tissue.size).sqrt(),
+        });
     (center, footprint)
 }
 
