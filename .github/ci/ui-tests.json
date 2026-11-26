@@ -114,6 +114,10 @@
       "reason": "Moss placement, dim-room comparison, rock turning, breakage, removal and paid regrowth in both renderers; Garden Lab's headless scenario and client tests stay on PRs."
     },
     {
+      "test": "garden_lab::garden_lab_tree_bed_grows_cuts_and_returns_in_both_renderers",
+      "reason": "The tree bed's growth at 64x, a cut branch and the return to the grass bed in both renderers; Garden Lab's headless scenario and client tests, including the tree bed's, stay on PRs."
+    },
+    {
       "test": "garden_lab::garden_lab_pause_step_and_renderers_smoke",
       "reason": "Launcher extra used for development; its 16-second smoke left PRs with Material Lab's to bring PR UI back under five minutes. Garden Lab's headless scenario and client tests stay on PRs."
     },

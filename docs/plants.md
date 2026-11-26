@@ -609,7 +609,9 @@ are shoots that earn energy under the same light rule and die back in shade,
 its trunk and branches are wood, and every tissue pays upkeep from its
 component's pool. The policy is `0x7472656500000001` (tree version 1).
 `Tree::plant` seeds one size-two root at the origin with `[40,40,40]`, as a
-host action; the policy never plants.
+host action; the policy never plants. Garden Lab's
+[tree bed](garden-lab.md#tree-bed-743) shows the conifer growing beside grass,
+with each point's bid.
 
 ### Growth points and bids
 
@@ -738,7 +740,8 @@ dropped after 5 ticks.
   run short and energy can keep another root. When both are plentiful and
   energy is tight, root tips are dropped.
 - **Shedding.** Shaded needles, dead tissue and bare branch tips in the dark
-  with nowhere to reach are shed.
+  with nowhere to reach are shed. A bare stub beside the trunk waits instead:
+  shed, it would sprout again into the same shade.
 
 Under overhead light a cell is lit only when nothing lies above it, so the
 needles that live are the ones on the cone's outer edge, and the shaded ones
@@ -766,6 +769,9 @@ tests:
   against 40, and it reaches 40 by tick 600.
 - **Grass:** a grass patch beside the tree grows in light under the coming
   crown, then dies back in its shade, while grass beyond the crown lives.
+- **Cuts:** a top branch cut away in the light grows back to its full reach
+  within 200 ticks. The lowest, cut under the crown, comes back as a one-cell
+  stub, the only wood the tree grows or sheds in the next 300 ticks.
 - **The interface:** every point bids even when broke, the cadence, priority
   order with claims and the budget, each refusal, the role and foliage rules,
   the views' frame and counts, the probes, and the encoder's layout, ranges
