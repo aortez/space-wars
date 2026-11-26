@@ -87,6 +87,12 @@ pub enum ContactCharge {
         sources: [ContactSource; 2],
         /// The fastest approach that started the episode, `wu / s`.
         closing_speed: f32,
+        /// The patch the law priced across, and the section behind each side.
+        geometry: ContactGeometry,
+        /// What the law priced: the fastest approach among the impact's points
+        /// in its substep, and the effective mass its share of the energy
+        /// gives at that speed.
+        load: Impact,
         outcome: Outcome,
         protected: [bool; 2],
     },
@@ -493,8 +499,8 @@ fn charge(
     let [Some(a), Some(b)] = event.sources.map(|s| surfaces.surface(s)) else {
         return unpriced(Some(share.energy), Unpriced::Undeclared);
     };
-    let outcome = match price(a, b, &share) {
-        Ok(outcome) => outcome,
+    let (geometry, load, outcome) = match price(a, b, &share) {
+        Ok(priced) => priced,
         Err(error) => return unpriced(Some(share.energy), Unpriced::Material(error)),
     };
     let protected = absorb(surfaces, event.sources, outcome.consumed);
@@ -502,6 +508,8 @@ fn charge(
         episode: event.id,
         sources: event.sources,
         closing_speed: event.closing_speed,
+        geometry,
+        load,
         outcome,
         protected,
     }
@@ -576,23 +584,33 @@ fn section(surface: &ContactSurface, width: f32) -> Result<Section, MaterialErro
     ))
 }
 
-/// The impact law on a share of energy, across what the impact's points cover.
-fn price(a: ContactSurface, b: ContactSurface, share: &Share) -> Result<Outcome, MaterialError> {
+/// The impact law on a share of energy, across what the impact's points
+/// cover. Returns the geometry and load it priced with, and the outcome.
+fn price(
+    a: ContactSurface,
+    b: ContactSurface,
+    share: &Share,
+) -> Result<(ContactGeometry, Impact, Outcome), MaterialError> {
     let width = width(&a, &b, &share.coverage)?;
     let contact = ContactGeometry::new(width, section(&a, width)?, section(&b, width)?);
-    let effective_mass = (2.0 * share.energy / (share.speed * share.speed)) as f32;
+    // No energy is no effective mass, even at no speed.
+    let effective_mass = if share.energy == 0.0 {
+        0.0
+    } else {
+        (2.0 * share.energy / (share.speed * share.speed)) as f32
+    };
+    let load = Impact {
+        closing_speed: share.speed as f32,
+        effective_mass,
+    };
     if share.energy == 0.0 || effective_mass < MIN_EFFECTIVE_MASS {
         // The impact's points took none of the motion, or too little for the
         // law to price, such as when another impact on the same body pushed
         // them clear.
         contact.validate()?;
-        return Ok(Outcome::default());
+        return Ok((contact, load, Outcome::default()));
     }
-    let load = Impact {
-        closing_speed: share.speed as f32,
-        effective_mass,
-    };
-    impact(&a.region, &b.region, contact, load)
+    Ok((contact, load, impact(&a.region, &b.region, contact, load)?))
 }
 
 mod supports;

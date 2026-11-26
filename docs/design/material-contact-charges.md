@@ -47,8 +47,11 @@ uses either charges or the native response, never both.
 Each new impact is reported once, as a `ContactCharge`:
 
 - `Charged` carries the episode, its sources, the approach that started it,
-  the law's `Outcome` and which sides were shielded. The outcome's slots follow
-  the sources.
+  the patch and load the law priced, the law's `Outcome` and which sides were
+  shielded. The outcome's slots follow the sources. The law on the two
+  surfaces as the host kept them just before the charge, across that patch
+  with that load, gives the outcome, so a record of the three is enough to
+  check it.
 - `Unpriced` carries the reason and, once the budget is solved, the impact's
   energy:
   - `Retired`: a side's region was retired after the step.
