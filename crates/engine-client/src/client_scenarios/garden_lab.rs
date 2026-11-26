@@ -23,7 +23,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Garden Lab: up/down chooses a control; Space or gamepad bottom face activates it. Left/right moves the opaque shade. Controls include pause/step, speed, light, nutrients, water, shade, inspection, cutting, fresh planting, tissue limits 1–128 and spread 0–8 cells. Limits apply in place; full supplies do not guarantee affordable growth. R restarts; Esc/Start opens host pause. Green living, amber stressed, grey dead; cyan lines show real connections. A pink outline identifies the selected tissue. Physiology ticks are 1000ms, default viewing is 1x, maximum 16x, run limit 480 ticks. Moss controls place deliberate patches on dirt and a movable rock, turn the rock, break its edge, remove it or scrape a strip; olive moss tolerates the dim room, while darkness and the rock's shaded underside still kill it. Light also cycles to dark.",
+    controls_help: "Garden Lab: up/down chooses a control; Space or gamepad bottom face activates it. Left/right moves the opaque shade. Controls include pause/step, speed, light, nutrients, water, shade, inspection, cutting, fresh planting, tissue limits 1–128 and spread 0–8 cells. Limits apply in place; full supplies do not guarantee affordable growth. R restarts; Esc/Start opens host pause. Green living, amber stressed, grey dead; cyan lines show real connections. A pink outline identifies the selected tissue. Physiology ticks are 1000ms, default viewing is 1x, maximum 16x, run limit 480 ticks. Moss controls place deliberate patches on dirt and a movable rock, turn the rock, break its edge, remove it or scrape a strip; olive moss tolerates the dim room, while darkness and the rock's shaded underside still kill it. Light also cycles to dark. The last control shows the tree bed, a conifer beside grass with its own controls and clock (16x to start, up to 64x, 1200-tick run): bids show yellow when won, red when refused and grey when outbid, and a control cuts the selected or lowest branch.",
     create,
 };
 
@@ -149,6 +149,40 @@ impl ClientScenario for GardenLabClientScenario {
                 "work":[r.work.rays,r.work.footprint_tests,r.work.collider_records],
             })
         });
+        // The tree bed's tissue records add the point's kind, bid and outcome
+        // from the last decision.
+        let tree_bed = s.tree_bed.as_ref().map(|bed| {
+            let bo = bed.plants.observe();
+            let records: Vec<_> = bo
+                .tissues
+                .iter()
+                .map(|t| {
+                    let mut v = record(&bo, t, false, bed.exposure.get(&t.id), None);
+                    if let Some(r) = bed.record(t.id) {
+                        v["kind"] = serde_json::json!(format!("{:?}", r.view.point.kind));
+                        v["bid"] = serde_json::json!(format!("{:?}", r.bid.action));
+                        v["priority"] = serde_json::json!(r.bid.priority);
+                        v["outcome"] = serde_json::json!(format!("{:?}", r.outcome));
+                    }
+                    v
+                })
+                .collect();
+            let selected = bed
+                .selection()
+                .and_then(|t| records.iter().find(|v| v["id"] == t.id).cloned());
+            serde_json::json!({
+                "tick":bo.tick,"seed":bo.seed,
+                "run_state":if bo.tick >= scenario_garden_lab::TREE_MAX_TICKS { "complete" } else if bed.paused { "lab_paused" } else { "running" },
+                "paused":bed.paused,"speed":bed.speed,"pending_ns":bed.pending_ns(),"dropped_ms":bed.dropped_ms,
+                "intensity":bed.intensity,"availability":bed.availability,"shade":bed.shade,"shade_x":bed.shade_x,
+                "inspect":bed.inspect,"bids":bed.bids,"control":bed.control,"cuts":bed.cuts,
+                "tree_summary":bed.tree_summary(),"grass_summary":bed.grass_summary(),"bid_summary":bed.bid_summary(),
+                "tissues":records,"selected_tissue":selected,"connections":bo.connections,
+                "intake":bo.ledger.intake,"maintenance":bo.ledger.maintenance,
+                "growth":bo.ledger.growth,"loss":bo.ledger.loss,"unmet":bo.ledger.unmet,
+                "probes":bed.probes,"work":[bed.work.rays,bed.work.footprint_tests,bed.work.collider_records],
+            })
+        });
         // Selection walks bed tissue, then standing rock tissue.
         let standing = if s.standing_rock().is_some() {
             &rock_tissues[..]
@@ -176,6 +210,7 @@ impl ClientScenario for GardenLabClientScenario {
                     "placed":s.moss.is_some(),"summary":s.moss_summary(),
                     "decisions":format!("{:?}",s.moss_plan),"rock":rock,
                 },
+                "view":if s.showing_tree { "tree" } else { "grass" },"tree_bed":tree_bed,
             })
         )
     }
@@ -541,5 +576,88 @@ mod tests {
                 capture("maturation-240-cut", &s);
             }
         }
+    }
+    #[test]
+    fn garden_render_contract_tree_bed_draws_wood_needles_bids_and_grass() {
+        let output =
+            std::env::var_os("SPACEWARS_GARDEN_RENDER_ARTIFACTS").map(std::path::PathBuf::from);
+        if let Some(dir) = &output {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        let near = |p: &slint::Rgb8Pixel, c: [u8; 3]| {
+            (i16::from(p.r) - i16::from(c[0])).abs() < 12
+                && (i16::from(p.g) - i16::from(c[1])).abs() < 12
+                && (i16::from(p.b) - i16::from(c[2])).abs() < 12
+        };
+        // Wood, needles, blades and winning bids, at both viewports.
+        let capture = |name: &str, s: &GardenLabState| -> Vec<[usize; 4]> {
+            let frame = GardenLabScenario::render_frame(s);
+            assert!(frame.layers.iter().flat_map(|l| &l.primitives).any(|p| matches!(
+                p,
+                engine_common::RenderPrimitive::Text(t) if t.text.starts_with("GARDEN LAB TREE BED")
+            )));
+            let mut counts = Vec::new();
+            for (w, h) in [(1280.0, 720.0), (800.0, 480.0)] {
+                let viewport = Viewport::new(w, h);
+                let pixels = raster(&frame, viewport);
+                let count = |c: [u8; 3]| pixels.as_slice().iter().filter(|p| near(p, c)).count();
+                counts.push([
+                    count([140, 92, 51]),
+                    count([26, 179, 89]),
+                    count([64, 255, 77]),
+                    count([255, 230, 51]),
+                ]);
+                let export = svg(&frame, viewport);
+                assert!(!export.contains("NaN"));
+                assert!(export.contains("#8c5c33"), "vector wood fill absent");
+                if let Some(dir) = &output {
+                    let stem = format!("tree-{name}-{}x{}", w as u32, h as u32);
+                    write_png(&dir.join(format!("{stem}-raster.png")), &pixels);
+                    std::fs::write(dir.join(format!("{stem}-vector.svg")), &export).unwrap();
+                }
+            }
+            if let Some(dir) = &output {
+                let bed = s.shown_tree_bed().unwrap();
+                let state = serde_json::json!({"simulation_seconds":bed.plants.observe().tick,
+                    "tree":bed.tree_summary(),"grass":bed.grass_summary(),"bids":bed.bid_summary(),
+                    "preview_only":true});
+                std::fs::write(
+                    dir.join(format!("tree-{name}-state.json")),
+                    serde_json::to_vec_pretty(&state).unwrap(),
+                )
+                .unwrap();
+            }
+            counts
+        };
+        let mut s = GardenLabScenario::init((), 42);
+        s.command(Command::TreeBed);
+        let run = |s: &mut GardenLabState, until: u64| {
+            let bed = s.tree_bed.as_mut().unwrap();
+            while bed.plants.observe().tick < until {
+                bed.tick();
+            }
+        };
+        run(&mut s, 200);
+        // While it grows, some bids win every decision and show yellow.
+        for [wood, needles, blades, won] in capture("growing", &s) {
+            assert!(wood > 200, "wood invisible: {wood}");
+            assert!(needles > 20, "needles invisible: {needles}");
+            assert!(blades > 20, "blades invisible: {blades}");
+            assert!(won > 5, "winning bids invisible: {won}");
+        }
+        s.command(Command::Bids);
+        for [.., won] in capture("bids-off", &s) {
+            assert_eq!(won, 0, "bids drawn while off");
+        }
+        s.command(Command::Bids);
+        run(&mut s, 600);
+        let full = capture("cone", &s);
+        s.command(Command::CutBranch);
+        let cut = capture("cut", &s);
+        for ([wood, needles, ..], [cut_wood, cut_needles, ..]) in full.into_iter().zip(cut) {
+            assert!(cut_wood < wood && cut_needles < needles);
+        }
+        run(&mut s, 800);
+        capture("stub", &s);
     }
 }

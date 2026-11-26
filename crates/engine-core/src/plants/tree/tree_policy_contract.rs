@@ -222,6 +222,81 @@ fn conifer_grows_from_a_seed_into_a_conical_crown_and_replays() {
 }
 
 #[test]
+fn a_branch_cut_in_the_light_regrows_and_one_under_the_crown_leaves_a_stub() {
+    let (mut plants, tree) = planted(Traits::default());
+    let mut brain = Conifer::default();
+    let mut run = |plants: &mut Plants, ticks: u64| -> Vec<Round> {
+        (0..ticks)
+            .map(|_| {
+                let o = plants.observe();
+                let bed = Bed::new(&o, FULL);
+                let round = tree.plan(&o, &bed, &bed, &mut brain);
+                plants.tick(o.tick, false, 1, &round.intents, &bed).unwrap();
+                round
+            })
+            .collect()
+    };
+    run(&mut plants, 600);
+    let x = ORIGIN[0];
+    let reach = |o: &Observation, tier: i32| {
+        (1..WIDTH)
+            .take_while(|d| living(o, Role::Wood).any(|t| t.cell == [x + d, ORIGIN[1] + tier]))
+            .count()
+    };
+    // Cut a tier's right branch at the trunk, with all that grew beyond it.
+    let cut = |plants: &mut Plants, tier: i32| {
+        let o = plants.observe();
+        let base = living(&o, Role::Wood)
+            .find(|t| t.cell == [x + 1, ORIGIN[1] + tier])
+            .unwrap()
+            .id;
+        let mut gone = vec![base];
+        let mut i = 0;
+        while i < gone.len() {
+            let id = gone[i];
+            i += 1;
+            gone.extend(
+                o.connections
+                    .iter()
+                    .filter(|&&(parent, _)| parent == id)
+                    .map(|&(_, child)| child),
+            );
+        }
+        plants.remove_many(&gone).unwrap();
+    };
+    let shape = Conifer::default();
+    let lowest = shape.first_tier;
+    let top = (lowest..=shape.max_height - shape.tier_spacing)
+        .step_by(shape.tier_spacing as usize)
+        .last()
+        .unwrap();
+
+    // Nothing lies above the top tier's tip, so its branch grows back.
+    assert_eq!(reach(&plants.observe(), top), 2);
+    cut(&mut plants, top);
+    assert_eq!(reach(&plants.observe(), top), 0);
+    run(&mut plants, 200);
+    let o = plants.observe();
+    assert_eq!(reach(&o, top), 2, "{}", draw(&o));
+
+    // The tiers above shade the lowest one's whole length. The trunk sprouts
+    // one stub there and keeps it, rather than growing and shedding it again
+    // and again.
+    cut(&mut plants, lowest);
+    let rounds = run(&mut plants, 300);
+    let o = plants.observe();
+    assert_eq!(reach(&o, lowest), 1, "{}", draw(&o));
+    let churn: Vec<_> = rounds
+        .iter()
+        .flat_map(|r| &r.records)
+        .filter(|r| matches!(r.outcome, Outcome::Won(_)))
+        .filter(|r| matches!(r.bid.action, Action::Grow(Role::Wood) | Action::Shed))
+        .map(|r| (r.view.point.kind, r.bid.action))
+        .collect();
+    assert_eq!(churn, [(Kind::Trunk, Action::Grow(Role::Wood))]);
+}
+
+#[test]
 fn light_water_and_nutrients_each_hold_the_tree_back_until_they_return() {
     let wood = |o: &Observation| living(o, Role::Wood).count();
     let (full, _) = grow_under(300, |_| FULL);

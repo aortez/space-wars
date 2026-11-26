@@ -849,3 +849,137 @@ fn garden_lab_moss_surfaces_light_motion_and_support_loss_in_both_renderers() {
         }
     });
 }
+
+fn tree_tissues(v: &Value) -> &Vec<Value> {
+    v["tree_bed"]["tissues"].as_array().unwrap()
+}
+fn tree_tick(v: &Value) -> u64 {
+    v["tree_bed"]["tick"].as_u64().unwrap()
+}
+/// The tree's living tissue of one role.
+fn tree_living<'a>(v: &'a Value, role: &'a str) -> impl Iterator<Item = &'a Value> {
+    tree_tissues(v).iter().filter(move |t| {
+        t["policy"] == engine_core::plants::tree::POLICY
+            && t["role"] == role
+            && t["health"].as_u64().unwrap() > 0
+    })
+}
+/// Move the tree view's cursor forward to a control, then activate it.
+fn choose_tree(h: &mut FunctionalHarness, s: &mut UiState, current: &mut usize, target: usize) {
+    while *current != target {
+        press(h, s, InputButton::Down);
+        *current = (*current + 1) % scenario_garden_lab::TREE_CONTROLS.len();
+    }
+    press(h, s, InputButton::South);
+}
+const WOOD: [u8; 3] = [140, 92, 51];
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn garden_lab_tree_bed_grows_cuts_and_returns_in_both_renderers() {
+    run_functional_test_with_seed("garden-tree", "winit-femtovg", 42, |h| {
+        let ready = h.wait_until_ready();
+        let mut s = h.activate_until_scenario("garden-lab", ready);
+        for renderer in ["vector", "raster"] {
+            s = h.activate_guarded("launcher.settings", &s);
+            if control_value(&s, "launcher.settings.renderer.next") != Some(renderer) {
+                s = h.activate_guarded("launcher.settings.renderer.next", &s);
+            }
+            assert_eq!(
+                control_value(&s, "launcher.settings.renderer.next"),
+                Some(renderer)
+            );
+            s = h.activate_guarded("launcher.settings.back", &s);
+            h.activate_guarded("launcher.start", &s);
+            s = h.wait_for(
+                UiStatePredicate {
+                    screen: Some(UiScreen::Gameplay),
+                    scenario: Some("garden-lab".into()),
+                    ..Default::default()
+                },
+                TRANSITION_TIMEOUT,
+            );
+            // The tree bed is the last grass control. Shown, it runs on its
+            // own clock at 16x while the grass bed waits.
+            let mut c = 0;
+            choose(h, &mut s, &mut c, scenario_garden_lab::CONTROLS.len() - 1);
+            let shown = snapshot(h, |v| v["view"] == "tree" && v["tree_bed"].is_object());
+            assert_eq!(shown["tree_bed"]["speed"], 16);
+            let grass = tick(&shown);
+            let mut t = 0;
+            choose_tree(h, &mut s, &mut t, 2);
+            press(h, &mut s, InputButton::South);
+            snapshot(h, |v| v["tree_bed"]["speed"] == 64);
+
+            // While the tree grows, every point of it shows its last bid.
+            let growing = snapshot(h, |v| tree_tick(v) >= 150);
+            let tree: Vec<_> = tree_tissues(&growing)
+                .iter()
+                .filter(|t| t["policy"] == engine_core::plants::tree::POLICY)
+                .collect();
+            assert!(tree.len() > 10, "{growing}");
+            for t in tree {
+                assert!(t["bid"].is_string() && t["outcome"].is_string(), "{t}");
+            }
+            let image = capture(h, renderer, "tree-growing", &growing);
+            assert!(color_pixels(&image, |p| near(p, WOOD)) > 100);
+
+            // Grown, the conifer stands 14 cells tall with its needles lit,
+            // and the grass under its lowest tier has died.
+            snapshot(h, |v| tree_tick(v) >= 450);
+            choose_tree(h, &mut s, &mut t, 0);
+            let grown = snapshot(h, |v| v["tree_bed"]["paused"] == true);
+            let origin = scenario_garden_lab::TREE_ORIGIN;
+            let top = tree_living(&grown, "Wood")
+                .map(|t| t["cell"][1].as_i64().unwrap())
+                .max()
+                .unwrap();
+            assert_eq!(top - i64::from(origin[1]), 14, "{grown}");
+            assert!(tree_living(&grown, "Shoot").count() >= 12);
+            let dead_under = tree_tissues(&grown)
+                .iter()
+                .filter(|t| {
+                    t["policy"] == engine_core::plants::grass::POLICY
+                        && t["role"] == "Shoot"
+                        && t["health"] == 0
+                        && t["cell"][0].as_i64().unwrap() <= i64::from(origin[0]) + 6
+                })
+                .count();
+            assert!(dead_under >= 2, "{grown}");
+            assert_eq!(tick(&grown), grass, "the grass bed ran while hidden");
+            let image = capture(h, renderer, "tree-grown", &grown);
+            assert!(color_pixels(&image, |p| near(p, WOOD)) > 200);
+
+            // The selection is the tree's seed, so the cut takes the lowest
+            // branch on the grass's side, with its shares.
+            let wood = tree_living(&grown, "Wood").count();
+            choose_tree(h, &mut s, &mut t, 13);
+            let cut = snapshot(h, |v| v["tree_bed"]["cuts"] == 1);
+            assert_eq!(tree_living(&cut, "Wood").count(), wood - 6);
+            for r in 0..3 {
+                assert!(
+                    cut["tree_bed"]["loss"][r].as_u64().unwrap()
+                        > grown["tree_bed"]["loss"][r].as_u64().unwrap()
+                );
+            }
+            capture(h, renderer, "tree-cut", &cut);
+
+            // Back to the grass bed, which runs again from where it waited.
+            choose_tree(h, &mut s, &mut t, 15);
+            let back = snapshot(h, |v| v["view"] == "grass");
+            assert!(tick(&back) >= grass);
+            assert_eq!(back["tree_bed"]["cuts"], 1);
+
+            h.pause_guarded(&s);
+            s = h.wait_for(
+                UiStatePredicate {
+                    screen: Some(UiScreen::PauseMain),
+                    ..Default::default()
+                },
+                TRANSITION_TIMEOUT,
+            );
+            h.activate_guarded("pause.return-to-launcher", &s);
+            s = h.wait_until_ready();
+        }
+    });
+}

@@ -1,5 +1,6 @@
 //! A finite, reproducible viewing host for the shared plant physiology: grass
-//! on dirt, plus deliberately placed moss on dirt and on a movable rock.
+//! on dirt, plus deliberately placed moss on dirt and on a movable rock, and a
+//! taller bed where a conifer grows beside grass.
 use engine_common::*;
 use engine_core::{
     Vec2,
@@ -21,6 +22,10 @@ use engine_terrain::{
     Brush, CellCoord, EditMode, Material, MaterialId, Terrain, TerrainEdit, TerrainGeometry,
 };
 use std::{collections::BTreeMap, time::Duration};
+
+pub mod tree_bed;
+use tree_bed::next_light;
+pub use tree_bed::{TREE_CONTROLS, TREE_GRASS_ORIGIN, TREE_MAX_TICKS, TREE_ORIGIN, TreeBed};
 
 pub const TICK_MS: u64 = 1000;
 pub const MAX_TICKS: u64 = 480;
@@ -45,7 +50,8 @@ const MOSS_GREEN: RenderColor = RenderColor::rgb(0.45, 0.72, 0.18);
 const STRESSED: RenderColor = RenderColor::rgb(1.0, 0.65, 0.12);
 const DEAD: RenderColor = RenderColor::rgb(0.5, 0.4, 0.4);
 /// Commands are edge triggered by the client; step works only while lab-paused.
-#[derive(Clone, Copy, Debug)]
+/// While the tree bed is shown, commands act on it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Command {
     Pause,
@@ -74,6 +80,11 @@ pub enum Command {
     BreakRock,
     RemoveRock,
     ScrapeMoss,
+    TreeBed,
+    GrassBed,
+    Bids,
+    CutBranch,
+    PlantTree,
 }
 impl Command {
     pub fn action(self) -> Action {
@@ -116,12 +127,17 @@ impl Command {
             Self::BreakRock,
             Self::RemoveRock,
             Self::ScrapeMoss,
+            Self::TreeBed,
+            Self::GrassBed,
+            Self::Bids,
+            Self::CutBranch,
+            Self::PlantTree,
         ]
         .get(*v as usize)
         .copied()
     }
 }
-pub const CONTROLS: [(&str, Command); 23] = [
+pub const CONTROLS: [(&str, Command); 24] = [
     ("Pause / resume", Command::Pause),
     ("Single step", Command::Step),
     ("Faster (max 16x)", Command::Faster),
@@ -145,6 +161,7 @@ pub const CONTROLS: [(&str, Command); 23] = [
     ("Break rock edge", Command::BreakRock),
     ("Remove rock", Command::RemoveRock),
     ("Scrape moss strip", Command::ScrapeMoss),
+    ("Tree bed: a conifer beside grass", Command::TreeBed),
 ];
 
 fn uptake<'a>(
@@ -352,6 +369,10 @@ pub struct GardenLabState {
     pub moss: Option<Moss>,
     pub moss_plan: Plan,
     pub rock: Option<Rock>,
+    /// The taller bed, made the first time it is shown and kept while the
+    /// grass bed is shown again.
+    pub tree_bed: Option<TreeBed>,
+    pub showing_tree: bool,
     pub paused: bool,
     pub speed: u64,
     pub intensity: u16,
@@ -617,7 +638,21 @@ impl GardenLabState {
             self.rock = Some(Rock::insert(&mut self.world, self.seed));
         }
     }
+    /// The tree bed, while it is shown.
+    pub fn shown_tree_bed(&self) -> Option<&TreeBed> {
+        self.tree_bed.as_ref().filter(|_| self.showing_tree)
+    }
     pub fn command(&mut self, c: Command) {
+        if let Some(bed) = self.tree_bed.as_mut().filter(|_| self.showing_tree) {
+            let leave = c == Command::GrassBed
+                || c == Command::Activate && TREE_CONTROLS[bed.control].1 == Command::GrassBed;
+            if leave {
+                self.showing_tree = false;
+            } else {
+                bed.command(c);
+            }
+            return;
+        }
         match c {
             Command::Previous => {
                 self.control = (self.control + CONTROLS.len() - 1) % CONTROLS.len()
@@ -643,15 +678,7 @@ impl GardenLabState {
             }
             Command::Faster => self.speed = (self.speed * 2).min(16),
             Command::Slower => self.speed = (self.speed / 2).max(1),
-            Command::Light => {
-                self.intensity = match self.intensity {
-                    1000 => 50,
-                    50 => 250,
-                    250 => 500,
-                    500 => 0,
-                    _ => 1000,
-                }
-            }
+            Command::Light => self.intensity = next_light(self.intensity),
             Command::Nutrients => {
                 self.availability[0] = if self.availability[0] == 0 { 1000 } else { 0 }
             }
@@ -680,7 +707,12 @@ impl GardenLabState {
                     .collect();
                 self.plants.remove_many(&ids).unwrap();
             }
-            Command::Reset => *self = GardenLabScenario::init((), self.seed),
+            // A fresh grass bed; the tree bed is its own and stays as it is.
+            Command::Reset => {
+                let tree_bed = self.tree_bed.take();
+                *self = GardenLabScenario::init((), self.seed);
+                self.tree_bed = tree_bed;
+            }
             Command::PlaceMoss => self.place_moss(),
             // Moss follows its support-local cells; turning changes only light.
             Command::TurnRock => {
@@ -741,9 +773,22 @@ impl GardenLabState {
                     rock.plants.remove_many(&ids).unwrap();
                 }
             }
+            Command::TreeBed => {
+                if self.tree_bed.is_none() {
+                    self.tree_bed = Some(TreeBed::new(self.seed));
+                }
+                self.showing_tree = true;
+            }
+            // Tree bed controls do nothing here.
+            Command::GrassBed | Command::Bids | Command::CutBranch | Command::PlantTree => {}
         }
     }
+    /// Time passes only for the bed that is shown.
     pub fn advance(&mut self, dt: Duration) {
+        if let Some(bed) = self.tree_bed.as_mut().filter(|_| self.showing_tree) {
+            bed.advance(dt);
+            return;
+        }
         if self.paused || dt.is_zero() {
             return;
         }
@@ -871,6 +916,8 @@ impl Scenario for GardenLabScenario {
             moss: None,
             moss_plan: Plan::default(),
             rock: None,
+            tree_bed: None,
+            showing_tree: false,
             paused: false,
             speed: 1,
             intensity: 1000,
@@ -920,6 +967,9 @@ impl Scenario for GardenLabScenario {
         TickModel::FixedTimestep { hz: 60 }
     }
     fn render_frame(s: &GardenLabState) -> RenderFrame {
+        if let Some(bed) = s.shown_tree_bed() {
+            return bed.render_frame();
+        }
         let mut f = RenderFrame::new(Camera2::new(RenderPoint::new(0.0, 0.0), 22.0));
         let p = |cell: [i32; 2]| {
             let v = s.terrain.cell_center(CellCoord::new(cell[0], cell[1]));

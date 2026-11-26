@@ -1119,8 +1119,11 @@ impl Conifer {
             && dark
             && p.needles_beyond == 0
             && p.dead_beyond == 0
+            && p.across.abs() > 1
         {
-            // A bare tip in shade with nowhere to reach is dropped.
+            // A bare tip in shade with nowhere to reach is dropped, back to
+            // the stub beside the trunk. The stub waits: shed, it would sprout
+            // again into the same shade.
             return act(Action::Shed, 100);
         }
         best(options)

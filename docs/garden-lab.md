@@ -242,3 +242,100 @@ a scraped strip regrown by new tissue, retaining a PNG/JSON pair at each stage. 
 count only the rock's own screen region, because anti-aliased HUD text produces
 the same slate grey. It took 258 seconds under local Xvfb; there is no hosted
 runner measurement yet.
+
+## Tree bed (#743)
+
+The last control, **Tree bed: a conifer beside grass**, shows a second bed, in
+which the hand-written conifer from [Plants](plants.md#tree-743) grows beside a
+grass patch. The lab shows one bed at a time. Each bed keeps its own world,
+plants, clock, control cursor and settings, and only the bed shown runs, so
+the grass bed, its control positions and its tests are unchanged. **Back to
+grass bed** returns to it, and showing the tree bed again finds it as it was,
+even after the grass bed's reset. The host's restart starts the whole lab
+again, on its grass bed.
+
+The bed is 32 cells wide and 26 tall, with dirt up to row 7: eight rows of dirt
+where the grass bed has four, and air for a tree 14 cells tall. The tree's seed
+is at [12,7] and the grass's at [20,7], each with its finite reserves, under
+the grass physiology and the grass bed's grass traits. Light falls straight
+down at the chosen intensity; the sun drawn in the corner only marks it. At
+each boundary the bed measures light at every blade and needle and at up to
+64 cells the tree asks about, and the runtime admits the tree's winning bids
+and the grass's plan together.
+
+Playback starts at 16x and goes from 1x to 64x, with the grass bed's 1000 ms
+ticks, catch-up limit and fractional carry. A run stops aging at 1200 ticks.
+
+| Control | Effect |
+| --- | --- |
+| Pause / resume, single step, faster, slower | As in the grass bed, from 1x to 64x. |
+| Light | Cycles full sun (1000), dim room (50), 250, 500 and dark (0). |
+| Nutrients, water | Each toggles its soil supply between 1000 and 0. |
+| Shade, shade left, shade right | A bar high above the bed, first over the grass's seed. Left and right also move it. |
+| Underground inspection | Shows or hides roots and the links between tissues. |
+| Inspect next tissue | Moves the pink selection through the bed's tissue in ID order. |
+| Bids on/off | Shows or hides each point's last bid. |
+| Cut a branch | Cuts the selected wood and everything beyond it, if it is off the trunk; otherwise the lowest branch, on the grass's side first. The cut tissue's shares are lost. |
+| Plant fresh tree and grass | Replaces the bed with a fresh one, with the default settings. |
+| Back to grass bed | Shows the grass bed. |
+
+Wood is brown, drawn from its parent with a width that grows with the square
+root of its size, so the trunk tapers. Needles are green triangles that
+lengthen as they mature. Blades, runners and roots draw as in the grass bed,
+and stressed and dead tissue share its amber and grey. With bids shown, each
+point that bid anything but a wait carries a dot: yellow when its bid won, red
+when the world refused it, and grey when higher bids spent the decision's
+budget first. A winning growth bid also draws a yellow line to the cell it
+grows into. The text lists the tree (its living wood, needles and roots, dead
+tissue, height, depth, cuts, and energy intake and upkeep), the grass, the
+last decision's bids by outcome with refusals by reason, the light work and
+probes, and the selected tissue. A selected point of the tree also shows its
+kind, its place in the tree's frame, its bid, priority and outcome, and the
+readings it has: light for a needle, and for wood what it carries and the
+headroom back to the seed.
+
+The `garden_lab=` status record adds `view` (`grass` or `tree`) and a
+`tree_bed` object, null until the bed is first shown. It holds the bed's clock
+and settings, the three summaries, its ledger, light work and probe count, and
+every tissue; the tree's tissue entries add the point's kind, bid, priority and
+outcome.
+
+With seed 42 in full sun, the conifer stands 14 cells tall at tick 600, with
+branch tiers reaching 6, 5, 4, 3 and 2 cells to each side, 13 needles and 16
+roots down to depth 5. It takes in 312 energy a tick and pays 213 in upkeep.
+The grass fills its 32 tissues; its two blades under the lowest tier have died
+in the tree's shade, and the six beyond it live. Cut at tick 600, the lowest
+branch on the grass's side grows back only as a one-cell stub under the tiers
+above, which the tree keeps. A top branch, in the light, grows back to its
+full two cells within 200 ticks.
+
+| | Growing, with its bids | Grown, over dead grass | The lowest branch cut | Its stub, 200 ticks on |
+| --- | --- | --- | --- | --- |
+| 1280×720 | ![A young conifer ten cells tall with three tiers of branches, its needles marked with yellow and grey dots, beside eight green blades of grass](screenshots/garden-lab/tree-growing-1280x720-raster.png) | ![The grown conifer, fourteen cells tall, five tiers of branches shortening toward the top and a needle at each tip, over two grey blades of grass, with six green blades beyond](screenshots/garden-lab/tree-cone-1280x720-raster.png) | ![The same conifer with its lowest right branch gone](screenshots/garden-lab/tree-cut-1280x720-raster.png) | ![The same conifer with a one-cell stub where its lowest right branch was](screenshots/garden-lab/tree-stub-1280x720-raster.png) |
+| 800×480 | ![A young conifer ten cells tall with three tiers of branches, its needles marked with yellow and grey dots, beside eight green blades of grass](screenshots/garden-lab/tree-growing-800x480-raster.png) | ![The grown conifer, fourteen cells tall, five tiers of branches shortening toward the top and a needle at each tip, over two grey blades of grass, with six green blades beyond](screenshots/garden-lab/tree-cone-800x480-raster.png) | ![The same conifer with its lowest right branch gone](screenshots/garden-lab/tree-cut-800x480-raster.png) | ![The same conifer with a one-cell stub where its lowest right branch was](screenshots/garden-lab/tree-stub-800x480-raster.png) |
+
+At tick 200 the tree is 10 cells tall with three tiers; that tick, four of its
+points' bids won and five were outbid. At tick 600 its cone is complete, and the
+two blades under its lowest tier are grey. Cut, the lowest right branch goes
+with its needle, and by tick 800 a one-cell stub stands in its place. The
+pictures come from the window-free renderer, without the text.
+`SPACEWARS_GARDEN_RENDER_ARTIFACTS=<dir> cargo test --locked --profile ci -p
+engine-client garden_render_contract_tree_bed` regenerates all eight.
+
+`tree_bed_contract` covers that growth with an exact replay; light and shade
+reaching the blades beneath; showing the bed from the grass controls with its
+own cursor, clock and settings while the grass bed waits, the 64x limit, pause,
+step and the 1200-tick stop; both cuts; and fresh planting. The window-free
+`garden_render_contract_tree_bed_draws_wood_needles_bids_and_grass` counts
+wood, needle, blade and winning-bid pixels at 1280x720 and 800x480, checks
+that hidden bids draw nothing and that a cut removes wood and needles from the
+picture, and exports preview-only PNG, SVG and state files when
+`SPACEWARS_GARDEN_RENDER_ARTIFACTS` is set.
+
+The full-only functional case
+`garden_lab_tree_bed_grows_cuts_and_returns_in_both_renderers` drives the real
+launcher in vector and raster modes. It shows the tree bed from the grass
+controls, runs it at 64x, checks every tree point's bid in the status, the
+grown cone and the dead grass beneath it, cuts the lowest branch and returns to
+the grass bed, retaining a PNG/JSON pair at each stage. It took 56 seconds
+under local Xvfb.
