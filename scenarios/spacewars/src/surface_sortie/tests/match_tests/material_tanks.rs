@@ -1,10 +1,10 @@
-//! Supplied rounds, the laser and contacts against tanks (#238): in the
-//! rounds' fixture, where a ship's hull fails on the fourth round, and on a
-//! material planet.
+//! Supplied rounds, the laser and contacts against tanks, and what a failed
+//! tank leaves (#238): in the rounds' fixture, where a ship's hull fails on the
+//! fourth round, and on a material planet.
 use super::*;
 use crate::{
     Allegiance,
-    tanks::{TANK_HEALTH, TankCommand, TankDamage, TankDamageCause, TankId},
+    tanks::{TANK_HEALTH, TankCommand, TankDamage, TankDamageCause, TankId, TankLoss},
 };
 use engine_rapier::rover::RoverSpawnPose;
 
@@ -52,12 +52,26 @@ fn fixture() -> (SurfaceSortieState, TankId) {
     (state, tank)
 }
 
+/// What is left of `tank`'s armor: none once it is destroyed.
 fn health(state: &SurfaceSortieState, tank: TankId) -> f32 {
-    state.world.tank_snapshot(tank).unwrap().health
+    state
+        .world
+        .tank_snapshot(tank)
+        .map_or(0.0, |tank| tank.health)
 }
 
+/// The last hit that cost `tank` health. Its loss keeps it in the step that
+/// destroys it.
 fn last_damage(state: &SurfaceSortieState, tank: TankId) -> Option<TankDamage> {
-    state.world.tank_snapshot(tank).unwrap().last_damage
+    match state.world.tank_snapshot(tank) {
+        Some(snapshot) => snapshot.last_damage,
+        None => state
+            .world
+            .tank_losses
+            .iter()
+            .find(|loss| loss.id == tank)
+            .map(|loss| loss.damage),
+    }
 }
 
 /// A round from 8 units off the tank's center of mass, closing at 300, that
@@ -88,8 +102,9 @@ fn shine(state: &mut SurfaceSortieState) {
     SurfaceSortieScenario::step(state, &[action], Duration::from_nanos(16_666_667));
 }
 
-/// A round costs a fresh tank 13.19 and fails it on the eighth hit. Each hit
-/// names the seat whose round it was, or no side for a round no seat fired.
+/// A round costs a fresh tank 13.19 and fails it on the eighth hit, which
+/// destroys it. Each hit names the seat whose round it was, or no side for a
+/// round no seat fired.
 #[test]
 fn rounds_fail_a_tank_on_the_eighth_hit_and_name_the_seat_that_fired() {
     let (mut state, tank) = fixture();
@@ -152,6 +167,7 @@ fn rounds_fail_a_tank_on_the_eighth_hit_and_name_the_seat_that_fired() {
         full.iter().all(|hit| (hit - 13.19).abs() < 0.01),
         "{hits:?}"
     );
+    assert!(state.world.tank_snapshot(tank).is_none());
 }
 
 /// From 40 units off, the laser fails a tank in 9.33 seconds, sooner than the
@@ -182,6 +198,123 @@ fn the_laser_fails_a_tank_and_names_the_seat_that_fired() {
     let last = last_damage(&state, tank).unwrap();
     assert_eq!(last.cause, TankDamageCause::Laser);
     assert_eq!(last.source, Some(FIRST_SEAT));
+    assert!(state.world.tank_snapshot(tank).is_none());
+}
+
+/// A tank whose armor fails leaves the world in that step, and only then. Its
+/// wreckage is six ownerless fragments in its side's color that keep its
+/// motion and its mass. Nothing replaces it, and the round goes on.
+#[test]
+fn a_failed_tank_leaves_once_as_wreckage_that_keeps_its_motion_and_the_round_goes_on() {
+    let (mut state, tank) = fixture();
+    assert!(state.world.debris.is_empty());
+    // It flies and spins.
+    let bodies = state.world.physics.tanks.bodies();
+    let velocity = Vec2::new(0.0, 45.0);
+    let world = &mut state.world.physics.world;
+    for &body in &bodies {
+        assert!(world.set_velocity(body, velocity, 1.5, true));
+    }
+    let masses: Vec<_> = bodies
+        .iter()
+        .map(|&body| world.body_mass(body).unwrap())
+        .collect();
+    let round = state.match_observation().unwrap();
+    // How its bodies move as the step that fails it ends, from a copy whose
+    // armor holds.
+    let mut intact = state.clone();
+    idle(&mut intact, 1);
+    let motions: Vec<_> = bodies
+        .iter()
+        .map(|&body| intact.world.physics.world.motion(body).unwrap())
+        .collect();
+    // Its armor fails outright between steps. What fails it is the other
+    // tests' business.
+    let hit = TankDamage {
+        tick: state.world.tick + 1,
+        cause: TankDamageCause::Round,
+        amount: TANK_HEALTH,
+        source: Some(FIRST_SEAT),
+    };
+    state.world.physics.tanks.damage(tank, hit);
+    idle(&mut state, 1);
+    assert!(state.world.tank_snapshot(tank).is_none());
+    assert!(!state.world.command_tank(tank, TankCommand::default()));
+    for &body in &bodies {
+        assert!(state.world.physics.world.motion(body).is_none());
+    }
+    let loss = TankLoss {
+        id: tank,
+        allegiance: GOVERNMENT,
+        damage: hit,
+    };
+    assert_eq!(state.world.tank_losses, [loss]);
+    let wreckage = &state.world.debris;
+    assert_eq!(wreckage.len(), 6);
+    let mass = masses.iter().sum::<f32>();
+    let carried = masses
+        .iter()
+        .zip(&motions)
+        .fold(Vec2::ZERO, |sum, (mass, motion)| {
+            sum + motion.linear_velocity * *mass
+        });
+    let (mut total, mut momentum) = (0.0, Vec2::ZERO);
+    for fragment in wreckage {
+        assert_eq!(fragment.kind, DebrisKind::Fragment);
+        assert!(fragment.fragment_shape.is_some());
+        assert_eq!(fragment.owner_id, None);
+        assert_eq!(fragment.spawn_tick + 1, state.world.tick);
+        let color = fragment.color;
+        let olive = GOVERNMENT_TANK_COLOR;
+        for (shade, base) in [(color.r, olive.r), (color.g, olive.g), (color.b, olive.b)] {
+            assert!((shade - base).abs() <= 0.04, "{color:?}");
+        }
+        // It lies beside the body it came from and moves as that body's
+        // point there does, spin and all.
+        let (&body, motion) = bodies
+            .iter()
+            .zip(&motions)
+            .min_by(|(_, a), (_, b)| {
+                let a = a.position.distance_to(fragment.position);
+                a.total_cmp(&b.position.distance_to(fragment.position))
+            })
+            .unwrap();
+        assert!(motion.position.distance_to(fragment.position) < 1.0);
+        let point = intact
+            .world
+            .physics
+            .world
+            .velocity_at_point(body, fragment.position);
+        let point = point.unwrap();
+        assert!(
+            (fragment.velocity - point).length() < 1.0e-3,
+            "{:?} {point:?}",
+            fragment.velocity
+        );
+        assert!((fragment.velocity - motion.linear_velocity).length() > 0.1);
+        let share = fragment.inertial_mass.unwrap();
+        total += share;
+        momentum += fragment.velocity * share;
+    }
+    assert!((total - mass).abs() < 1.0e-4 * mass, "{total} {mass}");
+    assert!(
+        (momentum - carried).length() < 1.0e-4 * carried.length(),
+        "{momentum:?} {carried:?}"
+    );
+    // Later steps neither destroy it again nor add to its wreckage.
+    for _ in 0..120 {
+        idle(&mut state, 1);
+        assert!(state.world.tank_losses.is_empty());
+        assert_eq!(state.world.tank_ids().count(), 0);
+        assert!(state.world.debris.len() <= 6);
+    }
+    // A tank's loss is no pilot's, and it ends nothing.
+    let after = state.match_observation().unwrap();
+    assert_eq!(after.reason, None);
+    assert_eq!(after.outcome, None);
+    assert_eq!(after.finished_tick, None);
+    assert_eq!(after.owned_planets, round.owned_planets);
+    assert_eq!(after.pilots, round.pilots);
 }
 
 /// The material planet with its spin off, and the seats' ships at world +Y and
