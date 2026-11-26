@@ -272,8 +272,8 @@ body/colliders and player or government allegiance. Repeated registration does
 not renew contact history. Owners must call `unregister_ground_surface_force`
 on destruction/retirement if a physical wreck remains; missing native bodies
 are pruned automatically. Reset starts with an empty registry; cloning
-preserves its state. A restart or a new match builds a new world from its seed,
-so no tank, wreck or loss carries over.
+preserves its state. A restart builds a new world from its seed, and a new
+match builds one from a fresh seed, so no tank, wreck or loss carries over.
 
 ## Observations and verification
 
@@ -351,9 +351,10 @@ departure that ends the block at the departure distance, with clone/replay
 equality; a hop by a tank carrying another on its back, which keeps its block;
 a tank riding a detached fragment while the claim completes around it; clearing
 the last tank beside a flying ship; a lost flag footing that keeps every tank
-and its allegiance; a health bar that stays above a tank on its back; and a
-claim that completes on the tick its last defender dies, while the defender's
-wreck never counts.
+with its allegiance and damage; a health bar that stays above a tank on its
+back; a claim that completes on the tick its last defender dies, while the
+defender's wreck never counts; and a world rebuilt from its seed after tanks
+fought, as a restart rebuilds it, which holds nothing of them.
 
 Positive AI flight/capture fixtures now let their otherwise idle opponent
 depart through real controls only when its landing feet support it on the
