@@ -830,6 +830,26 @@ impl ClockState {
     /// aperture decides where plants can live, never where material may rest.
     /// `planned_only` commits just the sites the ceiling planned at its start.
     fn admit_soil_delivery(&mut self, planned_only: bool) -> grass::SoilAdmissionPlan {
+        let allowed = planned_only.then(|| {
+            self.ceiling
+                .material
+                .iter()
+                .map(|s| (s.column, s.row))
+                .collect::<std::collections::BTreeSet<_>>()
+        });
+        self.admit_soil_where(|site| {
+            allowed
+                .as_ref()
+                .is_none_or(|sites| sites.contains(&(site.column, site.row)))
+        })
+    }
+
+    /// Commits soil to the empty sites over actual support that `wanted`
+    /// picks.
+    fn admit_soil_where(
+        &mut self,
+        wanted: impl Fn(&grass::SoilSite) -> bool,
+    ) -> grass::SoilAdmissionPlan {
         use engine_rapier::world::{CollisionGroups, PhysicsId};
         let layout = Layout::new(self.aspect_ratio());
         self.synchronize_soil();
@@ -844,18 +864,8 @@ impl ClockState {
         let soil = self
             .soil
             .get_or_insert_with(|| grass::SoilHabitat::new(layout));
-        let allowed = planned_only.then(|| {
-            self.ceiling
-                .material
-                .iter()
-                .map(|s| (s.column, s.row))
-                .collect::<std::collections::BTreeSet<_>>()
-        });
         let plan = soil.admit(&supports, |site| {
-            if allowed
-                .as_ref()
-                .is_some_and(|sites| !sites.contains(&(site.column, site.row)))
-            {
+            if !wanted(&site) {
                 return true;
             }
             let Some(surface) = surfaces.iter().find(|s| s.covers(site.min.x, site.max.x)) else {
@@ -1615,15 +1625,21 @@ impl ClockState {
     /// What a stranded spaceling goes by, but for the face's surfaces.
     fn stranded_view(&self) -> stranded::Surroundings<'static> {
         let event = self.event_kind();
+        let ordinary = self.duck_visit.is_none() && !self.arena.holds(arena::Owner::Visit);
         stranded::Surroundings {
             surfaces: &[],
             event,
             // A course, an open drain or an event's own panels are not the
             // floor it walks, nor are a fight's hills over it.
-            floor: self.duck_visit.is_none()
-                && !self.arena.holds(arena::Owner::Visit)
+            floor: ordinary
                 && self.floor.mode() == engine_common::ClockFloorMode::Closed
                 && event != Some(ClockEventKind::Tanks),
+            // An open drain leaves it a bank on either side.
+            drain: (ordinary && self.floor.mode() == engine_common::ClockFloorMode::DrainOpen)
+                .then(|| Layout::new(self.aspect_ratio()).drain_half_width()),
+            falling: self
+                .arena
+                .holds(arena::Owner::Event(ClockEventKind::Falling)),
             birds: self
                 .crow_visit
                 .as_ref()
@@ -1675,13 +1691,48 @@ impl ClockState {
             .held_mut(arena::Owner::Stranded)
             .expect("the stranded spaceling's claim keeps a world");
         if advance {
-            if self.stranded.step(world, around) {
+            let gone = self.stranded.step(world, around);
+            if let Some(x) = self.stranded.take_burial() {
+                self.bury_stranded(x);
+            }
+            if gone {
                 self.arena.release(arena::Owner::Stranded);
             }
         } else if let Some(spaceling) = &mut self.stranded.spaceling {
             spaceling.synchronize(world, around);
         }
     }
+
+    /// A dead spaceling's remains turn to dirt in the floor's soil at `x`, or
+    /// as near it as the floor shows where a side of the frame hides `x`: in
+    /// the column there and those beside it, wherever the floor holds soil.
+    /// Where the middle one took dirt, a grass seed takes root in it while
+    /// Grass is on and no grass grows yet: as the Grass event's seeds, it is
+    /// the clock's grass while it lives.
+    fn bury_stranded(&mut self, x: f32) {
+        let reach = stranded::REMAINS_REACH as f32 * grass::SOIL_CELL_SIZE;
+        // A blow can throw its remains against a wall, under the frame.
+        let layout = Layout::new(self.aspect_ratio());
+        let inset = layout.frame_width + reach + grass::SOIL_CELL_SIZE;
+        let x = x.clamp(layout.bounds_min.x + inset, layout.bounds_max.x - inset);
+        self.admit_soil_where(|site| site.min.x - reach <= x && x < site.max.x + reach);
+        let Some(soil) = &self.soil else {
+            return;
+        };
+        let column = soil.column_at(x);
+        let dirt = soil
+            .terrain()
+            .cell(engine_terrain::CellCoord::new(
+                column,
+                grass::SOIL_DEPTH_CELLS as i32 - 1,
+            ))
+            .is_some_and(|cell| cell.material == grass::CLOCK_DIRT);
+        if dirt && self.config.events.grass && self.plants.grass_tissues() == 0 {
+            // The plants refuse it when they have no room for it.
+            let _ = self.plant_grass(column);
+        }
+    }
+
     pub fn cell_swap_state(&self) -> Option<engine_common::ClockCellSwapState> {
         match self.active_event.as_ref()? {
             ActiveEvent::CellSwap(event) => Some(event.diagnostics()),
@@ -1994,6 +2045,32 @@ impl ClockState {
             };
             self.active_event = Some(ActiveEvent::Rain(Box::new(rain)));
             return;
+        }
+        // Beside a stranded spaceling, Falling's bars fall in the arena it
+        // stands in, where they can meet it, and it sees them go before they
+        // move. Without room for them there, they fall in a world of their
+        // own and its beam comes for it.
+        if kind == ClockEventKind::Falling
+            && self.duck_visit.is_none()
+            && self.stranded.spaceling.is_some()
+        {
+            let mut owners = self.arena_owners();
+            owners.push(arena::Owner::Event(kind));
+            if self.arena.admit(&owners).is_ok() {
+                self.floor.acquire(kind);
+                let context = EventContext {
+                    segments: &mut self.segments,
+                    surfaces: &mut self.surfaces,
+                    display: self.display,
+                    layout,
+                    floor: self.floor.geometry(layout),
+                };
+                self.active_event = Some(ActiveEvent::Falling(
+                    events::falling::FallingEvent::in_arena(context, seed, &mut self.arena),
+                ));
+                self.update_stranded(false);
+                return;
+            }
         }
         if matches!(
             kind,

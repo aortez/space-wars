@@ -1071,3 +1071,134 @@ fn tanks_the_hills_leave_a_spaceling_stranded_on_the_clock() {
         assert_eq!(stranded.accounting.time_up, 1);
     }
 }
+
+#[test]
+fn tanks_a_spaceling_left_on_the_clock_runs_from_fallings_bars() {
+    use engine_common::ClockStrandedPhase as Phase;
+    let camera = Camera::new();
+    // Seed 9715's hills leave a spaceling behind at both sizes, as above. On
+    // the walk named for each size, a bar kills it.
+    let seed = 9715;
+    for (size, patch, scale, fatal) in [((1024, 768), (72, 60), 5, 3), ((800, 480), (60, 48), 6, 7)]
+    {
+        let viewport = Viewport::new(size.0 as f32, size.1 as f32);
+        camera.window.set_size(PhysicalSize::new(size.0, size.1));
+        let name = format!("{}x{}", size.0, size.1);
+        let spaceling = |state: &scenario_clock::ClockState| {
+            state
+                .stranded_state()
+                .and_then(|stranded| stranded.spaceling)
+        };
+        // The fight's run until `ticks` into the spaceling's `walk`th walk
+        // on the floor, when Falling begins.
+        let falling = |walk: usize, ticks: usize| {
+            let mut state = face_fight(viewport, seed);
+            let (mut walks, mut walking) = (0, false);
+            while walks < walk {
+                step(&mut state);
+                let now = spaceling(&state).is_some_and(|it| it.phase == Phase::Walking);
+                walks += usize::from(now && !walking);
+                walking = now;
+            }
+            for _ in 0..ticks {
+                step(&mut state);
+            }
+            assert_eq!(spaceling(&state).unwrap().perch, None, "{name}");
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::preview_event(ClockEventKind::Falling)],
+                Duration::ZERO,
+            );
+            state
+        };
+        let until = |state: &mut scenario_clock::ClockState, phase: Phase, limit: usize| {
+            for _ in 0..limit {
+                if spaceling(state).is_some_and(|it| it.phase == phase) {
+                    return;
+                }
+                step(state);
+            }
+            panic!("{name}: {phase:?}, {:?}", spaceling(state));
+        };
+        let steps = |state: &mut scenario_clock::ClockState, ticks: usize| {
+            for _ in 0..ticks {
+                step(state);
+            }
+        };
+        // The frame, and where `at` is on it, a fifth of a patch's height
+        // lower.
+        let shot = |state: &scenario_clock::ClockState, at: [i32; 2]| {
+            let frame = ClockScenario::render_frame(state);
+            let pixels = draw(&camera.ui, &camera.window, &frame, viewport, false);
+            let feet = on_screen(state, size, at);
+            (pixels, [feet[0], feet[1] - patch.1 as f32 * 0.2])
+        };
+        let feet = |state: &scenario_clock::ClockState| spaceling(state).unwrap().position_milli;
+        let mut strip = Vec::new();
+
+        // At the start of its sixth walk, it stops to look up as the bars
+        // begin to come down, and runs clear of them along its bank.
+        let mut state = falling(6, 0);
+        steps(&mut state, 6);
+        strip.push(shot(&state, feet(&state)));
+        until(&mut state, Phase::Dodging, 30);
+        let knockdowns = spaceling(&state).unwrap().knockdowns;
+        steps(&mut state, 30);
+        assert_eq!(spaceling(&state).unwrap().phase, Phase::Dodging, "{name}");
+        let running = shot(&state, feet(&state));
+        camera.keep(&format!("{name}-stranded-dodge"), &running.0);
+        strip.push(running);
+        until(&mut state, Phase::Standing, 4 * 60);
+        steps(&mut state, 30);
+        strip.push(shot(&state, feet(&state)));
+        while state.event_kind() == Some(ClockEventKind::Falling) {
+            step(&mut state);
+        }
+        let it = spaceling(&state).unwrap();
+        assert_eq!(it.knockdowns, knockdowns, "{name}: untouched");
+        assert!(it.dodges >= 1 && it.phase == Phase::Standing && it.perch.is_none());
+
+        // With Falling 1.25 s into that walk, it runs, and a bar comes down
+        // on it and kills it. Its remains lie dulled, turn to dirt, and grass
+        // grows from the dirt.
+        let mut state = falling(fatal, 75);
+        until(&mut state, Phase::Dodging, 30);
+        steps(&mut state, 12);
+        assert_eq!(spaceling(&state).unwrap().phase, Phase::Dodging, "{name}");
+        strip.push(shot(&state, feet(&state)));
+        until(&mut state, Phase::Dead, 2 * 60);
+        let blow = shot(&state, feet(&state));
+        camera.keep(&format!("{name}-stranded-clobbered"), &blow.0);
+        strip.push(blow);
+        steps(&mut state, 30);
+        assert_eq!(spaceling(&state).unwrap().phase, Phase::Dead, "{name}");
+        strip.push(shot(&state, feet(&state)));
+        let soil = state.grass_state().soil_added;
+        while state.grass_state().soil_added == soil {
+            assert_eq!(spaceling(&state).unwrap().phase, Phase::Dead, "{name}");
+            step(&mut state);
+        }
+        assert_eq!(state.grass_state().soil_added - soil, 9, "{name}");
+        let lay = feet(&state);
+        steps(&mut state, 30);
+        strip.push(shot(&state, lay));
+        steps(&mut state, 60);
+        let stranded = state.stranded_state().unwrap();
+        assert!(stranded.spaceling.is_none(), "{name}");
+        assert_eq!(stranded.accounting.died, 1, "{name}");
+        steps(&mut state, 20 * 60);
+        let grass = state.grass_state();
+        assert!(grass.shoots >= 1, "{name}: {grass:?}");
+        let grown = shot(&state, lay);
+        camera.keep(&format!("{name}-stranded-grass"), &grown.0);
+        strip.push(grown);
+        let frames: Vec<_> = strip
+            .iter()
+            .map(|(pixels, centre)| (pixels, *centre))
+            .collect();
+        camera.keep(
+            &format!("{name}-stranded-falling-zoom"),
+            &follow(&frames, patch, scale),
+        );
+    }
+}

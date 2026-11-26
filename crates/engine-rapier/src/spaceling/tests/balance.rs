@@ -160,6 +160,38 @@ fn a_real_high_speed_landing_causes_knockdown() {
 }
 
 #[test]
+fn a_body_left_limp_and_undriven_comes_to_rest() {
+    for limp in [false, true] {
+        let (mut world, mut spaceling) = floor_fixture(0.0, Vec2::ZERO);
+        settle(&mut world, &mut spaceling);
+        if limp {
+            spaceling.go_limp(&mut world);
+            let snapshot = spaceling.snapshot(&world).unwrap();
+            assert_eq!(snapshot.balance, SpacelingBalance::KnockedDown);
+            assert_eq!(snapshot.knockdowns, 0, "going limp is no knockdown");
+        }
+        // Sent sliding, and driven no more.
+        world.set_velocity(spaceling.body(), Vec2::new(6.0, 0.0), 0.0, true);
+        for _ in 0..240 {
+            world.clear_forces();
+            world.apply_velocity_delta(spaceling.body(), GRAVITY * DT, true);
+            world.step(DT);
+        }
+        let speed = world
+            .motion(spaceling.body())
+            .unwrap()
+            .linear_velocity
+            .length();
+        if limp {
+            assert!(speed < 0.1, "{speed}");
+        } else {
+            // Its traction is its controller's, so with none it glides on.
+            assert!(speed > 5.0, "{speed}");
+        }
+    }
+}
+
+#[test]
 fn loss_of_support_or_gravity_aborts_recovery() {
     for remove_support in [true, false] {
         let (mut world, mut spaceling) = floor_fixture(0.0, Vec2::ZERO);

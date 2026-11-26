@@ -9,7 +9,7 @@ use super::{
 };
 use crate::{
     DIGIT_SLOT_COUNT, GridCell, SegmentRepresentation, SegmentState,
-    arena::ClockArena,
+    arena::{ClockArena, Owner, ids::canonical},
     digit_surfaces::{
         Footprint, Glyph, Retirement, SlotIds, SurfaceId, SurfaceLedger, SurfacePose,
         SurfaceSource, bit,
@@ -18,7 +18,7 @@ use crate::{
     fonts::CellMask,
     layout::Layout,
     meridiem::{self, LetterState},
-    physics::{FallingBodies, FallingWorld, body_id},
+    physics::{self, FallingBodies, FallingWorld, body_id},
 };
 
 pub const FALLING_TICKS: u64 = 210;
@@ -26,7 +26,15 @@ pub const REFORMING_TICKS: u64 = 90;
 
 enum Mechanics {
     Standalone(Option<Box<FallingWorld>>),
-    Shared { bodies: Option<FallingBodies> },
+    /// The batch in the arena a visit leases it.
+    Shared {
+        bodies: Option<FallingBodies>,
+    },
+    /// The batch in the run's arena beside the residents there, with walls of
+    /// its own, while no visit holds the arena.
+    Arena {
+        bodies: Option<FallingBodies>,
+    },
 }
 
 /// One lit cell of a falling segment. It keeps its surface from the fall
@@ -69,7 +77,7 @@ impl FallingEvent {
     pub fn own_world(&self) -> Option<&PhysicsWorld> {
         match &self.mechanics {
             Mechanics::Standalone(world) => world.as_ref().map(|w| w.world()),
-            Mechanics::Shared { .. } => None,
+            Mechanics::Shared { .. } | Mechanics::Arena { .. } => None,
         }
     }
 
@@ -147,6 +155,38 @@ impl FallingEvent {
         }
     }
 
+    /// The batch falls in the run's arena beside the residents there, as it
+    /// would beside a visit, so that what stands on the floor meets it. The
+    /// caller has admitted the claim and opened the drain, which the arena
+    /// keeps as the residents' floor.
+    pub fn in_arena(context: EventContext<'_>, seed: u64, arena: &mut ClockArena) -> Self {
+        let letters = Self::letters_for(&context);
+        let pieces = Self::take_pieces(context.segments, context.surfaces);
+        let world = arena.claim(Owner::Event(ClockEventKind::Falling));
+        physics::insert_walls(world, context.layout, canonical::FALLING_ARENA_WALLS.start);
+        let bodies = FallingBodies::insert(
+            world,
+            context.layout,
+            context.segments,
+            letters.as_ref().map_or(&[], |l| l.as_slice()),
+            &mut StdRng::seed_from_u64(seed),
+        );
+        Self {
+            phase: EventPhase::Falling,
+            tick: 0,
+            mechanics: Mechanics::Arena {
+                bodies: Some(bodies),
+            },
+            letters,
+            standalone_floor: None,
+            pieces,
+            targets: Vec::new(),
+            window: 0.0,
+        }
+    }
+
+    /// A player joins a standalone fall, whose world becomes the arena. One
+    /// falling in an arena already has no room for one.
     pub fn join_player(
         &mut self,
         arena: &mut ClockArena,
@@ -186,8 +226,13 @@ impl FallingEvent {
         })
     }
 
+    /// Whether the batch falls in the run's arena, leased from a visit or
+    /// beside the residents, which it reads back after the arena's step.
     pub fn shares_visit_arena(&self) -> bool {
-        matches!(self.mechanics, Mechanics::Shared { .. })
+        matches!(
+            self.mechanics,
+            Mechanics::Shared { .. } | Mechanics::Arena { .. }
+        )
     }
 
     /// How opaque the event shows a vacant arena: it fades out at the end of
@@ -231,7 +276,8 @@ impl FallingEvent {
     /// once they stop falling. Returns true when the event has finished.
     pub fn observe(&mut self, context: EventContext<'_>, arena: &mut ClockArena) -> bool {
         let reform = self.reforms();
-        let Mechanics::Shared { bodies } = &mut self.mechanics else {
+        let (Mechanics::Shared { bodies } | Mechanics::Arena { bodies }) = &mut self.mechanics
+        else {
             unreachable!("only a shared Falling reads the arena back");
         };
         let world = arena.world_mut().expect("leased arena");
@@ -451,13 +497,23 @@ impl FallingEvent {
     }
 
     /// Only the event's batch is removed; the live player's floor and character
-    /// survive replacement, reformation and completion unchanged.
+    /// survive replacement, reformation and completion unchanged. Beside the
+    /// residents, its walls go with its claim.
     pub fn release(&mut self, player: Option<&mut DuckEvent>, arena: &mut ClockArena) {
-        if let Mechanics::Shared { bodies } = &mut self.mechanics {
-            if let Some(bodies) = bodies.take() {
-                bodies.remove(arena.world_mut().expect("leased arena"));
+        match &mut self.mechanics {
+            Mechanics::Shared { bodies } => {
+                if let Some(bodies) = bodies.take() {
+                    bodies.remove(arena.world_mut().expect("leased arena"));
+                }
+                duck::end_lease(player, arena, ClockEventKind::Falling);
             }
-            duck::end_lease(player, arena, ClockEventKind::Falling);
+            Mechanics::Arena { bodies } => {
+                if let Some(bodies) = bodies.take() {
+                    bodies.remove(arena.world_mut().expect("a held arena"));
+                }
+                arena.release(Owner::Event(ClockEventKind::Falling));
+            }
+            Mechanics::Standalone(_) => {}
         }
     }
 
@@ -477,7 +533,7 @@ impl FallingEvent {
                 .as_ref()
                 .map_or((0, 0), |w| (w.body_count(), w.collider_count())),
             // A shared world is the run's arena, which ClockState counts once.
-            Mechanics::Shared { .. } => (0, 0),
+            Mechanics::Shared { .. } | Mechanics::Arena { .. } => (0, 0),
         }
     }
 }

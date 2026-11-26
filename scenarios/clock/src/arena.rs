@@ -102,10 +102,15 @@ impl Owner {
 
     /// An owner that rests on the floor, so the arena keeps a floor under it
     /// while no visit's terrain is one. Soil is fixed in place and needs none.
+    /// Falling's batch lands on the floor beside the residents.
     fn rests(self) -> bool {
         matches!(
             self,
-            Self::Fixture(_) | Self::Spider | Self::Crow | Self::Stranded
+            Self::Fixture(_)
+                | Self::Spider
+                | Self::Crow
+                | Self::Stranded
+                | Self::Event(ClockEventKind::Falling)
         )
     }
 
@@ -159,12 +164,11 @@ impl Owner {
                 MAX_EXPLOSION_CELLS + count(&ids::canonical::MAGPIE),
                 MAX_EXPLOSION_CELLS + count(&ids::canonical::MAGPIE),
             ),
-            // A bar for each lit segment and one for each of the two meridiem
-            // letters, with a collider for each of their cells.
-            Self::Event(ClockEventKind::Falling) => Population::new(
-                DIGIT_SLOT_COUNT * SegmentKind::ALL.len() + 2,
-                crate::fonts::MAX_DIGIT_CELLS + crate::meridiem::MAX_CELLS,
-            ),
+            // Its batch, and beside the residents its two walls.
+            Self::Event(ClockEventKind::Falling) => FALLING_BATCH.plus(Population::new(
+                count(&ids::canonical::FALLING_ARENA_WALLS),
+                count(&ids::canonical::FALLING_ARENA_WALLS),
+            )),
             Self::Event(ClockEventKind::Meltdown) => {
                 Population::new(MAX_MELTDOWN_CELLS, MAX_MELTDOWN_CELLS)
             }
@@ -197,6 +201,16 @@ impl Owner {
         }
     }
 
+    /// What this owner takes of the arena beside a visit, if `visit`, or
+    /// beside none: its budget, but Falling's batch beside a visit falls in
+    /// the visit's terrain and puts up no walls of its own.
+    const fn need(self, visit: bool) -> Population {
+        match self {
+            Self::Event(ClockEventKind::Falling) if visit => FALLING_BATCH,
+            _ => self.budget(),
+        }
+    }
+
     /// The identities this owner's bodies take. While other owners keep the
     /// world, letting go removes whatever is left in them.
     fn ranges(self) -> &'static [Range<u64>] {
@@ -221,7 +235,9 @@ impl Owner {
                 TANKS_PIECES,
                 TANKS_SURVIVORS,
             ],
-            Self::Event(ClockEventKind::Falling) => &[FALLING_SEGMENTS, FALLING_LETTERS],
+            Self::Event(ClockEventKind::Falling) => {
+                &[FALLING_SEGMENTS, FALLING_LETTERS, FALLING_ARENA_WALLS]
+            }
             Self::Event(ClockEventKind::Meltdown) => &[MELTDOWN_CELLS],
             Self::Event(_) => &[],
             Self::Soil => &[SOIL],
@@ -256,6 +272,13 @@ const fn count(range: &Range<u64>) -> usize {
 const FLOOR_BUDGET: Population = Population::new(
     count(&ids::canonical::ARENA_FLOOR),
     count(&ids::canonical::ARENA_FLOOR),
+);
+
+/// Falling's batch: a bar for each lit segment and one for each of the two
+/// meridiem letters, with a collider for each of their cells.
+const FALLING_BATCH: Population = Population::new(
+    DIGIT_SLOT_COUNT * SegmentKind::ALL.len() + 2,
+    crate::fonts::MAX_DIGIT_CELLS + crate::meridiem::MAX_CELLS,
 );
 
 /// The largest budget of any event that shares the arena.
@@ -335,12 +358,13 @@ const _: () = assert!(
 
 /// Whether `owners` can hold the arena together: no more residents than it
 /// may hold, and budgets that together fit its capacity, with the floor kept
-/// under resting residents while no visit's terrain is one. Soil's claim is
-/// reserved for the whole run, so it counts whether or not the soil holds the
-/// arena yet, and soil is never refused. Outside the duel the crow's room,
-/// and the floor kept under it, is reserved the same way: the crow takes no
-/// room that another claim counts on, and is never refused for room. So is
-/// a stranded spaceling's, in the duel and out of it. Changes nothing.
+/// under resting residents while no visit's terrain is one, and Falling's
+/// walls only then. Soil's claim is reserved for the whole run, so it counts
+/// whether or not the soil holds the arena yet, and soil is never refused.
+/// Outside the duel the crow's room, and the floor kept under it, is reserved
+/// the same way: the crow takes no room that another claim counts on, and is
+/// never refused for room. So is a stranded spaceling's, in the duel and out
+/// of it. Changes nothing.
 pub(crate) fn admits(owners: &[Owner]) -> Result<(), Unavailable> {
     let mut held: Vec<Owner> = Vec::with_capacity(owners.len() + 2);
     for owner in owners.iter().copied().chain([Owner::Soil]) {
@@ -370,7 +394,8 @@ pub(crate) fn admits(owners: &[Owner]) -> Result<(), Unavailable> {
     if !held.contains(&Owner::Stranded) {
         held.push(Owner::Stranded);
     }
-    let floor = held.iter().any(|owner| owner.rests()) && !held.contains(&Owner::Visit);
+    let visit = held.contains(&Owner::Visit);
+    let floor = held.iter().any(|owner| owner.rests()) && !visit;
     let floor = if floor {
         FLOOR_BUDGET
     } else {
@@ -378,7 +403,7 @@ pub(crate) fn admits(owners: &[Owner]) -> Result<(), Unavailable> {
     };
     let need = held
         .iter()
-        .fold(floor, |need, owner| need.plus(owner.budget()));
+        .fold(floor, |need, owner| need.plus(owner.need(visit)));
     if need.within(capacity(&held)) {
         Ok(())
     } else {
@@ -1178,6 +1203,25 @@ mod tests {
     }
 
     #[test]
+    fn fallings_bars_and_walls_fit_beside_a_stranded_spaceling_and_two_fixtures() {
+        // With no visit, the arena keeps its floor under them all and Falling
+        // puts up its walls, and the crow's room is kept too. The two fixture
+        // owners a run can start with leave the bars room beside the
+        // spaceling. A third, which nothing starts, does not, and Falling then
+        // falls in a world of its own.
+        let mut owners = vec![
+            Owner::Stranded,
+            Owner::Crow,
+            Owner::Event(ClockEventKind::Falling),
+            Owner::Fixture(0),
+            Owner::Fixture(1),
+        ];
+        assert_eq!(admits(&owners), Ok(()));
+        owners.push(Owner::Fixture(2));
+        assert_eq!(admits(&owners), Err(Unavailable::Capacity));
+    }
+
+    #[test]
     fn a_refusal_is_counted_and_changes_nothing_else() {
         let mut arena = ClockArena::default();
         let fixtures: Vec<_> = (0..MAX_RESIDENT_CLAIMS as u8).map(Owner::Fixture).collect();
@@ -1348,6 +1392,9 @@ pub(crate) mod ids {
         /// `ENTRANCE_WALL`: a drain-joined player inherits Falling's left wall
         /// instead of inserting its own. See `DuckEvent::insert_entrance_wall`.
         pub(crate) const FALLING_WALLS: Range<u64> = 2000..2002;
+        /// Falling's side walls while its batch falls in the arena beside the
+        /// residents, with no visit's terrain to bound it.
+        pub(crate) const FALLING_ARENA_WALLS: Range<u64> = 2002..2004;
         /// The two hinged door flaps.
         pub(crate) const FLAPS: Range<u64> = 2100..2102;
         /// Falling's bars: `DIGIT_SLOT_COUNT` slots of `SegmentKind::ALL`.
@@ -1471,6 +1518,7 @@ pub(crate) mod ids {
             ("RESPONSIVE_PANELS", RESPONSIVE_PANELS),
             ("ENTRANCE_WALL", ENTRANCE_WALL),
             ("FALLING_WALLS", FALLING_WALLS),
+            ("FALLING_ARENA_WALLS", FALLING_ARENA_WALLS),
             ("FLAPS", FLAPS),
             ("FALLING_SEGMENTS", FALLING_SEGMENTS),
             ("FALLING_LETTERS", FALLING_LETTERS),

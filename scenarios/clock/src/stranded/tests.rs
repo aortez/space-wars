@@ -479,7 +479,6 @@ fn with_the_time_unknown_its_beam_comes_a_little_after_its_stay_is_up() {
 #[test]
 fn an_event_that_leaves_it_no_digit_to_stand_on_brings_its_beam_first() {
     for kind in [
-        ClockEventKind::Falling,
         ClockEventKind::Meltdown,
         ClockEventKind::Explosion,
         ClockEventKind::Coins,
@@ -508,6 +507,30 @@ fn an_event_that_leaves_it_no_digit_to_stand_on_brings_its_beam_first() {
         assert!(!state.arena.holds(Owner::Stranded));
         assert_eq!(state.stranded.accounting.event, 1);
     }
+}
+
+#[test]
+fn with_no_room_beside_it_for_fallings_bars_its_beam_comes_first() {
+    let mut state = stranded(5.0 / 3.0, 42);
+    until_phase(&mut state, Phase::Standing, 10 * 60);
+    // Three fixture owners, one more than a run can start with, leave the
+    // arena no room for the bars beside it.
+    let layout = Layout::new(state.aspect_ratio());
+    for index in 0..3 {
+        state.arena.claim_resident(Owner::Fixture(index), layout);
+    }
+    act(
+        &mut state,
+        ClockAction::preview_event(ClockEventKind::Falling),
+    );
+    // The bars fall in a world of their own, and its beam comes for it.
+    assert_eq!(state.event_kind(), Some(ClockEventKind::Falling));
+    assert!(!state.arena.holds(Owner::Event(ClockEventKind::Falling)));
+    let visitor = spaceling(&state);
+    assert_eq!(
+        (visitor.phase, visitor.leaving.map(|(why, _)| why)),
+        (Phase::BeamedUp, Some(Departure::Event))
+    );
 }
 
 #[test]
@@ -551,6 +574,267 @@ fn it_stays_through_the_events_that_leave_the_digits_standing() {
         assert_eq!(state.stranded.accounting.stranded, 1);
         assert!(state.arena.holds(Owner::Stranded));
     }
+}
+
+/// A spaceling the fight at `seed` left, down on the floor at `x` as Falling
+/// begins.
+fn falling_on_the_floor(seed: u64, x: f32) -> ClockState {
+    let mut state = stranded(5.0 / 3.0, seed);
+    until_phase(&mut state, Phase::Standing, 10 * 60);
+    let floor = Layout::new(state.aspect_ratio()).floor_y;
+    send(&mut state, Place::Floor(Vec2::new(x, floor)));
+    act(
+        &mut state,
+        ClockAction::preview_event(ClockEventKind::Falling),
+    );
+    state
+}
+
+/// Steps on while Falling lasts, at most a minute, answering whether the
+/// spaceling was ever knocked down meanwhile; it never dies.
+fn through_falling(state: &mut ClockState) -> bool {
+    let mut knocked = false;
+    for _ in 0..60 * 60 {
+        if state.event_kind() != Some(ClockEventKind::Falling) {
+            return knocked;
+        }
+        tick(state);
+        let visitor = spaceling(state);
+        assert!(visitor.leaving.is_none());
+        assert_ne!(visitor.phase, Phase::Dead);
+        knocked |= visitor.phase == Phase::GettingUp;
+    }
+    panic!("Falling still on");
+}
+
+#[test]
+fn fallings_bars_come_down_in_its_world_as_it_takes_off_from_its_digit() {
+    let mut state = stranded(5.0 / 3.0, 42);
+    until_phase(&mut state, Phase::Standing, 10 * 60);
+    assert!(matches!(spaceling(&state).place, Place::Block(_)));
+    act(
+        &mut state,
+        ClockAction::preview_event(ClockEventKind::Falling),
+    );
+    assert!(state.arena.holds(Owner::Event(ClockEventKind::Falling)));
+    // It takes off as its block drops away.
+    assert_eq!(spaceling(&state).phase, Phase::Flying);
+    tick(&mut state);
+    // Every bar coming down is a body in the world it flies in.
+    let world = state.arena.held(Owner::Stranded).unwrap();
+    let rigid = state
+        .published
+        .iter()
+        .filter(|surface| surface.source == SurfaceSource::Rigid)
+        .count();
+    assert!(rigid > 0);
+    assert_eq!(bars(world, &state.published).len(), rigid);
+    assert!(!through_falling(&mut state));
+    // Once they are gone it lands again, on a digit or the floor, and stays.
+    until_phase(&mut state, Phase::Standing, 10 * 60);
+    let visitor = spaceling(&state);
+    assert!(!matches!(visitor.place, Place::Air(_)));
+    assert_eq!(visitor.knockdowns, 0);
+    assert!(visitor.hardest < spec(visitor.scale).balance.knockdown_velocity_change);
+    assert!(visitor.leaving.is_none());
+}
+
+#[test]
+fn on_the_floor_it_runs_out_from_under_the_bars_it_can_get_clear_of() {
+    // Seed 4's bars come down on it, a few steps from a stretch they miss.
+    let mut state = falling_on_the_floor(4, -218.4);
+    let start = spaceling(&state).feet;
+    // It takes a moment to see them.
+    for _ in 1..DODGE_REACTION {
+        tick(&mut state);
+        assert_eq!(spaceling(&state).phase, Phase::Standing);
+    }
+    until_phase(&mut state, Phase::Dodging, 2);
+    let visitor = spaceling(&state);
+    assert!((visitor.place.feet().x - start.x).abs() > REACH * visitor.scale);
+    assert!(!through_falling(&mut state));
+    let visitor = spaceling(&state);
+    assert_eq!(visitor.knockdowns, 0);
+    assert!(visitor.hardest < spec(visitor.scale).balance.knockdown_velocity_change);
+}
+
+#[test]
+fn a_bar_that_knocks_it_down_on_the_floor_leaves_it_to_get_up() {
+    // A bar seed 2 brings down beside it catches it a glancing blow.
+    let mut state = falling_on_the_floor(2, 218.4);
+    assert!(through_falling(&mut state));
+    let visitor = spaceling(&state);
+    let knockdown = spec(visitor.scale).balance.knockdown_velocity_change;
+    assert!((knockdown..LETHAL * knockdown).contains(&visitor.hardest));
+    assert_eq!(visitor.knockdowns, 1);
+    until_phase(&mut state, Phase::Standing, 10 * 60);
+    assert_eq!(state.stranded.accounting.died, 0);
+}
+
+#[test]
+fn a_bar_that_comes_down_on_it_kills_it_and_it_turns_to_dirt_where_grass_takes_root() {
+    // Seed 2 brings a bar down on it squarely.
+    let mut state = falling_on_the_floor(2, 109.2);
+    state.config.events.grass = true;
+    let added = state
+        .soil
+        .as_ref()
+        .map_or(0, |soil| soil.accounting().added);
+    until_phase(&mut state, Phase::Dead, 10 * 60);
+    let visitor = spaceling(&state);
+    let knockdown = spec(visitor.scale).balance.knockdown_velocity_change;
+    assert!(visitor.hardest >= LETHAL * knockdown);
+    // It lies where it fell, comes to rest there well before it could have
+    // lain dead as long as it may, turns to dirt, and its stay ends.
+    let mut lay = None;
+    for n in 0..DEAD_TICKS + CRUMBLE_TICKS + 2 {
+        let Some(visitor) = state.stranded.spaceling.as_ref() else {
+            break;
+        };
+        assert_eq!(visitor.phase, Phase::Dead);
+        if visitor.crumbling.is_some() && lay.is_none() {
+            assert!(n < DEAD_TICKS / 2, "it lay still after {n} ticks");
+            let world = state.arena.held(Owner::Stranded).unwrap();
+            let motion = world.motion(body()).unwrap();
+            assert!(motion.linear_velocity.length() < REST_SPEED * visitor.scale);
+            lay = Some(motion.position.x);
+        }
+        tick(&mut state);
+    }
+    assert!(state.stranded.spaceling.is_none());
+    assert_eq!(state.stranded.accounting.died, 1);
+    assert!(!state.arena.holds(Owner::Stranded));
+    // Its remains are dirt in the columns under them, and a seed has taken
+    // root in the middle one.
+    let soil = state.soil.as_ref().unwrap();
+    let column = soil.column_at(lay.expect("it turned to dirt"));
+    let rows = crate::grass::SOIL_DEPTH_CELLS as i32;
+    for x in column - REMAINS_REACH..=column + REMAINS_REACH {
+        for y in 0..rows {
+            let cell = soil
+                .terrain()
+                .cell(engine_terrain::CellCoord::new(x, y))
+                .unwrap();
+            assert_eq!(cell.material, crate::grass::CLOCK_DIRT, "{x} {y}");
+        }
+    }
+    assert_eq!(
+        soil.accounting().added - added,
+        (2 * REMAINS_REACH as u64 + 1) * crate::grass::SOIL_DEPTH_CELLS as u64
+    );
+    let roots: Vec<_> = state
+        .plants
+        .plants
+        .observe()
+        .tissues
+        .iter()
+        .filter(|tissue| tissue.role == engine_core::plants::Role::Root)
+        .map(|tissue| tissue.cell)
+        .collect();
+    assert_eq!(roots, [[column, rows - 1]]);
+}
+
+#[test]
+fn killed_it_goes_limp_and_its_remains_come_to_rest_where_the_blow_leaves_them() {
+    // Seed 13's bar kills it with one blow, which would have sent it gliding
+    // along the floor with no grip but its controller's.
+    let mut state = falling_on_the_floor(13, -218.4);
+    until_phase(&mut state, Phase::Dead, 10 * 60);
+    let world = state.arena.held(Owner::Stranded).unwrap();
+    assert_eq!(
+        spaceling(&state).spaceling.snapshot(world).unwrap().balance,
+        SpacelingBalance::KnockedDown
+    );
+    // Its remains lie still on the floor within a second, so they begin to
+    // turn to dirt a second later, while the bars still come down.
+    for _ in 0..2 * SECOND {
+        if spaceling(&state).crumbling.is_some() {
+            assert_eq!(state.event_kind(), Some(ClockEventKind::Falling));
+            return;
+        }
+        tick(&mut state);
+    }
+    panic!("its remains never lay still");
+}
+
+#[test]
+fn its_remains_turn_to_no_dirt_where_the_floor_holds_no_soil() {
+    let mut state = stranded(5.0 / 3.0, 42);
+    until_phase(&mut state, Phase::Standing, 10 * 60);
+    state.config.events.grass = true;
+    act(
+        &mut state,
+        ClockAction::preview_event(ClockEventKind::Falling),
+    );
+    let added = |state: &ClockState| {
+        state
+            .soil
+            .as_ref()
+            .map_or(0, |soil| soil.accounting().added)
+    };
+    let before = added(&state);
+    // Falling's drain is open under the middle of the floor.
+    state.bury_stranded(0.0);
+    assert_eq!(added(&state), before);
+    assert_eq!(state.plants.grass_tissues(), 0);
+}
+
+#[test]
+fn remains_under_a_side_of_the_frame_turn_to_dirt_where_the_floor_shows() {
+    let aspect = 4.0 / 3.0;
+    let mut state = stranded(aspect, 42);
+    until_phase(&mut state, Phase::Standing, 10 * 60);
+    state.config.events.grass = true;
+    let layout = Layout::new(aspect);
+    // A blow has thrown them against the left wall, under the frame.
+    state.bury_stranded(layout.bounds_min.x + 1.0);
+    let soil = state.soil.as_ref().unwrap();
+    assert_eq!(
+        soil.accounting().added,
+        (2 * REMAINS_REACH as u64 + 1) * crate::grass::SOIL_DEPTH_CELLS as u64
+    );
+    let roots: Vec<_> = state
+        .plants
+        .plants
+        .observe()
+        .tissues
+        .iter()
+        .filter(|tissue| tissue.role == engine_core::plants::Role::Root)
+        .map(|tissue| tissue.cell[0])
+        .collect();
+    let [column] = roots[..] else {
+        panic!("{roots:?}")
+    };
+    // All three columns of its dirt show, and the seed in the middle one.
+    let (first, last) = soil
+        .columns_within(
+            layout.bounds_min.x + layout.frame_width,
+            layout.bounds_max.x - layout.frame_width,
+        )
+        .unwrap();
+    assert!(first <= column - REMAINS_REACH && column + REMAINS_REACH <= last);
+    for x in column - REMAINS_REACH..=column + REMAINS_REACH {
+        let cell = soil
+            .terrain()
+            .cell(engine_terrain::CellCoord::new(x, 0))
+            .unwrap();
+        assert_eq!(cell.material, crate::grass::CLOCK_DIRT, "{x}");
+    }
+}
+
+#[test]
+fn a_stay_through_falling_replays_alike_from_its_seed() {
+    let run = || {
+        let mut state = falling_on_the_floor(2, 109.2);
+        let mut seen = Vec::new();
+        for _ in 0..12 * 60 {
+            tick(&mut state);
+            let soil = state.soil.as_ref().map(|soil| soil.accounting().added);
+            seen.push((state.stranded_state(), soil));
+        }
+        seen
+    };
+    assert_eq!(run(), run());
 }
 
 #[test]

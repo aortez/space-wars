@@ -5,7 +5,7 @@ use super::{
 use crate::{
     events::{FIXED_HZ, tanks::survivor::PILOT_SCALE},
     presentation::Bounds,
-    stranded::Scene,
+    stranded::{Phase, Scene},
 };
 use std::f32::consts::TAU;
 
@@ -14,6 +14,22 @@ use std::f32::consts::TAU;
 const STICK_HEIGHT: f32 = 3.0;
 const CLOTH_DROP: f32 = 1.1;
 const CLOTH_REACH: f32 = 1.7;
+
+/// The share of its suit's color a dead spaceling keeps, and the earthy
+/// color the rest goes to as it turns to dirt.
+const DEAD_TINT: f32 = 0.55;
+const EARTH: RenderColor = RenderColor::rgb(0.36, 0.25, 0.15);
+
+/// `color` gone `share` of the way to `to`.
+fn toward(color: RenderColor, to: RenderColor, share: f32) -> RenderColor {
+    let mix = |a: f32, b: f32| a + (b - a) * share;
+    RenderColor {
+        r: mix(color.r, to.r),
+        g: mix(color.g, to.g),
+        b: mix(color.b, to.b),
+        a: color.a,
+    }
+}
 
 /// A flag on a digit block, its stick's foot at `foot`, `raised` of the way
 /// up from the block to standing: the stick, and a cloth of its side's
@@ -44,9 +60,9 @@ fn planted_flag(
 /// The spaceling a Tanks fight's hills left behind, and the flag one
 /// planted: the flag on its block, the one the spaceling is planting, the
 /// smoke its jetpack left, the beam that comes for it, and the spaceling
-/// itself, standing, walking, planting, riding its jetpack or fading as its
-/// beam lifts it out. They are drawn in front of the face, at `tick` of the
-/// run.
+/// itself, standing, walking, running, planting, riding its jetpack, fading
+/// as its beam lifts it out, or dead, going the color of the earth as it
+/// turns to dirt. They are drawn in front of the face, at `tick` of the run.
 pub(super) fn render(frame: &mut RenderFrame, scene: &Scene, tick: u64, layout: Layout) {
     let bounds = Bounds {
         min: Vec2::new(layout.bounds_min.x + layout.frame_width, layout.floor_y),
@@ -68,6 +84,13 @@ pub(super) fn render(frame: &mut RenderFrame, scene: &Scene, tick: u64, layout: 
     };
     let scale = spaceling.scale;
     let color = TEAMS[spaceling.slot];
+    // Dead, its suit dulls, and goes the color of the earth as it turns to
+    // dirt.
+    let suit = if spaceling.phase == Phase::Dead {
+        toward(color, EARTH, 1.0 - DEAD_TINT * (1.0 - spaceling.fade()))
+    } else {
+        color
+    };
     if let Some((foot, raised)) = spaceling.planting() {
         planted_flag(
             frame,
@@ -103,7 +126,7 @@ pub(super) fn render(frame: &mut RenderFrame, scene: &Scene, tick: u64, layout: 
         spaceling.motion(),
         spaceling.facing,
         pose,
-        faded(color, 1.0 - spaceling.fade()),
+        faded(suit, 1.0 - spaceling.fade()),
         scale,
         bounds,
     );

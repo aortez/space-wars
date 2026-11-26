@@ -241,7 +241,7 @@ fn print_stranded(stranded: &engine_common::ClockStrandedState) {
             .map(|why| format!(", leaving ({})", why.as_str()))
             .unwrap_or_default();
         println!(
-            "Stranded spaceling: {} tank's, from fight {}, {}{leaving}, age={} phase tick={}, position={:?}, facing right={}, perch={:?}, flags={} flights={} knockdowns={}",
+            "Stranded spaceling: {} tank's, from fight {}, {}{leaving}, age={} phase tick={}, position={:?}, facing right={}, perch={:?}, flags={} flights={} knockdowns={} dodges={}",
             side(spaceling.slot),
             spaceling.fight_id,
             spaceling.phase.as_str(),
@@ -252,7 +252,8 @@ fn print_stranded(stranded: &engine_common::ClockStrandedState) {
             spaceling.perch,
             spaceling.flags,
             spaceling.flights,
-            spaceling.knockdowns
+            spaceling.knockdowns,
+            spaceling.dodges
         );
     }
     if let Some(flag) = &stranded.flag {
@@ -265,13 +266,14 @@ fn print_stranded(stranded: &engine_common::ClockStrandedState) {
     }
     let accounting = &stranded.accounting;
     println!(
-        "Stranded so far: {} left behind; beamed out time-up={} event={} no-place={}; cleared={} lost={}",
+        "Stranded so far: {} left behind; beamed out time-up={} event={} no-place={}; cleared={} lost={} died={}",
         accounting.stranded,
         accounting.time_up,
         accounting.event,
         accounting.no_place,
         accounting.cleared,
-        accounting.lost
+        accounting.lost,
+        accounting.died
     );
 }
 

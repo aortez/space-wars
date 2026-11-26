@@ -22,11 +22,20 @@
 //! the moment, as while a duck's course lies over the floor and the digits'
 //! reels turn, its jetpack holds it aloft where it is.
 //!
+//! Falling's bars fall in its world. On a digit it takes off as its block
+//! drops away, and on the floor it runs from the bars it sees coming down
+//! at it. A blow hard enough kills it, as the change in its velocity says,
+//! and its remains turn to dirt in the floor's soil, where a grass seed may
+//! take root.
+//!
 //! It leaves in a beam, as a spaceling the rescue beam finds does: when an
 //! event that leaves it no digit to stand on begins, when it has had nowhere
 //! to stand for as long as its jetpack holds it up, or at the first change of
 //! the time once it has stayed 20 minutes. A resize ends its stay at once.
-use std::{f32::consts::PI, ops::RangeInclusive};
+use std::{
+    f32::consts::{PI, SQRT_2},
+    ops::RangeInclusive,
+};
 
 use engine_common::{
     ClockEventKind, ClockStrandedAccounting, ClockStrandedFlag, ClockStrandedSpaceling,
@@ -167,6 +176,37 @@ const REST_SPIN: f32 = 1.5;
 const LOST: f32 = 8.0;
 /// Friction of its perch, as the digits' other solids have.
 const PERCH_FRICTION: f32 = 0.65;
+
+/// How long it takes to look up at Falling's bars once they begin to come
+/// down, and how often it looks again while it runs from them.
+const DODGE_REACTION: u64 = SECOND / 5;
+const DODGE_LOOK: u64 = SECOND / 20;
+/// How far ahead it reckons where the bars come down, in seconds.
+const DODGE_AHEAD: f32 = 1.5;
+/// How far clear of a bar it means to be, in units of its fight.
+const DODGE_CLEAR: f32 = 0.5;
+/// The share of its walking speed it counts on running at.
+const DODGE_PACE: f32 = 0.85;
+/// A bar's cell on the floor slower than this, in units of the fight a
+/// second, lies in its way rather than coming at it.
+const BAR_REST: f32 = 2.0;
+/// How far ahead a bar's cell along the floor is reckoned to slide, in
+/// seconds.
+const SLIDE_AHEAD: f32 = 0.4;
+/// How fast Falling's bars fall, in world units a second squared.
+const BAR_FALL: f32 = crate::arena::MECHANICS_GRAVITY;
+/// A blow that changes its velocity by this many times what knocks it down
+/// kills it: about what a bar falling from the face onto it squarely gives,
+/// where one that bounced, slid or glanced off it knocks it down.
+const LETHAL: f32 = 5.0;
+/// How long it lies still on the floor dead before it turns to dirt, how
+/// long that takes, and the longest it lies anywhere before it does.
+const LIE_TICKS: u32 = FIXED_HZ;
+const CRUMBLE_TICKS: u64 = SECOND;
+const DEAD_TICKS: u64 = 10 * SECOND;
+/// The columns of the floor's soil to either side of the one under its
+/// remains that they turn to as well.
+pub(crate) const REMAINS_REACH: i32 = 1;
 
 /// Its body: the fight's spaceling, which meets everything in the arena.
 fn spec(scale: f32) -> SpacelingSpec {
@@ -373,6 +413,12 @@ pub(crate) struct Surroundings<'a> {
     /// Whether the ordinary floor lies closed, with no visit's course in its
     /// place.
     pub floor: bool,
+    /// While the ordinary floor's drain is open, with no visit's course in
+    /// its place, the drain's half-width: it stands on either bank.
+    pub drain: Option<f32>,
+    /// Whether Falling's bars fall in the world it stands in, where they can
+    /// meet it.
+    pub falling: bool,
     /// Where a crow is, and where it is going.
     pub birds: [Option<Vec2>; 2],
     /// The digits the face shows.
@@ -385,6 +431,32 @@ impl Surroundings<'_> {
     fn raining(&self) -> bool {
         self.event == Some(ClockEventKind::Rain)
     }
+
+    /// Whether Falling's bars are coming down where it is.
+    fn bars_falling(&self) -> bool {
+        self.falling && self.event == Some(ClockEventKind::Falling)
+    }
+}
+
+/// The lit cells of Falling's bars as the face shows them: each one's
+/// middle, its velocity, and how far its corners reach from its middle.
+/// The face is a step behind the bodies, so each cell is carried on by it.
+fn bars(world: &PhysicsWorld, surfaces: &[DigitSurface]) -> Vec<(Vec2, Vec2, f32)> {
+    surfaces
+        .iter()
+        .filter(|surface| surface.source == SurfaceSource::Rigid)
+        .filter_map(|surface| {
+            let motion = world.motion(surface.body?)?;
+            let arm = surface.origin - motion.position;
+            let velocity =
+                motion.linear_velocity + Vec2::new(-arm.y, arm.x) * motion.angular_velocity;
+            Some((
+                surface.origin + velocity * DT,
+                velocity,
+                CELL_HALF * SQRT_2 * surface.scale,
+            ))
+        })
+        .collect()
 }
 
 /// How a stranded spaceling's stay ended.
@@ -396,6 +468,8 @@ pub(crate) enum Gone {
     Lost,
     /// A resize ended its stay.
     Cleared,
+    /// A blow killed it.
+    Died,
 }
 
 /// A spaceling as its fight leaves it behind.
@@ -470,6 +544,20 @@ pub(crate) struct Stranded {
     still: u32,
     /// The digits the face last showed it.
     digits: [Option<u8>; DIGIT_SLOT_COUNT],
+    /// Its velocity after the next step were nothing to meet it, while its
+    /// body is the spaceling's.
+    expected: Option<Vec2>,
+    /// The hardest blow it has taken: the change in its velocity it least
+    /// expected, in world units a second.
+    hardest: f32,
+    /// The age Falling's bars began to come down at, while they do.
+    bars_since: Option<u64>,
+    /// The age it next looks at the bars at while it runs from them.
+    looked: u64,
+    /// Dead, where across the floor its remains turn to dirt, until the run
+    /// takes them into the soil, and the age they began to.
+    burial: Option<f32>,
+    crumbling: Option<u64>,
     /// Why its beam came, and where its feet were when it did.
     leaving: Option<(Departure, Vec2)>,
     /// The smoke its jetpack left behind it, by the age it was left at.
@@ -477,6 +565,7 @@ pub(crate) struct Stranded {
     flights: u32,
     flags: u32,
     knockdowns: u32,
+    dodges: u32,
 }
 
 impl Stranded {
@@ -527,11 +616,18 @@ impl Stranded {
             pressed: None,
             still: 0,
             digits: around.digits,
+            expected: None,
+            hardest: 0.0,
+            bars_since: None,
+            looked: 0,
+            burial: None,
+            crumbling: None,
             leaving: None,
             puffs: Vec::new(),
             flights: 0,
             flags: 0,
             knockdowns: 0,
+            dodges: 0,
         };
         let nearest = blocks(layout, around.surfaces)
             .into_iter()
@@ -576,11 +672,13 @@ impl Stranded {
             .min(1.0)
     }
 
-    /// How far it has faded from view in its beam, from not at all to gone.
+    /// How far it has faded from view in its beam, or as its remains turn
+    /// to dirt, from not at all to gone.
     pub fn fade(&self) -> f32 {
-        match self.leaving {
-            Some(_) => Self::lifted(self.age - self.since),
-            None => 0.0,
+        match (self.leaving, self.crumbling) {
+            (Some(_), _) => Self::lifted(self.age - self.since),
+            (None, Some(since)) => ((self.age - since) as f32 / CRUMBLE_TICKS as f32).min(1.0),
+            (None, None) => 0.0,
         }
     }
 
@@ -755,6 +853,7 @@ impl Stranded {
                 .total_cmp(&b.feet.distance_to(from))
         };
         let own = self.place.block().map(|block| block.surface);
+        let blocks: &[Block] = if around.bars_falling() { &[] } else { blocks };
         if around.raining()
             && let Some(cover) = blocks
                 .iter()
@@ -787,12 +886,46 @@ impl Stranded {
         if !tops.is_empty() {
             return Some(Place::Block(tops[self.rng.random_range(0..tops.len())]));
         }
-        let held = match self.place {
-            Place::Block(own) => blocks.iter().any(|block| block.surface == own.surface),
-            Place::Floor(_) => around.floor,
+        self.holds(blocks, around).then_some(self.place)
+    }
+
+    /// Whether the place it stands on or is going to still holds: its block
+    /// at rest in the face, which no block is while Falling's bars come
+    /// down, or the floor.
+    fn holds(&self, blocks: &[Block], around: Surroundings<'_>) -> bool {
+        match self.place {
+            Place::Block(own) => {
+                !around.bars_falling() && blocks.iter().any(|block| block.surface == own.surface)
+            }
+            Place::Floor(spot) => self.floor_holds(around, spot.x),
             Place::Air(_) => false,
-        };
-        held.then_some(self.place)
+        }
+    }
+
+    /// Whether the floor holds it at `x`: the ordinary floor lying closed,
+    /// or either bank while its drain is open.
+    fn floor_holds(&self, around: Surroundings<'_>, x: f32) -> bool {
+        around.floor
+            || around
+                .drain
+                .is_some_and(|lip| x.abs() >= lip + spec(self.scale).radius)
+    }
+
+    /// The stretch of the floor it can run along: inside the frame's sides,
+    /// and while the drain is open, its own bank.
+    fn bank(&self, around: Surroundings<'_>) -> [f32; 2] {
+        let [left, right] = self.floor_span();
+        match around.drain {
+            Some(lip) => {
+                let lip = lip + spec(self.scale).radius;
+                if self.feet.x < 0.0 {
+                    [left, -lip]
+                } else {
+                    [lip, right]
+                }
+            }
+            None => [left, right],
+        }
     }
 
     /// Flies to the place it next chooses, stays where it stands if that is
@@ -809,13 +942,15 @@ impl Stranded {
 
     /// Whether the event under way leaves it no digit to stand on: one that
     /// takes the digits apart or away, floods them, or the next fight.
-    fn evicted(&self, event: Option<ClockEventKind>) -> bool {
-        match event {
+    /// Falling's bars it can meet are no reason to go, and it stays to dodge
+    /// them.
+    fn evicted(&self, around: Surroundings<'_>) -> bool {
+        match around.event {
             Some(ClockEventKind::Tanks) => !self.home,
+            Some(ClockEventKind::Falling) => !around.falling,
             Some(kind) => matches!(
                 kind,
-                ClockEventKind::Falling
-                    | ClockEventKind::Meltdown
+                ClockEventKind::Meltdown
                     | ClockEventKind::Explosion
                     | ClockEventKind::Coins
                     | ClockEventKind::Marquee
@@ -825,12 +960,14 @@ impl Stranded {
         }
     }
 
-    /// Whether something has knocked it off the block it stands on.
-    fn off_block(&self) -> bool {
+    /// Whether something has knocked it off the block it stands on, or down
+    /// through the floor's open drain, even while it is down.
+    fn off_place(&self) -> bool {
         let pitch = self.layout.pitch;
         match (self.phase, self.place) {
-            (Phase::Flying | Phase::BeamedUp | Phase::GettingUp, _)
-            | (_, Place::Floor(_) | Place::Air(_)) => false,
+            (Phase::Flying | Phase::BeamedUp | Phase::Dead, _) | (_, Place::Air(_)) => false,
+            (_, Place::Floor(spot)) => self.feet.y < spot.y - BELOW_BLOCK * pitch,
+            (Phase::GettingUp, _) => false,
             (_, Place::Block(block)) => {
                 (self.feet.x - block.feet.x).abs() > OFF_BLOCK * pitch
                     || self.feet.y < block.feet.y - BELOW_BLOCK * pitch
@@ -844,28 +981,35 @@ impl Stranded {
     /// another place when the one it stands on or is going to no longer
     /// holds, when a crow comes too near it, when it rains with cover to be
     /// had, and when it has been knocked off its block, back onto which it
-    /// flies. With no place to go to it hovers, and from the air it takes
-    /// the first place there is.
+    /// flies, or down the floor's open drain. With no place to go to it
+    /// hovers, and from the air it takes the first place there is. As
+    /// Falling's bars begin to come down, it stops where it walks to look
+    /// up, and once they have gone it stands a while. Dead, it goes by
+    /// nothing.
     fn react(&mut self, world: &mut PhysicsWorld, around: Surroundings<'_>) {
-        if self.leaving.is_some() {
+        if self.leaving.is_some() || self.phase == Phase::Dead {
             return;
         }
         if around.event != Some(ClockEventKind::Tanks) {
             self.home = false;
         }
         let changed = std::mem::replace(&mut self.digits, around.digits) != around.digits;
-        if self.evicted(around.event) {
+        if self.evicted(around) {
             return self.leave(world, Departure::Event);
         }
         if (self.age >= STAY_TICKS && changed) || self.age >= STAY_TICKS + GRACE_TICKS {
             return self.leave(world, Departure::TimeUp);
         }
+        if around.bars_falling() != self.bars_since.is_some() {
+            self.bars_since = around.bars_falling().then_some(self.age);
+            if matches!(self.phase, Phase::Walking | Phase::Dodging) {
+                self.place = Place::Floor(self.feet);
+                self.until = self.age + self.rng.random_range(FLOOR_PAUSE);
+                self.enter(Phase::Standing);
+            }
+        }
         let blocks = blocks(self.layout, around.surfaces);
-        let held = match self.place {
-            Place::Block(own) => blocks.iter().any(|block| block.surface == own.surface),
-            Place::Floor(_) => around.floor,
-            Place::Air(_) => false,
-        };
+        let held = self.holds(&blocks, around);
         if held {
             self.placed = self.age;
         }
@@ -888,7 +1032,7 @@ impl Stranded {
                 .iter()
                 .any(|block| block.covered && !near(block.feet));
         if held && !crowded && !exposed {
-            if self.off_block() {
+            if self.off_place() {
                 self.fly(world, self.place);
             }
             return;
@@ -896,7 +1040,7 @@ impl Stranded {
         self.wary = self.age + WARY_TICKS;
         match self.choose(world, &blocks, around) {
             Some(place) if place == self.place => {
-                if self.off_block() {
+                if self.off_place() {
                     self.fly(world, place);
                 }
             }
@@ -936,8 +1080,18 @@ impl Stranded {
                     assert!(world.set_gravity_scale(body, self.fall / pull, true));
                     self.pull = Some(pull);
                 }
-                self.spaceling
-                    .apply_control(world, self.control, Vec2::new(0.0, -self.fall), DT);
+                // Dead, nothing holds it up or rights it.
+                if self.phase != Phase::Dead {
+                    self.spaceling.apply_control(
+                        world,
+                        self.control,
+                        Vec2::new(0.0, -self.fall),
+                        DT,
+                    );
+                }
+                self.expected = world
+                    .motion(body)
+                    .map(|motion| motion.linear_velocity - Vec2::new(0.0, self.fall * DT));
             }
         }
     }
@@ -946,9 +1100,9 @@ impl Stranded {
     /// is drawn, solid for whatever meets it but the birds, which have
     /// perches of their own.
     fn bring_perch(&mut self, world: &mut PhysicsWorld) {
-        let wanted = match self.leaving {
-            Some(_) => None,
-            None => self.place.block(),
+        let wanted = match (self.leaving, self.phase) {
+            (Some(_), _) | (None, Phase::Dead) => None,
+            (None, _) => self.place.block(),
         };
         if self.perch == wanted {
             return;
@@ -1023,11 +1177,26 @@ impl Stranded {
                 self.angle = snapshot.motion.angle;
                 self.feet = snapshot.motion.position
                     - Vec2::Y.rotate_radians(self.angle) * spec(self.scale).half_height();
+                let blow = self.expected.take().map_or(0.0, |expected| {
+                    (snapshot.motion.linear_velocity - expected).length()
+                });
+                self.hardest = self.hardest.max(blow);
                 let beyond = LOST * self.scale;
-                if self.feet.y < self.layout.floor_y - beyond
-                    || self.feet.x.abs() > self.layout.bounds_max.x + beyond
-                {
+                let out = self.feet.y < self.layout.floor_y - beyond
+                    || self.feet.x.abs() > self.layout.bounds_max.x + beyond;
+                if self.phase == Phase::Dead {
+                    return self.lie(around, snapshot, out);
+                }
+                if out {
                     return Some(Gone::Lost);
+                }
+                if blow >= LETHAL * spec(self.scale).balance.knockdown_velocity_change {
+                    // Limp, it takes the friction a body comes to rest by,
+                    // for its grip was its controller's.
+                    self.spaceling.go_limp(world);
+                    self.flight = None;
+                    self.enter(Phase::Dead);
+                    return None;
                 }
                 self.react(world, around);
                 if !matches!(
@@ -1081,6 +1250,12 @@ impl Stranded {
             self.knockdowns += 1;
             self.pressed = None;
             return self.enter(Phase::GettingUp);
+        }
+        if self.bars_since.is_some()
+            && matches!(self.place, Place::Floor(_))
+            && matches!(self.phase, Phase::Standing | Phase::Dodging)
+        {
+            return self.dodge(world, around);
         }
         match self.phase {
             Phase::GettingUp => {
@@ -1180,13 +1355,178 @@ impl Stranded {
                     }
                 }
             }
-            Phase::Flying | Phase::Hovering | Phase::BeamedUp => {}
+            Phase::Flying | Phase::Hovering | Phase::BeamedUp | Phase::Dodging | Phase::Dead => {}
         }
     }
 
-    /// How long it has walked for, in seconds, while it walks.
+    /// On the floor as Falling's bars come down: once it has had a moment to
+    /// see them, it reckons where their cells will come down through its
+    /// height, and runs for the nearest stretch of its bank that none will
+    /// come down on before it gets there, looking again as it goes.
+    fn dodge(&mut self, world: &PhysicsWorld, around: Surroundings<'_>) {
+        let since = self.bars_since.expect("bars coming down");
+        if self.age < since + DODGE_REACTION {
+            return;
+        }
+        let reach = REACH * self.scale;
+        if self.phase != Phase::Dodging || self.age >= self.looked {
+            self.looked = self.age + DODGE_LOOK;
+            match self.refuge(world, around) {
+                Some(x) if (x - self.feet.x).abs() > reach => {
+                    if self.phase != Phase::Dodging {
+                        self.dodges += 1;
+                        self.enter(Phase::Dodging);
+                    }
+                    self.place = Place::Floor(Vec2::new(x, self.feet.y));
+                }
+                _ if self.phase == Phase::Dodging => {
+                    self.place = Place::Floor(self.feet);
+                    self.enter(Phase::Standing);
+                }
+                _ => {}
+            }
+        }
+        if self.phase == Phase::Dodging {
+            let gap = self.place.feet().x - self.feet.x;
+            if gap.abs() <= reach {
+                self.place = Place::Floor(self.feet);
+                self.enter(Phase::Standing);
+            } else {
+                self.facing = gap.signum();
+                self.control.walk = self.facing;
+            }
+        }
+    }
+
+    /// Where it runs to from Falling's bars: none while none of their cells
+    /// will come down through its height where it stands within
+    /// `DODGE_AHEAD`. Otherwise the nearest place along its bank, short of
+    /// any cell lying on the floor in its way, that none will come down on,
+    /// and that it can run to past those coming down between before they
+    /// do; failing that, the nearest that none will come down on, and
+    /// failing that, the one they come down on last.
+    fn refuge(&self, world: &PhysicsWorld, around: Surroundings<'_>) -> Option<f32> {
+        let walker = spec(self.scale);
+        let (x, floor) = (self.feet.x, self.feet.y);
+        let head = floor + 2.0 * walker.half_height();
+        let [mut left, mut right] = self.bank(around);
+        // Where each cell comes down through its height: the stretch of the
+        // floor it sweeps, widened by its reach and the spaceling's, and the
+        // seconds before it gets there.
+        let mut threats: Vec<(f32, f32, f32)> = Vec::new();
+        for (cell, velocity, reach) in bars(world, around.surfaces) {
+            let low = cell.y - reach;
+            if cell.y + reach < floor {
+                continue;
+            }
+            let wide = reach + walker.radius + DODGE_CLEAR * self.scale;
+            if low <= floor + 0.5 * reach && velocity.length() < BAR_REST * self.scale {
+                // It cannot run through a cell lying on the floor.
+                if cell.x + wide < x {
+                    left = left.max(cell.x + reach + walker.radius);
+                } else if cell.x - wide > x {
+                    right = right.min(cell.x - reach - walker.radius);
+                }
+                continue;
+            }
+            let down_to = |height: f32| {
+                let above = low - height;
+                if above <= 0.0 {
+                    0.0
+                } else {
+                    let up = velocity.y;
+                    (up + (up * up + 2.0 * BAR_FALL * above).sqrt()) / BAR_FALL
+                }
+            };
+            let (start, end) = if low <= head {
+                (0.0, SLIDE_AHEAD)
+            } else {
+                (down_to(head), down_to(floor))
+            };
+            if start > DODGE_AHEAD {
+                continue;
+            }
+            let (from, to) = (cell.x + velocity.x * start, cell.x + velocity.x * end);
+            threats.push((from.min(to) - wide, from.max(to) + wide, start));
+        }
+        let over = |at: f32| {
+            threats
+                .iter()
+                .filter(move |(lo, hi, _)| *lo <= at && at <= *hi)
+        };
+        over(x).next()?;
+        let speed = DODGE_PACE * walker.walk_speed;
+        let gap = 1e-3 * self.scale;
+        let mut places = vec![left, right];
+        for (lo, hi, _) in &threats {
+            places.extend([lo - gap, hi + gap]);
+        }
+        places.retain(|at| (left..=right).contains(at));
+        let clear = |at: &f32| over(*at).next().is_none();
+        // Each cell coming down across its way, it must be past first.
+        let first = |at: &f32| {
+            threats.iter().all(|(lo, hi, start)| {
+                let (near, far) = if *at > x { (*lo, *hi) } else { (-*hi, -*lo) };
+                let (from, to) = if *at > x { (x, *at) } else { (-x, -*at) };
+                far < from || near > to || (far - from) / speed < *start
+            })
+        };
+        let nearest = |a: &&f32, b: &&f32| (**a - x).abs().total_cmp(&(**b - x).abs());
+        let latest = |at: &f32| {
+            over(*at)
+                .map(|(_, _, start)| *start)
+                .fold(f32::INFINITY, f32::min)
+        };
+        places
+            .iter()
+            .filter(|at| clear(at) && first(at))
+            .min_by(nearest)
+            .or_else(|| places.iter().filter(|at| clear(at)).min_by(nearest))
+            .or_else(|| places.iter().max_by(|a, b| latest(a).total_cmp(&latest(b))))
+            .copied()
+    }
+
+    /// Dead, it lies where it fell until it has lain still on the floor for
+    /// a second, or anywhere once the bars have gone, or for at most
+    /// `DEAD_TICKS`, and then turns to dirt over a second, in the floor's
+    /// soil under it. An event it would not stay for turns it to dirt at
+    /// once. Answers that its stay has ended once it has, or once it has
+    /// left the view, as down the drain, with no soil to turn to.
+    fn lie(
+        &mut self,
+        around: Surroundings<'_>,
+        snapshot: SpacelingSnapshot,
+        out: bool,
+    ) -> Option<Gone> {
+        if let Some(since) = self.crumbling {
+            return (self.age - since >= CRUMBLE_TICKS).then_some(Gone::Died);
+        }
+        if out {
+            return Some(Gone::Died);
+        }
+        let scale = self.scale;
+        let walker = spec(scale);
+        let resting = snapshot.motion.linear_velocity.length() < REST_SPEED * scale
+            && snapshot.motion.angular_velocity.abs() < REST_SPIN;
+        self.still = if resting { self.still + 1 } else { 0 };
+        let middle = snapshot.motion.position;
+        let down = middle.y <= self.layout.floor_y + walker.half_height() + LANDING_GAP * scale;
+        let bars = around
+            .surfaces
+            .iter()
+            .any(|surface| surface.source == SurfaceSource::Rigid && surface.body.is_some());
+        let lain = self.still >= LIE_TICKS && (down || !bars);
+        if lain || self.age - self.since >= DEAD_TICKS || self.evicted(around) {
+            self.burial = Some(middle.x);
+            self.crumbling = Some(self.age);
+        }
+        None
+    }
+
+    /// How long it has walked or run for, in seconds, while it does.
     pub fn stride(&self) -> Option<f32> {
-        (self.phase == Phase::Walking).then(|| (self.age - self.since) as f32 * DT)
+        matches!(self.phase, Phase::Walking | Phase::Dodging)
+            .then(|| (self.age - self.since) as f32 * DT)
     }
 
     /// How long its jetpack has burned for, in seconds, while it flies or
@@ -1209,6 +1549,7 @@ impl Stranded {
             flags: self.flags,
             flights: self.flights,
             knockdowns: self.knockdowns,
+            dodges: self.dodges,
             leaving: self.leaving.map(|(why, _)| why),
         }
     }
@@ -1264,6 +1605,12 @@ impl Scene {
         true
     }
 
+    /// Where across the floor the spaceling's remains turn to dirt, once, as
+    /// they begin to, for the run to take into the floor's soil.
+    pub fn take_burial(&mut self) -> Option<f32> {
+        self.spaceling.as_mut()?.burial.take()
+    }
+
     /// The spaceling's stay is over, as `gone` says. Its flag stays.
     pub fn end(&mut self, gone: Gone) {
         if self.spaceling.take().is_none() {
@@ -1275,6 +1622,7 @@ impl Scene {
             Gone::Left(Departure::NoPlace) => &mut self.accounting.no_place,
             Gone::Lost => &mut self.accounting.lost,
             Gone::Cleared => &mut self.accounting.cleared,
+            Gone::Died => &mut self.accounting.died,
         };
         *count += 1;
     }

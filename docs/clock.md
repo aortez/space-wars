@@ -2043,8 +2043,8 @@ rain the spaceling stands only on the topmost block of a column, as the crow
 perches. It brings one perch to the arena, a fixed square where the block it
 stands on or is going to is drawn, solid for whatever meets it but the birds,
 which bring perches of their own. The floor holds it while it is the
-ordinary floor, closed: not a duck's course, an open drain, an event's own
-panels or a fight's hills.
+ordinary floor: closed, or either bank while Falling holds its drain open,
+but not a duck's course, an event's own panels or a fight's hills.
 
 **Getting about.** A jetpack carries it from place to place: up from where
 its feet are, over an arc, and down onto where they will stand, at 28 units
@@ -2079,11 +2079,50 @@ flies to a place clear of both, if there is one, and looks again a second
 later. The magpie comes only with Coins, which the spaceling does not stay
 for.
 
-**Knocks.** Standing or walking, its body is a spaceling's among the arena's
-others, and what meets it pushes it, as a spider crossing its block does.
+**Knocks.** Standing, walking or running, its body is a spaceling's among
+the arena's others, and what meets it pushes it, as a spider crossing its
+block does.
 Knocked down, it gets up as the physics crate's spaceling does. If it is not
 up within 2 s, or has no room to get up, its jetpack rights it and takes it
-back to where it stood, and one knocked off its block flies back onto it.
+back to where it stood, and one knocked off its block flies back onto it. A
+blow is the change in its velocity that nothing it does accounts for, as the
+physics crate's spaceling measures its own. One of five times what knocks it
+down or more kills it, about what a bar falling from the face onto it
+squarely gives; the physics decides, not a roll.
+
+**Falling.** Falling's bars fall in its world, the run's arena, with walls
+of their own at the sides of the view, and the floor's drain opens under
+the middle. On a digit, or on the floor over the drain, it takes off on its
+jetpack as its block or the floor drops away, and hovers, passing in front
+of the bars as it does of everything in flight, until they have gone, when
+it lands where it next chooses. On either bank it stays on that bank: a walk
+stops as the bars begin to come down, and a fifth of a second later it looks
+up. It reckons where each lit cell of the bars will come down through its
+height within 1.5 s, from how the cell moves and Falling's fall, and runs,
+at a spaceling's full walk rather than its stroll, for the nearest stretch
+of its bank that none will come down on, short of any bar lying on the floor
+in its way, past those coming down between before they do. It looks again
+every twentieth of a second as it runs, and stands once it is there or once
+nothing is coming down where it stands. With no such stretch it can reach in
+time, it runs for the nearest one clear of them anyway, and with none at
+all, for where they come down last. A bar thrown back off a wall or another
+bar can still catch it. Once they have gone, it stands a while and goes on.
+
+**Dead.** Killed, it lies where it fell, its suit dulled, and whatever meets
+it pushes it about. Once it has lain still for a second, on the floor or,
+once the bars have gone, anywhere, or at most 10 s after the blow, it turns
+to dirt over a second, going the color of the earth as it fades. Its remains
+become dirt in the floor's soil through the intake Grass uses: the 2-unit
+column under where it lies and the one either side, 3 cells deep, wherever
+the floor holds soil, so none over the open drain. Remains a blow has thrown
+against a wall, under a side of the frame, turn to dirt as near them as the
+floor shows, with all three columns in view. While Grass's switch is
+on and no grass grows yet, and the middle column took dirt, a grass seed
+takes root in it, the clock's grass while it lives, as the Grass event's
+seeds are. Remains that
+fall down the drain or out of view leave no dirt. An event it would not stay
+for alive starts it turning to dirt at once. Either way its stay ends as
+`died`.
 
 **Nowhere to stand.** While no digit is at rest and the floor is not the
 ordinary one, as when the reels turn over a duck's course, its jetpack lifts
@@ -2097,7 +2136,8 @@ first place that is there again. Its jetpack holds it so for at most 10 s.
 | A duck, automatic or a player's | Leaves the floor for the digits until the course has gone. |
 | Digit Slide | Leaves a digit that slides, at once, for another block. The other digits hold it as before, and the one that slid does again once it rests. |
 | Cell Swap or Slot Machine | Has no block to stand on while cells are on their way or the reels turn, so it goes down to the floor until they rest, or hovers where it is if the floor is not there either. |
-| Falling, Meltdown, Explosion, Coins, Marquee or Aquarium | Leaves in its beam as the event begins. |
+| Falling | Takes off from its digit as its block drops away, or runs from the bars on the floor, which may knock it down or kill it. With no room for the bars in the arena, they fall in a world of their own and it leaves in its beam as the event begins. |
+| Meltdown, Explosion, Coins, Marquee or Aquarium | Leaves in its beam as the event begins. |
 | The next Tanks fight | Leaves in its beam as the hills rise. |
 
 **Leaving.** It leaves in a beam, as a spaceling the rescue beam finds does:
@@ -2117,24 +2157,28 @@ one behind, and the arena keeps a floor under it
 hills begin to withdraw takes its spaceling with it. Once they have, the
 spaceling is the clock's and stays. Its claim keeps the fight's world, and
 with it the contact capture the fight turned on, with nothing bound
-([Tanks](#tanks)).
+([Tanks](#tanks)). Falling, begun while it stays and no visit holds the
+arena, claims the arena beside it, `event`, for its bars, its letters and
+its two walls, and the arena keeps its floor, with the drain open, under
+them.
 
 `clock state` reports `stranded` once a fight has left a spaceling behind.
 `spaceling`, while one stays, gives the fight it came from (`fight_id`), its
 side (`slot`), its phase (`flying`, `hovering`, `standing`, `walking`,
-`planting`, `sheltering`, `getting-up` or `beamed-up`), its age, where its
-feet are, the block it stands on or is going to (`perch`, as digit slot,
-column and row, and null for the floor), its flags, flights and knockdowns,
-and why it is `leaving`. `flag`, while one stands, gives its block and its
-age. `accounting` counts the spacelings the run's fights have left behind
-and what became of them: `time_up`, `event` and `no_place` for those a beam
-lifted out, `cleared` by a resize, and `lost` out of view. Seven seconds
-into a stay, `spacewars-cli clock state` printed:
+`dodging`, `planting`, `sheltering`, `getting-up`, `beamed-up` or `dead`),
+its age, where its feet are, the block it stands on or is going to (`perch`,
+as digit slot, column and row, and null for the floor), its flags, flights,
+knockdowns and dodges, and why it is `leaving`. `flag`, while one stands,
+gives its block and its age. `accounting` counts the spacelings the run's
+fights have left behind and what became of them: `time_up`, `event` and
+`no_place` for those a beam lifted out, `cleared` by a resize, `lost` out of
+view, and `died` of a blow. Seven seconds into a stay, `spacewars-cli clock
+state` printed:
 
 ```text
-Stranded spaceling: right tank's, from fight 1, standing, age=437 phase tick=222, position=[187733, 85079], facing right=true, perch=Some([2, 5, 7]), flags=1 flights=1 knockdowns=0
+Stranded spaceling: right tank's, from fight 1, standing, age=437 phase tick=222, position=[187733, 85079], facing right=true, perch=Some([2, 5, 7]), flags=1 flights=1 knockdowns=0 dodges=0
 Stranded flag: right tank's, on block [2, 5, 7], age=222
-Stranded so far: 1 left behind; beamed out time-up=0 event=0 no-place=0; cleared=0 lost=0
+Stranded so far: 1 left behind; beamed out time-up=0 event=0 no-place=0; cleared=0 lost=0 died=0
 ```
 
 `cargo test --locked -p scenario-clock stranded` covers the blocks a face
@@ -2146,9 +2190,18 @@ it does not stay for and its stay through the others, a digit changing
 under it, a Digit Slide, sheltering from Rain with and without cover, the
 crow, a duck's course, hovering while the reels turn over that course and
 the beam that comes when nothing is left to stand on, a knock off its block,
-a resize, and the next fight starting with it on the floor. The fight's side
-is under `events::tanks`: the even draw among six endings, and the beam for
-a spaceling that is not on its feet when the winner goes up.
+a resize, and the next fight starting with it on the floor. For Falling they
+cover its bars coming down in its world as it takes off from its digit, its
+run out from under them on the floor, a bar that knocks it down and leaves
+it to get up, one that kills it and the dirt and grass its remains turn to,
+its remains going limp and coming to rest where the blow leaves them, no
+dirt over the open drain, remains under a side of the frame turning to dirt
+where the floor shows, its beam when the arena has no room for the bars
+beside it, and a stay through Falling replayed from its seed. The physics
+crate's spaceling tests that a body left limp with nothing driving it
+comes to rest, where one left on its feet glides on. The fight's side is
+under `events::tanks`: the even draw among six endings, and the beam for a
+spaceling that is not on its feet when the winner goes up.
 
 A local survey fought 60 seeds at each of five shapes, 4:3, 5:3, 16:9,
 portrait (0.6) and 4:1, once with every loser's spaceling thrown clear and
@@ -2186,10 +2239,15 @@ as they fall:
 - A crow came within 3 pitches of it as the crow flew in or out, before it
   looked again, 0.89 pitches at the closest, and while it hovered with
   nowhere to go, 0.15 pitches at the closest.
-- With every event on the calm profile, all 200 stays ended in its beam as
-  an event it does not stay for began, a median of 2.1 minutes after the
-  hills left it and at most 8.0: Aquarium 40 times, Meltdown and Marquee 35
-  each, Explosion and Falling 30 each, Coins 20 and the next Tanks fight 10.
+- With every event on the calm profile, 197 of the 200 stays ended in its
+  beam as an event it does not stay for began, a median of 2.2 minutes after
+  the hills left it and at most 8.0: Meltdown 50 times, Aquarium 45, Marquee
+  and Explosion 35 each, Coins 22 and the next Tanks fight 10. The other 3,
+  one fight's at three shapes, died in Falling. While it left for Falling
+  too, the same stays ended a median of 2.1 minutes in, 30 of them as
+  Falling began; 27 of those stayed through it, a median of 1.4 minutes
+  longer and at most 4.5. It ran from the bars in 17 stays and was knocked
+  down 14 times, all in Falling, and nothing else killed it.
 - With the rolls as they fall, 239 spacelings got out of the 1,500 fights.
   Of the 199 with a winner in view, 44 drew the rescue beam, 19 a stowaway,
   36 a surrender, 18 a parting shot, 41 the rebuild and 41 no beam; of the
@@ -2220,6 +2278,59 @@ hills rose with its beam, loop CPU averaged 10.11 ms, against 9.99 ms for
 the first fight's, with one loop of 1,680 over 16.7 ms and no refresh
 skipped.
 
+A survey of Falling took 16 fights' spacelings at each shape, with Grass's
+switch on, and began Falling under each on its digit, and again on the floor
+at each of 7 places evenly spread across it, following it until 3 s after
+Falling ended:
+
+- On its digit, all 80 took off as their blocks dropped away and hovered,
+  and nothing struck them. So did the 80 at the middle place, over the
+  drain. All of them landed again once the bars had gone.
+- Of the 480 on a bank, 54 had no bar come down where they stood and 131 ran
+  and came through untouched. 175 were knocked down, 12 of them more than
+  once, and all got up. 120 were killed, 29 of them after a knockdown, from
+  0.7 to 2.7 s into Falling. The places nearest the walls were the safest,
+  with 8 and 13 deaths in 80, against 23–29 under the digits. At 4:1, whose
+  floor runs well beyond its digits, 46 of the 96 on a bank had no bar come
+  down where they stood and 13 died; at the other shapes 23–33 of 96 died.
+- Every one killed turned to dirt, 9 cells of it, and a grass seed took
+  root in each.
+- The same fights' spacelings stood on either bank 0.1, 0.25, 0.5 and 1
+  pitch from the drain as Falling began, 640 in all, and 144 were killed.
+  116 lay where the blow left them and turned to dirt, 9 cells of it, or 3
+  or 6 where some of their three columns lay over the drain, and grass took
+  root in all but the one with 3 cells. 27 went down the drain and left no
+  dirt. The last still lay dead 3 s after Falling ended.
+- On the development workstation, one process at a time under another job's
+  load, 4 fights at each shape, a tick of Falling took a median of 41–58 µs
+  with no spaceling, its bars falling in a world of their own, and 49–75 µs
+  with the spaceling on its digit or the floor beside them in the arena,
+  against 13–20 µs on the idle clock as it stood on its digit. The slowest
+  took 0.79 ms, as it ran, against 0.19 ms with no spaceling.
+
+On sw-picade-2, eight more Tanks fights were fought with a trial build that,
+as above, sends every loser's spaceling out, thrown clear, and draws it no
+beam, with Grass's switch on. In each stay, Falling began as the spaceling
+stood on its digit, and again once it stood on the floor, and each time it
+claimed the arena beside the spaceling. Each was traced for 4 s, as was
+Falling twice before the first fight, with no spaceling, and the idle clock
+twice. All eight on a digit took off as their blocks dropped away, and
+landed once the bars had gone. Of the eight on the floor, six ran, were
+knocked down once and got up, and two were killed. One turned to dirt, 9
+cells of it, where grass took root. The grass lost its shoots in the next
+round's first Falling, and the rest of it had died by the sixth round's.
+The other stood a third of a pitch from the open drain as Falling began
+and left no dirt, most likely gone down the drain. No loop ran over
+16.7 ms, and no refresh was skipped. Beside the spaceling, Falling's loops
+averaged 0.8–1.0 ms more than with none.
+
+| 4 s traces | Loop CPU mean (ms) | 95th percentile (ms) | 99th percentile (ms) | Slowest (ms) | Loops over 16.7 ms | Refreshes skipped |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| The idle clock, 2 | 5.63 | 6.75 | 6.99 | 8.61 | 0 of 480 | 0 of 478 |
+| Falling with no spaceling, 2 | 6.58 | 8.01 | 8.43 | 9.88 | 0 of 480 | 0 of 478 |
+| Falling, the spaceling on its digit, 8 | 7.54 | 10.00 | 11.47 | 14.34 | 0 of 1,920 | 0 of 1,909 |
+| Falling, the spaceling on the floor, 8 | 7.37 | 9.66 | 11.33 | 12.60 | 0 of 1,920 | 0 of 1,907 |
+
 The run data stays local.
 
 | | On a digit with its flag | Sheltering from the rain | Off the hills on its jetpack, planting its flag, walking the floor, sheltering, and in its beam, five or six times larger |
@@ -2238,6 +2349,25 @@ shelter, and 0.83 s into the beam that comes when the minute turns 20
 minutes after the hills left it, each frame centered on the spaceling.
 `SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
 engine-client tanks_the_hills_leave_a_spaceling` regenerates all six.
+
+| | Running from Falling's bars | Killed by one | Grass on its dirt | Stopped as the bars begin, running, clear of them; then running, the blow, lying dead, turning to dirt, and grass, five or six times larger |
+| --- | --- | --- | --- | --- |
+| 1024×768 | ![Falling's bars coming down across the clock, the drain open between the floor's two banks, the spaceling a speck running along the right bank](screenshots/clock/tanks-1024x768-stranded-dodge.png) | ![Falling's bars piled on both banks, the spaceling a speck under those at the right](screenshots/clock/tanks-1024x768-stranded-clobbered.png) | ![The clock whole again, a tuft of grass on the floor at the right](screenshots/clock/tanks-1024x768-stranded-grass.png) | ![The spaceling standing on the floor, running, standing clear; then running, under a bar as it comes down, lying dulled under the bars, fading to the color of earth over a patch of dirt, and a green tuft of grass on the dirt](screenshots/clock/tanks-1024x768-stranded-falling-zoom.png) |
+| 800×480 | ![Falling's bars coming down across the clock, the drain open between the floor's two banks, the spaceling a speck on the right bank](screenshots/clock/tanks-800x480-stranded-dodge.png) | ![Falling's bars piled on both banks, the spaceling under those at the right](screenshots/clock/tanks-800x480-stranded-clobbered.png) | ![The clock whole again, a tuft of grass on the floor at the right](screenshots/clock/tanks-800x480-stranded-grass.png) | ![The spaceling standing on the floor, a bar coming down beside it, standing clear among the fallen bars; then running, under a bar as it comes down, lying dulled under the bars, fading to the color of earth over a patch of dirt, and a green tuft of grass on the dirt](screenshots/clock/tanks-800x480-stranded-falling-zoom.png) |
+
+In the run of seed 9715's fight, Falling began as the spaceling set out on
+its sixth walk on the floor. The first picture shows it half a second into
+its run, and it came through untouched. In a run of the same fight, Falling
+began 1.25 s into its third walk at 4:3 and its seventh at 5:3. The second
+picture shows the moment a bar came down on it and killed it, and the third
+the grass on its dirt about 20 s after its remains had gone. Each strip
+shows the first run a tenth of a second in, its walk stopped, half a
+second into its run, and half a second after it stood clear, then the
+second run a fifth of a second into its run, at the blow, half a second
+after it, halfway through its turning to dirt, and the grass, each frame
+centered on the spaceling or on where it lay. `SPACEWARS_TANKS_ARTIFACTS=<dir>
+cargo test --locked --profile ci -p engine-client
+tanks_a_spaceling_left_on_the_clock` regenerates all eight.
 
 ### Cell swaps
 
@@ -2812,8 +2942,10 @@ the [qualification's](#spider-visit-qualification-2026-11-01) second visit:
 ### Managed floor and drain
 
 The ordinary floor is **closed by default**, including unsynchronized startup,
-idle/cooldown, Color Cycle, Marquee and Digit Slide. Standalone Falling acquires the center
-drain before creating its temporary material. It stays fully open through
+idle/cooldown, Color Cycle, Marquee and Digit Slide. Falling acquires the center
+drain before creating its temporary material, standalone or in the arena
+beside a stranded spaceling, whose floor the drain opens in. It stays fully
+open through
 recovery/cleanup, then closes after the event's bodies and remaining visuals
 have been released. Preview replacement, resize and
 restart use the same ownership boundary. Pausing or disabling a currently running
@@ -4677,8 +4809,10 @@ Its module comment states the rules, and `arena_contract.rs` holds them:
   move time steps nothing.
 - **Owners claim it.** A visit claims it for its terrain and character, and
   one event at a time shares it beside a visit: Aquarium, Explosion, Coins,
-  Falling or Meltdown. The spider claims it for its stay, with its body, its line, the
-  frame it climbs and a proxy for each digit cell
+  Falling or Meltdown. Falling also claims it beside a stranded spaceling
+  while no visit holds it, for its bars and two walls of its own at the
+  sides of the view. The spider claims it for its stay, with its body, its
+  line, the frame it climbs and a proxy for each digit cell
   ([below](#the-spider-on-the-digits)). The crow claims it for its visit, with
   its body and a perch on top of each exposed digit column
   ([above](#crow-visitor)). A spaceling a Tanks fight left stranded claims
@@ -4732,9 +4866,16 @@ An event that needs rigid bodies in the shared world declares an `Owner` with
 its identity ranges and budget, asks `arena::admits` before it changes
 anything, claims the arena rather than building a world of its own, and lets
 go of only its own claim. If its budget raises `ARENA_CAPACITY`, record the new
-caps here. Standalone Falling, Explosion and Coins still step worlds of their own, so
+caps here. Falling's walls do not: its batch and walls take 32 bodies and
+241 colliders, within Coins' 240 bodies and Aquarium's 243 colliders.
+Beside a stranded spaceling and the crow, the two fixture owners
+`SPACEWARS_CLOCK_ARENA_FIXTURE=two-owners` starts still leave them room; a
+third would not.
+Standalone Falling, Explosion and Coins still step worlds of their own, so
 their bodies meet residents only once a player joins and the arena adopts that
-world. Clock's state publishes all of this in its
+world. Falling begun beside a stranded spaceling is not standalone: its bars
+fall in the arena and meet the residents.
+Clock's state publishes all of this in its
 [`arena` object](#public-controls-and-synchronized-captures) and each event's
 `blocked_by_arena`, and `clock trigger` fails an event the arena would refuse
 with `action-unavailable` and the arena's notice.

@@ -67,45 +67,13 @@ impl FallingWorld {
         let layout = drain.layout();
         let mut world = PhysicsWorld::new(crate::arena::mechanics_config(layout));
         world.reserve(4, 4, 0);
-        for (index, (min, max)) in drain
-            .slabs()
-            .chain([
-                (
-                    Vec2::new(layout.bounds_min.x - 20.0, layout.bounds_min.y),
-                    Vec2::new(layout.bounds_min.x, layout.bounds_max.y + 100.0),
-                ),
-                (
-                    Vec2::new(layout.bounds_max.x, layout.bounds_min.y),
-                    Vec2::new(layout.bounds_max.x + 20.0, layout.bounds_max.y + 100.0),
-                ),
-            ])
-            .enumerate()
-        {
-            // The two banks are addressed as course surfaces by a drain-joined
-            // player, and the walls are the boundary such a player inherits.
-            let entity = PhysicsId::new(if index < 2 {
-                canonical::DRAIN_BANKS.start + index as u64
-            } else {
-                canonical::FALLING_WALLS.start + (index - 2) as u64
-            });
-            let mut collider = ColliderSpec::cuboid(
-                ColliderId::new(entity, ColliderRole::PRIMARY, 0),
-                (max.x - min.x) * 0.5,
-                (max.y - min.y) * 0.5,
-            );
-            if index >= 2 {
-                collider.collision_groups = crate::arena::FRAME;
-            }
-            assert!(world.insert_body(
-                BodyId::new(entity, BodyRole::PRIMARY),
-                BodySpec {
-                    kind: BodyKind::Fixed,
-                    position: (min + max) * 0.5,
-                    ..BodySpec::default()
-                },
-                &[collider],
-            ));
+        // The two banks are addressed as course surfaces by a drain-joined
+        // player, and the walls are the boundary such a player inherits.
+        for (index, (min, max)) in drain.slabs().enumerate() {
+            let entity = PhysicsId::new(canonical::DRAIN_BANKS.start + index as u64);
+            insert_slab(&mut world, entity, min, max, None);
         }
+        insert_walls(&mut world, layout, canonical::FALLING_WALLS.start);
         world
     }
 
@@ -119,6 +87,52 @@ impl FallingWorld {
     }
     pub fn collider_count(&self) -> usize {
         self.world.collider_count()
+    }
+}
+
+/// A fixed box from `min` to `max`, in `groups` if given.
+fn insert_slab(
+    world: &mut PhysicsWorld,
+    entity: PhysicsId,
+    min: Vec2,
+    max: Vec2,
+    groups: Option<engine_rapier::world::CollisionGroups>,
+) {
+    let mut collider = ColliderSpec::cuboid(
+        ColliderId::new(entity, ColliderRole::PRIMARY, 0),
+        (max.x - min.x) * 0.5,
+        (max.y - min.y) * 0.5,
+    );
+    if let Some(groups) = groups {
+        collider.collision_groups = groups;
+    }
+    assert!(world.insert_body(
+        BodyId::new(entity, BodyRole::PRIMARY),
+        BodySpec {
+            kind: BodyKind::Fixed,
+            position: (min + max) * 0.5,
+            ..BodySpec::default()
+        },
+        &[collider],
+    ));
+}
+
+/// Falling's two walls, just beyond the sides of the view, from entity
+/// `first`. They hold its bars in view, and let the birds through.
+pub(crate) fn insert_walls(world: &mut PhysicsWorld, layout: Layout, first: u64) {
+    let walls = [
+        (
+            Vec2::new(layout.bounds_min.x - 20.0, layout.bounds_min.y),
+            Vec2::new(layout.bounds_min.x, layout.bounds_max.y + 100.0),
+        ),
+        (
+            Vec2::new(layout.bounds_max.x, layout.bounds_min.y),
+            Vec2::new(layout.bounds_max.x + 20.0, layout.bounds_max.y + 100.0),
+        ),
+    ];
+    for (index, (min, max)) in walls.into_iter().enumerate() {
+        let entity = PhysicsId::new(first + index as u64);
+        insert_slab(world, entity, min, max, Some(crate::arena::FRAME));
     }
 }
 
