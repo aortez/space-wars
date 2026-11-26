@@ -926,6 +926,7 @@ impl ClockArena {
     }
 
     pub fn step(&mut self, dt: f32) {
+        self.metrics = PhysicsStepMetrics::default();
         let scale = self.resident_gravity_scale();
         let Some(world) = &mut self.world else {
             return;
@@ -1044,7 +1045,8 @@ impl ClockArena {
         (owners, floor)
     }
 
-    /// The last step's timings and populations.
+    /// This tick's step's timings and populations, or none on a tick that
+    /// did not step the arena.
     pub fn metrics(&self) -> PhysicsStepMetrics {
         self.metrics
     }

@@ -669,6 +669,9 @@ pub struct PhysicsStepMetrics {
     pub island_time: Duration,
     pub island_constraints_time: Duration,
     pub solver_time: Duration,
+    /// Contact capture's time over the step's substeps, the material
+    /// response's included. Zero in a world without capture.
+    pub capture_time: Duration,
     /// None when the physics backend does not provide complete CCD timing.
     pub ccd_time: Option<Duration>,
     pub ccd_first_impact_time: Duration,
@@ -2052,6 +2055,10 @@ impl PhysicsWorld {
             island_time: counters.stages.island_construction_time.time(),
             island_constraints_time: counters.stages.island_constraints_collection_time.time(),
             solver_time: counters.stages.solver_time.time(),
+            capture_time: self
+                .loading
+                .as_ref()
+                .map_or(Duration::ZERO, loading::LoadingState::capture_time),
             // The vendored backend times both substep selection and clamping,
             // accumulating across every substep (see SPACEWARS_PATCH.md).
             ccd_time: Some(counters.stages.ccd_time.time()),

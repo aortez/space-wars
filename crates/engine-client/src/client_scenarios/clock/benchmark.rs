@@ -36,11 +36,16 @@ pub enum ClockBenchmarkCase {
     /// the digits and the way out, with the digits' proxies reposed as the
     /// seconds change.
     Spider,
+    /// One Tanks fight per cycle in the run's arena: the tanks come down,
+    /// settle and fight to a result, their contacts priced by contact
+    /// charges, and the winner goes back up. A cycle lasts as long as the
+    /// longest fight can.
+    Tanks,
 }
 
 impl ClockBenchmarkCase {
     #[cfg(test)]
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::Idle,
         Self::Falling,
         Self::ColorCycle,
@@ -53,6 +58,7 @@ impl ClockBenchmarkCase {
         Self::Grass,
         Self::Residents,
         Self::Spider,
+        Self::Tanks,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -75,6 +81,7 @@ impl ClockBenchmarkCase {
             Self::Aquarium => ClockEventKind::Aquarium,
             Self::Grass => ClockEventKind::Grass,
             Self::Spider => ClockEventKind::Spider,
+            Self::Tanks => ClockEventKind::Tanks,
         })
     }
 
@@ -305,6 +312,36 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// A Tanks event's ticks report the arena's step, with capture and the
+    /// duel's binding while the tanks fight. An idle tick reports no step.
+    #[test]
+    fn a_tanks_fixture_reports_its_arena_and_charges_only_while_it_fights() {
+        let config = ClockBenchmarkConfig {
+            case: ClockBenchmarkCase::Tanks,
+            ..Default::default()
+        };
+        let (mut state, mut driver) = Driver::new(config, 7, 4.0 / 3.0);
+        let (mut captured, mut bound, mut idle) = (0, 0, 0);
+        for _ in 0..ClockBenchmarkCase::Tanks.cycle_ticks() {
+            let actions = driver.next_actions();
+            ClockScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
+            let arena = state.last_arena_step_metrics();
+            if let Some(times) = state.tanks_contact_times() {
+                assert!(arena.wall_time > Duration::ZERO);
+                captured += usize::from(arena.capture_time > Duration::ZERO);
+                bound += usize::from(times.bind > Duration::ZERO);
+            } else if state.lifecycle() == scenario_clock::EventLifecycle::Idle {
+                idle += 1;
+                assert_eq!(arena.wall_time, Duration::ZERO);
+                assert_eq!(arena.capture_time, Duration::ZERO);
+            }
+        }
+        assert!(
+            captured > 0 && bound > 0 && idle > 0,
+            "{captured} {bound} {idle}"
+        );
     }
 
     #[test]

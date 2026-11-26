@@ -81,7 +81,7 @@ fn clock_csv_reports_real_dimensions_resources_and_cpu_only_work() {
     for renderer in ["vector", "raster"] {
         let rows = run("digit-slide", renderer, 0);
         for row in &rows {
-            assert_eq!(row["benchmark_version"], "3");
+            assert_eq!(row["benchmark_version"], "4");
             assert_eq!(row["seed"], "7");
             assert_eq!(row["viewport_width"], "80");
             assert_eq!(
@@ -94,6 +94,15 @@ fn clock_csv_reports_real_dimensions_resources_and_cpu_only_work() {
             );
             assert_eq!(row["clock_case"], "digit-slide");
             assert_eq!(row["clock_theme"], "normal");
+            assert_eq!(row["spacewars_case"], "");
+            // Only a Tanks fight prices contacts.
+            for field in [
+                "avg_capture_ms",
+                "avg_contact_bind_ms",
+                "avg_contact_price_ms",
+            ] {
+                assert_eq!(row[field], "0.000");
+            }
             assert_eq!(row["frames"], "60");
             assert_eq!(row["updates"], "60");
             assert_eq!(row["max_bodies"], "0");

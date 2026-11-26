@@ -351,6 +351,10 @@ backend. Normal UI startup should be tested separately because Slint backend
 selection, fullscreen behavior, and physical keyboard input are display-stack
 dependent.
 
+Add `--spacewars-benchmark-case deathmatch` for Deathmatch's small universe,
+without planets and full of asteroids. Its ships sit idle and are healed after
+each step, so every run steps the same debris.
+
 The Yocto image also installs the target-independent NES benchmark. It uses the
 bundled Falling ROM and does not need a window, input device, or audio device:
 

@@ -2016,6 +2016,7 @@ pub fn run_benchmark(options: BenchmarkOptions) -> Result<(), Box<dyn std::error
         write_benchmark_header(file)?;
     }
 
+    let mut run = RunTails::default();
     for second in 1..=seconds {
         let mut sample = BenchmarkSample::default();
         let sample_started = Instant::now();
@@ -2032,6 +2033,8 @@ pub fn run_benchmark(options: BenchmarkOptions) -> Result<(), Box<dyn std::error
         }
 
         sample.wall_time = sample_started.elapsed();
+        run.steps.extend_from_slice(&sample.step_samples);
+        run.frames.extend_from_slice(&sample.total_samples);
         let row = BenchmarkRow::from_sample(
             &options.scenario,
             second,
@@ -2045,8 +2048,43 @@ pub fn run_benchmark(options: BenchmarkOptions) -> Result<(), Box<dyn std::error
             write_benchmark_row(file, &row, &options)?;
         }
     }
+    eprintln!("{}", run.summary());
 
     Ok(())
+}
+
+/// Every measured step and frame, for tails over the whole run, which a
+/// row's 60 samples cannot show.
+#[derive(Default)]
+struct RunTails {
+    steps: Vec<Duration>,
+    frames: Vec<Duration>,
+}
+
+impl RunTails {
+    fn summary(&self) -> String {
+        let tails = |samples: &[Duration]| {
+            format!(
+                "p50 {:.3} p95 {:.3} p99 {:.3} p99.9 {:.3} max {:.3}",
+                percentile_ms(samples, 0.50),
+                percentile_ms(samples, 0.95),
+                percentile_ms(samples, 0.99),
+                percentile_ms(samples, 0.999),
+                samples
+                    .iter()
+                    .copied()
+                    .max()
+                    .map(duration_ms)
+                    .unwrap_or_default(),
+            )
+        };
+        format!(
+            "benchmark run: {} steps, step ms {}; frame ms {}",
+            self.steps.len(),
+            tails(&self.steps),
+            tails(&self.frames)
+        )
+    }
 }
 
 fn benchmark_frame(
@@ -2240,6 +2278,9 @@ struct BenchmarkRow {
     avg_rapier_island_constraints_ms: f64,
     avg_rapier_solver_ms: f64,
     avg_rapier_ccd_ms: Option<f64>,
+    avg_capture_ms: f64,
+    avg_contact_bind_ms: f64,
+    avg_contact_price_ms: f64,
     avg_render_ms: f64,
     avg_present_ms: f64,
     avg_raster_clear_ms: f64,
@@ -2377,6 +2418,9 @@ impl BenchmarkRow {
             // Rapier 0.34 exposes no complete CCD timer. Preserve the column
             // as unavailable instead of reporting a misleading zero.
             avg_rapier_ccd_ms: None,
+            avg_capture_ms: avg_ms(sample.scenario_metrics.capture_time, frames),
+            avg_contact_bind_ms: avg_ms(sample.scenario_metrics.contact_bind_time, frames),
+            avg_contact_price_ms: avg_ms(sample.scenario_metrics.contact_price_time, frames),
             avg_render_ms: avg_ms(sample.render_time, frames),
             avg_present_ms: avg_ms(sample.present_time, frames),
             avg_raster_clear_ms: avg_ms(sample.raster_timings.clear, frames),
@@ -2414,11 +2458,11 @@ impl BenchmarkRow {
 fn write_benchmark_header(mut writer: impl Write) -> io::Result<()> {
     write!(
         writer,
-        "benchmark_version,seed,viewport_width,viewport_height,internal_width,internal_height,warmup_seconds,clock_case,clock_recipe,clock_theme,max_bodies,max_colliders,max_scene_items,event_active_frames,"
+        "benchmark_version,seed,viewport_width,viewport_height,internal_width,internal_height,warmup_seconds,clock_case,clock_recipe,clock_theme,spacewars_case,max_bodies,max_colliders,max_scene_items,event_active_frames,"
     )?;
     writeln!(
         writer,
-        "scenario,renderer,raster_scale,second,frames,updates,throughput_fps,scene_items,asteroids,fragments,shells,particles,balls,gravity_sources,gravity_targets,gravity_nodes,gravity_exact_interactions,gravity_approximations,gravity_applied_sources,active_bodies,sleeping_bodies,candidate_pairs,max_candidate_pairs,contact_pairs,max_contact_pairs,solver_contacts,max_solver_contacts,added,removed,avg_step_ms,p50_step_ms,p95_step_ms,p99_step_ms,max_step_ms,avg_workload_ms,avg_lifecycle_ms,max_lifecycle_ms,avg_gravity_ms,avg_gravity_validation_ms,avg_gravity_build_ms,avg_gravity_aggregation_ms,avg_gravity_traversal_ms,avg_collision_ms,avg_physics_ms,avg_snapshot_ms,avg_rapier_step_ms,avg_rapier_update_ms,avg_rapier_user_changes_ms,avg_rapier_kinematic_interpolation_ms,avg_rapier_collision_detection_ms,avg_rapier_broad_phase_ms,avg_rapier_final_broad_phase_ms,avg_rapier_narrow_phase_ms,avg_rapier_island_ms,avg_rapier_island_constraints_ms,avg_rapier_solver_ms,avg_rapier_ccd_ms,avg_render_ms,avg_present_ms,avg_raster_clear_ms,avg_raster_player_ms,avg_raster_player_starfield_ms,avg_raster_player_bodies_ms,avg_raster_player_world_ms,avg_raster_player_sun_planets_ms,avg_raster_player_spaceports_ms,avg_raster_player_effects_ms,avg_raster_player_ships_ms,avg_raster_player_debris_ms,avg_raster_player_particles_ms,avg_raster_player_other_ms,avg_raster_other_frames_ms,avg_raster_overview_refresh_ms,avg_raster_overview_blit_ms,avg_raster_overview_live_ms,avg_raster_image_ms,avg_total_ms,p50_total_ms,p95_total_ms,p99_total_ms,max_total_ms"
+        "scenario,renderer,raster_scale,second,frames,updates,throughput_fps,scene_items,asteroids,fragments,shells,particles,balls,gravity_sources,gravity_targets,gravity_nodes,gravity_exact_interactions,gravity_approximations,gravity_applied_sources,active_bodies,sleeping_bodies,candidate_pairs,max_candidate_pairs,contact_pairs,max_contact_pairs,solver_contacts,max_solver_contacts,added,removed,avg_step_ms,p50_step_ms,p95_step_ms,p99_step_ms,max_step_ms,avg_workload_ms,avg_lifecycle_ms,max_lifecycle_ms,avg_gravity_ms,avg_gravity_validation_ms,avg_gravity_build_ms,avg_gravity_aggregation_ms,avg_gravity_traversal_ms,avg_collision_ms,avg_physics_ms,avg_snapshot_ms,avg_rapier_step_ms,avg_rapier_update_ms,avg_rapier_user_changes_ms,avg_rapier_kinematic_interpolation_ms,avg_rapier_collision_detection_ms,avg_rapier_broad_phase_ms,avg_rapier_final_broad_phase_ms,avg_rapier_narrow_phase_ms,avg_rapier_island_ms,avg_rapier_island_constraints_ms,avg_rapier_solver_ms,avg_rapier_ccd_ms,avg_capture_ms,avg_contact_bind_ms,avg_contact_price_ms,avg_render_ms,avg_present_ms,avg_raster_clear_ms,avg_raster_player_ms,avg_raster_player_starfield_ms,avg_raster_player_bodies_ms,avg_raster_player_world_ms,avg_raster_player_sun_planets_ms,avg_raster_player_spaceports_ms,avg_raster_player_effects_ms,avg_raster_player_ships_ms,avg_raster_player_debris_ms,avg_raster_player_particles_ms,avg_raster_player_other_ms,avg_raster_other_frames_ms,avg_raster_overview_refresh_ms,avg_raster_overview_blit_ms,avg_raster_overview_live_ms,avg_raster_image_ms,avg_total_ms,p50_total_ms,p95_total_ms,p99_total_ms,max_total_ms"
     )
 }
 
@@ -2434,7 +2478,7 @@ fn write_benchmark_row(
     };
     write!(
         writer,
-        "3,{},{},{},{},{},{},{},{},{},{},{},{},{},",
+        "4,{},{},{},{},{},{},{},{},{},{},{},{},{},{},",
         options.seed,
         options.viewport.width,
         options.viewport.height,
@@ -2453,6 +2497,11 @@ fn write_benchmark_row(
         },
         if options.scenario == "clock" {
             options.configuration.clock.theme.as_str()
+        } else {
+            ""
+        },
+        if options.scenario == "spacewars-classic" {
+            options.configuration.spacewars.as_str()
         } else {
             ""
         },
@@ -2520,6 +2569,9 @@ fn write_benchmark_row(
         format!("{:.3}", row.avg_rapier_solver_ms),
         row.avg_rapier_ccd_ms
             .map_or_else(String::new, |ms| format!("{ms:.3}")),
+        format!("{:.3}", row.avg_capture_ms),
+        format!("{:.3}", row.avg_contact_bind_ms),
+        format!("{:.3}", row.avg_contact_price_ms),
         format!("{:.3}", row.avg_render_ms),
         format!("{:.3}", row.avg_present_ms),
         format!("{:.3}", row.avg_raster_clear_ms),

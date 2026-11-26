@@ -211,11 +211,14 @@ pub(super) fn bind(physics: &mut SpacewarsPhysics) {
         })
         .collect();
     let world = &physics.world;
+    // A collider belongs to its body's entity, so whether charges price it is
+    // settled before its binding and body are looked up. Most of a busy
+    // game's colliders, its chips and fragments, go no further.
     let unbound: Vec<_> = world
         .collider_ids()
+        .filter(|collider| priced(physics, collider.entity))
         .filter(|&collider| world.loading_binding(collider).is_none())
         .filter_map(|collider| Some((collider, world.collider_body(collider)?)))
-        .filter(|&(_, body)| priced(physics, body.entity))
         .collect();
     let Some(regions) = &mut physics.contacts else {
         return;

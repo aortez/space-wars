@@ -34,9 +34,32 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
 pub(super) const TERRAIN_REGISTRATION: ScenarioRegistration =
     super::surface_sortie::TERRAIN_REGISTRATION;
 
+/// A deterministic Spacewars workload for the benchmarks.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, clap::ValueEnum)]
+pub enum SpacewarsBenchmarkCase {
+    /// The default universe at 500% health, its ships turning, thrusting and
+    /// firing both weapons throughout, with debris and particles seeded.
+    #[default]
+    Standard,
+    /// Deathmatch's small universe, without planets and full of asteroids.
+    /// Both ships, at 500%, sit idle and are healed after each step, so no
+    /// game ends and each run steps the same debris.
+    Deathmatch,
+}
+
+impl SpacewarsBenchmarkCase {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Standard => "standard",
+            Self::Deathmatch => "deathmatch",
+        }
+    }
+}
+
 pub(crate) struct SpacewarsClientScenario {
     pub(crate) state: Box<SpacewarsState>,
     player_2_rule_bot: bool,
+    benchmark: Option<SpacewarsBenchmarkCase>,
 }
 
 fn create(
@@ -64,11 +87,25 @@ fn create(
         ScenarioStartMode::Normal => {
             SpacewarsScenario::init(spacewars_config_from_settings(settings), seed)
         }
-        ScenarioStartMode::Benchmark(_) => SpacewarsScenario::init_benchmark(seed),
+        ScenarioStartMode::Benchmark(configuration) => match configuration.spacewars {
+            SpacewarsBenchmarkCase::Standard => SpacewarsScenario::init_benchmark(seed),
+            SpacewarsBenchmarkCase::Deathmatch => {
+                let mut config = SpacewarsConfig::deathmatch();
+                for player in &mut config.players {
+                    player.health_percent = 500;
+                }
+                SpacewarsScenario::init(config, seed)
+            }
+        },
+    };
+    let benchmark = match mode {
+        ScenarioStartMode::Normal => None,
+        ScenarioStartMode::Benchmark(configuration) => Some(configuration.spacewars),
     };
     Ok(Box::new(SpacewarsClientScenario {
         state: Box::new(state),
         player_2_rule_bot,
+        benchmark,
     }))
 }
 
@@ -86,10 +123,19 @@ impl ClientScenario for SpacewarsClientScenario {
     }
 
     fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult {
-        SpacewarsScenario::step(&mut self.state, actions, dt)
+        let result = SpacewarsScenario::step(&mut self.state, actions, dt);
+        if self.benchmark == Some(SpacewarsBenchmarkCase::Deathmatch) {
+            for ship in &mut self.state.ships {
+                ship.life = ship.life_max;
+            }
+        }
+        result
     }
 
     fn map_input(&self, input: &mut ClientInput, benchmark_active: bool) -> Vec<Action> {
+        if benchmark_active && self.benchmark == Some(SpacewarsBenchmarkCase::Deathmatch) {
+            return Vec::new();
+        }
         let mut actions = input.actions_for_spacewars(
             &self.state,
             benchmark_active,
@@ -216,6 +262,9 @@ impl ClientScenario for SpacewarsClientScenario {
             rapier_island_time: metrics.rapier.island_time,
             rapier_island_constraints_time: metrics.rapier.island_constraints_time,
             rapier_solver_time: metrics.rapier.solver_time,
+            capture_time: metrics.rapier.capture_time,
+            contact_bind_time: metrics.contact_bind_time,
+            contact_price_time: metrics.contact_price_time,
             added: metrics.added,
             removed: metrics.removed,
             ..BenchmarkStepMetrics::default()
@@ -389,5 +438,42 @@ mod tests {
 
         assert!(!scenario.player_2_rule_bot);
         assert_eq!(scenario.state.players[1].name, "Player 2");
+    }
+
+    #[test]
+    fn the_deathmatch_benchmark_keeps_its_idle_ships_alive() {
+        let configuration = BenchmarkConfiguration {
+            spacewars: SpacewarsBenchmarkCase::Deathmatch,
+            ..BenchmarkConfiguration::default()
+        };
+        let mut scenario = create(
+            7,
+            &Settings::default(),
+            Viewport::new(1280.0, 720.0),
+            ScenarioStartMode::Benchmark(configuration),
+            &ScenarioAsset::None,
+        )
+        .unwrap();
+        let mut input = ClientInput::default();
+        let mut struck = 0;
+        for _ in 0..600 {
+            let actions = scenario.map_input(&mut input, true);
+            assert!(actions.is_empty());
+            scenario.step(&actions, Duration::from_nanos(16_666_667));
+            let state = &scenario
+                .as_any()
+                .downcast_ref::<SpacewarsClientScenario>()
+                .unwrap()
+                .state;
+            struck += state.ship_debris_collisions.len();
+            assert!(state.planets.is_empty());
+            assert!(state.winner.is_none());
+            for ship in &state.ships {
+                assert_eq!(ship.form, ShipForm::Ship);
+                assert_eq!(ship.life, ship.life_max);
+            }
+        }
+        // Asteroids strike the ships, so the healing is needed.
+        assert!(struck > 0);
     }
 }

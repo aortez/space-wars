@@ -397,6 +397,11 @@ run were retained locally under `target/clock-benchmarks/run.zhYlok3O/`.
 ./benchmark-clock.sh --cases idle,rain --theme christmas
 ./benchmark-clock.sh --cases idle,rain --theme turning
 
+# One Tanks fight a cycle, its contacts priced by contact charges. A cycle
+# lasts as long as the longest fight can; seed 7's first fight at 4:3 is over
+# in about 27 seconds.
+./benchmark-clock.sh --cases tanks --seconds 30 --width 1024 --height 768
+
 # Heavy rain, including duck entry, drainage and cleanup (42-second event).
 # Short default runs sample the shower only; use 45+ seconds for the full cycle.
 ./benchmark-clock.sh --cases rain --seconds 45 --repeats 3
@@ -444,8 +449,10 @@ included in the first measured cycle. For steady-state comparisons, collect
 multiple complete cycles and repeats, and report cold-start effects separately.
 
 CSV **benchmark version 2** added metadata/resource columns to the existing
-host report, and **version 3** adds `clock_theme` after `clock_recipe`. Consume
-columns by name, not numeric position:
+host report, and **version 3** adds `clock_theme` after `clock_recipe`.
+**Version 4** adds `spacewars_case` after `clock_theme`, and `avg_capture_ms`,
+`avg_contact_bind_ms` and `avg_contact_price_ms` after `avg_rapier_ccd_ms`.
+Consume columns by name, not numeric position:
 
 - `viewport_width/height` are logical pixels; `internal_width/height` are the
   actual raster allocation dimensions (rounded up). Scale 2 means **four times
@@ -468,7 +475,15 @@ columns by name, not numeric position:
   mistake them for active-phase-only costs.
 - Percentiles describe each 60-frame row. The wrapper reports the worst row's
   p95, not a whole-run p95. Compare median **per-run means** across repeats;
-  averaging p95 values does not produce a combined percentile.
+  averaging p95 values does not produce a combined percentile. The client's
+  standard error ends with the whole run's step and frame p50, p95, p99,
+  p99.9 and max, which the wrapper keeps in each run's log.
+- For Clock, the physics columns (`avg_physics_ms` and the `avg_rapier_*`
+  stages) are the run's arena step, which is zero on a tick without one.
+  Clock's other work has no timers. `avg_capture_ms` is contact capture
+  within that step, and `avg_contact_bind_ms` and `avg_contact_price_ms` are a
+  Tanks fight's contact charges: binding the tanks and terrain before each
+  step, and pricing the step's impacts after it.
 
 Clock currently exposes these fixtures headlessly only. Its normal launcher,
 pause menu, local-time source and Preview controls are unchanged; `host benchmark`

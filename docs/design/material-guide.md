@@ -96,8 +96,9 @@ measures. Spacewars and Scorched are the two worked hosts:
    [once only](material-sources.md#once-only).
 3. **Contacts.**
    - Turn on capture and speculative arrivals, with bounds sized to the scene.
-     Once on, capture stays on for the world's life, and it visits every
-     touching pair each step, bound or not.
+     Once on, capture stays on for the world's life. Each step it visits
+     every pair of colliders the narrow phase tracks, touching or not and
+     bound or not. A pair without solver contacts costs a visit and no more.
    - Create a capture region with `create_loading_region` for each body whose
      contacts should be priced, and bind its colliders, new and replaced ones
      before each step. Capture records a pair only when both sides are bound,
@@ -134,6 +135,13 @@ measures. Spacewars and Scorched are the two worked hosts:
    refuses and the `Unpriced` charges, as both games' hosts do. A rejected
    batch's impacts are missing from the charges, and may start later on
    whatever approach the solver left.
+7. **Cost.** `PhysicsStepMetrics::capture_time` is capture's share of a step.
+   Time the host's binding and pricing beside it, as both games' hosts do,
+   and measure on the Pi. The headless benchmark reports all three as
+   `avg_capture_ms`, `avg_contact_bind_ms` and `avg_contact_price_ms`, for
+   Spacewars and for Clock's Tanks fights. In Spacewars' Deathmatch, a
+   binding walk over every collider each step is half or more of what
+   charges cost.
 
 ## What is on the model
 
@@ -169,10 +177,11 @@ the model replaced or left in place.
   [Ledger-set bounce](material-ledger-bounce.md) measured what setting it would
   change, and recommends not building it yet.
 - **Capture's bounds.** Capture refuses a whole batch on overflow, and the
-  batch's impacts are missing from the charges. Every touching pair counts
-  toward its visits, bound or not. Once a scene fills capture's room for
-  episodes, each batch that opens more than it ends is refused, and the room
-  stays full (#704). Neither game comes near the bounds
+  batch's impacts are missing from the charges. Each pair the narrow phase
+  tracks counts a visit, touching or not and bound or not, and so do each
+  manifold and point of a bound pair with solver contacts. Once a scene fills
+  capture's room for episodes, each batch that opens more than it ends is
+  refused, and the room stays full (#704). Neither game comes near the bounds
   ([game worlds](material-contact-charges.md#game-worlds)).
 - **Budgets.** An impact whose budget has more than 32 rows, the ends of its
   patches, or doesn't converge goes unpriced. In 96 of Scorched's duels, 30 of

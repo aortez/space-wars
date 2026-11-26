@@ -14,7 +14,7 @@ use engine_rapier::{
 use engine_terrain::{Cell, MaterialId};
 use scenario_scorched_earth::{
     BankStrength, CpuPolicy, FIXED_HZ, FiringRange, SHELL_LIFETIME_TICKS, ScorchedConfig,
-    host::{Bounds, Budget, HostedDuel, Placement, capture_contacts},
+    host::{Bounds, Budget, ContactTimes, HostedDuel, Placement, capture_contacts},
 };
 
 pub const RAISE_TICKS: u64 = 2 * FIXED_HZ as u64;
@@ -210,6 +210,9 @@ pub struct TanksEvent {
     retired_tank_mass: f32,
     entry_failure: Option<&'static str>,
     entry_restarts: u8,
+    /// What the duel's contact charges took this tick: nothing on a tick
+    /// the duel does not step.
+    contact_times: ContactTimes,
 }
 
 impl TanksEvent {
@@ -304,6 +307,7 @@ impl TanksEvent {
             retired_tank_mass: 0.0,
             entry_failure: None,
             entry_restarts: 0,
+            contact_times: ContactTimes::default(),
         })
     }
 
@@ -383,6 +387,7 @@ impl TanksEvent {
         display: crate::digits::DisplaySnapshot,
         surfaces: &mut SurfaceLedger,
     ) -> bool {
+        self.contact_times = ContactTimes::default();
         self.synchronize(arena, display, surfaces);
         let world = arena.held_mut(OWNER).expect("Tanks holds the arena");
         let scale = self.duel.placement().scale;
@@ -473,6 +478,7 @@ impl TanksEvent {
             self.duel
                 .finish_step(world)
                 .expect("one completion per Clock tick");
+            self.contact_times = self.duel.contact_times();
             // Loose cells fall as the dirt does.
             let gravity = self.duel.gravity_scale(world);
             for impact in self.duel.impacts() {
@@ -968,6 +974,11 @@ impl TanksEvent {
     /// angle).
     pub fn face_cells(&self) -> Vec<(Vec2, f32, f32)> {
         self.damage.cells(self.layout)
+    }
+
+    /// What the duel's contact charges took this tick.
+    pub fn contact_times(&self) -> ContactTimes {
+        self.contact_times
     }
 
     pub fn diagnostics(&self, arena: &ClockArena) -> ClockTanksState {
