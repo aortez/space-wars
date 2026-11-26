@@ -430,7 +430,8 @@ and the probe below gives its reasons.
   the last hit names a contact and no side. Its armor is twice as strong as
   planet rock, so the rock gives way first, and its settling, driving, bumps
   and ordinary landings cost it nothing, as
-  [Spacewars bodies](material-sources.md#spacewars-bodies) measures.
+  [Spacewars bodies](material-sources.md#spacewars-bodies) measures. A tank
+  whose armor fails breaks up in the same step.
 - **Capture's bounds** are 4,096 regions, 16,384 bindings, 4,096 episodes,
   65,536 visits and 8,192 contacts a batch, and 32,768 records a step, to
   hold `MAX_ASTEROIDS` asteroids beside the rest. In 15 seconds at the

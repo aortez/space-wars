@@ -108,7 +108,8 @@ planet. Flags move and rotate with their planet at their original contact
 location. Tanks are drawn as in Spacewars, in their player's color or a
 government's olive, with a bar above each that its health fills. Rounds, the
 laser and hard crashes wear a tank's armor, as
-[Spacewars bodies](design/material-sources.md#spacewars-bodies) describes.
+[Spacewars bodies](design/material-sources.md#spacewars-bodies) describes, and
+a tank whose armor fails breaks up.
 
 ### Two-player expedition
 
@@ -257,12 +258,22 @@ Each live tank is registered as a ground force the first time claims update
 after it is placed, with its chassis body, its chassis and wheel colliders, and
 its allegiance. Removing a tank takes its bodies out of the world, and the next
 update drops its registration; tank IDs are never reused. Unregistering a live
-tank lasts only until that next update. Other ground actors use
-`register_ground_surface_force` with their native body/colliders and player or
-government allegiance. Repeated registration does not renew contact history.
-Owners must call `unregister_ground_surface_force` on destruction/retirement if
-a physical wreck remains; missing native bodies are pruned automatically. Reset
-starts with an empty registry; cloning preserves its state.
+tank lasts only until that next update. A tank whose armor fails leaves the
+world in the step it fails, once, and `SpacewarsState::tank_losses` records it
+with the hit that failed it. That step's claim update no longer counts it, with
+no contact grace, so a claim it held can complete on that tick. Its wreck is
+six ownerless breakup fragments in its side's color that keep its bodies'
+motion and share their mass: ordinary debris, which never counts and which the
+ground wears away. As with a rover's, its wheels' pieces start overlapping its
+chassis's a little, and its first steps part them at about 2 u/s at most.
+Nothing replaces it, and its loss touches no pilot, round rule or score. Other
+ground actors use `register_ground_surface_force` with their native
+body/colliders and player or government allegiance. Repeated registration does
+not renew contact history. Owners must call `unregister_ground_surface_force`
+on destruction/retirement if a physical wreck remains; missing native bodies
+are pruned automatically. Reset starts with an empty registry; cloning
+preserves its state. A restart or a new match builds a new world from its seed,
+so no tank, wreck or loss carries over.
 
 ## Observations and verification
 
@@ -340,7 +351,9 @@ departure that ends the block at the departure distance, with clone/replay
 equality; a hop by a tank carrying another on its back, which keeps its block;
 a tank riding a detached fragment while the claim completes around it; clearing
 the last tank beside a flying ship; a lost flag footing that keeps every tank
-and its allegiance; and a health bar that stays above a tank on its back.
+and its allegiance; a health bar that stays above a tank on its back; and a
+claim that completes on the tick its last defender dies, while the defender's
+wreck never counts.
 
 Positive AI flight/capture fixtures now let their otherwise idle opponent
 depart through real controls only when its landing feet support it on the

@@ -3,13 +3,18 @@
 //! The host owns stepping and gravity. Material admission uses completed-world
 //! queries; raw assembly admission validates geometry only. No tank stores a
 //! remembered planet or performs frame transport.
+//!
+//! Each tank keeps what is left of its armor. The host's weapons and contact
+//! charges wear it, and the host breaks up a tank whose armor fails (#238).
 
 use std::collections::BTreeMap;
 
 use engine_core::Vec2;
 use engine_rapier::{
     rover::{RoverAssembly, RoverControl, RoverSnapshot, RoverSpawnPose, RoverSpec},
-    world::{BodyId, ColliderId, PhysicsId, PhysicsWorld, RayCastOptions, SurfaceContact},
+    world::{
+        BodyId, BodyMotion, ColliderId, PhysicsId, PhysicsWorld, RayCastOptions, SurfaceContact,
+    },
 };
 
 use crate::Allegiance;
@@ -62,6 +67,23 @@ pub struct TankDamage {
     /// The side whose round or laser it was. A contact has none, and neither
     /// does a round no player fired.
     pub source: Option<Allegiance>,
+}
+
+/// A tank destroyed in the last step.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TankLoss {
+    pub id: TankId,
+    pub allegiance: Allegiance,
+    /// The hit that failed its armor.
+    pub damage: TankDamage,
+}
+
+/// What a tank whose armor failed leaves behind.
+pub(crate) struct Wreck {
+    pub loss: TankLoss,
+    /// Its chassis's and its wheels' motion and mass as it left the world, or
+    /// none if the world no longer held them.
+    pub bodies: Option<[(BodyMotion, f32); 3]>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
@@ -486,6 +508,41 @@ impl Tanks {
             return false;
         };
         tank.assembly.remove(physics)
+    }
+
+    /// Takes each tank whose armor has failed out of the world and returns its
+    /// wreck. A tank leaves once, and nothing replaces it.
+    pub(crate) fn remove_failed(&mut self, physics: &mut PhysicsWorld) -> Vec<Wreck> {
+        let failed: Vec<_> = self
+            .actors
+            .iter()
+            .filter(|(_, tank)| tank.health <= 0.0)
+            .map(|(&id, _)| id)
+            .collect();
+        let mut wrecks = Vec::with_capacity(failed.len());
+        for id in failed {
+            let tank = self.actors.remove(&id).expect("each failed tank is live");
+            let bodies = tank
+                .assembly
+                .bodies()
+                .map(|body| Some((physics.motion(body)?, physics.body_mass(body)?)));
+            tank.assembly.remove(physics);
+            let damage = tank
+                .last_damage
+                .expect("only a recorded hit lowers a tank's health");
+            wrecks.push(Wreck {
+                loss: TankLoss {
+                    id,
+                    allegiance: tank.allegiance,
+                    damage,
+                },
+                bodies: match bodies {
+                    [Some(chassis), Some(left), Some(right)] => Some([chassis, left, right]),
+                    _ => None,
+                },
+            });
+        }
+        wrecks
     }
 
     pub fn clear(&mut self, physics: &mut PhysicsWorld) {

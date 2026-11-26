@@ -1,8 +1,8 @@
 use super::*;
 use crate::{
-    Allegiance,
+    Allegiance, DebrisKind,
     surface_sortie::surface_forces::{SURFACE_DEPARTURE_DISTANCE, SurfaceForceId},
-    tanks::{TankCommand, TankDamage, TankDamageCause, TankId},
+    tanks::{TANK_HEALTH, TankCommand, TankDamage, TankDamageCause, TankId},
 };
 use engine_common::{RenderLine, RenderPoint};
 use engine_rapier::{rover::RoverSpawnPose, world::RayCastOptions};
@@ -337,6 +337,122 @@ fn clearing_the_last_hostile_tank_lets_the_claim_finish_beside_a_flying_ship() {
             .iter()
             .all(|f| !matches!(f.id, SurfaceForceId::Ground(_)))
     );
+}
+
+/// A claim that its last defender holds one tick short of done completes on the
+/// tick that the defender dies. The defender leaves the gate in that step, with
+/// no contact grace, and its wreck never counts while the ground wears it away.
+#[test]
+fn a_claim_completes_on_the_tick_its_last_defender_dies() {
+    let mut state = garrison(1);
+    // Where a tank comes to rest on the far side.
+    let settled = place(&mut state, -Vec2::Y, GOVERNMENT);
+    idle(&mut state, 120);
+    let poses: Vec<_> = state
+        .world
+        .physics
+        .tanks
+        .bodies()
+        .into_iter()
+        .map(|body| state.world.physics.world.motion(body).unwrap())
+        .collect();
+    assert!(state.world.remove_tank(settled));
+    // The claim rises unopposed until one tick is left.
+    let stage = FLAG_STAGE_TIME.as_secs_f32() * 60.0;
+    let held = (stage - 1.0) / stage;
+    step(&mut state, [INTERACT, NEUTRAL]);
+    let mut ticks = 0;
+    while state.claim_observation(0, 0).unwrap().progress < held - 1.0e-4 {
+        idle(&mut state, 1);
+        ticks += 1;
+        assert!(ticks <= 600, "{:?}", state.claim_observation(0, 0));
+    }
+    // A defender appears just where the first tank rested and holds the claim
+    // there.
+    let defender = state
+        .world
+        .physics
+        .tanks
+        .insert(
+            &mut state.world.physics.world,
+            RoverSpawnPose {
+                wheel_center: (poses[1].position + poses[2].position) * 0.5,
+                up_angle: poses[0].angle + core::f32::consts::FRAC_PI_2,
+            },
+            physics::tank_spec(),
+            GOVERNMENT,
+        )
+        .expect("room for the tank");
+    for (body, pose) in state.world.physics.tanks.bodies().into_iter().zip(&poses) {
+        let world = &mut state.world.physics.world;
+        assert!(world.set_pose(body, pose.position, pose.angle, true));
+        assert!(world.set_velocity(body, Vec2::ZERO, 0.0, true));
+    }
+    state.world.physics.material_queries_dirty = true;
+    for _ in 0..60 {
+        idle(&mut state, 1);
+        let claim = state.claim_observation(0, 0).unwrap();
+        assert_eq!(claim.status, PlanetClaimStatus::OpposingSurfaceForces);
+        assert_eq!(claim.opposition.ground_units, 1);
+        assert!((claim.progress - held).abs() < 1.0e-4, "{claim:?}");
+    }
+    assert_eq!(state.world.planets[0].owner_id, None);
+    // Its armor fails outright between steps, and the claim completes in the
+    // step that destroys it.
+    let hit = TankDamage {
+        tick: state.world.tick + 1,
+        cause: TankDamageCause::Round,
+        amount: TANK_HEALTH,
+        source: Some(FIRST),
+    };
+    state.world.physics.tanks.damage(defender, hit);
+    idle(&mut state, 1);
+    assert!(state.world.tank_snapshot(defender).is_none());
+    assert_eq!(state.world.tank_losses.len(), 1);
+    assert_eq!(state.world.planets[0].owner_id, Some(0));
+    let claim = state.claim_observation(0, 0).unwrap();
+    assert_eq!(claim.status, PlanetClaimStatus::Secured);
+    assert!(claim.opposition.is_empty());
+    // Its wreck falls where it stood, and the ground wears it away as it does
+    // any debris. It never counts.
+    let wreck = |state: &SurfaceSortieState| {
+        let debris = state.world.debris.iter();
+        debris
+            .filter(|debris| debris.kind == DebrisKind::Fragment)
+            .map(|fragment| fragment.position)
+            .collect::<Vec<_>>()
+    };
+    let fragments = wreck(&state);
+    assert_eq!(fragments.len(), 6);
+    for fragment in fragments {
+        assert!(fragment.distance_to(poses[0].position) < 4.0);
+    }
+    let mut left = 6;
+    let mut ticks = 0;
+    while left > 0 {
+        idle(&mut state, 1);
+        ticks += 1;
+        assert!(ticks <= 600, "{:?}", wreck(&state));
+        assert!(state.claim_observation(0, 0).unwrap().opposition.is_empty());
+        // Its wheels' pieces start overlapping its chassis's a little, as a
+        // rover's do, and its first steps part them gently.
+        if ticks <= 10 {
+            let debris = state.world.debris.iter();
+            for fragment in debris.filter(|debris| debris.kind == DebrisKind::Fragment) {
+                assert!(fragment.velocity.length() < 2.5, "{:?}", fragment.velocity);
+            }
+        }
+        let now = wreck(&state).len();
+        assert!(now <= left);
+        left = now;
+    }
+    assert!(
+        state
+            .surface_force_observations()
+            .iter()
+            .all(|f| !matches!(f.id, SurfaceForceId::Ground(_)))
+    );
+    assert_eq!(state.world.planets[0].owner_id, Some(0));
 }
 
 #[test]

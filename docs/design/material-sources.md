@@ -349,7 +349,8 @@ toughness raised, for the laser, as [Lasers as beams](#lasers-as-beams) says.
   planet rock, so the rock gives way first. A tank's settling, driving and
   braking cost it nothing, and neither does a bump from another tank or a hop
   that lands at up to 16 u/s. Thrown down onto the planet at 50 u/s, a tank
-  loses 1.99.
+  loses 1.99. A tank whose armor fails breaks into six breakup fragments,
+  which share its bodies' mass and so carry its momentum.
 
 ### Cannon shells as shots
 

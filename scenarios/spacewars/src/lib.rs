@@ -50,7 +50,7 @@ use engine_gravity::{
     GravityBackend, GravityConfig, GravityId, GravityParticipant, GravitySolver, GravityStepMetrics,
 };
 use engine_rapier::{
-    rover::{RoverControl, RoverSnapshot},
+    rover::{RoverControl, RoverSnapshot, RoverSpec},
     world::{BodyMotion, PhysicsStepMetrics},
 };
 use physics::{MechanicalContact, MechanicalEntity};
@@ -416,6 +416,8 @@ pub struct SpacewarsState {
     pub body_impacts: Vec<BodyImpact>,
     /// Each new impact contact charges priced in this step.
     pub contact_hits: Vec<ContactHit>,
+    /// Each tank destroyed in this step.
+    pub tank_losses: Vec<tanks::TankLoss>,
     pub spaceport_contacts: Vec<SpaceportContact>,
     pub player_view_heights: [f32; 2],
     pub last_step_metrics: SpacewarsStepMetrics,
@@ -1351,6 +1353,7 @@ impl Scenario for SpacewarsScenario {
             body_collisions: Vec::new(),
             body_impacts: Vec::new(),
             contact_hits: Vec::new(),
+            tank_losses: Vec::new(),
             spaceport_contacts: Vec::new(),
             player_view_heights,
             last_step_metrics: SpacewarsStepMetrics::default(),
@@ -1584,6 +1587,7 @@ impl SpacewarsScenario {
         surface_sortie::match_rules::apply_heat(state, surface_pilots, dt);
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
         handle_rover_deaths(state);
+        handle_tank_deaths(state);
         surface_sortie::combat::record_hits(state, surface_pilots);
         surface_sortie::impact::record_contacts(state, surface_pilots);
 
@@ -3939,8 +3943,15 @@ fn rover_breakup_fragments_for_state(
         .get(rover.owner_id)
         .map(|player| player.color)
         .unwrap_or(Color::DIM_GREY);
-    let mut fragments =
-        rover_breakup_fragments(motions, color, rover.owner_id, state.seed, state.tick, salt);
+    let mut fragments = rover_breakup_fragments(
+        &physics::spacewars_rover_spec(),
+        motions.map(|motion| (motion, None)),
+        color,
+        Some(rover.owner_id),
+        state.seed,
+        state.tick,
+        salt,
+    );
     if let Some(planet) = state.planets.get(rover.planet) {
         for fragment in &mut fragments {
             let offset = fragment.position - planet.position;
@@ -3960,15 +3971,19 @@ fn rover_breakup_fragments_for_state(
     fragments
 }
 
+/// The six fragments an assembly that `spec` shapes breaks into: two from its
+/// chassis and two from each wheel, given in `bodies` in that order. Each
+/// fragment moves as the point of its body it came from, and a body whose mass
+/// is given shares it between its two.
 fn rover_breakup_fragments(
-    motions: [BodyMotion; 3],
+    spec: &RoverSpec,
+    bodies: [(BodyMotion, Option<f32>); 3],
     color: Color,
-    owner_id: usize,
+    owner_id: Option<usize>,
     seed: u64,
     tick: u64,
     salt: u64,
 ) -> Vec<DebrisState> {
-    let spec = physics::spacewars_rover_spec();
     let chassis = [
         Vec2::new(-spec.chassis_half_width, -spec.chassis_half_height),
         Vec2::new(spec.chassis_half_width, -spec.chassis_half_height),
@@ -3982,18 +3997,18 @@ fn rover_breakup_fragments(
         Vec2::new(-spec.wheel_radius, spec.wheel_radius),
     ];
     let parts = [
-        (motions[0], [chassis[0], chassis[1], chassis[2]]),
-        (motions[0], [chassis[0], chassis[2], chassis[3]]),
-        (motions[1], [wheel[0], wheel[1], wheel[2]]),
-        (motions[1], [wheel[0], wheel[2], wheel[3]]),
-        (motions[2], [wheel[0], wheel[1], wheel[2]]),
-        (motions[2], [wheel[0], wheel[2], wheel[3]]),
+        (bodies[0], [chassis[0], chassis[1], chassis[2]]),
+        (bodies[0], [chassis[0], chassis[2], chassis[3]]),
+        (bodies[1], [wheel[0], wheel[1], wheel[2]]),
+        (bodies[1], [wheel[0], wheel[2], wheel[3]]),
+        (bodies[2], [wheel[0], wheel[1], wheel[2]]),
+        (bodies[2], [wheel[0], wheel[2], wheel[3]]),
     ];
     let mut rng = breakup_rng_for_event(seed, tick, salt);
 
     parts
         .into_iter()
-        .map(|(motion, points)| {
+        .map(|((motion, mass), points)| {
             let local_center = polygon_center(&points);
             let local_shape = points.map(|point| point - local_center);
             let world_offset = local_center.rotate_radians(motion.angle);
@@ -4008,8 +4023,9 @@ fn rover_breakup_fragments(
                 color.random_variation(0.08, &mut rng),
             );
             fragment.rotation_radians = motion.angle;
-            fragment.owner_id = Some(owner_id);
+            fragment.owner_id = owner_id;
             fragment.spawn_tick = tick;
+            fragment.inertial_mass = mass.map(|mass| mass * 0.5);
             fragment
         })
         .collect()
@@ -4971,6 +4987,29 @@ fn handle_rover_deaths(state: &mut SpacewarsState) {
     let dead_ids = dead.iter().map(|rover| rover.id).collect::<BTreeSet<_>>();
     state.rovers.retain(|rover| !dead_ids.contains(&rover.id));
     state.debris.extend(fragments);
+}
+
+/// Breaks up each tank whose armor has failed. It leaves the world once, as six
+/// ownerless fragments in its side's color that keep its bodies' motion and
+/// share their mass, and nothing replaces it.
+fn handle_tank_deaths(state: &mut SpacewarsState) {
+    let wrecks = state.physics.tanks.remove_failed(&mut state.physics.world);
+    state.tank_losses = wrecks.iter().map(|wreck| wreck.loss).collect();
+    for wreck in wrecks {
+        let Some(bodies) = wreck.bodies else {
+            continue;
+        };
+        let fragments = rover_breakup_fragments(
+            &physics::tank_spec(),
+            bodies.map(|(motion, mass)| (motion, Some(mass))),
+            tank_color(state, wreck.loss.allegiance),
+            None,
+            state.seed,
+            state.tick,
+            0xDEAD_7A4C ^ wreck.loss.id.entity(),
+        );
+        state.debris.extend(fragments);
+    }
 }
 
 fn update_rover_patrol(state: &mut SpacewarsState) {
