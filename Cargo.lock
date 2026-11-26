@@ -1588,6 +1588,14 @@ name = "engine-chess"
 version = "0.1.0"
 
 [[package]]
+name = "engine-chess-board"
+version = "0.1.0"
+dependencies = [
+ "engine-chess",
+ "engine-common",
+]
+
+[[package]]
 name = "engine-client"
 version = "0.1.0"
 dependencies = [
@@ -1601,6 +1609,8 @@ dependencies = [
  "directories",
  "drm",
  "engine-agent",
+ "engine-chess",
+ "engine-chess-board",
  "engine-common",
  "engine-core",
  "engine-nes",
