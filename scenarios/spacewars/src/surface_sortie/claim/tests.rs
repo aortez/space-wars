@@ -3,6 +3,7 @@ use engine_rapier::world::{
     BodyId as PhysicsBodyId, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec,
 };
 mod opposition;
+mod tanks;
 
 const P1: PlayerId = PlayerId::PLAYER_1;
 const P2: PlayerId = PlayerId::PLAYER_2;

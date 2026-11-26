@@ -70,10 +70,14 @@ claimant.
 
 Any live opposing surface force on the planet prevents starting or advancing
 lowering/raising, including the final ownership step. This includes distant or
-knocked-down pilots, occupied or empty landed ships, and registered government
-ground units. Friendly units, unowned units, wrecks and nearby flying ships do
-not block. Boarding represents the pilot by the vehicle and does not change
-the vehicle's allegiance. Government allegiance is independent of player seats.
+knocked-down pilots, occupied or empty landed ships, and live tanks of another
+side, upright or overturned, moving or still. Friendly units, a player's own
+tanks among them, unowned units, wrecks and nearby flying ships do not block.
+Boarding represents the pilot by the vehicle and does not change the vehicle's
+allegiance. A tank's allegiance is set when it is placed, to a government
+hostile to both players or to one player, and nothing changes it afterward. A
+government is no player seat, and neither a capture nor a lost flag converts,
+repairs or replaces a tank.
 
 Opposition preserves partial time only while the same claimant still qualifies.
 Losing footing, balance or flag range cancels normally; clearing the opposition
@@ -82,20 +86,27 @@ seat iteration order. An arriving defender does not revoke completed ownership.
 Destroying the flag footing neutralizes ownership without retiring its defenders,
 so the replacement flag remains gated.
 
-Membership requires actual native terrain support. Pilots and registered ground
-units retain their last association across a brief hop/contact gap for less than
-one second and at most eight world units from their last supported body position,
-measured in the planet's moving frame. Only new support refreshes that interval.
-Foreign support, clear departure, death, retirement or allegiance reassignment
-ends continuity. Ships require current landing-foot contact; applying thrust
-clears membership immediately. Approach frames and gravity selection never
-establish surface membership.
+Membership requires actual native terrain support: a contact that holds the
+unit up, pushing it away from the planet's center. A tank has it through any
+wheel or chassis contact of that kind, so a tank on its back still counts, but
+one touching only a steep wall does not. Pilots, tanks and other registered
+ground units retain their last association across a brief hop/contact gap for
+less than one second and at most eight world units from their last supported
+body position, measured in the planet's moving frame. Only new support
+refreshes that interval. Foreign support, such as a detached fragment or loose
+grains beneath a unit, ends continuity at once, as do clear departure, death,
+retirement and allegiance reassignment. A touch from the side or from above is
+not support, so a ship or tank brushing or riding a hopping tank leaves its
+grace alone. Ships require current landing-foot contact; applying thrust clears
+membership immediately. Approach frames and gravity selection never establish
+surface membership.
 
 The HUD shows ownership, lowering/raising progress and why progress is blocked.
 Minimap planet colors show completed ownership; triangles locate flags, even
 while raising or lowering. A rising flag does not prematurely recolor the
 planet. Flags move and rotate with their planet at their original contact
-location.
+location. Tanks are drawn as in Spacewars, in their player's color or a
+government's olive.
 
 ### Two-player expedition
 
@@ -240,12 +251,16 @@ assembly, and rebuilding reuses the assigned slot with a fresh full assembly.
 Recovery adds bounded per-seat checks, not another physics step or gravity
 solve. Expedition no longer spawns physical outpost terminals.
 
-Future ground actors use `register_ground_surface_force` with their native
-body/colliders and player or government allegiance. Repeated registration does
-not renew contact history. Owners must call `unregister_ground_surface_force`
-on destruction/retirement if a physical wreck remains; missing native bodies
-are pruned automatically. This hook does not implement tanks, their AI or their
-physics. Reset starts with an empty registry; cloning preserves its state.
+Each live tank is registered as a ground force the first time claims update
+after it is placed, with its chassis body, its chassis and wheel colliders, and
+its allegiance. Removing a tank takes its bodies out of the world, and the next
+update drops its registration; tank IDs are never reused. Unregistering a live
+tank lasts only until that next update. Other ground actors use
+`register_ground_surface_force` with their native body/colliders and player or
+government allegiance. Repeated registration does not renew contact history.
+Owners must call `unregister_ground_surface_force` on destruction/retirement if
+a physical wreck remains; missing native bodies are pruned automatically. Reset
+starts with an empty registry; cloning preserves its state.
 
 ## Observations and verification
 
@@ -315,6 +330,15 @@ limits, and clone/replay equality. Destroying the flag footing in both dirt
 shapes neutralizes ownership while retaining the hostile force and conserving
 material. The workflow example uses the main match host on a controlled
 one-planet start; it never writes ownership or fabricates contacts.
+
+Tank regressions place real government and player-owned tanks on a material
+planet. They cover opposition from each seat, with readable allegiance and
+color and no third seat; an overturned tank on the far side; a hop against a
+departure that ends the block at the departure distance, with clone/replay
+equality; a hop by a tank carrying another on its back, which keeps its block;
+a tank riding a detached fragment while the claim completes around it; clearing
+the last tank beside a flying ship; and a lost flag footing that keeps every
+tank and its allegiance.
 
 Positive AI flight/capture fixtures now let their otherwise idle opponent
 depart through real controls only when its landing feet support it on the

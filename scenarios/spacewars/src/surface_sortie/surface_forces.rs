@@ -10,20 +10,8 @@ pub const SURFACE_CONTACT_GRACE: Duration = Duration::from_secs(1);
 pub const SURFACE_DEPARTURE_DISTANCE: f32 = 8.0;
 pub const MAX_GROUND_FORCES: usize = 32;
 pub const MAX_FORCE_COLLIDERS: usize = 4;
-
-/// Unit allegiance does not depend on the planet's current flag or player seats.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SurfaceAllegiance {
-    Player(PlayerId),
-    Government(u64),
-}
-
-impl SurfaceAllegiance {
-    fn opposes(self, player: PlayerId) -> bool {
-        self != Self::Player(player)
-    }
-}
+// Every live tank registers, so the registry must be able to hold them all.
+const _: () = assert!(crate::tanks::MAX_TANKS <= MAX_GROUND_FORCES);
 
 /// Counts reveal why a claim is blocked without supplying target positions.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
@@ -47,20 +35,22 @@ pub enum SurfaceForceId {
     Ground(PhysicsId),
 }
 
-/// A live ground actor registers its own native assembly. The owning actor must
-/// unregister on retirement/destruction even if a physical wreck is retained.
-/// Missing native bodies are also pruned at the completed-step boundary.
+/// A live ground actor's native assembly. The gate registers each tank in
+/// `Tanks` on every update, so a tank counts until it leaves `Tanks`. Any other
+/// actor registers itself, and must unregister on retirement or destruction if
+/// a physical wreck remains. Missing native bodies are also pruned at the
+/// completed-step boundary.
 #[derive(Debug, Clone)]
 pub struct GroundSurfaceForce {
     pub body: BodyId,
     pub colliders: Vec<ColliderId>,
-    pub allegiance: Option<SurfaceAllegiance>,
+    pub allegiance: Option<Allegiance>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct SurfaceForceObservation {
     pub id: SurfaceForceId,
-    pub allegiance: SurfaceAllegiance,
+    pub allegiance: Allegiance,
     pub planet: usize,
     pub contact_gap_seconds: f32,
 }
@@ -74,7 +64,7 @@ struct Membership {
 
 #[derive(Debug, Clone, Copy)]
 struct Presence {
-    allegiance: SurfaceAllegiance,
+    allegiance: Allegiance,
     membership: Membership,
 }
 
@@ -86,7 +76,7 @@ pub(super) struct SurfaceForces {
 
 struct ForceSample {
     id: SurfaceForceId,
-    allegiance: SurfaceAllegiance,
+    allegiance: Allegiance,
     position: Vec2,
     support: Option<usize>,
     retain_contact_gap: bool,
@@ -162,8 +152,9 @@ impl SurfaceForces {
 }
 
 impl SurfaceSortieState {
-    /// Bounded extension for future tanks. Registration cannot fabricate support
-    /// or duplicate a pilot/ship; the next completed step samples real contacts.
+    /// Registers a ground actor other than a pilot or ship, as every live tank
+    /// is registered. Registration cannot fabricate support or duplicate a
+    /// pilot/ship; the next completed step samples real contacts.
     pub fn register_ground_surface_force(&mut self, force: GroundSurfaceForce) -> bool {
         let id = force.body.entity;
         if force.colliders.is_empty()
@@ -210,6 +201,34 @@ impl SurfaceSortieState {
     }
 
     pub(super) fn update_surface_forces(&mut self, dt: Duration) {
+        // Every live tank is a ground force of its own allegiance, registered
+        // the first step it is seen. A tank that has left the world has no
+        // bodies, so the prune below drops it.
+        let unregistered: Vec<_> = self
+            .world
+            .physics
+            .tanks
+            .ground_forces()
+            .filter(|(body, colliders, allegiance)| {
+                self.surface_forces
+                    .ground
+                    .get(&body.entity)
+                    .is_none_or(|force| {
+                        force.body != *body
+                            || force.colliders != colliders
+                            || force.allegiance != Some(*allegiance)
+                    })
+            })
+            .map(|(body, colliders, allegiance)| GroundSurfaceForce {
+                body,
+                colliders: colliders.to_vec(),
+                allegiance: Some(allegiance),
+            })
+            .collect();
+        for force in unregistered {
+            let registered = self.register_ground_surface_force(force);
+            debug_assert!(registered, "the gate holds every live tank");
+        }
         let mut samples =
             Vec::with_capacity(self.player_count() * 2 + self.surface_forces.ground.len());
         for (seat, pilot) in self.pilots.iter().enumerate() {
@@ -218,7 +237,7 @@ impl SurfaceSortieState {
             {
                 samples.push(ForceSample {
                     id: SurfaceForceId::Pilot(pilot.id.0),
-                    allegiance: SurfaceAllegiance::Player(pilot.owner),
+                    allegiance: Allegiance::Player(pilot.owner),
                     position: snapshot.motion.position,
                     support: snapshot
                         .support
@@ -252,7 +271,7 @@ impl SurfaceSortieState {
             };
             samples.push(ForceSample {
                 id,
-                allegiance: SurfaceAllegiance::Player(owner),
+                allegiance: Allegiance::Player(owner),
                 position: motion.position,
                 support: self.ship_support_planet(seat),
                 // Ships need live landing contact. Takeoff and flight never
@@ -273,6 +292,16 @@ impl SurfaceSortieState {
                 .world
                 .motion(force.body)
                 .expect("retained live body");
+            // A contact supports a unit only where it holds the unit up, as
+            // a pilot stands. Native support refreshes its membership, and
+            // support from anything else, such as a detached fragment, ends it
+            // at once. A touch from the side or from above does neither.
+            let kept = self
+                .surface_forces
+                .present
+                .get(&SurfaceForceId::Ground(id))
+                .map(|presence| presence.membership.planet)
+                .filter(|&p| p < self.world.planets.len());
             let mut foreign_support = false;
             let support = force
                 .colliders
@@ -280,15 +309,18 @@ impl SurfaceSortieState {
                 .flat_map(|&collider| self.world.physics.world.surface_contacts(collider))
                 .filter(|c| c.separation <= 0.04 && c.collider.entity != id)
                 .filter_map(|c| {
-                    let Some(planet) = physics::planet_surface_support_index(c.collider)
-                        .filter(|&p| p < self.world.planets.len())
-                    else {
-                        foreign_support = true;
-                        return None;
-                    };
-                    let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
+                    let planet = physics::planet_surface_support_index(c.collider)
+                        .filter(|&p| p < self.world.planets.len());
+                    // Up points away from the planet touched or, for anything
+                    // else, from the planet the unit belongs to. A unit that
+                    // belongs to none has no grace to end.
+                    let frame = motion::SurfaceFrame::read(&self.world.physics, planet.or(kept)?);
                     let up = (body.position - frame.position).normalized();
-                    (c.normal.dot(up) > 0.2).then_some(planet)
+                    if c.normal.dot(up) <= 0.2 {
+                        return None;
+                    }
+                    foreign_support |= planet.is_none();
+                    planet
                 })
                 .min();
             samples.push(ForceSample {

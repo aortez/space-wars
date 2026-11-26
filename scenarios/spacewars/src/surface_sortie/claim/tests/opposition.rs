@@ -1,7 +1,6 @@
 use super::*;
-use crate::surface_sortie::surface_forces::{
-    GroundSurfaceForce, SurfaceAllegiance, SurfaceForceId,
-};
+use crate::Allegiance;
+use crate::surface_sortie::surface_forces::{GroundSurfaceForce, SurfaceForceId};
 
 fn blocked(player: usize) -> [SurfaceOpposition; 2] {
     let mut result = [SurfaceOpposition::default(); 2];
@@ -279,7 +278,7 @@ fn add_ground_force(state: &mut SurfaceSortieState, serial: u64) -> GroundSurfac
     GroundSurfaceForce {
         body,
         colliders: vec![collider],
-        allegiance: Some(SurfaceAllegiance::Government(4)),
+        allegiance: Some(Allegiance::Government(4)),
     }
 }
 
@@ -324,7 +323,7 @@ fn registered_native_government_force_blocks_without_a_player_seat_and_retires_w
         PlanetClaimStatus::OpposingSurfaceForces
     );
     assert_eq!(state.world.planets[0].owner_id, None);
-    for allegiance in [None, Some(SurfaceAllegiance::Player(P1))] {
+    for allegiance in [None, Some(Allegiance::Player(P1))] {
         let mut friendly = force.clone();
         friendly.allegiance = allegiance;
         assert!(state.register_ground_surface_force(friendly));

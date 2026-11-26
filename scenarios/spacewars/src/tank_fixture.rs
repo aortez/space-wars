@@ -8,7 +8,7 @@ use engine_terrain::{Brush, EditMode, TerrainEdit};
 use serde::Serialize;
 
 use crate::{
-    SpacewarsScenario, SpacewarsState,
+    Allegiance, SpacewarsScenario, SpacewarsState,
     tanks::{TankCommand, TankId},
 };
 
@@ -109,7 +109,11 @@ impl TankFixture {
             // footprint across a one-cell drop above the tank step limit.
             ids.push(
                 state
-                    .place_tank(Vec2::new(496.0, 565.0), -Vec2::Y)
+                    .place_tank(
+                        Vec2::new(496.0, 565.0),
+                        -Vec2::Y,
+                        Allegiance::INITIAL_GOVERNMENT,
+                    )
                     .expect("top admission"),
             );
         }
@@ -117,7 +121,11 @@ impl TankFixture {
         if count == 2 {
             ids.push(
                 state
-                    .place_tank(Vec2::new(435.0, 500.0), Vec2::X)
+                    .place_tank(
+                        Vec2::new(435.0, 500.0),
+                        Vec2::X,
+                        Allegiance::INITIAL_GOVERNMENT,
+                    )
                     .expect("side admission"),
             );
         }

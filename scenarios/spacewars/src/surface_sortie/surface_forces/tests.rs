@@ -9,7 +9,7 @@ fn frame() -> motion::SurfaceFrame {
     }
 }
 
-fn sample(id: SurfaceForceId, owner: SurfaceAllegiance) -> ForceSample {
+fn sample(id: SurfaceForceId, owner: Allegiance) -> ForceSample {
     ForceSample {
         id,
         allegiance: owner,
@@ -24,7 +24,7 @@ fn contact_grace_follows_the_planet_but_cannot_be_renewed_by_polling() {
     let mut forces = SurfaceForces::default();
     let mut s = sample(
         SurfaceForceId::Pilot(1),
-        SurfaceAllegiance::Player(PlayerId::PLAYER_1),
+        Allegiance::Player(PlayerId::PLAYER_1),
     );
     forces.update(std::slice::from_ref(&s), &[frame()], Duration::ZERO);
     let local = (s.position - frame().position).rotate_radians(-frame().angle);
@@ -65,14 +65,14 @@ fn departure_reassignment_and_retirement_clear_membership_without_grace() {
         let mut f = SurfaceForces::default();
         let mut s = sample(
             SurfaceForceId::Ground(PhysicsId::new(20)),
-            SurfaceAllegiance::Government(99),
+            Allegiance::Government(99),
         );
         f.update(std::slice::from_ref(&s), &[frame()], Duration::ZERO);
         s.support = None;
         match cause {
             0 => s.position.x += SURFACE_DEPARTURE_DISTANCE + 0.01,
             1 => s.retain_contact_gap = false,
-            2 => s.allegiance = SurfaceAllegiance::Player(PlayerId::PLAYER_1),
+            2 => s.allegiance = Allegiance::Player(PlayerId::PLAYER_1),
             3 => s.id = SurfaceForceId::Ground(PhysicsId::new(21)),
             _ => {}
         }
@@ -94,15 +94,15 @@ fn opposition_is_claimant_relative_and_independent_of_registration_order() {
     let mut samples = vec![
         sample(
             SurfaceForceId::Pilot(1),
-            SurfaceAllegiance::Player(PlayerId::PLAYER_1),
+            Allegiance::Player(PlayerId::PLAYER_1),
         ),
         sample(
             SurfaceForceId::Ship(1),
-            SurfaceAllegiance::Player(PlayerId::PLAYER_2),
+            Allegiance::Player(PlayerId::PLAYER_2),
         ),
         sample(
             SurfaceForceId::Ground(PhysicsId::new(3)),
-            SurfaceAllegiance::Government(7),
+            Allegiance::Government(7),
         ),
     ];
     let mut a = SurfaceForces::default();
