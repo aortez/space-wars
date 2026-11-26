@@ -589,6 +589,14 @@ fn a_tank_on_detached_terrain_stops_counting_and_the_capture_leaves_it_intact() 
     step(&mut state, [INTERACT, NEUTRAL]);
     idle(&mut state, 60);
     assert_eq!(ground_units(&state, 0), 1);
+    // It has taken a hit from the first seat's laser.
+    let laser = TankDamage {
+        tick: state.world.tick + 1,
+        cause: TankDamageCause::Laser,
+        amount: 25.0,
+        source: Some(FIRST),
+    };
+    state.world.physics.tanks.damage(tank, laser);
     // Cut a column through the planet a few cells beneath the tank, so the cap
     // it rests on breaks away as a fragment.
     let frame = motion::SurfaceFrame::read(&state.world.physics, 0);
@@ -640,20 +648,43 @@ fn a_tank_on_detached_terrain_stops_counting_and_the_capture_leaves_it_intact() 
     // rode the fragment through the whole claim.
     assert_eq!(ticks as u64, FLAG_STAGE_TIME.as_secs() * 60);
     assert_eq!(detached, ticks);
-    // Capture neither removes nor converts it.
+    // Capture neither removes, converts nor repairs it.
     assert_eq!(tanks(&state), [(tank, GOVERNMENT)]);
+    let snapshot = state.world.tank_snapshot(tank).unwrap();
+    assert_eq!(
+        (snapshot.health, snapshot.last_damage),
+        (TANK_HEALTH - 25.0, Some(laser))
+    );
 }
 
 #[test]
-fn losing_the_flag_footing_keeps_every_tank_with_its_allegiance() {
+fn losing_the_flag_footing_keeps_every_tank_with_its_allegiance_and_damage() {
     let mut state = garrison(1);
     let friendly = place(&mut state, -Vec2::X, FIRST);
+    // The seat's own tank has taken a round that no seat fired.
+    let round = TankDamage {
+        tick: state.world.tick + 1,
+        cause: TankDamageCause::Round,
+        amount: 40.0,
+        source: None,
+    };
+    state.world.physics.tanks.damage(friendly, round);
+    let damage = |state: &SurfaceSortieState, tank: TankId| {
+        let tank = state.world.tank_snapshot(tank).unwrap();
+        (tank.health, tank.last_damage)
+    };
+    let round_dealt = (TANK_HEALTH - 40.0, Some(round));
     step(&mut state, [INTERACT, NEUTRAL]);
     idle(&mut state, 240);
     assert_eq!(
         state.world.planets[0].owner_id,
         Some(0),
         "a friendly tank never blocks"
+    );
+    assert_eq!(
+        damage(&state, friendly),
+        round_dealt,
+        "capture repairs nothing"
     );
     let hostile = place(&mut state, Vec2::X, GOVERNMENT);
     idle(&mut state, 60);
@@ -663,6 +694,15 @@ fn losing_the_flag_footing_keeps_every_tank_with_its_allegiance() {
         "arrival does not neutralize ownership"
     );
     assert_eq!(ground_units(&state, 0), 1);
+    // The defender has taken a hit from the first seat's laser.
+    let laser = TankDamage {
+        tick: state.world.tick + 1,
+        cause: TankDamageCause::Laser,
+        amount: 25.0,
+        source: Some(FIRST),
+    };
+    state.world.physics.tanks.damage(hostile, laser);
+    let laser_dealt = (TANK_HEALTH - 25.0, Some(laser));
     let footing = state.claims[0].flag.unwrap().anchor.footing.unwrap();
     state
         .world
@@ -684,4 +724,69 @@ fn losing_the_flag_footing_keeps_every_tank_with_its_allegiance() {
     }
     assert_eq!(state.claims[0].neutralizations, 1);
     assert_eq!(tanks(&state), [(friendly, FIRST), (hostile, GOVERNMENT)]);
+    assert_eq!(damage(&state, friendly), round_dealt);
+    assert_eq!(
+        damage(&state, hostile),
+        laser_dealt,
+        "the planet's loss repairs neither"
+    );
+}
+
+/// The client restarts a sortie by building it again from its seed, and a new
+/// match builds one from a fresh seed, so a world must keep nothing of an
+/// earlier world's tanks. One built after another's tanks fought and failed
+/// holds no tank, wreck or registration. It steps just as one built before any
+/// play does: its first tank takes the same identity, and the two match
+/// through the claim that tank blocks.
+#[test]
+fn a_rebuilt_world_holds_nothing_of_an_earlier_worlds_tanks() {
+    let mut pristine = garrison(1);
+    // A defender blocks the first seat's claim, with the seat's own tank on the
+    // planet too, until the defender's armor fails and leaves its wreck.
+    let mut played = garrison(1);
+    let friendly = place(&mut played, -Vec2::X, FIRST);
+    let defender = place(&mut played, Vec2::X, GOVERNMENT);
+    step(&mut played, [INTERACT, NEUTRAL]);
+    idle(&mut played, 60);
+    assert_eq!(ground_units(&played, 0), 1);
+    let round = TankDamage {
+        tick: played.world.tick + 1,
+        cause: TankDamageCause::Round,
+        amount: TANK_HEALTH,
+        source: Some(FIRST),
+    };
+    played.world.physics.tanks.damage(defender, round);
+    idle(&mut played, 1);
+    assert_eq!(tanks(&played), [(friendly, FIRST)]);
+    let wreck = |state: &SurfaceSortieState| {
+        let debris = state.world.debris.iter();
+        debris
+            .filter(|debris| debris.kind == DebrisKind::Fragment)
+            .count()
+    };
+    assert_eq!(wreck(&played), 6);
+    let mut restarted = garrison(1);
+    assert!(tanks(&restarted).is_empty());
+    assert_eq!(wreck(&restarted), 0);
+    assert!(
+        restarted
+            .surface_force_observations()
+            .iter()
+            .all(|force| !matches!(force.id, SurfaceForceId::Ground(_)))
+    );
+    let first = place(&mut pristine, Vec2::X, GOVERNMENT);
+    assert_eq!(place(&mut restarted, Vec2::X, GOVERNMENT), first);
+    for state in [&mut pristine, &mut restarted] {
+        step(state, [INTERACT, NEUTRAL]);
+        idle(state, 60);
+    }
+    assert_eq!(ground_units(&restarted, 0), 1);
+    assert_eq!(
+        restarted.world.physics.world.snapshot_bytes().unwrap(),
+        pristine.world.physics.world.snapshot_bytes().unwrap()
+    );
+    assert_eq!(
+        SurfaceSortieScenario::observe(&restarted).payload,
+        SurfaceSortieScenario::observe(&pristine).payload
+    );
 }
