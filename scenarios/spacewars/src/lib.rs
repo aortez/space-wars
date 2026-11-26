@@ -248,6 +248,26 @@ impl PlayerId {
     }
 }
 
+/// The side a unit fights for. It depends on neither a planet's flag nor the
+/// player seats, so a government's units are no third player.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Allegiance {
+    Player(PlayerId),
+    Government(u64),
+}
+
+impl Allegiance {
+    /// The one government of the first garrisons: hostile to both players and
+    /// friendly to its own units.
+    pub const INITIAL_GOVERNMENT: Self = Self::Government(0);
+
+    /// Whether this unit opposes `player`: every unit but the player's own.
+    pub fn opposes(self, player: PlayerId) -> bool {
+        self != Self::Player(player)
+    }
+}
+
 /// Stable index for a planet. Spacewars planets persist for the episode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct PlanetId(u32);
@@ -6271,7 +6291,7 @@ fn render_state_with_camera(
 
     for id in state.tank_ids() {
         if let Some(tank) = state.tank_snapshot(id) {
-            render_tank(&mut frame, &tank);
+            render_tank(&mut frame, &tank, tank_color(state, tank.allegiance));
         }
     }
 
@@ -6895,9 +6915,20 @@ fn blend_color(from: RenderColor, to: RenderColor, t: f32) -> RenderColor {
     )
 }
 
-fn render_tank(frame: &mut RenderFrame, tank: &tanks::TankSnapshot) {
+/// A government's tanks are olive.
+const GOVERNMENT_TANK_COLOR: RenderColor = RenderColor::rgb(0.60, 0.68, 0.32);
+
+/// A tank takes the color of the player it fights for, or the government's
+/// olive, so its side reads at a glance.
+fn tank_color(state: &SpacewarsState, allegiance: Allegiance) -> RenderColor {
+    match allegiance {
+        Allegiance::Player(player) => render_color(state.players[player.index()].color),
+        Allegiance::Government(_) => GOVERNMENT_TANK_COLOR,
+    }
+}
+
+fn render_tank(frame: &mut RenderFrame, tank: &tanks::TankSnapshot, color: RenderColor) {
     let spec = physics::tank_spec();
-    let color = RenderColor::rgb(0.60, 0.68, 0.32);
     let outline = RenderColor::rgb(0.07, 0.09, 0.06);
     for wheel in tank.assembly.wheels {
         frame.push_primitive(

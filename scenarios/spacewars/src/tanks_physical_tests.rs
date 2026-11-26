@@ -78,6 +78,7 @@ fn unsettled_course(angle: f32) -> (PhysicsWorld, Tanks, TankId) {
                 up_angle: std::f32::consts::FRAC_PI_2 + angle,
             },
             crate::physics::tank_spec(),
+            Allegiance::INITIAL_GOVERNMENT,
         )
         .unwrap();
     tanks.command(
@@ -200,6 +201,7 @@ fn canonical_tanks_receive_real_tank_ship_and_pilot_collision_impulses() {
                     up_angle: std::f32::consts::FRAC_PI_2,
                 },
                 crate::physics::tank_spec(),
+                Allegiance::INITIAL_GOVERNMENT,
             )
             .unwrap();
         let snapshot = tanks.snapshot(&host.world, target).unwrap();
@@ -214,6 +216,7 @@ fn canonical_tanks_receive_real_tank_ship_and_pilot_collision_impulses() {
                             up_angle: std::f32::consts::FRAC_PI_2,
                         },
                         crate::physics::tank_spec(),
+                        Allegiance::INITIAL_GOVERNMENT,
                     )
                     .unwrap();
                 tanks.actors[&id].assembly.bodies().to_vec()
@@ -380,11 +383,19 @@ fn repeated_host_clear_readmission_and_physics_restore_preserve_actor_handles() 
         let mut previous = Vec::new();
         for cycle in 0..4 {
             let a = state
-                .place_tank(state.planets[0].position + Vec2::Y * 65.0, -Vec2::Y)
+                .place_tank(
+                    state.planets[0].position + Vec2::Y * 65.0,
+                    -Vec2::Y,
+                    Allegiance::INITIAL_GOVERNMENT,
+                )
                 .unwrap();
             tick(&mut state);
             let b = state
-                .place_tank(state.planets[0].position - Vec2::X * 65.0, Vec2::X)
+                .place_tank(
+                    state.planets[0].position - Vec2::X * 65.0,
+                    Vec2::X,
+                    Allegiance::INITIAL_GOVERNMENT,
+                )
                 .unwrap();
             tick(&mut state);
             for &old in &previous {
@@ -840,6 +851,7 @@ fn naturally_released_grain_piles_support_drive_and_brake_for_both_shapes() {
                     up_angle: std::f32::consts::FRAC_PI_2,
                 },
                 crate::physics::tank_spec(),
+                Allegiance::INITIAL_GOVERNMENT,
             )
             .unwrap();
         let mut grain_support = 0;
@@ -927,7 +939,11 @@ fn host_admission_exhaustion_and_full_capacity_do_no_partial_insertion() {
     );
     assert!(
         state
-            .place_tank(Vec2::new(496.0, 565.0), -Vec2::Y)
+            .place_tank(
+                Vec2::new(496.0, 565.0),
+                -Vec2::Y,
+                Allegiance::INITIAL_GOVERNMENT
+            )
             .is_none()
     );
     assert_eq!(
@@ -958,7 +974,8 @@ fn host_admission_exhaustion_and_full_capacity_do_no_partial_insertion() {
                         wheel_center: Vec2::new(100.0 + n as f32 * 10.0, 200.0),
                         up_angle: std::f32::consts::FRAC_PI_2
                     },
-                    crate::physics::tank_spec()
+                    crate::physics::tank_spec(),
+                    Allegiance::INITIAL_GOVERNMENT,
                 )
                 .is_some()
         );
@@ -966,7 +983,11 @@ fn host_admission_exhaustion_and_full_capacity_do_no_partial_insertion() {
     let bodies = state.physics.world.body_count();
     assert!(
         state
-            .place_tank(Vec2::new(f32::NAN, 0.0), Vec2::ZERO)
+            .place_tank(
+                Vec2::new(f32::NAN, 0.0),
+                Vec2::ZERO,
+                Allegiance::INITIAL_GOVERNMENT
+            )
             .is_none()
     );
     assert_eq!(
@@ -1131,6 +1152,7 @@ fn edited_planet_course(
                 up_angle: up.y.atan2(up.x) + planet.wrapper_angle,
             },
             crate::physics::tank_spec(),
+            Allegiance::INITIAL_GOVERNMENT,
         )
         .unwrap();
     (state, id)

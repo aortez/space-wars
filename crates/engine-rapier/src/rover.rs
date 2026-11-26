@@ -428,6 +428,10 @@ impl RoverAssembly {
         [self.chassis, self.wheels[0], self.wheels[1]]
     }
 
+    pub fn chassis_collider(&self) -> ColliderId {
+        self.chassis_collider
+    }
+
     pub fn wheel_colliders(&self) -> [ColliderId; 2] {
         self.wheel_colliders
     }

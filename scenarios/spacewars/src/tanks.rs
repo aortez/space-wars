@@ -9,8 +9,10 @@ use std::collections::BTreeMap;
 use engine_core::Vec2;
 use engine_rapier::{
     rover::{RoverAssembly, RoverControl, RoverSnapshot, RoverSpawnPose, RoverSpec},
-    world::{BodyId, PhysicsId, PhysicsWorld, RayCastOptions, SurfaceContact},
+    world::{BodyId, ColliderId, PhysicsId, PhysicsWorld, RayCastOptions, SurfaceContact},
 };
+
+use crate::Allegiance;
 
 pub const MAX_TANKS: usize = 16;
 const CONTACT_BUDGET: usize = 128;
@@ -32,6 +34,8 @@ pub struct TankCommand {
 #[derive(Debug, Clone)]
 struct Tank {
     assembly: RoverAssembly,
+    /// Fixed when the tank is placed. Planet ownership never changes it.
+    allegiance: Allegiance,
     command: TankCommand,
     blocked: bool,
     gravity: [Vec2; 3],
@@ -40,6 +44,7 @@ struct Tank {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TankSnapshot {
     pub id: TankId,
+    pub allegiance: Allegiance,
     pub command: TankCommand,
     pub assembly: RoverSnapshot,
     pub mount_position: Vec2,
@@ -138,6 +143,21 @@ impl Tanks {
         self.actors.keys().copied()
     }
 
+    /// Each live tank's chassis, its colliders with the chassis's first, and
+    /// its allegiance: what the surface presence gate needs to count it (#234).
+    pub(crate) fn ground_forces(
+        &self,
+    ) -> impl Iterator<Item = (BodyId, [ColliderId; 3], Allegiance)> + '_ {
+        self.actors.values().map(|tank| {
+            let [left, right] = tank.assembly.wheel_colliders();
+            (
+                tank.assembly.bodies()[0],
+                [tank.assembly.chassis_collider(), left, right],
+                tank.allegiance,
+            )
+        })
+    }
+
     pub fn len(&self) -> usize {
         self.actors.len()
     }
@@ -151,6 +171,7 @@ impl Tanks {
         physics: &mut PhysicsWorld,
         pose: RoverSpawnPose,
         spec: RoverSpec,
+        allegiance: Allegiance,
     ) -> Option<TankId> {
         if self.len() >= MAX_TANKS {
             return None;
@@ -164,6 +185,7 @@ impl Tanks {
             id,
             Tank {
                 assembly,
+                allegiance,
                 command: TankCommand::default(),
                 blocked: false,
                 gravity: [Vec2::ZERO; 3],
@@ -212,6 +234,7 @@ impl Tanks {
         let remaining = std::cell::Cell::new(CONTACT_BUDGET);
         Some(TankSnapshot {
             id,
+            allegiance: tank.allegiance,
             command: tank.command,
             drive_blocked: tank.blocked,
             local_gravity: tank.gravity[0],
@@ -419,9 +442,21 @@ mod tests {
                     .unwrap();
             }
             host_step(&mut state);
-            let a = state.place_tank(Vec2::new(496.0, 565.0), -Vec2::Y).unwrap();
+            let a = state
+                .place_tank(
+                    Vec2::new(496.0, 565.0),
+                    -Vec2::Y,
+                    Allegiance::INITIAL_GOVERNMENT,
+                )
+                .unwrap();
             host_step(&mut state);
-            let b = state.place_tank(Vec2::new(435.0, 500.0), Vec2::X).unwrap();
+            let b = state
+                .place_tank(
+                    Vec2::new(435.0, 500.0),
+                    Vec2::X,
+                    Allegiance::INITIAL_GOVERNMENT,
+                )
+                .unwrap();
             state.command_tank(
                 a,
                 TankCommand {
@@ -508,7 +543,13 @@ mod tests {
         let mut state = super::super::SpacewarsScenario::init_terrain_fixture(42);
         state.ships[0].position = Vec2::new(700.0, 700.0);
         host_step(&mut state);
-        let id = state.place_tank(Vec2::new(500.0, 565.0), -Vec2::Y).unwrap();
+        let id = state
+            .place_tank(
+                Vec2::new(500.0, 565.0),
+                -Vec2::Y,
+                Allegiance::INITIAL_GOVERNMENT,
+            )
+            .unwrap();
         state.command_tank(
             id,
             TankCommand {
@@ -575,16 +616,28 @@ mod tests {
         // No stale spatial index may authorize placement.
         assert!(
             state
-                .place_tank(Vec2::new(500.0, 565.0), -Vec2::Y)
+                .place_tank(
+                    Vec2::new(500.0, 565.0),
+                    -Vec2::Y,
+                    Allegiance::INITIAL_GOVERNMENT
+                )
                 .is_none()
         );
         host_step(&mut state);
         let a = state
-            .place_tank(Vec2::new(500.0, 565.0), -Vec2::Y)
+            .place_tank(
+                Vec2::new(500.0, 565.0),
+                -Vec2::Y,
+                Allegiance::INITIAL_GOVERNMENT,
+            )
             .expect("top material placement");
         host_step(&mut state);
         let b = state
-            .place_tank(Vec2::new(435.0, 500.0), Vec2::X)
+            .place_tank(
+                Vec2::new(435.0, 500.0),
+                Vec2::X,
+                Allegiance::INITIAL_GOVERNMENT,
+            )
             .expect("side material placement");
         host_step(&mut state);
         assert_ne!(a, b);
@@ -597,7 +650,11 @@ mod tests {
         assert!(state.tank_snapshot(b).unwrap().local_gravity.x > 0.0);
         assert!(
             state
-                .place_tank(before.assembly.chassis.position + Vec2::Y * 5.0, -Vec2::Y)
+                .place_tank(
+                    before.assembly.chassis.position + Vec2::Y * 5.0,
+                    -Vec2::Y,
+                    Allegiance::INITIAL_GOVERNMENT
+                )
                 .is_none()
         );
         super::super::SpacewarsScenario::step(&mut state, &[], std::time::Duration::ZERO);
@@ -655,7 +712,13 @@ mod tests {
         use engine_terrain::{Brush, EditMode, TerrainEdit};
         let mut state = super::super::SpacewarsScenario::init_terrain_fixture(42);
         host_step(&mut state);
-        let id = state.place_tank(Vec2::new(500.0, 565.0), -Vec2::Y).unwrap();
+        let id = state
+            .place_tank(
+                Vec2::new(500.0, 565.0),
+                -Vec2::Y,
+                Allegiance::INITIAL_GOVERNMENT,
+            )
+            .unwrap();
         for _ in 0..60 {
             host_step(&mut state);
         }
@@ -700,7 +763,13 @@ mod tests {
     fn unsupported_host_tank_retains_inertia_and_receives_gravity_once() {
         let mut state = super::super::SpacewarsScenario::init_terrain_fixture(42);
         host_step(&mut state);
-        let id = state.place_tank(Vec2::new(500.0, 565.0), -Vec2::Y).unwrap();
+        let id = state
+            .place_tank(
+                Vec2::new(500.0, 565.0),
+                -Vec2::Y,
+                Allegiance::INITIAL_GOVERNMENT,
+            )
+            .unwrap();
         // Remove the actual supporting material body, retaining the gravity source.
         state
             .physics
@@ -741,14 +810,24 @@ mod tests {
             let ids: Vec<_> = (0..MAX_TANKS)
                 .map(|i| {
                     tanks
-                        .insert(&mut physics, pose(i as f32 * 10.0), RoverSpec::default())
+                        .insert(
+                            &mut physics,
+                            pose(i as f32 * 10.0),
+                            RoverSpec::default(),
+                            Allegiance::INITIAL_GOVERNMENT,
+                        )
                         .unwrap()
                 })
                 .collect();
             assert_eq!(physics.body_count(), MAX_TANKS * 3);
             assert!(
                 tanks
-                    .insert(&mut physics, pose(1000.0), RoverSpec::default())
+                    .insert(
+                        &mut physics,
+                        pose(1000.0),
+                        RoverSpec::default(),
+                        Allegiance::INITIAL_GOVERNMENT
+                    )
                     .is_none()
             );
             if let Some(old) = stale {
@@ -770,15 +849,30 @@ mod tests {
         let mut tanks = Tanks::default();
         assert!(
             tanks
-                .insert(&mut physics, pose(f32::NAN), RoverSpec::default())
+                .insert(
+                    &mut physics,
+                    pose(f32::NAN),
+                    RoverSpec::default(),
+                    Allegiance::INITIAL_GOVERNMENT
+                )
                 .is_none()
         );
         assert_eq!(physics.body_count(), 0);
         let a = tanks
-            .insert(&mut physics, pose(0.0), RoverSpec::default())
+            .insert(
+                &mut physics,
+                pose(0.0),
+                RoverSpec::default(),
+                Allegiance::INITIAL_GOVERNMENT,
+            )
             .unwrap();
         let b = tanks
-            .insert(&mut physics, pose(10.0), RoverSpec::default())
+            .insert(
+                &mut physics,
+                pose(10.0),
+                RoverSpec::default(),
+                Allegiance::INITIAL_GOVERNMENT,
+            )
             .unwrap();
         let before = tanks.snapshot(&physics, b).unwrap();
         assert!(tanks.command(
@@ -813,14 +907,20 @@ impl super::SpacewarsState {
     /// assembly envelope against every reciprocal solid collision group. Queries
     /// share an 8192-unit traversal cap; capacity rejection does no query work.
     /// Admission requires a completed host step and invalidates queries afterward.
-    pub fn place_tank(&mut self, origin: Vec2, down: Vec2) -> Option<TankId> {
+    /// The tank fights for `allegiance` for as long as it lives.
+    pub fn place_tank(
+        &mut self,
+        origin: Vec2,
+        down: Vec2,
+        allegiance: Allegiance,
+    ) -> Option<TankId> {
         self.physics.tanks.admission = TankAdmissionWork::default();
         if self.physics.tanks.len() >= MAX_TANKS {
             self.physics.tanks.admission.capacity_rejected = true;
             return None;
         }
         let mut remaining = ADMISSION_BUDGET;
-        let result = self.place_tank_bounded(origin, down, &mut remaining);
+        let result = self.place_tank_bounded(origin, down, allegiance, &mut remaining);
         self.physics.tanks.admission.traversal = ADMISSION_BUDGET - remaining;
         self.physics.tanks.admission.exhausted = remaining == 0 && result.is_none();
         result
@@ -834,6 +934,7 @@ impl super::SpacewarsState {
         &mut self,
         origin: Vec2,
         down: Vec2,
+        allegiance: Allegiance,
         remaining: &mut usize,
     ) -> Option<TankId> {
         if self.physics.material_queries_dirty {
@@ -912,6 +1013,7 @@ impl super::SpacewarsState {
                 up_angle: angle,
             },
             spec,
+            allegiance,
         )?;
         self.physics.material_queries_dirty = true;
         Some(id)
