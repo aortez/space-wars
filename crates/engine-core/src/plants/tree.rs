@@ -30,6 +30,11 @@ pub struct Traits {
     /// follows the foliage it feeds, so wood must thicken before needles
     /// beyond it grow or mature further.
     pub foliage_per_wood_size: u16,
+    /// Thousandths of the light crossing a cell of wood, or of needles, that
+    /// gets through. By default a branch takes a quarter and a cluster of
+    /// needles two fifths.
+    pub wood_transmits: u16,
+    pub needle_transmits: u16,
     /// The planted seed's finite reserves.
     pub starting_reserves: Resources,
 }
@@ -44,6 +49,8 @@ impl Default for Traits {
             wood_size: 1,
             needle_size: 1,
             foliage_per_wood_size: 6,
+            wood_transmits: 750,
+            needle_transmits: 600,
             starting_reserves: [40; 3],
         }
     }
@@ -361,6 +368,8 @@ impl Tree {
             || traits.max_tissues > 1024
             || traits.foliage_per_wood_size == 0
             || [traits.root_size, traits.wood_size, traits.needle_size].contains(&0)
+            || traits.wood_transmits >= 1000
+            || traits.needle_transmits >= 1000
         {
             return Err(Rejection::Invalid);
         }
@@ -409,6 +418,21 @@ impl Tree {
                 .clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32
         };
         [dot(self.up), dot(side)]
+    }
+
+    /// The share of the light crossing a tissue that gets through, for the
+    /// host's light publication. The tree's wood and needles let some
+    /// through; anything else, another plant's tissue included, none.
+    pub fn transmits(&self, t: &Tissue) -> f32 {
+        if t.policy != POLICY || t.support != Some(self.support) {
+            return 0.0;
+        }
+        let thousandths = match t.role {
+            Role::Wood => self.traits.wood_transmits,
+            Role::Shoot => self.traits.needle_transmits,
+            _ => 0,
+        };
+        f32::from(thousandths) / 1000.0
     }
 
     fn own<'a>(&self, o: &'a Observation) -> impl Iterator<Item = &'a Tissue> {

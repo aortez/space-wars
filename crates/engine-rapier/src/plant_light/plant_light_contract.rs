@@ -657,6 +657,64 @@ fn plant_light_contract_wood_shades_by_size_samples_nothing_and_stands_in_air() 
 }
 
 #[test]
+fn plant_light_contract_translucent_tissue_passes_the_product_of_its_shares() {
+    let (w, t, g, a) = fixture();
+    let r = roots(&w, &t, &g, &a);
+    // A blade under a branch, under a needle, in one column.
+    let blade = shoot(&a, 1, [5, 2]);
+    let branch = Tissue {
+        role: Role::Wood,
+        ..shoot(&a, 2, [5, 3])
+    };
+    let needle = shoot(&a, 3, [5, 4]);
+    let tissues = [blade.clone(), branch, needle.clone()];
+    let publish =
+        |publisher: &mut LightingPublisher, tick: u64, transmits: &dyn Fn(&Tissue) -> f32| {
+            PlantLight::publish_with_probes(
+                publisher,
+                tick,
+                tick,
+                full_sun(Vec2::Y),
+                &r,
+                &tissues,
+                u64::MAX,
+                WorldOccluders {
+                    tick,
+                    geometry_generation: tick,
+                    footprints: &[],
+                },
+                &[],
+                transmits,
+            )
+        };
+    let shares = |t: &Tissue| match t.id {
+        2 => 0.75,
+        3 => 0.6,
+        _ => 0.0,
+    };
+    let mut publisher = LightingPublisher::default();
+    let light = publish(&mut publisher, 0, &shares).unwrap();
+    let env = light.environment(0).unwrap();
+    assert_eq!(env.exposure(&needle).light, 1000);
+    assert_eq!(env.exposure(&blade).light, 450);
+    let under = light.diagnostic(&blade, 0).unwrap();
+    assert_eq!((under.rays, under.blocked_rays), (1, 1));
+    assert_eq!(under.first_blocker, Some(LightId(u64::MAX, 2)));
+    // A share of 0 keeps a disk opaque, as the other publications do.
+    let opaque = publish(&mut publisher, 1, &|_| 0.0).unwrap();
+    assert_eq!(opaque.environment(1).unwrap().exposure(&blade).light, 0);
+    // A share passes less than all the light, and some.
+    for bad in [1.0, -0.25, f32::NAN] {
+        let one = move |t: &Tissue| if t.id == 3 { bad } else { 0.0 };
+        assert_eq!(
+            publish(&mut publisher, 2, &one).err(),
+            Some(LightingError::InvalidInput),
+            "{bad}"
+        );
+    }
+}
+
+#[test]
 fn plant_light_contract_probes_measure_empty_cells_and_shade_nothing() {
     let (mut w, t, g, a) = fixture();
     // A blade sits below the open probed cell; a solid hangs above the other.
@@ -683,6 +741,7 @@ fn plant_light_contract_probes_measure_empty_cells_and_shade_nothing() {
                 footprints: &[],
             },
             probes,
+            &|_| 0.0,
         )
     };
     let mut publisher = LightingPublisher::default();

@@ -25,7 +25,7 @@ use std::{collections::BTreeMap, time::Duration};
 
 pub mod tree_bed;
 use tree_bed::next_light;
-pub use tree_bed::{TREE_CONTROLS, TREE_GRASS_ORIGIN, TREE_MAX_TICKS, TREE_ORIGIN, TreeBed};
+pub use tree_bed::{SUNS, TREE_CONTROLS, TREE_GRASS_ORIGIN, TREE_MAX_TICKS, TREE_ORIGIN, TreeBed};
 
 pub const TICK_MS: u64 = 1000;
 pub const MAX_TICKS: u64 = 480;
@@ -85,6 +85,7 @@ pub enum Command {
     Bids,
     CutBranch,
     PlantTree,
+    Sun,
 }
 impl Command {
     pub fn action(self) -> Action {
@@ -132,6 +133,7 @@ impl Command {
             Self::Bids,
             Self::CutBranch,
             Self::PlantTree,
+            Self::Sun,
         ]
         .get(*v as usize)
         .copied()
@@ -780,7 +782,11 @@ impl GardenLabState {
                 self.showing_tree = true;
             }
             // Tree bed controls do nothing here.
-            Command::GrassBed | Command::Bids | Command::CutBranch | Command::PlantTree => {}
+            Command::GrassBed
+            | Command::Bids
+            | Command::CutBranch
+            | Command::PlantTree
+            | Command::Sun => {}
         }
     }
     /// Time passes only for the bed that is shown.

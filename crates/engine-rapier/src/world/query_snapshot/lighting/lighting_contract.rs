@@ -193,6 +193,69 @@ fn coincident_emitting_receiver_is_local_but_other_geometry_blocks() {
     assert_eq!(view.blocker(r), Some(footprint.id));
 }
 #[test]
+fn translucent_disks_multiply_their_shares_and_never_block() {
+    let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+    let solid = add(&mut world, 1, Vec2::new(8.0, 0.0), false);
+    world.step(1.0 / 60.0);
+    let snapshot = world.query_snapshot();
+    let disk = |id: u64, x: f32, transmits: f32| TranslucentFootprint {
+        id: LightId(u64::MAX, id),
+        center: Vec2::new(x, 0.0),
+        radius: 0.5,
+        transmits,
+    };
+    let translucent = [disk(1, 2.0, 0.5), disk(2, 4.0, 0.8), disk(3, 4.0, 0.5)];
+    let off_ray = [OpaqueFootprint {
+        id: LightId(u64::MAX, 4),
+        center: Vec2::new(4.0, 5.0),
+        radius: 0.5,
+    }];
+    let view = snapshot
+        .lighting_visibility(&off_ray, &[])
+        .unwrap()
+        .with_translucent(&translucent)
+        .unwrap();
+    // Short of the solid, the ray keeps the product of the disks' shares and
+    // names the nearest; none of them blocks it outright.
+    let r = ray(Vec2::ZERO, Vec2::new(6.0, 0.0));
+    assert_eq!(view.blocker(r), None);
+    assert_eq!(
+        view.transmission(r),
+        (0.5 * 0.8 * 0.5, Some(LightId(u64::MAX, 1)))
+    );
+    assert_eq!(
+        view.transmission(ray(Vec2::new(3.0, 0.0), Vec2::new(6.0, 0.0)))
+            .0,
+        0.8 * 0.5
+    );
+    // A ray on to the solid is blocked, whatever it crossed first.
+    let through = ray(Vec2::ZERO, Vec2::new(10.0, 0.0));
+    assert_eq!(
+        view.transmission(through),
+        (0.0, Some(light_collider_id(solid)))
+    );
+    // Translucent disks share the opaque ones' identities and checks.
+    let reused = [disk(4, 0.0, 0.5)];
+    let view = || snapshot.lighting_visibility(&off_ray, &[]).unwrap();
+    assert!(matches!(
+        view().with_translucent(&reused),
+        Err(LightingError::ConflictingIdentity)
+    ));
+    for transmits in [0.0, 1.0, f32::NAN] {
+        assert!(matches!(
+            view().with_translucent(&[disk(5, 0.0, transmits)]),
+            Err(LightingError::InvalidInput)
+        ));
+    }
+    let many: Vec<_> = (0..MAX_LIGHT_FOOTPRINTS as u64)
+        .map(|i| disk(10 + i, 0.0, 0.5))
+        .collect();
+    assert!(matches!(
+        view().with_translucent(&many),
+        Err(LightingError::Capacity)
+    ));
+}
+#[test]
 fn collider_capacity_is_explicit() {
     let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
     for i in 0..MAX_LIGHT_COLLIDERS {

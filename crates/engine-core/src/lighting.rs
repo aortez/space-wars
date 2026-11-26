@@ -114,6 +114,17 @@ pub struct LightRay {
 /// None means visible; Some identifies an opaque blocker.
 pub trait Visibility {
     fn blocker(&self, ray: LightRay) -> Option<LightId>;
+
+    /// The share of the ray's light that reaches its receiver, from 0 when
+    /// something opaque blocks it to 1 when nothing takes any, and the
+    /// nearest thing that took some. Without translucent occluders a ray is
+    /// either blocked or clear.
+    fn transmission(&self, ray: LightRay) -> (f32, Option<LightId>) {
+        match self.blocker(ray) {
+            Some(blocker) => (0.0, Some(blocker)),
+            None => (1.0, None),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -131,7 +142,9 @@ pub struct Exposure {
     pub directional: f32,
     pub local: f32,
     pub rays: usize,
+    /// Rays that lost some or all of their light on the way.
     pub blocked_rays: usize,
+    /// What took light from the first such ray.
     pub first_blocker: Option<LightId>,
 }
 
@@ -292,13 +305,14 @@ impl LightingSnapshot {
                         return 0.0;
                     }
                     result.rays += 1;
-                    if let Some(blocker) = visibility.blocker(LightRay { receiver, endpoint }) {
+                    let (share, taker) = visibility.transmission(LightRay { receiver, endpoint });
+                    if share < 1.0 {
                         result.blocked_rays += 1;
-                        result.first_blocker.get_or_insert(blocker);
-                        0.0
-                    } else {
-                        energy
+                        if let Some(taker) = taker {
+                            result.first_blocker.get_or_insert(taker);
+                        }
                     }
+                    energy * share
                 };
                 result.directional = sample(
                     EmissionPoint {

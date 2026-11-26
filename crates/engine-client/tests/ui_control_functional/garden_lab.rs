@@ -906,16 +906,33 @@ fn garden_lab_tree_bed_grows_cuts_and_returns_in_both_renderers() {
             let shown = snapshot(h, |v| v["view"] == "tree" && v["tree_bed"].is_object());
             assert_eq!(shown["tree_bed"]["speed"], 16);
             let grass = tick(&shown);
+            let control = |c: scenario_garden_lab::Command| {
+                scenario_garden_lab::TREE_CONTROLS
+                    .iter()
+                    .position(|&(_, x)| x == c)
+                    .unwrap()
+            };
             let mut t = 0;
-            choose_tree(h, &mut s, &mut t, 2);
+            choose_tree(
+                h,
+                &mut s,
+                &mut t,
+                control(scenario_garden_lab::Command::Faster),
+            );
             press(h, &mut s, InputButton::South);
             snapshot(h, |v| v["tree_bed"]["speed"] == 64);
 
-            // While the tree grows, every point of it shows its last bid.
-            let growing = snapshot(h, |v| tree_tick(v) >= 150);
+            // While the tree grows, every point of it shows its last bid. A
+            // point born since the last decision has not bid yet, so the check
+            // takes the points already there at an earlier reading.
+            let earlier = snapshot(h, |v| tree_tick(v) >= 150);
+            let growing = snapshot(h, |v| tree_tick(v) > tree_tick(&earlier));
             let tree: Vec<_> = tree_tissues(&growing)
                 .iter()
-                .filter(|t| t["policy"] == engine_core::plants::tree::POLICY)
+                .filter(|t| {
+                    t["policy"] == engine_core::plants::tree::POLICY
+                        && tree_tissues(&earlier).iter().any(|e| e["id"] == t["id"])
+                })
                 .collect();
             assert!(tree.len() > 10, "{growing}");
             for t in tree {
@@ -925,9 +942,14 @@ fn garden_lab_tree_bed_grows_cuts_and_returns_in_both_renderers() {
             assert!(color_pixels(&image, |p| near(p, WOOD)) > 100);
 
             // Grown, the conifer stands 14 cells tall with its needles lit,
-            // and the grass under its lowest tier has died.
-            snapshot(h, |v| tree_tick(v) >= 450);
-            choose_tree(h, &mut s, &mut t, 0);
+            // and the grass's nearest blade has died in its shadow.
+            snapshot(h, |v| tree_tick(v) >= 600);
+            choose_tree(
+                h,
+                &mut s,
+                &mut t,
+                control(scenario_garden_lab::Command::Pause),
+            );
             let grown = snapshot(h, |v| v["tree_bed"]["paused"] == true);
             let origin = scenario_garden_lab::TREE_ORIGIN;
             let top = tree_living(&grown, "Wood")
@@ -935,7 +957,14 @@ fn garden_lab_tree_bed_grows_cuts_and_returns_in_both_renderers() {
                 .max()
                 .unwrap();
             assert_eq!(top - i64::from(origin[1]), 14, "{grown}");
-            assert!(tree_living(&grown, "Shoot").count() >= 12);
+            assert!(tree_living(&grown, "Shoot").count() >= 30);
+            // Some needles stand in the shade of the tree above them, lit
+            // through it.
+            assert!(
+                tree_living(&grown, "Shoot")
+                    .any(|t| t["light"].as_u64().is_some_and(|l| (1..1000).contains(&l))),
+                "{grown}"
+            );
             let dead_under = tree_tissues(&grown)
                 .iter()
                 .filter(|t| {
@@ -945,7 +974,7 @@ fn garden_lab_tree_bed_grows_cuts_and_returns_in_both_renderers() {
                         && t["cell"][0].as_i64().unwrap() <= i64::from(origin[0]) + 6
                 })
                 .count();
-            assert!(dead_under >= 2, "{grown}");
+            assert!(dead_under >= 1, "{grown}");
             assert_eq!(tick(&grown), grass, "the grass bed ran while hidden");
             let image = capture(h, renderer, "tree-grown", &grown);
             assert!(color_pixels(&image, |p| near(p, WOOD)) > 200);
@@ -953,7 +982,12 @@ fn garden_lab_tree_bed_grows_cuts_and_returns_in_both_renderers() {
             // The selection is the tree's seed, so the cut takes the lowest
             // branch on the grass's side, with its shares.
             let wood = tree_living(&grown, "Wood").count();
-            choose_tree(h, &mut s, &mut t, 13);
+            choose_tree(
+                h,
+                &mut s,
+                &mut t,
+                control(scenario_garden_lab::Command::CutBranch),
+            );
             let cut = snapshot(h, |v| v["tree_bed"]["cuts"] == 1);
             assert_eq!(tree_living(&cut, "Wood").count(), wood - 6);
             for r in 0..3 {
@@ -965,7 +999,12 @@ fn garden_lab_tree_bed_grows_cuts_and_returns_in_both_renderers() {
             capture(h, renderer, "tree-cut", &cut);
 
             // Back to the grass bed, which runs again from where it waited.
-            choose_tree(h, &mut s, &mut t, 15);
+            choose_tree(
+                h,
+                &mut s,
+                &mut t,
+                control(scenario_garden_lab::Command::GrassBed),
+            );
             let back = snapshot(h, |v| v["view"] == "grass");
             assert!(tick(&back) >= grass);
             assert_eq!(back["tree_bed"]["cuts"], 1);

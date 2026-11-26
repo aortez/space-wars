@@ -226,7 +226,13 @@ and wood elements declare opaque world-space disks:
 center = support pose applied to terrain cell center; radius =
 `cell_size * 0.25 * sqrt(size)`. Roots have no optical footprint. These declared
 disks are the initial blade/leaf/structural approximation, not colliders or a
-second physics world. Dead above-ground tissue stays opaque until removed.
+second physics world. Dead above-ground tissue keeps shading until removed.
+`publish_with_probes` also takes the share of the light each tissue's disk
+lets through. A share of 0, which `publish` and `publish_with_occluders` give
+every tissue, keeps a disk opaque; one below 1 lets that much through, and a
+ray keeps the product of the shares it crosses
+([translucent disks](lighting.md#translucent-disks)). A share of 1 or more,
+below 0 or not a number is invalid input.
 All attached elements must name the assembly's current generational support.
 A caller-reserved surface namespace plus never-reused tissue ID identifies each
 disk; reserve that namespace from physical entity IDs and other tissue sets.
@@ -613,6 +619,14 @@ host action; the policy never plants. Garden Lab's
 [tree bed](garden-lab.md#tree-bed-743) shows the conifer growing beside grass,
 with each point's bid.
 
+The tree's wood and needles let part of the light crossing them through:
+`Traits::wood_transmits` and `needle_transmits`, in thousandths, default to
+750 and 600, since a branch takes a little of the light and a cluster of
+needles less than half. `Tree::transmits` gives a host each tissue's share for
+`PlantLight::publish_with_probes`; another plant's tissue gets 0 and stays
+opaque. A needle under one tier keeps 1000 × 0.75 × 0.6 = 450 of full sun,
+enough to grow there, and one under two tiers 202, which is shade.
+
 ### Growth points and bids
 
 At each decision, every tissue of the tree is a growth point and bids, living
@@ -743,14 +757,25 @@ dropped after 5 ticks.
   with nowhere to reach are shed. A bare stub beside the trunk waits instead:
   shed, it would sprout again into the same shade.
 
-Under overhead light a cell is lit only when nothing lies above it, so the
-needles that live are the ones on the cone's outer edge, and the shaded ones
-inside are shed as the tiers above extend over them. In the 25-cell test bed
-in full sun, the seed reaches full height at tick 386. By tick 600 it has a
-trunk 14 cells tall, thickened from size 7 at its base to 2 at the top,
-branch tiers reaching 6, 5, 4, 3 and 2 cells to each side, 13 mature needles
-and 16 roots down to depth 5, after 36 sheds. It takes in 312 energy a tick
-and pays 213.
+In `tree_policy_contract`'s bed, light falls straight down and a cell is lit
+only when nothing lies above it, so the needles that live are the ones on the
+cone's outer edge, and the shaded ones inside are shed as the tiers above extend
+over them. In that 25-cell bed in full sun, the seed reaches full height at tick
+386. By tick 600 it has a trunk 14 cells tall, thickened from size 7 at its base
+to 2 at the top, branch tiers reaching 6, 5, 4, 3 and 2 cells to each side, 13
+mature needles and 16 roots down to depth 5, after 36 sheds. It takes in 312
+energy a tick and pays 213.
+
+With `PlantLight` and the tree's shares, the crown lets part of the light
+through, and the tree grows fuller. Under a sun 15 degrees off vertical from the
+left, as in Garden Lab's tree bed, it reaches full height at tick 570. At tick
+600 it has the same tiers and 36 needles: along both sides of the top tiers and
+the whole sunny side of the lower ones, and on the shaded side of the lowest two
+only at their ends. It takes in 521 energy a tick and pays 425. Under an
+overhead sun the conifer stops at 11 cells. There each needle under a tier keeps
+450, which pays little more than its own upkeep and that of the wood carrying
+it, and the leader never sees the surplus of a quarter of upkeep it waits for. A
+brain that weighs a needle's cost in wood could do better.
 
 ### Verification
 
@@ -777,7 +802,11 @@ tests:
   the views' frame and counts, the probes, and the encoder's layout, ranges
   and unknowns.
 
-`tree_growth_contract`, in `engine-rapier`, grows the same conifer beside
-grass on a terrain support through `PlantLight` with probes and `RootUptake`,
-and replays it. `plant_light_contract` and `root_uptake_contract` cover probes
-and soil readings.
+`tree_growth_contract`, in `engine-rapier`, grows the conifer beside grass on
+a terrain support through `PlantLight` with probes, the tree's shares and
+`RootUptake`, under a sun 15 degrees from the left. It checks the full cone;
+probes read in full sun and through the crown; every kept needle is lit, at
+least ten of them through tissue above, and more stand on the sunny side; a
+blade dies in the crown's shadow; and the run replays. `plant_light_contract`
+and `root_uptake_contract` cover probes, translucent tissue and soil
+readings.

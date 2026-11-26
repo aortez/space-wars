@@ -16,6 +16,18 @@ pub struct OpaqueFootprint {
     pub radius: f32,
 }
 
+/// A tissue disk that lets part of the light crossing it through, such as
+/// foliage or a thin branch. A ray through several keeps the product of their
+/// shares.
+#[derive(Clone, Copy, Debug)]
+pub struct TranslucentFootprint {
+    pub id: LightId,
+    pub center: Vec2,
+    pub radius: f32,
+    /// Strictly between 0 and 1; a disk that passes nothing is opaque.
+    pub transmits: f32,
+}
+
 /// Per-collider identity. Physics IDs are not reused during a scenario run;
 /// the second word encodes role and part, not an organism-wide exclusion.
 pub fn light_collider_id(id: ColliderId) -> LightId {
@@ -36,6 +48,7 @@ pub struct LightingVisibility<'a> {
     snapshot: &'a QuerySnapshot,
     counters: std::cell::Cell<VisibilityCounters>,
     footprints: &'a [OpaqueFootprint],
+    translucent: &'a [TranslucentFootprint],
     transparent: &'a [ColliderId],
 }
 
@@ -119,6 +132,7 @@ impl QuerySnapshot {
             snapshot: self,
             counters: std::cell::Cell::new(VisibilityCounters::default()),
             footprints,
+            translucent: &[],
             transparent,
         })
     }
@@ -167,9 +181,37 @@ fn shape_blocker(
     precise_segment::cast(ray, id, shape, pose)
 }
 
-impl LightingVisibility<'_> {
+impl<'a> LightingVisibility<'a> {
     pub fn counters(&self) -> VisibilityCounters {
         self.counters.get()
+    }
+
+    /// Also let light through these disks, each passing its share. They
+    /// share the opaque disks' work cap and identities.
+    pub fn with_translucent(
+        mut self,
+        translucent: &'a [TranslucentFootprint],
+    ) -> Result<Self, LightingError> {
+        if translucent.len() > MAX_LIGHT_FOOTPRINTS - self.footprints.len() {
+            return Err(LightingError::Capacity);
+        }
+        // A share that is not a number fails both comparisons.
+        let valid = |p: &TranslucentFootprint| {
+            finite_vec2(p.center)
+                && p.radius.is_finite()
+                && p.radius > 0.0
+                && p.transmits > 0.0
+                && p.transmits < 1.0
+        };
+        if !translucent.iter().all(valid) {
+            return Err(LightingError::InvalidInput);
+        }
+        let mut identities: BTreeSet<LightId> = self.footprints.iter().map(|p| p.id).collect();
+        if translucent.iter().any(|p| !identities.insert(p.id)) {
+            return Err(LightingError::ConflictingIdentity);
+        }
+        self.translucent = translucent;
+        Ok(self)
     }
 }
 
@@ -218,6 +260,34 @@ impl Visibility for LightingVisibility<'_> {
             }
         }
         hit.map(|(_, id)| id)
+    }
+
+    fn transmission(&self, ray: LightRay) -> (f32, Option<LightId>) {
+        if let Some(blocker) = self.blocker(ray) {
+            return (0.0, Some(blocker));
+        }
+        let mut counters = self.counters.get();
+        counters.footprint_tests = counters
+            .footprint_tests
+            .saturating_add(self.translucent.len() as u64);
+        self.counters.set(counters);
+        let mut share = 1.0;
+        let mut nearest: Option<(f32, LightId)> = None;
+        for disk in self.translucent {
+            let shape = rapier2d::parry::shape::Ball::new(disk.radius);
+            if let Some(distance) = shape_blocker(
+                ray,
+                disk.id,
+                &shape,
+                &Pose::translation(disk.center.x, disk.center.y),
+            ) {
+                share *= disk.transmits;
+                if nearest.is_none_or(|previous| (distance, disk.id) < previous) {
+                    nearest = Some((distance, disk.id));
+                }
+            }
+        }
+        (share, nearest.map(|(_, id)| id))
     }
 }
 

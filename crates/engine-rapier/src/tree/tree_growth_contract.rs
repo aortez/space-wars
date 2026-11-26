@@ -19,10 +19,14 @@ const WIDTH: u32 = 32;
 const TOP_DIRT: i32 = 7;
 const TREE: [i32; 2] = [12, TOP_DIRT];
 const GRASS: [i32; 2] = [20, TOP_DIRT];
+/// Toward a sun fifteen degrees off vertical from the left, as in Garden
+/// Lab's tree bed.
+const SUN: Vec2 = Vec2::new(-0.258_819, 0.965_926);
 
-/// A conifer and a grass patch on one support, in full overhead sun, through
-/// the real light publication with the tree's probes and the real soil.
-fn grow(ticks: u64) -> (Vec<Observation>, Vec<Round>) {
+/// A conifer and a grass patch on one support, in full sun from this
+/// direction, through the real light publication with the tree's probes, the
+/// light its wood and needles let through, and the real soil.
+fn grow(ticks: u64, sun: Vec2) -> (Vec<Observation>, Vec<Round>) {
     let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
     let terrain = Terrain::generate(
         WIDTH,
@@ -87,7 +91,7 @@ fn grow(ticks: u64) -> (Vec<Observation>, Vec<Round>) {
             &mut publisher,
             o.tick,
             o.tick,
-            full_sun(Vec2::Y),
+            full_sun(sun),
             &roots,
             &o.tissues,
             u64::MAX,
@@ -97,6 +101,7 @@ fn grow(ticks: u64) -> (Vec<Observation>, Vec<Round>) {
                 footprints: &[],
             },
             &probes,
+            &|t| tree.transmits(t),
         )
         .unwrap();
         let lit = GrassEnvironment {
@@ -147,8 +152,8 @@ fn draw(o: &Observation) -> String {
 }
 
 #[test]
-fn tree_growth_contract_conifer_shades_out_grass_in_real_light_and_replays() {
-    let (history, rounds) = grow(600);
+fn tree_growth_contract_conifer_lit_from_the_left_shades_grass_and_replays() {
+    let (history, rounds) = grow(600, SUN);
     let o = history.last().unwrap();
     let picture = draw(o);
     let brain = Conifer::default();
@@ -174,41 +179,44 @@ fn tree_growth_contract_conifer_shades_out_grass_in_real_light_and_replays() {
             .collect();
         assert_eq!(reach, [6, 5, 4, 3, 2], "{picture}");
     }
-    // The brain read light at probed cells and supply at dirt cells, and
-    // every needle it kept is in the light.
+    // The brain read light at probed cells, in full sun and through the
+    // crown, and supply at dirt cells.
     let records: Vec<_> = rounds.iter().flat_map(|r| &r.records).collect();
     let candidates = || records.iter().flat_map(|r| &r.view.candidates);
     assert!(candidates().any(|c| c.light == Some(1000)));
-    assert!(candidates().any(|c| c.light == Some(0)));
+    assert!(candidates().any(|c| c.light.is_some_and(|l| l > 0 && l < 1000)));
     assert!(candidates().any(|c| c.soil == Some([1000; 2])));
+    // Light gets through the crown: every needle it kept is lit, many
+    // through the tissue above them, and the sunny side carries more.
     let last = rounds.last().unwrap();
     let needles: Vec<_> = last
         .records
         .iter()
         .filter(|r| r.view.point.kind == tree::Kind::Needle && r.view.point.alive)
         .collect();
-    assert!(needles.len() >= 12, "{picture}");
+    let light = |r: &&tree::Record| r.view.point.light.unwrap_or(0);
+    assert!(needles.len() >= 30, "{picture}");
+    assert!(needles.iter().all(|r| light(r) >= 250), "{picture}");
     assert!(
-        needles
-            .iter()
-            .all(|r| r.view.point.light.is_some_and(|l| l >= 250)),
+        needles.iter().filter(|r| light(r) < 1000).count() >= 10,
         "{picture}"
     );
-    // Grass under the crown died in its shade; beyond it, grass lives.
-    let edge = TREE[0] + 6;
-    let blades = |alive: bool, under: bool| {
-        o.tissues
-            .iter()
-            .filter(|t| {
-                t.policy == grass::POLICY
-                    && t.role == Role::Shoot
-                    && (t.health > 0) == alive
-                    && (t.cell[0] <= edge) == under
-            })
+    let side = |s: i32| {
+        own(Role::Shoot)
+            .filter(|t| (t.cell[0] - TREE[0]).signum() == s)
             .count()
     };
-    assert_eq!(blades(true, true), 0, "{picture}");
-    assert!(blades(false, true) >= 2, "{picture}");
-    assert!(blades(true, false) >= 3, "{picture}");
-    assert_eq!((history, rounds), grow(600));
+    assert!(side(-1) > side(1), "{picture}");
+    // Grass in the crown's shadow, on its right, died; beyond it, grass lives.
+    let blades = |alive: bool| {
+        o.tissues
+            .iter()
+            .filter(move |t| {
+                t.policy == grass::POLICY && t.role == Role::Shoot && (t.health > 0) == alive
+            })
+            .map(|t| t.cell[0])
+    };
+    assert!(blades(false).any(|x| x == TREE[0] + 5), "{picture}");
+    assert!(blades(true).count() >= 6, "{picture}");
+    assert_eq!((history, rounds), grow(600, SUN));
 }

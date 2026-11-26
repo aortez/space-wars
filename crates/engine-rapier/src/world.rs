@@ -50,7 +50,8 @@ mod tether;
 pub use query_snapshot::{
     AreaValidation, CapsuleQuery, LightingVisibility, MAX_LIGHT_COLLIDERS, MAX_LIGHT_FOOTPRINTS,
     MAX_OPTICAL_EXCLUSIONS, OpaqueFootprint, QueryArea, QueryChange, QueryColliderState,
-    QueryFrame, QueryRegion, QuerySnapshot, RegionChanges, VisibilityCounters, light_collider_id,
+    QueryFrame, QueryRegion, QuerySnapshot, RegionChanges, TranslucentFootprint,
+    VisibilityCounters, light_collider_id,
 };
 pub use surface_drive::SurfaceDrive;
 pub use tether::{TetherSpec, TetherState};

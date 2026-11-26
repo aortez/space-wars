@@ -23,7 +23,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Garden Lab: up/down chooses a control; Space or gamepad bottom face activates it. Left/right moves the opaque shade. Controls include pause/step, speed, light, nutrients, water, shade, inspection, cutting, fresh planting, tissue limits 1–128 and spread 0–8 cells. Limits apply in place; full supplies do not guarantee affordable growth. R restarts; Esc/Start opens host pause. Green living, amber stressed, grey dead; cyan lines show real connections. A pink outline identifies the selected tissue. Physiology ticks are 1000ms, default viewing is 1x, maximum 16x, run limit 480 ticks. Moss controls place deliberate patches on dirt and a movable rock, turn the rock, break its edge, remove it or scrape a strip; olive moss tolerates the dim room, while darkness and the rock's shaded underside still kill it. Light also cycles to dark. The last control shows the tree bed, a conifer beside grass with its own controls and clock (16x to start, up to 64x, 1200-tick run): bids show yellow when won, red when refused and grey when outbid, and a control cuts the selected or lowest branch.",
+    controls_help: "Garden Lab: up/down chooses a control; Space or gamepad bottom face activates it. Left/right moves the opaque shade. Controls include pause/step, speed, light, nutrients, water, shade, inspection, cutting, fresh planting, tissue limits 1–128 and spread 0–8 cells. Limits apply in place; full supplies do not guarantee affordable growth. R restarts; Esc/Start opens host pause. Green living, amber stressed, grey dead; cyan lines show real connections. A pink outline identifies the selected tissue. Physiology ticks are 1000ms, default viewing is 1x, maximum 16x, run limit 480 ticks. Moss controls place deliberate patches on dirt and a movable rock, turn the rock, break its edge, remove it or scrape a strip; olive moss tolerates the dim room, while darkness and the rock's shaded underside still kill it. Light also cycles to dark. The last control shows the tree bed, a conifer beside grass with its own controls and clock (16x to start, up to 64x, 1200-tick run): its sun shines a little from the left, from overhead or a little from the right, its tree's wood and needles let part of the light through, bids show yellow when won, red when refused and grey when outbid, and a control cuts the selected or lowest branch.",
     create,
 };
 
@@ -149,8 +149,9 @@ impl ClientScenario for GardenLabClientScenario {
                 "work":[r.work.rays,r.work.footprint_tests,r.work.collider_records],
             })
         });
-        // The tree bed's tissue records add the point's kind, bid and outcome
-        // from the last decision.
+        // The tree bed's tissue records add each tissue's last light reading,
+        // null where it takes none, and each of the tree's points' kind, bid
+        // and outcome from the last decision. A point born since has not bid.
         let tree_bed = s.tree_bed.as_ref().map(|bed| {
             let bo = bed.plants.observe();
             let records: Vec<_> = bo
@@ -158,6 +159,7 @@ impl ClientScenario for GardenLabClientScenario {
                 .iter()
                 .map(|t| {
                     let mut v = record(&bo, t, false, bed.exposure.get(&t.id), None);
+                    v["light"] = serde_json::json!(bed.exposure.get(&t.id).map(|e| e.light));
                     if let Some(r) = bed.record(t.id) {
                         v["kind"] = serde_json::json!(format!("{:?}", r.view.point.kind));
                         v["bid"] = serde_json::json!(format!("{:?}", r.bid.action));
@@ -174,7 +176,8 @@ impl ClientScenario for GardenLabClientScenario {
                 "tick":bo.tick,"seed":bo.seed,
                 "run_state":if bo.tick >= scenario_garden_lab::TREE_MAX_TICKS { "complete" } else if bed.paused { "lab_paused" } else { "running" },
                 "paused":bed.paused,"speed":bed.speed,"pending_ns":bed.pending_ns(),"dropped_ms":bed.dropped_ms,
-                "intensity":bed.intensity,"availability":bed.availability,"shade":bed.shade,"shade_x":bed.shade_x,
+                "intensity":bed.intensity,"sun":scenario_garden_lab::SUNS[bed.sun].0,
+                "availability":bed.availability,"shade":bed.shade,"shade_x":bed.shade_x,
                 "inspect":bed.inspect,"bids":bed.bids,"control":bed.control,"cuts":bed.cuts,
                 "tree_summary":bed.tree_summary(),"grass_summary":bed.grass_summary(),"bid_summary":bed.bid_summary(),
                 "tissues":records,"selected_tissue":selected,"connections":bo.connections,

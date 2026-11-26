@@ -9,7 +9,7 @@ pub use areas::{
 };
 pub use lighting::{
     LightingVisibility, MAX_LIGHT_COLLIDERS, MAX_LIGHT_FOOTPRINTS, MAX_OPTICAL_EXCLUSIONS,
-    OpaqueFootprint, VisibilityCounters, light_collider_id,
+    OpaqueFootprint, TranslucentFootprint, VisibilityCounters, light_collider_id,
 };
 
 #[derive(Clone)]

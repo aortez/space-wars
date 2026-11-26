@@ -89,6 +89,24 @@ boundary cannot exempt an overlapping child's interior. The zero-length check
 uses bounded point queries over the same admitted shape nodes, with no new
 allocation or world step. Blocker diagnostics select the nearest hit with identity ties.
 
+### Translucent disks
+
+`LightingVisibility::with_translucent` adds `TranslucentFootprint` disks for
+tissue that lets part of the light through, such as a tree's wood and needles.
+Each passes a share strictly between 0 and 1. They count toward the same
+2048-disk cap as the opaque disks and must not reuse their identities;
+nonfinite geometry, a nonpositive radius or a share outside that range is
+invalid input. `Visibility::transmission` answers, for one ray, the share of
+its light that reaches the receiver and the nearest thing that took some. An
+opaque collider or disk on the ray still takes all of it. Otherwise the ray
+keeps the product of the shares of the translucent disks it crosses, with the
+same endpoint trimming as an opaque disk. The default implementation answers
+from `blocker`, so a visibility without translucent disks, such as Clock's,
+gives every ray a share of 0 or 1 exactly as before. The query multiplies each
+contribution by its ray's share. A ray that lost any light counts in the
+blocked-ray count, and the first blocker names what took light from the first
+such ray.
+
 ## Bounds and failure behavior
 
 | Resource | Hard limit / behavior |
@@ -100,7 +118,7 @@ allocation or world step. Blocker diagnostics select the nearest hit with identi
 | Visibility rays/batch | At most 64 * (1 + 256 * 8) = 131136 |
 | Canonical colliders | 2048; reject larger optical view |
 | Shape complexity | 2048 total shape nodes plus polygon/polyline vertices |
-| Lightweight opaque disks | 2048 |
+| Lightweight disks, opaque and translucent | 2048 together |
 | Transparent physical colliders | 256 |
 | Exposure cache entries | 0; each query recomputes from the immutable inputs |
 | Source update cadence | Once per completed simulation tick; no render updates |
@@ -129,21 +147,25 @@ work bounds, not measured performance claims.
 `GeometryGeneration` are observable errors. Failed publication retains the old
 snapshot; age checks still apply. The publisher counts successful publications,
 rejections and capacity rejections. Snapshots report deduplicated copies;
-exposure reports ray count, blocked-ray count and first blocker. No overflow
-silently discards light or multiplies brightness by draw copies. Retaining old
-`Arc` snapshots is the caller's responsibility; the publisher retains only one.
+exposure reports ray count, the count of rays that lost light, and first
+blocker. No overflow silently discards light or multiplies brightness by draw
+copies. Retaining old `Arc` snapshots is the caller's responsibility; the
+publisher retains only one.
 
 ## Acceptance fixtures
 
 - Core `lighting_contract`: contact/distance/cutoff, addition and directional
   baseline, hue/active state, footprint energy and draw-copy identity,
   invalid inputs, immutable lifecycle/age/revisions, publication counters,
-  maximum source/footprint/receiver work and overflow, and a cone's whole
-  share, soft or hard edge and validation.
+  maximum source/footprint/receiver work and overflow, a cone's whole
+  share, soft or hard edge and validation, and a translucent occluder's share
+  of one contribution.
 - Rapier `lighting_contract`: canonical solids, sensor/water exclusions,
   attached receiver and emitter endpoints, intervening same-host part,
   lightweight tissue, removal and immutable copy, moving/rotating support,
-  world/step inactivity and footprint overflow.
+  world/step inactivity and footprint overflow, and translucent disks'
+  product of shares, an opaque solid beyond them, and their identity, share
+  and capacity checks.
 - Client `lighting_presentation_contract`: actual vector/raster consumers,
   camera changes, no/repeated presentation, fixed paused ticks and software
   scales; source-derived unculled Clock digits and maximum admitted text,
@@ -165,7 +187,9 @@ shade threshold. Shoot energy uses the runtime's per-logical-tick
 `shoot_energy_per_size` coefficient; root supply keeps its separate duration
 scaling. See the plant contract below for integer rounding and energy units.
 It admits the complete support-local set plus world-space lightweight occluders
-from all relevant supports before querying. `publish_with_occluders` accepts
+from all relevant supports before querying. `publish_with_probes` also takes
+each tissue's share of light through its disk, and admits a tissue with a share
+as a translucent disk. `publish_with_occluders` accepts
 `WorldOccluders` tagged with the matching tick and geometry revision; the host
 rebuilds these disks from canonical poses after motion or removal. Stale tags,
 invalid geometry and duplicate surface identities reject. Local tissues and
