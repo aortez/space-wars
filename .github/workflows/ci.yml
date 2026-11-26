@@ -188,6 +188,8 @@ jobs:
         run: cargo clippy --locked -p engine-nes -p scenario-falling -p scenario-nes --all-targets --no-deps -- -D warnings
       - name: Lint chess rules and search
         run: cargo clippy --locked -p engine-chess --all-targets --no-deps -- -D warnings
+      - name: Lint chess board drawing
+        run: cargo clippy --locked -p engine-chess-board --all-targets --no-deps -- -D warnings
       - name: Exercise bundled-ROM release benchmark
         run: cargo run --locked --release -p scenario-falling --bin falling-benchmark -- 120 10
 
