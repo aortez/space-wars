@@ -588,3 +588,36 @@ fn a_charge_that_takes_all_the_scaled_armor_has_left_fails_the_armor() {
         }
     }
 }
+
+#[test]
+fn a_landing_in_the_envelope_costs_nothing_wherever_the_terrains_seams_fall() {
+    // Dropped at ten places a twentieth of a unit apart, across one of the
+    // terrain's cells and the seams between its pieces. The health each place
+    // cost a tank dropped from `height`.
+    let drops = |suspension: bool, height: f32| {
+        let quiet = quiet(suspension, Some(DrivingCourse::Flat));
+        (0..10)
+            .map(|place| {
+                let mut state = quiet.clone();
+                let lift = Vec2::new(0.05 * place as f32, height);
+                shift(&mut state, 0, lift, 0.0, Vec2::ZERO);
+                let landing = run(&mut state, 150);
+                let fastest = landing.iter().map(|c| c.closing_speed).fold(0.0, f32::max);
+                assert!(fastest > 15.0, "sprung={suspension}: {landing:?}");
+                100.0 - state.tanks[0].health
+            })
+            .collect::<Vec<_>>()
+    };
+    // A sprung tank from 12 units, the most its wheels land from for nothing,
+    // and a rigid one from 15.
+    assert_eq!(drops(true, 12.0), [0.0; 10]);
+    assert_eq!(drops(false, 15.0), [0.0; 10]);
+    // From 15 units, a sprung tank's wheels land faster, and where the seams
+    // fall sets the price: 0 to 0.34 here.
+    let fifteen = drops(true, 15.0);
+    assert!(fifteen.contains(&0.0), "{fifteen:?}");
+    assert!(
+        fifteen.iter().any(|&lost| lost > 0.1 && lost < 0.5),
+        "{fifteen:?}"
+    );
+}

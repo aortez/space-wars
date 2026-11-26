@@ -8,10 +8,11 @@ use crate::{
     fonts::CellMask,
 };
 use engine_common::{ClockEventProfile, ClockTimeFormat, Scenario};
+use engine_rapier::world::loading::RegionToken;
 use engine_rapier::world::{
     BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, RayCastOptions, physics_activity,
 };
-use scenario_scorched_earth::host::SCENERY;
+use scenario_scorched_earth::host::{Contact, ContactDiagnostics, Impact, SCENERY};
 use std::time::Duration;
 
 fn ready(aspect: f32, seed: u64, format: ClockTimeFormat) -> ClockState {
@@ -3301,4 +3302,150 @@ fn a_rebuild_cut_short_at_any_stage_leaves_nothing_behind() {
         );
         assert!(state.arena.idle(), "{stage}");
     }
+}
+
+/// The fight at 4:3 from seed 234, in which each tank's last shell is in
+/// flight at once, ready to fight.
+fn last_shells_together() -> ClockState {
+    let mut state = ready(4.0 / 3.0, 234, ClockTimeFormat::TwentyFourHour);
+    start_fighting(&mut state);
+    state
+}
+
+/// The tanks' health in the fight under way.
+fn healths(state: &ClockState) -> [f32; 2] {
+    let world = state.arena.world().unwrap();
+    tanks(state).duel.tanks(world).map(|tank| tank.health)
+}
+
+/// What a fight's material shows after a tick: the duel's tick, the tanks'
+/// health, and the contacts, shell impacts and misses its last step listed.
+fn material(state: &ClockState) -> (u64, [f32; 2], Vec<Contact>, Vec<Impact>, ContactDiagnostics) {
+    let duel = &tanks(state).duel;
+    (
+        duel.tick(),
+        healths(state),
+        duel.contacts().to_vec(),
+        duel.impacts().to_vec(),
+        duel.contact_diagnostics(),
+    )
+}
+
+#[test]
+fn a_fight_replays_alike_from_its_seed_and_a_pause_changes_nothing_in_it() {
+    // The second run pauses halfway through for steps of no length.
+    let fight = |pause_at: Option<usize>| {
+        let mut state = last_shells_together();
+        let mut ticks = Vec::new();
+        while tanks(&state).result.is_none() {
+            if Some(ticks.len()) == pause_at {
+                let before = material(&state);
+                let steps = physics_activity().steps;
+                for _ in 0..30 {
+                    ClockScenario::step(&mut state, &[], Duration::ZERO);
+                }
+                assert_eq!(physics_activity().steps, steps);
+                assert_eq!(material(&state), before);
+            }
+            tick(&mut state);
+            ticks.push(material(&state));
+        }
+        (ticks, tanks(&state).result)
+    };
+    let (first, result) = fight(None);
+    assert_eq!(result, Some(ResultKind::Neither));
+    assert!(first.len() > 600, "{} ticks", first.len());
+    let (paused, paused_result) = fight(Some(first.len() / 2));
+    assert_eq!(paused_result, result);
+    assert_eq!(paused.len(), first.len());
+    let parted = first.iter().zip(&paused).position(|(a, b)| a != b);
+    assert_eq!(parted, None, "the paused fight went another way");
+}
+
+#[test]
+fn a_new_fight_in_place_of_one_under_way_starts_its_tanks_afresh() {
+    // The regions of the tanks' bound colliders.
+    let bound = |state: &ClockState| -> Vec<RegionToken> {
+        let world = state.arena.world().unwrap();
+        let duel = &tanks(state).duel;
+        let bodies: Vec<_> = (0..2).flat_map(|slot| duel.tank_bodies(slot)).collect();
+        world
+            .collider_ids()
+            .filter(|&collider| {
+                world
+                    .collider_body(collider)
+                    .is_some_and(|body| bodies.contains(&body))
+            })
+            .filter_map(|collider| world.loading_binding(collider))
+            .map(|source| source.region)
+            .collect()
+    };
+    // A fight is replaced once a shell has struck.
+    let mut state = last_shells_together();
+    let entry = tanks(&state).duel.tick();
+    while tanks(&state).duel.impacts().is_empty() {
+        tick(&mut state);
+    }
+    assert!(healths(&state).iter().any(|&health| health < 100.0));
+    assert_eq!(bound(&state).len(), 6);
+    let struck = tanks(&state).duel.tick();
+    assert!(struck > entry);
+    let id = state.event_id();
+    let before = physics_activity();
+    start_fighting(&mut state);
+    assert_ne!(state.event_id(), id);
+    // The old fight's world goes with its tanks and their regions, and the
+    // new one's tanks come down in a world of their own with whole armor. Its
+    // duel counts from its own start.
+    let after = physics_activity();
+    assert_eq!(after.dropped - before.dropped, 1);
+    assert_eq!(after.worlds - before.worlds, 1);
+    assert!(tanks(&state).duel.tick() < struck);
+    assert_eq!(healths(&state), [100.0; 2]);
+    let world = state.arena.world().unwrap();
+    let new = bound(&state);
+    assert_eq!(new.len(), 6);
+    assert!(
+        new.iter()
+            .all(|&region| world.loading_region_is_live(region))
+    );
+}
+
+#[test]
+fn a_shell_in_flight_when_its_tank_is_destroyed_still_charges_the_other() {
+    // Tank 1's last shell destroys tank 0 while tank 0's last shell flies.
+    let mut state = last_shells_together();
+    while healths(&state)[0] > 0.0 {
+        tick(&mut state);
+    }
+    let world = state.arena.world().unwrap();
+    let owner = tanks(&state).duel.tanks(world)[0].body.entity;
+    let airborne: Vec<u64> = tanks(&state)
+        .duel
+        .shells()
+        .filter(|shell| shell.source.owner == owner)
+        .map(|shell| shell.source.id)
+        .collect();
+    let [shell] = airborne[..] else {
+        panic!("tank 0's shells in flight: {airborne:?}");
+    };
+    assert!(healths(&state)[1] > 0.0);
+    let mut landed = None;
+    for _ in 0..600 {
+        tick(&mut state);
+        let impacts = tanks(&state).duel.impacts();
+        landed = impacts
+            .iter()
+            .find(|impact| impact.source.owner == owner && impact.source.id == shell)
+            .copied();
+        if landed.is_some() {
+            break;
+        }
+    }
+    // It charged tank 1 alone and took the armor it had left.
+    let impact = landed.expect("tank 0's last shell lands");
+    assert_eq!(impact.absorbed[0], 0.0);
+    assert!(impact.absorbed[1] > 0.0, "{impact:?}");
+    assert_eq!(healths(&state), [0.0; 2]);
+    assert_eq!(tanks(&state).result, Some(ResultKind::Neither));
 }

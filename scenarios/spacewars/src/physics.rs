@@ -9,6 +9,7 @@ use engine_rapier::{
         BodyId as PhysicsBodyId, BodyKind, BodyMotion, BodyRole, BodySpec, ColliderId,
         ColliderRole, ColliderSpec, CollisionGroups, PhysicsId, PhysicsStepMetrics, PhysicsWorld,
         PhysicsWorldConfig, RayCastOptions,
+        loading::CaptureConfig,
         weapon::{BeamSpec, Prepared, Pulse, Recipients, ShotSpec, WeaponEvent, Weapons},
     },
 };
@@ -304,6 +305,19 @@ impl SpacewarsPhysics {
         sun: Option<SunState>,
         planets: &[PlanetState],
     ) -> Self {
+        let capture = super::contact_charges::capture();
+        Self::with_capture(universe_radius, ships, sun, planets, capture)
+    }
+
+    /// The world [`Self::new`] makes, with `capture`'s bounds on the contacts
+    /// that charges price.
+    pub(super) fn with_capture(
+        universe_radius: f32,
+        ships: &[ShipState; 2],
+        sun: Option<SunState>,
+        planets: &[PlanetState],
+        capture: CaptureConfig,
+    ) -> Self {
         let mut physics = Self::empty(planets.len());
         physics.world.reserve(
             ships.len() + planets.len() + 2,
@@ -321,7 +335,7 @@ impl SpacewarsPhysics {
             let _ = physics.insert_ship(index, ship, false, false, false);
         }
         super::lasers::arm(&mut physics, ships.len());
-        super::contact_charges::enable(&mut physics);
+        super::contact_charges::enable(&mut physics, capture);
         physics
     }
 

@@ -71,6 +71,9 @@ pub struct ContactDiagnostics {
     /// Regions and bindings the world refused, each leaving a collider
     /// unbound for a step.
     pub refused_bindings: usize,
+    /// The impacts that charges left unpriced. Each is listed in
+    /// [`SpacewarsState::contact_hits`] with the reason.
+    pub unpriced: usize,
 }
 
 /// The regions contact charges keep.
@@ -163,11 +166,11 @@ impl SpacewarsState {
     }
 }
 
-/// Turns contact charges on for a new world.
-pub(super) fn enable(physics: &mut SpacewarsPhysics) {
+/// Turns contact charges on for a new world, with `capture`'s bounds.
+pub(super) fn enable(physics: &mut SpacewarsPhysics, capture: CaptureConfig) {
     let enabled = physics
         .world
-        .enable_loading_capture(capture())
+        .enable_loading_capture(capture)
         .and_then(|()| physics.world.enable_speculative_arrivals());
     debug_assert!(enabled.is_ok(), "contact charges: {enabled:?}");
     if enabled.is_ok() {
@@ -178,7 +181,7 @@ pub(super) fn enable(physics: &mut SpacewarsPhysics) {
 /// Capture's bounds: its defaults, with room for every body a game holds at
 /// once, up to `MAX_ASTEROIDS` asteroids beside the rest, and for several
 /// times the contacts of the busiest games measured.
-fn capture() -> CaptureConfig {
+pub(super) fn capture() -> CaptureConfig {
     CaptureConfig {
         max_regions: 4_096,
         max_bindings: 16_384,
@@ -320,13 +323,16 @@ pub(super) fn price(state: &mut SpacewarsState, pilots: &[SurfacePilot]) {
     };
     let charges = physics.world.charge_contact_impacts(&mut surfaces);
     debug_assert!(charges.is_ok(), "contact charges are on: {charges:?}");
-    let Some(regions) = &physics.contacts else {
+    let Some(regions) = &mut physics.contacts else {
         return;
     };
     for charge in charges.unwrap_or_default() {
-        if !regions.holds(&charge) {
-            contact_hits.push(surfaces.hit(charge, &normals));
+        if regions.holds(&charge) {
+            continue;
         }
+        let hit = surfaces.hit(charge, &normals);
+        regions.diagnostics.unpriced += usize::from(hit.unpriced.is_some());
+        contact_hits.push(hit);
     }
 }
 
