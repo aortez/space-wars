@@ -678,6 +678,7 @@ pub enum LaserTarget {
     Ship(usize),
     Spaceling(usize),
     Rover(u64),
+    Tank(tanks::TankId),
     Debris(usize),
     Body(BodyId),
     TerrainFragment(u64),
@@ -1577,6 +1578,7 @@ impl SpacewarsScenario {
         resolve_physics_collisions(state, &contacts, &accepted_ports, &debris_masses);
         let wear_started = Instant::now();
         contact_charges::wear_asteroids(state);
+        contact_charges::wear_tanks(state);
         contact_price_time += wear_started.elapsed();
         surface_sortie::solar::apply_damage(state, surface_pilots, dt);
         surface_sortie::match_rules::apply_heat(state, surface_pilots, dt);
@@ -2298,6 +2300,12 @@ fn resolve_laser_hits(
                 }
                 LaserTarget::Rover(id)
             }
+            Some(MechanicalEntity::Tank(entity)) => {
+                let Some(id) = state.physics.tanks.by_entity(entity) else {
+                    continue;
+                };
+                LaserTarget::Tank(id)
+            }
             Some(MechanicalEntity::Debris(id)) => {
                 let Some(debris) = state
                     .debris
@@ -2308,7 +2316,7 @@ fn resolve_laser_hits(
                 };
                 LaserTarget::Debris(debris)
             }
-            Some(MechanicalEntity::World | MechanicalEntity::Tank(_)) | None => continue,
+            Some(MechanicalEntity::World) | None => continue,
         };
         let hit = LaserHit {
             shooter,
@@ -2339,6 +2347,16 @@ fn apply_laser_hit(state: &mut SpacewarsState, hit: LaserHit) {
             if let Some(rover) = state.rovers.iter_mut().find(|rover| rover.id == id) {
                 rover.apply_damage(hit.damage);
             }
+        }
+        LaserTarget::Tank(id) => {
+            let shooter = state.ships[hit.shooter].owner_id;
+            let damage = tanks::TankDamage {
+                tick: state.tick + 1,
+                cause: tanks::TankDamageCause::Laser,
+                amount: hit.damage,
+                source: PlayerId::from_index(shooter).map(Allegiance::Player),
+            };
+            state.physics.tanks.damage(id, damage);
         }
         LaserTarget::Debris(debris) => {
             let impact_direction = hit.point - state.debris[debris].position;
@@ -2395,6 +2413,10 @@ fn impact_target_data(state: &SpacewarsState, target: LaserTarget) -> Option<(Ve
             let color = state.players.get(rover.owner_id)?.color;
             Some((position, color, 8.0))
         }
+        LaserTarget::Tank(id) => {
+            let (position, allegiance) = state.physics.tanks.chassis(&state.physics.world, id)?;
+            Some((position, tank_color(state, allegiance), 8.0))
+        }
         LaserTarget::Debris(debris) => state
             .debris
             .get(debris)
@@ -2420,6 +2442,7 @@ fn laser_target_salt(target: LaserTarget) -> u64 {
         LaserTarget::Ship(ship) => 0x5100_0000 ^ ship as u64,
         LaserTarget::Spaceling(player) => 0x5ACE_0000 ^ player as u64,
         LaserTarget::Rover(id) => 0x707E_0000 ^ id,
+        LaserTarget::Tank(id) => 0x7A4C_0000 ^ id.entity(),
         LaserTarget::Debris(debris) => 0xDEB0_0000 ^ debris as u64,
         LaserTarget::TerrainFragment(id) => 0x7E00_0000 ^ id,
         LaserTarget::Body(BodyId::Sun) => 0x5A00_0000,
@@ -3228,6 +3251,51 @@ fn resolve_physics_collisions(
                     sparks,
                     10.0,
                     0x707E_BA5E ^ rover_id ^ ((debris_index as u64) << 16),
+                );
+            }
+            (MechanicalEntity::Tank(entity), MechanicalEntity::Debris(debris_id)) => {
+                // A shell's hit on a tank is its shot's. Any other debris
+                // costs a tank only what its contact charges price.
+                let Some(&debris_index) = debris_indices.get(&debris_id) else {
+                    continue;
+                };
+                let shell = state.debris[debris_index];
+                if shell.kind != DebrisKind::Shell {
+                    continue;
+                }
+                let Some(damage) = shots::charged(state, debris_id, MechanicalEntity::Tank(entity))
+                else {
+                    continue;
+                };
+                let Some(id) = state.physics.tanks.by_entity(entity) else {
+                    continue;
+                };
+                let hit = tanks::TankDamage {
+                    tick: state.tick + 1,
+                    cause: tanks::TankDamageCause::Round,
+                    amount: damage,
+                    source: shell
+                        .owner_id
+                        .and_then(PlayerId::from_index)
+                        .map(Allegiance::Player),
+                };
+                state.physics.tanks.damage(id, hit);
+                // Its sparks keep the old shell's size, set by how fast it
+                // closed.
+                let Some((position, allegiance)) =
+                    state.physics.tanks.chassis(&state.physics.world, id)
+                else {
+                    continue;
+                };
+                spawn_impact_particles(
+                    state,
+                    -contact.normal,
+                    position,
+                    contact.point.unwrap_or(position),
+                    tank_color(state, allegiance),
+                    contact.closing_speed * CANNON_SHELL_SPARK_STRENGTH,
+                    10.0,
+                    0x7A4C_BA5E ^ entity ^ ((debris_index as u64) << 16),
                 );
             }
             (MechanicalEntity::Body(body_id), MechanicalEntity::Debris(debris_id)) => {
@@ -6291,7 +6359,11 @@ fn render_state_with_camera(
 
     for id in state.tank_ids() {
         if let Some(tank) = state.tank_snapshot(id) {
-            render_tank(&mut frame, &tank, tank_color(state, tank.allegiance));
+            render_tank(
+                &mut frame,
+                &tank,
+                render_color(tank_color(state, tank.allegiance)),
+            );
         }
     }
 
@@ -6916,17 +6988,22 @@ fn blend_color(from: RenderColor, to: RenderColor, t: f32) -> RenderColor {
 }
 
 /// A government's tanks are olive.
-const GOVERNMENT_TANK_COLOR: RenderColor = RenderColor::rgb(0.60, 0.68, 0.32);
+const GOVERNMENT_TANK_COLOR: Color = Color::rgb(0.60, 0.68, 0.32);
+/// How far a tank's health bar floats above its chassis's center, `wu`.
+const TANK_HEALTH_BAR_HEIGHT: f32 = 3.2;
 
 /// A tank takes the color of the player it fights for, or the government's
 /// olive, so its side reads at a glance.
-fn tank_color(state: &SpacewarsState, allegiance: Allegiance) -> RenderColor {
+fn tank_color(state: &SpacewarsState, allegiance: Allegiance) -> Color {
     match allegiance {
-        Allegiance::Player(player) => render_color(state.players[player.index()].color),
+        Allegiance::Player(player) => state.players[player.index()].color,
         Allegiance::Government(_) => GOVERNMENT_TANK_COLOR,
     }
 }
 
+/// Draws `tank` in `color`, with a bar above it that its health fills. The
+/// bar stays above the tank against its gravity, even with the tank on its
+/// back.
 fn render_tank(frame: &mut RenderFrame, tank: &tanks::TankSnapshot, color: RenderColor) {
     let spec = physics::tank_spec();
     let outline = RenderColor::rgb(0.07, 0.09, 0.06);
@@ -6974,6 +7051,34 @@ fn render_tank(frame: &mut RenderFrame, tank: &tanks::TankSnapshot, color: Rende
             stroke: Some(Stroke::new(outline, 0.2)),
         }),
     );
+    let up = if tank.local_gravity.length() > 0.0 {
+        -tank.local_gravity.normalized()
+    } else {
+        Vec2::Y.rotate_radians(chassis.angle)
+    };
+    let along = Vec2::new(up.y, -up.x);
+    // At full health the bar is as long as the chassis.
+    let length = 2.0 * spec.chassis_half_width;
+    let start = chassis.position + up * TANK_HEALTH_BAR_HEIGHT - along * length * 0.5;
+    frame.push_primitive(
+        ROVER_LAYER + 1,
+        RenderPrimitive::Line(engine_common::RenderLine::new(
+            render_point(start),
+            render_point(start + along * length),
+            Stroke::new(outline, 0.6),
+        )),
+    );
+    let health = (tank.health / tanks::TANK_HEALTH).clamp(0.0, 1.0);
+    if health > 0.0 {
+        frame.push_primitive(
+            ROVER_LAYER + 1,
+            RenderPrimitive::Line(engine_common::RenderLine::new(
+                render_point(start),
+                render_point(start + along * length * health),
+                Stroke::new(color, 0.35),
+            )),
+        );
+    }
 }
 
 fn render_rover(

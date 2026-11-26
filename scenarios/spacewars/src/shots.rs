@@ -82,6 +82,7 @@ pub(super) fn settle(
         return;
     };
     let exposed = match_rules::exposed(state, pilots);
+    let tanks = state.physics.tanks.healths();
     let SpacewarsState {
         ships,
         debris,
@@ -90,7 +91,7 @@ pub(super) fn settle(
         shot_hits,
         ..
     } = state;
-    let mut bodies = Bodies::new(ships, debris, rovers, exposed);
+    let mut bodies = Bodies::new(ships, debris, rovers, tanks, exposed);
     // A shell that died earlier in the step, such as to a laser or terrain, or
     // that left the game, lands no hit.
     let index = &bodies.index;
@@ -181,6 +182,9 @@ pub(super) struct Bodies<'a> {
     ships: &'a [ShipState; 2],
     debris: &'a [DebrisState],
     rovers: &'a [RoverState],
+    /// Each tank's entity value and health, in entity order. The tanks live
+    /// in the physics, which the weapons hold while they read this.
+    tanks: Vec<(u64, f32)>,
     /// Each piece of debris's index by its physics id.
     index: BTreeMap<u64, usize>,
     exposed: Vec<match_rules::Exposed>,
@@ -192,6 +196,7 @@ impl<'a> Bodies<'a> {
         ships: &'a [ShipState; 2],
         debris: &'a [DebrisState],
         rovers: &'a [RoverState],
+        tanks: Vec<(u64, f32)>,
         exposed: Vec<match_rules::Exposed>,
     ) -> Self {
         let index = debris
@@ -204,6 +209,7 @@ impl<'a> Bodies<'a> {
             ships,
             debris,
             rovers,
+            tanks,
             index,
             exposed,
             spent: BTreeMap::new(),
@@ -229,6 +235,14 @@ impl<'a> Bodies<'a> {
                     .ok()?;
                 let rover = self.rovers[at];
                 (!rover.dead).then(|| (rover.health_map(), rover.life))
+            }
+            MechanicalEntity::Tank(entity) => {
+                let at = self
+                    .tanks
+                    .binary_search_by_key(&entity, |&(key, _)| key)
+                    .ok()?;
+                let health = self.tanks[at].1;
+                (health > 0.0).then(|| (HealthMap::tank_armor(), health))
             }
             MechanicalEntity::Debris(id) => {
                 let item = self.debris(id)?;

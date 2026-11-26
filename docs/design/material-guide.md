@@ -55,6 +55,7 @@ game builds its regions from them:
 | Game | Body | Material | Amount | Details |
 | --- | --- | --- | --- | --- |
 | Spacewars | ship, escape pod and rover hulls | hull, with toughness 7,800 for a ship and 12,000 for a pod | plate 0.2 deep around the collision shape's perimeter | [Spacewars bodies](material-sources.md#spacewars-bodies) |
+| Spacewars | tank | armor, with toughness 13,000 | plate 0.2 deep around the chassis's 11.2 perimeter, 2 into the screen | [Spacewars bodies](material-sources.md#spacewars-bodies) |
 | Spacewars | pilot on foot | soft tissue, with toughness 35,000 | the pilot's capsule | [Spacewars bodies](material-sources.md#spacewars-bodies) |
 | Spacewars | asteroid, chip and breakup fragment | rock, with toughness 1,750 | what the body weighed when made | [Spacewars bodies](material-sources.md#spacewars-bodies) |
 | Spacewars | cannon shell | shell | what the shell weighed when fired | [Spacewars bodies](material-sources.md#spacewars-bodies) |
@@ -64,8 +65,9 @@ game builds its regions from them:
 
 Contact charges also take the radius each surface meets others with. A
 Spacewars hull's is 1 and a Scorched hull's 0.5, both estimates. A pilot meets
-others with its capsule's radius, a rover's bodies with their wheels' 0.75, a
-Scorched wheel with its own 0.65, and debris with its own radius.
+others with its capsule's radius, a rover's or a Spacewars tank's bodies with
+their wheels' 0.75, a Scorched wheel with its own 0.65, and debris with its own
+radius.
 
 The weapons:
 
@@ -153,7 +155,8 @@ measures. Spacewars and Scorched are the two worked hosts:
 | Spacewars asteroids | shells and lasers charge the rock | charged: an asteroid wears by its contacts | not priced | #330 |
 | Spacewars chips, breakup fragments and cannon shells | shells and lasers charge their rock or shell | not bound, so not priced | not priced | #330 |
 | Spacewars sun and planets | outside the model | rock that nothing wears | not priced | #330 |
-| Spacewars wreckage and tanks | outside the model | not bound, so not priced | not priced | tanks: #238 |
+| Spacewars tanks | shells and lasers charge the armor | charged: a tank wears by its contacts | not priced | #238 |
+| Spacewars wreckage | outside the model | not bound, so not priced | not priced | none |
 | Scorched's tanks | shells charge the armor | charged | not priced | #331 |
 | Clock's tanks | as Scorched's, at the arena's scale | charged | not priced | #331 |
 | Clock's face, wreck pieces and spacelings | outside the model | not bound, so not priced | not priced | none |

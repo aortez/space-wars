@@ -1,13 +1,13 @@
 //! Material regions over Spacewars health (#330).
 //!
 //! Each body a weapon can harm has a region of material: a ship's hull, an
-//! escape pod's hull, a pilot on foot, a piece of rock, a shell and a rover's
-//! hull. The game still stores each body's health, and the region is a view of
-//! it: the region's integrity is the body's health over its full health. So
-//! the rules that change health, such as contacts, solar heat, repairs and
-//! rebuilding, change the region with it. Debris breaks by the game's rule
-//! once it loses a fifth of its full health, so a fifth of its region's
-//! capacity breaks it, and the region itself never fails.
+//! escape pod's hull, a pilot on foot, a piece of rock, a shell, a rover's
+//! hull and a tank's armor. The game still stores each body's health, and the
+//! region is a view of it: the region's integrity is the body's health over
+//! its full health. So the rules that change health, such as contacts, solar
+//! heat, repairs and rebuilding, change the region with it. Debris breaks by
+//! the game's rule once it loses a fifth of its full health, so a fifth of its
+//! region's capacity breaks it, and the region itself never fails.
 //!
 //! A [`HealthMap`] is that view for one body. It turns the work a weapon
 //! charges the region into the health the body loses, and health back into
@@ -29,9 +29,19 @@
 //! a ship's laser kills a pilot on foot in half the time it takes to fail a
 //! pod's hull, as the old laser did. A round closing at 300 still kills one on
 //! the first hit, but one closing slower than about 236 does not.
+//!
+//! A tank's armor is plate as deep as a hull's around its chassis, in the
+//! reference armor with only its toughness raised (#238). In the same fixture,
+//! with the tank held still before each round, a round fails a fresh tank on
+//! the eighth hit, twice the ship's four. A round's work grows with the depth
+//! of plate behind the face it strikes and a beam's does not, so the laser
+//! fails a tank sooner than a ship. Armor is stronger than planet rock, so a
+//! tank's settling, driving, bumps and hops cost it nothing, though a hard
+//! enough crash does.
 use super::*;
-use engine_material::{HULL, Material, ROCK, Region, SHELL, SOFT_TISSUE, Section};
+use engine_material::{ARMOR, HULL, Material, ROCK, Region, SHELL, SOFT_TISSUE, Section};
 use surface_sortie::match_rules::{PILOT_HEALTH, POD_HULL_HEALTH};
+use tanks::TANK_HEALTH;
 
 /// Depth of hull plate behind a struck face, `wu`.
 const PLATE_DEPTH: f32 = 0.2;
@@ -54,6 +64,10 @@ const SHIP_HEALTH: f32 = 100.0;
 const POD_HULL_VOLUME: f32 = POD_HULL_PERIMETER * PLATE_DEPTH * POD_THICKNESS;
 /// A rover built with `ROVER_LIFE_MAX` health has this much hull.
 const ROVER_HULL_VOLUME: f32 = ROVER_HULL_PERIMETER * PLATE_DEPTH * THICKNESS;
+/// Perimeter of a tank's chassis, `wu`.
+const TANK_CHASSIS_PERIMETER: f32 = 11.2;
+/// A tank placed with `TANK_HEALTH` health has this much armor.
+const TANK_ARMOR_VOLUME: f32 = TANK_CHASSIS_PERIMETER * PLATE_DEPTH * THICKNESS;
 /// A pilot is as deep into the screen as the capsule is wide.
 const PILOT_THICKNESS: f32 = 2.0 * spaceling_geometry::RADIUS;
 /// Area of the pilot's capsule, `wu^2`.
@@ -94,6 +108,14 @@ pub const ASTEROID_ROCK: Material = Material {
     name: "asteroid rock",
     toughness: 1_750.0,
     ..ROCK
+};
+/// A tank's armor: the reference armor's stiffness and strength, tough enough
+/// that a supplied round fails a fresh tank on the eighth hit in the match
+/// tests' fixture, twice a ship's four.
+pub const TANK_ARMOR: Material = Material {
+    name: "tank armor",
+    toughness: 13_000.0,
+    ..ARMOR
 };
 
 /// A body's material at full health, and the health that stands for it. A hull
@@ -149,6 +171,16 @@ impl HealthMap {
             section: Section::new(THICKNESS, PLATE_DEPTH),
             volume: ROVER_HULL_VOLUME * (full_health / ROVER_LIFE_MAX),
             full_health,
+        }
+    }
+
+    /// A tank's armor: plate around the chassis, as deep as a hull's.
+    pub fn tank_armor() -> Self {
+        Self {
+            material: TANK_ARMOR,
+            section: Section::new(THICKNESS, PLATE_DEPTH),
+            volume: TANK_ARMOR_VOLUME,
+            full_health: TANK_HEALTH,
         }
     }
 
@@ -301,6 +333,7 @@ mod tests {
             ("pod", pod().health_map()),
             ("pilot", HealthMap::pilot()),
             ("rover", RoverState::new(1, 0, 0, 0).health_map()),
+            ("tank", HealthMap::tank_armor()),
             ("grit", asteroid(0.5).health_map()),
             ("boulder", asteroid(6.0).health_map()),
             ("fragment", fragment().health_map()),
@@ -318,12 +351,18 @@ mod tests {
         let rover = physics::spacewars_rover_spec();
         let chassis = 4.0 * (rover.chassis_half_width + rover.chassis_half_height);
         assert!((chassis - ROVER_HULL_PERIMETER).abs() < 1.0e-5);
+        let tank = physics::tank_spec();
+        let chassis = 4.0 * (tank.chassis_half_width + tank.chassis_half_height);
+        assert!((chassis - TANK_CHASSIS_PERIMETER).abs() < 1.0e-5);
+        // Plate on the chassis's top and its bottom leaves room between them.
+        assert!(PLATE_DEPTH < tank.chassis_half_height);
         assert!((PILOT_AREA - 0.250_686).abs() < 1.0e-5);
         // Each section is the plate or tissue the volume counts.
         let hulls = [
             (HealthMap::ship_hull(SHIP_HEALTH), SHIP_HULL_PERIMETER),
             (HealthMap::pod_hull(), POD_HULL_PERIMETER),
             (HealthMap::rover_hull(ROVER_LIFE_MAX), ROVER_HULL_PERIMETER),
+            (HealthMap::tank_armor(), TANK_CHASSIS_PERIMETER),
         ];
         for (map, perimeter) in hulls {
             let plate = perimeter * map.section.depth * map.section.thickness;
@@ -340,6 +379,7 @@ mod tests {
             (POD_HULL, HULL),
             (PILOT_TISSUE, SOFT_TISSUE),
             (ASTEROID_ROCK, ROCK),
+            (TANK_ARMOR, ARMOR),
         ] {
             let restored = Material {
                 name: reference.name,
@@ -366,6 +406,7 @@ mod tests {
                 358.4,
                 (2.0, 0.2),
             ),
+            (HealthMap::tank_armor(), 58_240.0, 582.4, (2.0, 0.2)),
             (asteroid(3.0).health_map(), 13_195.0, 1_400.0, (2.0, 1.0)),
             (shell().health_map(), 4_712.4, 4_712.4, (2.0, 2.0)),
             (round().health_map(), 375.0, 375.0, (2.0, 2.0)),

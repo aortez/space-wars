@@ -106,7 +106,9 @@ Minimap planet colors show completed ownership; triangles locate flags, even
 while raising or lowering. A rising flag does not prematurely recolor the
 planet. Flags move and rotate with their planet at their original contact
 location. Tanks are drawn as in Spacewars, in their player's color or a
-government's olive.
+government's olive, with a bar above each that its health fills. Rounds, the
+laser and hard crashes wear a tank's armor, as
+[Spacewars bodies](design/material-sources.md#spacewars-bodies) describes.
 
 ### Two-player expedition
 
@@ -337,8 +339,8 @@ color and no third seat; an overturned tank on the far side; a hop against a
 departure that ends the block at the departure distance, with clone/replay
 equality; a hop by a tank carrying another on its back, which keeps its block;
 a tank riding a detached fragment while the claim completes around it; clearing
-the last tank beside a flying ship; and a lost flag footing that keeps every
-tank and its allegiance.
+the last tank beside a flying ship; a lost flag footing that keeps every tank
+and its allegiance; and a health bar that stays above a tank on its back.
 
 Positive AI flight/capture fixtures now let their otherwise idle opponent
 depart through real controls only when its landing feet support it on the
