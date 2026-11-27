@@ -641,9 +641,13 @@ fn parse_command(body: &str) -> Result<ControlCommand, CommandParseError> {
                 Some("idle") => crate::client_scenarios::ClockBenchmarkCase::Idle,
                 Some("rain") => crate::client_scenarios::ClockBenchmarkCase::Rain,
                 Some("aquarium") => crate::client_scenarios::ClockBenchmarkCase::Aquarium,
+                Some("crow") => crate::client_scenarios::ClockBenchmarkCase::Crow,
+                Some("flock") => crate::client_scenarios::ClockBenchmarkCase::Flock,
+                Some("rain-crow") => crate::client_scenarios::ClockBenchmarkCase::RainCrow,
+                Some("rain-flock") => crate::client_scenarios::ClockBenchmarkCase::RainFlock,
                 _ => {
                     return Err(invalid_mutation_request(
-                        "clock-benchmark requires idle, rain or aquarium",
+                        "clock-benchmark requires idle, rain, aquarium, crow, flock, rain-crow or rain-flock",
                     ));
                 }
             };
@@ -2043,6 +2047,26 @@ mod tests {
                 "aquarium\nturning\n",
                 ClockBenchmarkCase::Aquarium,
                 ClockBenchmarkTheme::Turning,
+            ),
+            (
+                "crow\n",
+                ClockBenchmarkCase::Crow,
+                ClockBenchmarkTheme::Normal,
+            ),
+            (
+                "flock\n",
+                ClockBenchmarkCase::Flock,
+                ClockBenchmarkTheme::Normal,
+            ),
+            (
+                "rain-crow\n",
+                ClockBenchmarkCase::RainCrow,
+                ClockBenchmarkTheme::Normal,
+            ),
+            (
+                "rain-flock\nchristmas\n",
+                ClockBenchmarkCase::RainFlock,
+                ClockBenchmarkTheme::Christmas,
             ),
         ] {
             assert!(

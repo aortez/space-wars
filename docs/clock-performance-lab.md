@@ -357,7 +357,7 @@ cargo build --locked --release -p engine-client
 ./benchmark-clock.sh
 ```
 
-The wrapper runs all eleven cases at 1024×768, raster scales 1 and 2, three
+The wrapper runs all seventeen cases at 1024×768, raster scales 1 and 2, three
 independent processes per combination. Each run warms up for two simulated
 seconds, resets the seeded scenario, then measures 15 simulated seconds.
 Each CSV row represents exactly 60 fixed steps and 60 rendered/prepared frames,
@@ -416,6 +416,13 @@ run were retained locally under `target/clock-benchmarks/run.zhYlok3O/`.
 # almost entirely at rest.
 ./benchmark-clock.sh --cases idle,residents --seconds 60 --repeats 3
 
+# Crow visits: one crow, or a flock of four, the most a visit holds. The dry
+# cases bring their crows as each 23-second cycle starts; the rain cases bring
+# them 24 seconds into each 47-second cycle, once Heavy Rain's shower is over
+# and its water lies pooled. 47-second runs cover one rain visit or two dry ones.
+./benchmark-clock.sh --cases idle,crow,flock,rain,rain-crow,rain-flock \
+  --seconds 47 --repeats 3
+
 # A single raw run, without the wrapper.
 target/release/engine-client --scenario clock --benchmark-headless --seed 7 \
   --clock-benchmark-case meltdown --renderer raster --raster-scale 2 \
@@ -436,6 +443,10 @@ intentionally rolls all four digits as a dense preview; ordinary minute changes
 usually move fewer.
 Marquee uses the specified recipe and the fixed default `SPACE WARS` message.
 Its 15-second cycle is the longest; use at least 15 seconds to cover every phase.
+`crow` and `flock` preview no event and `rain-crow` and `rain-flock` preview
+Heavy Rain; each brings its crows with `ClockState::preview_crows`. From ten
+seconds into each visit until its 22-second cap the face reads **11:11**, so
+the crows' perches change under them, as when the minute turns.
 Fixtures wear Normal unless `--theme` chooses `christmas`, or `turning`, which
 changes between Christmas and Normal through the settings, as the live controls
 do, each change as the last half-second fade ends. Every theme runs the same

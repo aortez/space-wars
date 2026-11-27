@@ -2717,10 +2717,15 @@ The crow flies in above the face, lands on an exposed lit block, pauses, and
 occasionally hops along its row or flies to another digit. Only the topmost lit
 block in each digit column is a perch; feet use the rendered block's actual top.
 Time/format changes revalidate the target even while paused, without advancing
-its position or age. Falling, Meltdown, Explosion, Coins, Digit Slide and Marquee withdraw the
-perches and make it depart. Rain and Color Cycle can coexist, as can a player or
-automatic duck. Resize/restart clears the visit. A hard 22-second envelope and
-one admitted visit at a time prevent lingering or accumulating birds.
+its position or age. Falling, Meltdown, Explosion, Coins, Digit Slide, Cell Swap
+and Marquee withdraw the perches and make it depart. Color Cycle, Grass and Slot
+Machine can coexist, as can a player or automatic duck, and Rain and Aquarium,
+whose water each crow reads for itself: a shy crow that comes into a downpour
+is soaked within seconds or turns back as it comes, and no crow stays once the
+Aquarium's water covers the perches. The spider and Tanks wait for a visit to
+end, and a visit waits for them. Resize/restart clears the visit. A hard
+22-second envelope and one admitted visit at a time prevent lingering or
+accumulating birds.
 
 A visit holds up to four crows (#370). One admission in four brings a flock
 (#371) of two, three or four crows, each size as likely, whether the schedule,
@@ -2761,7 +2766,11 @@ it. The others go on, and every crow still there starts for home by the
 17-second deadline. The visit ends when its last crow has gone: only then
 does it let go of the arena and start the Crow cooldown, and until then it
 blocks what a crow blocks and refuses another crow. Tests bring visits of a
-known size with `ClockState::preview_crows`.
+known size with `ClockState::preview_crows`. The
+[flock qualification](clock-crow-flock-validation.md) (#372) records flocks
+beside each event and through the controls, pictures of them in software
+and through the cabinets' GPU scene, and their cost and display timing on a
+Pi 4 and a Pi 5 cabinet.
 
 Flight uses a small Clock-local motion controller: gravity, drag, bounded lateral
 steering and lift during visible wing downstrokes, with gliding gaps between
@@ -2826,7 +2835,10 @@ wet departures and `wetness_milli` (the fraction of that bird's spray tolerance 
 only when no crow remains. Payloads older than schema 31 have no `crows` and
 no `member`, and their `crow` is the visit's one crow. Text `clock state`
 prints a line for each crow.
-The catalog's `blocked_by_crow` identifies a duplicate admission. From idle:
+The catalog's `blocked_by_crow` identifies a duplicate admission. While crows
+visit, the guarded `clock trigger crow` is refused with `action-unavailable`
+and "A crow is already visiting; wait for departure", and the refusal's Clock
+state lists the crows still there. From idle:
 
 ```sh
 spacewars-cli clock trigger crow

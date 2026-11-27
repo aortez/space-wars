@@ -17,6 +17,8 @@ pub mod chess;
 mod coins_tests;
 mod crow;
 #[cfg(test)]
+mod crow_flock_events_tests;
+#[cfg(test)]
 mod crow_flock_tests;
 #[cfg(test)]
 mod crow_group_tests;

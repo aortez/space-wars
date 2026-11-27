@@ -753,6 +753,24 @@ fn crow_trigger_pause_settings_and_restart_preserve_the_resident_contract() {
                 crow.population.colliders + arena.floor.colliders
             )
         );
+        // Another Crow is refused while the flock visits, and the refusal
+        // shows the same four crows.
+        let busy = harness.clock_trigger_refusal(&admitted, ClockEventKind::Crow);
+        assert_eq!(busy.code, ControlFailureCode::ActionUnavailable);
+        assert_eq!(
+            busy.message,
+            "A crow is already visiting; wait for departure"
+        );
+        let refused = busy.current_clock_state.expect("the refusal's Clock state");
+        assert!(
+            refused
+                .crows
+                .iter()
+                .map(|crow| (crow.visit_id, crow.member))
+                .eq(members.iter().map(|member| (visit_id, *member))),
+            "{:?}",
+            refused.crows
+        );
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
         let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
         let page = harness.activate_guarded("pause.clock.events", &page);

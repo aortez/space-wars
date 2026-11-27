@@ -41,11 +41,26 @@ pub enum ClockBenchmarkCase {
     /// charges, and the winner goes back up. A cycle lasts as long as the
     /// longest fight can.
     Tanks,
+    /// Idle, with a visit of one crow per cycle: it flies in, perches and
+    /// hops on the face, and leaves by the visit's cap. Ten seconds in, the
+    /// face turns from 08:08 to 11:11 under it. A one keeps only its upright,
+    /// the narrowest top a digit has, so a crow whose perch goes finds
+    /// another.
+    Crow,
+    /// As Crow, with a flock of four, the most a visit holds (#372).
+    Flock,
+    /// Heavy Rain, with a visit of one crow once its shower is over and its
+    /// water lies pooled on the face and the floor, draining. The crow
+    /// perches and hops beside that water, reading it on every step, and the
+    /// face turns under it as in Crow.
+    RainCrow,
+    /// As RainCrow, with a flock of four.
+    RainFlock,
 }
 
 impl ClockBenchmarkCase {
     #[cfg(test)]
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 17] = [
         Self::Idle,
         Self::Falling,
         Self::ColorCycle,
@@ -59,25 +74,33 @@ impl ClockBenchmarkCase {
         Self::Residents,
         Self::Spider,
         Self::Tanks,
+        Self::Crow,
+        Self::Flock,
+        Self::RainCrow,
+        Self::RainFlock,
     ];
 
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Residents => "residents",
+            Self::Crow => "crow",
+            Self::Flock => "flock",
+            Self::RainCrow => "rain-crow",
+            Self::RainFlock => "rain-flock",
             _ => self.event().map_or("idle", ClockEventKind::as_str),
         }
     }
 
     fn event(self) -> Option<ClockEventKind> {
         Some(match self {
-            Self::Idle | Self::Residents => return None,
+            Self::Idle | Self::Residents | Self::Crow | Self::Flock => return None,
             Self::Falling => ClockEventKind::Falling,
             Self::ColorCycle => ClockEventKind::ColorCycle,
             Self::Meltdown => ClockEventKind::Meltdown,
             Self::Duck => ClockEventKind::Duck,
             Self::Marquee => ClockEventKind::Marquee,
             Self::DigitSlide => ClockEventKind::DigitSlide,
-            Self::Rain => ClockEventKind::Rain,
+            Self::Rain | Self::RainCrow | Self::RainFlock => ClockEventKind::Rain,
             Self::Aquarium => ClockEventKind::Aquarium,
             Self::Grass => ClockEventKind::Grass,
             Self::Spider => ClockEventKind::Spider,
@@ -91,12 +114,37 @@ impl ClockBenchmarkCase {
             Self::Spider => scenario_clock::SPIDER_EXIT_GRACE_TICKS,
             _ => 0,
         };
-        self.event().map_or(60, |event| {
+        let event = self.event().map_or(60, |event| {
             scenario_clock::EVENT_CATALOG[event as usize].duration_ticks
                 + grace
                 + scenario_clock::COOLDOWN_TICKS
                 + 60
-        })
+        });
+        // A visit of crows is over by its cap, and the next comes a second
+        // later at the soonest.
+        let crows = if self.crows() > 0 {
+            self.crows_come() + CROW_VISIT_TICKS + 60
+        } else {
+            0
+        };
+        event.max(crows)
+    }
+
+    /// How far into each cycle its crows come.
+    fn crows_come(self) -> u64 {
+        match self {
+            Self::RainCrow | Self::RainFlock => RAIN_CROWS_COME_TICK,
+            _ => 0,
+        }
+    }
+
+    /// How many crows each cycle brings.
+    fn crows(self) -> usize {
+        match self {
+            Self::Crow | Self::RainCrow => 1,
+            Self::Flock | Self::RainFlock => 4,
+            _ => 0,
+        }
     }
 
     /// The arena residents the run starts with.
@@ -154,6 +202,20 @@ impl ClockBenchmarkTheme {
     }
 }
 
+/// The longest a visit of crows lasts: its cap.
+const CROW_VISIT_TICKS: u64 =
+    scenario_clock::EVENT_CATALOG[ClockEventKind::Crow as usize].duration_ticks;
+
+/// When, into each visit of a crow fixture, the face turns under the crows:
+/// ten seconds in, as they hop.
+const CROW_RETARGET_TICK: u64 = 10 * 60;
+
+/// How far into a rain fixture's shower its crows come: its 20 seconds of
+/// rain are over and its last drops have landed. Crows that came while drops
+/// fell would leave soaked within seconds, and shy ones would turn back as
+/// they came, so they would share the water for no window worth timing.
+const RAIN_CROWS_COME_TICK: u64 = 24 * 60;
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ClockBenchmarkConfig {
     pub case: ClockBenchmarkCase,
@@ -186,7 +248,7 @@ impl Driver {
         );
         ClockScenario::step(
             &mut state,
-            &[ClockAction::set_reading(reading(0))],
+            &[ClockAction::set_reading(reading(config.case, 0))],
             std::time::Duration::ZERO,
         );
         let settings = state.settings();
@@ -200,17 +262,26 @@ impl Driver {
         )
     }
 
-    pub fn next_actions(&mut self) -> Vec<Action> {
+    /// The actions for the next step of `state`. A crow fixture's crows come
+    /// straight into `state`, as a preview of a visit of their number does.
+    pub fn next_actions(&mut self, state: &mut ClockState) -> Vec<Action> {
+        let case = self.config.case;
         let mut actions = Vec::new();
         if self.tick.is_multiple_of(60) {
-            actions.push(ClockAction::set_reading(reading(self.tick)));
+            actions.push(ClockAction::set_reading(reading(case, self.tick)));
         }
-        if self.tick.is_multiple_of(self.config.case.cycle_ticks())
-            && let Some(event) = self.config.case.event()
+        let into_cycle = self.tick % case.cycle_ticks();
+        if into_cycle == 0
+            && let Some(event) = case.event()
         {
-            // Include event construction and cleanup in the measured workload.
-            // Digit Slide intentionally previews every digit: a dense upper bound.
+            // Include event construction and cleanup in the measured
+            // workload. Digit Slide intentionally previews every digit: a
+            // dense upper bound.
             actions.push(ClockAction::preview_event(event));
+        }
+        if case.crows() > 0 && into_cycle == case.crows_come() {
+            let came = state.preview_crows(case.crows());
+            debug_assert!(came, "the last visit is over before its cycle ends");
         }
         if let Some(theme) = self.config.theme.change(self.tick) {
             // The live controls change the theme the same way (#458).
@@ -224,9 +295,20 @@ impl Driver {
     }
 }
 
-fn reading(tick: u64) -> ClockReading {
-    // Keep geometry comparable while exercising the normal seconds/colon refresh.
-    ClockReading::new(8, 8, ((tick / 60) % 60) as u8).unwrap()
+fn reading(case: ClockBenchmarkCase, tick: u64) -> ClockReading {
+    // Keep geometry comparable while exercising the normal seconds/colon
+    // refresh. While crows visit, the face turns from 08:08 to 11:11 under
+    // them, every digit to one whose top is narrower, and back once the
+    // visit is over.
+    let visit = (tick % case.cycle_ticks()).checked_sub(case.crows_come());
+    let (hour, minute) = if case.crows() > 0
+        && visit.is_some_and(|visit| (CROW_RETARGET_TICK..CROW_VISIT_TICKS).contains(&visit))
+    {
+        (11, 11)
+    } else {
+        (8, 8)
+    };
+    ClockReading::new(hour, minute, ((tick / 60) % 60) as u8).unwrap()
 }
 
 #[cfg(test)]
@@ -277,7 +359,7 @@ mod tests {
             });
             for step in 0..case.cycle_ticks() {
                 for (state, driver) in &mut runs {
-                    let actions = driver.next_actions();
+                    let actions = driver.next_actions(state);
                     ClockScenario::step(state, &actions, tick);
                 }
                 let [(normal, _), (christmas, _), (turning, _)] = &runs;
@@ -288,6 +370,7 @@ mod tests {
                     assert_eq!(themed.collider_count(), normal.collider_count());
                     assert_eq!(themed.duck_state(), normal.duck_state());
                     assert_eq!(themed.spider_state(), normal.spider_state());
+                    assert_eq!(themed.crow_states(), normal.crow_states());
                     assert_eq!(themed.display(), normal.display());
                 }
                 assert_eq!(normal.theme_state().theme, ClockTheme::Normal);
@@ -325,7 +408,7 @@ mod tests {
         let (mut state, mut driver) = Driver::new(config, 7, 4.0 / 3.0);
         let (mut captured, mut bound, mut idle) = (0, 0, 0);
         for _ in 0..ClockBenchmarkCase::Tanks.cycle_ticks() {
-            let actions = driver.next_actions();
+            let actions = driver.next_actions(&mut state);
             ClockScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
             let arena = state.last_arena_step_metrics();
             if let Some(times) = state.tanks_contact_times() {
@@ -344,6 +427,66 @@ mod tests {
         );
     }
 
+    /// Each crow fixture's cycle brings its crows at once: as it starts in
+    /// the dry fixtures, and once Heavy Rain's shower is over in the rain
+    /// fixtures, where no crow leaves the water before the face turns. Ten
+    /// seconds into a visit, the face turns under a flock and sends crows
+    /// whose perches go to others, at the seeds the cabinets and the
+    /// headless benchmark use. All are gone by the visit's cap.
+    #[test]
+    fn crow_fixtures_bring_their_crows_and_turn_the_face_under_them() {
+        use ClockBenchmarkCase::{Crow, Flock, RainCrow, RainFlock};
+        let escapes = |state: &ClockState| -> u32 {
+            state.crow_states().iter().map(|crow| crow.escapes).sum()
+        };
+        for case in [Crow, Flock, RainCrow, RainFlock] {
+            let config = ClockBenchmarkConfig {
+                case,
+                ..Default::default()
+            };
+            for (seed, aspect) in [
+                (7, 4.0 / 3.0),
+                (0, 4.0 / 3.0),
+                (7, 5.0 / 3.0),
+                (0, 5.0 / 3.0),
+            ] {
+                let (mut state, mut driver) = Driver::new(config, seed, aspect);
+                for tick in 0..case.cycle_ticks() {
+                    let before = escapes(&state);
+                    let actions = driver.next_actions(&mut state);
+                    ClockScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
+                    if tick == 0 {
+                        assert_eq!(state.event_kind(), case.event(), "{case:?}");
+                    }
+                    let visit = tick.checked_sub(case.crows_come());
+                    let crows = state.crow_states().len();
+                    let context = format!("{case:?} seed {seed} at {aspect}, tick {tick}");
+                    if visit.is_none() {
+                        assert_eq!(crows, 0, "{context}");
+                    }
+                    if visit == Some(0) {
+                        assert_eq!(crows, case.crows(), "{context}");
+                    }
+                    if case.event().is_some()
+                        && visit.is_some_and(|visit| visit <= CROW_RETARGET_TICK)
+                    {
+                        assert_eq!(crows, case.crows(), "{context}: {:?}", state.crow_states());
+                    }
+                    if visit == Some(CROW_RETARGET_TICK) && case.crows() > 1 {
+                        assert!(
+                            escapes(&state) > before,
+                            "{context}: {:?}",
+                            state.crow_states()
+                        );
+                    }
+                    if visit.is_some_and(|visit| visit + 1 >= CROW_VISIT_TICKS) {
+                        assert!(state.crow_states().is_empty(), "{context}");
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn every_fixture_repeats_deterministically_and_cleans_up() {
         for case in ClockBenchmarkCase::ALL {
@@ -355,8 +498,8 @@ mod tests {
             let (mut b, mut driver_b) = Driver::new(config, 7, 4.0 / 3.0);
             let mut active = 0;
             for tick in 0..case.cycle_ticks() * 2 {
-                let actions = driver_a.next_actions();
-                assert_eq!(actions, driver_b.next_actions());
+                let actions = driver_a.next_actions(&mut a);
+                assert_eq!(actions, driver_b.next_actions(&mut b));
                 for state in [&mut a, &mut b] {
                     ClockScenario::step(state, &actions, Duration::from_nanos(16_666_667));
                 }
@@ -366,11 +509,14 @@ mod tests {
                     ClockScenario::render_frame(&b)
                 );
                 assert_eq!(a.duck_state(), b.duck_state());
+                assert_eq!(a.crow_states(), b.crow_states());
                 active += u64::from(
-                    a.event_kind().is_some() || a.has_duck_visit() || a.spider_state().is_some(),
+                    a.event_kind().is_some()
+                        || a.has_duck_visit()
+                        || a.spider_state().is_some()
+                        || !a.crow_states().is_empty(),
                 );
-                assert_eq!(a.reading().unwrap().hour(), 8);
-                assert_eq!(a.reading().unwrap().minute(), 8);
+                assert_eq!(a.reading(), Some(reading(case, tick - tick % 60)));
                 if (tick + 1) % case.cycle_ticks() == 0 {
                     assert_eq!(a.lifecycle(), scenario_clock::EventLifecycle::Idle);
                     // Residents keep the arena for the rest of the run:
@@ -398,7 +544,7 @@ mod tests {
                     assert_eq!(a.arena_accounting().steps, tick + 1);
                 }
             }
-            assert_eq!(active > 0, case.event().is_some());
+            assert_eq!(active > 0, case.event().is_some() || case.crows() > 0);
             // The ceiling refuses a second Grass request during its hold, so
             // that fixture starts one event and keeps its sunlight owner.
             assert_eq!(
@@ -406,6 +552,8 @@ mod tests {
                 match case {
                     ClockBenchmarkCase::Idle | ClockBenchmarkCase::Residents => 0,
                     ClockBenchmarkCase::Grass => 1,
+                    // Each cycle's crows are an admission of their own.
+                    ClockBenchmarkCase::RainCrow | ClockBenchmarkCase::RainFlock => 4,
                     _ => 2,
                 }
             );
