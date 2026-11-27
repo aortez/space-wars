@@ -90,6 +90,9 @@ pub enum Command {
     PlantTree,
     Sun,
     PlantSeedling,
+    PhysicalWood,
+    LightSnow,
+    HeavySnow,
 }
 impl Command {
     pub fn action(self) -> Action {
@@ -139,6 +142,9 @@ impl Command {
             Self::PlantTree,
             Self::Sun,
             Self::PlantSeedling,
+            Self::PhysicalWood,
+            Self::LightSnow,
+            Self::HeavySnow,
         ]
         .get(*v as usize)
         .copied()
@@ -792,7 +798,10 @@ impl GardenLabState {
             | Command::CutBranch
             | Command::PlantTree
             | Command::Sun
-            | Command::PlantSeedling => {}
+            | Command::PlantSeedling
+            | Command::PhysicalWood
+            | Command::LightSnow
+            | Command::HeavySnow => {}
         }
     }
     /// Time passes only for the bed that is shown.
@@ -1004,7 +1013,7 @@ impl Scenario for GardenLabScenario {
             angle: 0.0,
         };
         if s.inspect {
-            links(&mut f, &bed, &o);
+            links(&mut f, &bed, &o, &|_, point| point);
         }
         for t in &o.tissues {
             if t.role == Role::Moss {
@@ -1083,7 +1092,7 @@ impl Scenario for GardenLabScenario {
             }
             let o = rock.plants.observe();
             if s.inspect {
-                links(&mut f, frame, &o);
+                links(&mut f, frame, &o, &|_, point| point);
             }
             for t in &o.tissues {
                 f.push_primitive(2, moss_cushion(frame, t));
@@ -1301,8 +1310,14 @@ impl Frame<'_> {
 }
 
 /// Actual topology links. Moss links run through the middle of its domes
-/// rather than floating above the carpet; other tissue links join cell centers.
-fn links(f: &mut RenderFrame, frame: &Frame<'_>, o: &plants::Observation) {
+/// rather than floating above the carpet; other tissue links join cell centers,
+/// each where `place` puts it.
+fn links(
+    f: &mut RenderFrame,
+    frame: &Frame<'_>,
+    o: &plants::Observation,
+    place: &dyn Fn(&Tissue, RenderPoint) -> RenderPoint,
+) {
     let at = |id: &u64| {
         let t = o.tissues.iter().find(|t| t.id == *id).unwrap();
         let offset = if t.role == Role::Moss {
@@ -1310,7 +1325,7 @@ fn links(f: &mut RenderFrame, frame: &Frame<'_>, o: &plants::Observation) {
         } else {
             Vec2::ZERO
         };
-        frame.point(t.cell, offset)
+        place(t, frame.point(t.cell, offset))
     };
     for (a, b) in &o.connections {
         f.push_primitive(

@@ -11,6 +11,15 @@ use engine_core::plants::{
 use engine_rapier::tree::TreeSenses;
 use std::{cmp::Reverse, collections::BTreeSet};
 
+mod wood;
+use wood::beyond;
+pub use wood::{
+    CONE_MASS, DRAG, Fallen, GRAVITY, HEAVY_SNOW, Hinge, LIGHT_SNOW, NEEDLE_MASS, SNOW_SECONDS,
+    Segment, Snow, WOOD_DT, Wood,
+};
+#[cfg(test)]
+mod wood_tests;
+
 /// Long enough to grow the full tree and regrow a cut branch, and for the
 /// tree's seeds to sprout and grow.
 pub const TREE_MAX_TICKS: u64 = 2000;
@@ -61,7 +70,7 @@ const UPRIGHT: [[f32; 2]; 5] = [
     [0.766, 0.643],
 ];
 
-pub const TREE_CONTROLS: [(&str, Command); 18] = [
+pub const TREE_CONTROLS: [(&str, Command); 21] = [
     ("Pause / resume", Command::Pause),
     ("Single step", Command::Step),
     ("Faster (max 64x)", Command::Faster),
@@ -80,6 +89,15 @@ pub const TREE_CONTROLS: [(&str, Command); 18] = [
     ("Inspect next tissue", Command::Select),
     ("Bids on/off", Command::Bids),
     ("Cut a branch: selected, else lowest", Command::CutBranch),
+    (
+        "Physical wood on/off: gravity and breaks; growth waits",
+        Command::PhysicalWood,
+    ),
+    (
+        "Light snow on/off: selected wood, else lowest branch's tip",
+        Command::LightSnow,
+    ),
+    ("Heavy snow on/off: the same", Command::HeavySnow),
     ("Plant a tree seed in the grass", Command::PlantSeedling),
     ("Plant fresh tree and grass", Command::PlantTree),
     ("Back to grass bed", Command::GrassBed),
@@ -116,6 +134,8 @@ pub struct TreeBed {
     pub work: VisibilityCounters,
     pub probes: usize,
     pub dropped_ms: u64,
+    /// The wood as bodies, and what has fallen.
+    pub wood: Wood,
     pending_ns: u64,
     seed: u64,
     world: PhysicsWorld,
@@ -128,7 +148,10 @@ pub struct TreeBed {
 impl TreeBed {
     /// A fresh bed: a tree seed and a grass seed, each with its finite reserves.
     pub fn new(seed: u64) -> Self {
-        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+            gravity: Vec2::new(0.0, -GRAVITY),
+            ..Default::default()
+        });
         let terrain = Terrain::generate(
             WIDTH as u32,
             HEIGHT as u32,
@@ -205,6 +228,7 @@ impl TreeBed {
             work: VisibilityCounters::default(),
             probes: 0,
             dropped_ms: 0,
+            wood: Wood::default(),
             pending_ns: 0,
             seed,
             world,
@@ -304,8 +328,16 @@ impl TreeBed {
         self.cleared += tending.cleared.len();
     }
 
+    /// Bodies move in real time while there are any. Physiology runs at the
+    /// bed's speed, unless the wood is physical.
     pub fn advance(&mut self, dt: Duration) {
         if self.paused || dt.is_zero() {
+            return;
+        }
+        if self.wood.physical || !self.wood.fallen.is_empty() {
+            self.step_wood(dt.as_secs_f32().min(WOOD_DT));
+        }
+        if self.wood.physical {
             return;
         }
         let incoming = dt.as_nanos().min(u128::from(u64::MAX / MAX_SPEED)) as u64 * self.speed;
@@ -331,7 +363,9 @@ impl TreeBed {
             Command::Activate => self.command(TREE_CONTROLS[self.control].1),
             Command::Pause => self.paused = !self.paused,
             Command::Step => {
-                if self.paused {
+                if self.paused && self.wood.physical {
+                    self.step_wood(WOOD_DT);
+                } else if self.paused {
                     self.tick();
                 }
             }
@@ -358,6 +392,9 @@ impl TreeBed {
             Command::Select => self.selected = self.selected.wrapping_add(1),
             Command::Bids => self.bids = !self.bids,
             Command::CutBranch => self.cut_branch(),
+            Command::PhysicalWood => self.toggle_wood(),
+            Command::LightSnow => self.snow(LIGHT_SNOW),
+            Command::HeavySnow => self.snow(HEAVY_SNOW),
             Command::PlantSeedling => self.plant_seedling(),
             Command::PlantTree => {
                 // Fresh seeds of each, under the same settings.
@@ -467,54 +504,47 @@ impl TreeBed {
 
     /// Cut the selected branch, or else the eldest tree's lowest, with
     /// everything that grew beyond the cut. As in cutting grass, their shares
-    /// are lost.
+    /// are lost. Physical wood falls where it was cut.
     fn cut_branch(&mut self) {
         let o = self.plants.observe();
         let owners = self.grove.owners(&o);
-        // A branch is a tree's wood beside its trunk.
-        let branch = |t: &Tissue| {
-            t.role == Role::Wood
-                && owners
-                    .get(&t.organism)
-                    .is_some_and(|tree| t.cell[0] != tree.origin[0])
+        let chosen = self
+            .selection()
+            .filter(|t| branch(&owners, t))
+            .map(|t| t.id)
+            .or_else(|| self.lowest_branch(&o));
+        let Some(cut) = chosen else {
+            return;
         };
-        let eldest = self.grove.trees.first().and_then(|tree| tree.organism(&o));
+        self.cuts += 1;
+        if let Some(segment) = self.wood.living.get(&cut) {
+            self.world.remove_connection(segment.hinge());
+            self.fall(cut);
+        } else {
+            self.plants.remove_many(&beyond(&o, cut)).unwrap();
+        }
+    }
+
+    /// The base of the eldest tree's lowest branch, where it grows from the
+    /// trunk: lowest first, then the side facing the grass.
+    fn lowest_branch(&self, o: &plants::Observation) -> Option<u64> {
+        let eldest = self.grove.trees.first().and_then(|tree| tree.organism(o));
+        let owners = self.grove.owners(o);
         let parent = |id: u64| {
             o.connections
                 .iter()
                 .find(|&&(_, child)| child == id)
                 .and_then(|&(p, _)| o.tissues.iter().find(|t| t.id == p))
         };
-        let chosen = self.selection().filter(branch).map(|t| t.id).or_else(|| {
-            // A branch's base grows from the trunk. Lowest first, then the
-            // side facing the grass.
-            o.tissues
-                .iter()
-                .filter(|t| {
-                    Some(t.organism) == eldest
-                        && branch(t)
-                        && parent(t.id).is_some_and(|p| !branch(p))
-                })
-                .min_by_key(|t| (t.cell[1], Reverse(t.cell[0])))
-                .map(|t| t.id)
-        });
-        let Some(cut) = chosen else {
-            return;
-        };
-        let mut gone = vec![cut];
-        let mut i = 0;
-        while i < gone.len() {
-            let id = gone[i];
-            i += 1;
-            gone.extend(
-                o.connections
-                    .iter()
-                    .filter(|&&(p, _)| p == id)
-                    .map(|&(_, child)| child),
-            );
-        }
-        self.plants.remove_many(&gone).unwrap();
-        self.cuts += 1;
+        o.tissues
+            .iter()
+            .filter(|t| {
+                Some(t.organism) == eldest
+                    && branch(&owners, t)
+                    && parent(t.id).is_some_and(|p| !branch(&owners, p))
+            })
+            .min_by_key(|t| (t.cell[1], Reverse(t.cell[0])))
+            .map(|t| t.id)
     }
 
     /// The eldest tree's living wood, needles, cones and roots, its dead
@@ -645,14 +675,192 @@ impl TreeBed {
         )
     }
 
-    pub fn render_frame(&self) -> RenderFrame {
-        let mut f = RenderFrame::new(Camera2::new(RenderPoint::new(0.0, 4.5), 36.0));
-        let bed = Frame {
+    /// What drawing a tissue needs to know of the bed.
+    fn scene<'a>(&'a self, o: &'a plants::Observation) -> Scene<'a> {
+        let owners = self.grove.owners(o);
+        // A tree with no wood yet is a seed, lying where it landed.
+        let seeds = owners
+            .iter()
+            .filter(|(_, tree)| !tree.own(o).any(|t| t.role == Role::Wood))
+            .map(|(&organism, _)| organism)
+            .collect();
+        Scene {
+            o,
+            owners,
+            seeds,
+            tissues: o.tissues.iter().map(|t| (t.id, t)).collect(),
+            parents: o.connections.iter().map(|&(p, c)| (c, p)).collect(),
+        }
+    }
+
+    fn frame(&self) -> Frame<'_> {
+        Frame {
             terrain: &self.terrain,
             geometry: &self.geometry,
             position: Vec2::ZERO,
             angle: 0.0,
+        }
+    }
+
+    /// A tissue's drawing where it grew, by layer.
+    fn tissue_drawing(
+        &self,
+        scene: &Scene,
+        t: &Tissue,
+        color: RenderColor,
+    ) -> Vec<(i32, RenderPrimitive)> {
+        let o = scene.o;
+        let owners = &scene.owners;
+        let bed = self.frame();
+        let p = |cell: [i32; 2]| bed.point(cell, Vec2::ZERO);
+        let parent = |id: u64| scene.parent(id);
+        let tree = t.policy == tree::POLICY;
+        let seed = tree && scene.seeds.contains(&t.organism);
+        let mut drawn = Vec::new();
+        let center = p(t.cell);
+        // How far a needle or cone has grown toward size three.
+        let grown = || {
+            let target = o.config.development_per_size.iter().sum::<u64>().max(1);
+            let progress = t.development.iter().sum::<u64>() as f32 / target as f32;
+            f32::from(t.size - 1) + progress
         };
+        match (tree, t.role) {
+            // A seed lies on the soil above its cell.
+            _ if seed => drawn.push((
+                3,
+                oval(
+                    RenderPoint::new(center.x, center.y + 0.64),
+                    0.32,
+                    0.15,
+                    color,
+                ),
+            )),
+            // Wood runs from the tissue it grew from, as wide as the
+            // disk it shades with, with a round joint at its end.
+            (_, Role::Wood) => {
+                let width = 0.5 * f32::from(t.size).sqrt();
+                let from = parent(t.id).map_or(center, |q| p(q.cell));
+                if from != center {
+                    drawn.push((2, garden_segment(from, center, width, color)));
+                }
+                drawn.push((
+                    2,
+                    RenderPrimitive::Circle(RenderCircle::filled(center, width * 0.5, color)),
+                ));
+            }
+            // A needle cell is a spray of thin needles from the wood it
+            // grows on, leaning away from the trunk as a conifer's do,
+            // which lengthen as it matures. On the trunk's line it
+            // stands upright.
+            (true, Role::Shoot) => {
+                let grown = grown();
+                let wood = parent(t.id);
+                let from = wood.map_or(center, |q| p(q.cell));
+                let (gx, gy) = if from == center {
+                    (0.0, 1.0)
+                } else {
+                    (center.x - from.x, center.y - from.y)
+                };
+                let trunk = owners.get(&t.organism).map_or(t.cell, |tree| tree.origin);
+                let out = (t.cell[0] - trunk[0]).signum() as f32;
+                // Turned toward the trunk's outside, or up beside it.
+                let (lx, ly, spray) = match (out == 0.0, gy == 0.0) {
+                    (true, _) => (1.0, 0.0, &UPRIGHT),
+                    (false, false) => (out, 0.0, &LEANING),
+                    (false, true) => (0.0, 1.0, &LEANING),
+                };
+                let surface = wood.map_or(0.0, |q| 0.25 * f32::from(q.size).sqrt());
+                let base = RenderPoint::new(from.x + gx * surface, from.y + gy * surface);
+                let length = 0.45 + 0.2 * grown;
+                for (i, [c, s]) in spray.iter().enumerate() {
+                    let reach = if i == 0 || i == 4 {
+                        0.8 * length
+                    } else {
+                        length
+                    };
+                    let tip = RenderPoint::new(
+                        base.x + reach * (gx * c + lx * s),
+                        base.y + reach * (gy * c + ly * s),
+                    );
+                    drawn.push((3, garden_segment(base, tip, 0.08, color)));
+                }
+            }
+            // A cone hangs from the branch tip above it, and lengthens
+            // as it ripens.
+            (true, Role::Cone) => {
+                let top = parent(t.id).map_or(center.y + 0.5, |q| {
+                    p(q.cell).y - 0.25 * f32::from(q.size).sqrt()
+                });
+                let length = 0.4 + 0.25 * grown();
+                drawn.push((
+                    3,
+                    oval(
+                        RenderPoint::new(center.x, top - 0.5 * length),
+                        0.12 + 0.12 * length,
+                        0.5 * length,
+                        color,
+                    ),
+                ));
+            }
+            // Blades as in the grass bed.
+            (false, Role::Shoot) => {
+                let target = o.config.development_per_size.iter().sum::<u64>().max(1);
+                let progress = t.development.iter().sum::<u64>() as f32 / target as f32;
+                let length = 0.75 + 0.4 * (f32::from(t.size - 1) + progress);
+                drawn.push((
+                    2,
+                    garden_segment(
+                        center,
+                        RenderPoint::new(center.x + 0.15, center.y + length),
+                        0.18,
+                        color,
+                    ),
+                ));
+            }
+            (false, Role::Runner) => drawn.push((
+                2,
+                garden_segment(
+                    RenderPoint::new(center.x - 0.35, center.y),
+                    RenderPoint::new(center.x + 0.35, center.y),
+                    0.18,
+                    color,
+                ),
+            )),
+            _ => {
+                let from =
+                    parent(t.id).map_or(RenderPoint::new(center.x, center.y + 0.3), |q| p(q.cell));
+                drawn.push((
+                    2,
+                    garden_segment(from, center, 0.12 + 0.06 * f32::from(t.size), color),
+                ));
+            }
+        }
+        drawn
+    }
+
+    /// Grey dead, amber stressed, else by its role.
+    fn color(scene: &Scene, t: &Tissue) -> RenderColor {
+        let tree = t.policy == tree::POLICY;
+        let seed = tree && scene.seeds.contains(&t.organism);
+        if t.health == 0 {
+            DEAD
+        } else if t.shade_ticks > 0 || t.shortage_ticks > 0 {
+            STRESSED
+        } else {
+            match (tree, t.role) {
+                _ if seed => SEED,
+                (_, Role::Wood) => WOOD,
+                (true, Role::Shoot) => NEEDLE,
+                (true, Role::Cone) => CONE,
+                (false, Role::Shoot) => BLADE,
+                _ => ROOT,
+            }
+        }
+    }
+
+    pub fn render_frame(&self) -> RenderFrame {
+        let mut f = RenderFrame::new(Camera2::new(RenderPoint::new(0.0, 4.5), 36.0));
+        let bed = self.frame();
         let p = |cell: [i32; 2]| bed.point(cell, Vec2::ZERO);
         // The dirt as one block, from its bottom row to the soil surface.
         let corners = [[0, 0], [WIDTH - 1, 0], [WIDTH - 1, TOP_DIRT], [0, TOP_DIRT]];
@@ -667,160 +875,30 @@ impl TreeBed {
             )),
         );
         let o = self.plants.observe();
+        let scene = self.scene(&o);
+        // Physical wood moves its drawing with its body, and its needles' and
+        // cones' with it.
+        let moved = |t: &Tissue| self.moved(&scene, t);
+        let place = |t: &Tissue, point: RenderPoint| moved(t).map_or(point, |m| m.point(point));
         if self.inspect {
-            links(&mut f, &bed, &o);
+            links(&mut f, &bed, &o, &place);
         }
-        let parent = |id: u64| {
-            o.connections
-                .iter()
-                .find(|&&(_, child)| child == id)
-                .and_then(|&(p, _)| o.tissues.iter().find(|t| t.id == p))
-        };
-        let owners = self.grove.owners(&o);
-        // A tree with no wood yet is a seed, lying where it landed.
-        let seeds: BTreeSet<u64> = owners
-            .iter()
-            .filter(|(_, tree)| !tree.own(&o).any(|t| t.role == Role::Wood))
-            .map(|(&organism, _)| organism)
-            .collect();
+        self.draw_wood(&mut f);
         for t in &o.tissues {
-            let tree = t.policy == tree::POLICY;
-            let seed = tree && seeds.contains(&t.organism);
+            let seed = t.policy == tree::POLICY && scene.seeds.contains(&t.organism);
             let underground = matches!(t.role, Role::Root | Role::Runner) && !seed;
             if underground && !self.inspect {
                 continue;
             }
-            let color = if t.health == 0 {
-                DEAD
-            } else if t.shade_ticks > 0 || t.shortage_ticks > 0 {
-                STRESSED
-            } else {
-                match (tree, t.role) {
-                    _ if seed => SEED,
-                    (_, Role::Wood) => WOOD,
-                    (true, Role::Shoot) => NEEDLE,
-                    (true, Role::Cone) => CONE,
-                    (false, Role::Shoot) => BLADE,
-                    _ => ROOT,
-                }
-            };
-            let center = p(t.cell);
-            // How far a needle or cone has grown toward size three.
-            let grown = || {
-                let target = o.config.development_per_size.iter().sum::<u64>().max(1);
-                let progress = t.development.iter().sum::<u64>() as f32 / target as f32;
-                f32::from(t.size - 1) + progress
-            };
-            match (tree, t.role) {
-                // A seed lies on the soil above its cell.
-                _ if seed => f.push_primitive(
-                    3,
-                    oval(
-                        RenderPoint::new(center.x, center.y + 0.64),
-                        0.32,
-                        0.15,
-                        color,
-                    ),
-                ),
-                // Wood runs from the tissue it grew from, as wide as the
-                // disk it shades with, with a round joint at its end.
-                (_, Role::Wood) => {
-                    let width = 0.5 * f32::from(t.size).sqrt();
-                    let from = parent(t.id).map_or(center, |q| p(q.cell));
-                    if from != center {
-                        f.push_primitive(2, garden_segment(from, center, width, color));
-                    }
-                    f.push_primitive(
-                        2,
-                        RenderPrimitive::Circle(RenderCircle::filled(center, width * 0.5, color)),
-                    );
-                }
-                // A needle cell is a spray of thin needles from the wood it
-                // grows on, leaning away from the trunk as a conifer's do,
-                // which lengthen as it matures. On the trunk's line it
-                // stands upright.
-                (true, Role::Shoot) => {
-                    let grown = grown();
-                    let wood = parent(t.id);
-                    let from = wood.map_or(center, |q| p(q.cell));
-                    let (gx, gy) = if from == center {
-                        (0.0, 1.0)
-                    } else {
-                        (center.x - from.x, center.y - from.y)
-                    };
-                    let trunk = owners.get(&t.organism).map_or(t.cell, |tree| tree.origin);
-                    let out = (t.cell[0] - trunk[0]).signum() as f32;
-                    // Turned toward the trunk's outside, or up beside it.
-                    let (lx, ly, spray) = match (out == 0.0, gy == 0.0) {
-                        (true, _) => (1.0, 0.0, &UPRIGHT),
-                        (false, false) => (out, 0.0, &LEANING),
-                        (false, true) => (0.0, 1.0, &LEANING),
-                    };
-                    let surface = wood.map_or(0.0, |q| 0.25 * f32::from(q.size).sqrt());
-                    let base = RenderPoint::new(from.x + gx * surface, from.y + gy * surface);
-                    let length = 0.45 + 0.2 * grown;
-                    for (i, [c, s]) in spray.iter().enumerate() {
-                        let reach = if i == 0 || i == 4 {
-                            0.8 * length
-                        } else {
-                            length
-                        };
-                        let tip = RenderPoint::new(
-                            base.x + reach * (gx * c + lx * s),
-                            base.y + reach * (gy * c + ly * s),
-                        );
-                        f.push_primitive(3, garden_segment(base, tip, 0.08, color));
-                    }
-                }
-                // A cone hangs from the branch tip above it, and lengthens
-                // as it ripens.
-                (true, Role::Cone) => {
-                    let top = parent(t.id).map_or(center.y + 0.5, |q| {
-                        p(q.cell).y - 0.25 * f32::from(q.size).sqrt()
-                    });
-                    let length = 0.4 + 0.25 * grown();
-                    f.push_primitive(
-                        3,
-                        oval(
-                            RenderPoint::new(center.x, top - 0.5 * length),
-                            0.12 + 0.12 * length,
-                            0.5 * length,
-                            color,
-                        ),
-                    );
-                }
-                // Blades as in the grass bed.
-                (false, Role::Shoot) => {
-                    let target = o.config.development_per_size.iter().sum::<u64>().max(1);
-                    let progress = t.development.iter().sum::<u64>() as f32 / target as f32;
-                    let length = 0.75 + 0.4 * (f32::from(t.size - 1) + progress);
-                    f.push_primitive(
-                        2,
-                        garden_segment(
-                            center,
-                            RenderPoint::new(center.x + 0.15, center.y + length),
-                            0.18,
-                            color,
-                        ),
-                    );
-                }
-                (false, Role::Runner) => f.push_primitive(
-                    2,
-                    garden_segment(
-                        RenderPoint::new(center.x - 0.35, center.y),
-                        RenderPoint::new(center.x + 0.35, center.y),
-                        0.18,
-                        color,
-                    ),
-                ),
-                _ => {
-                    let from = parent(t.id)
-                        .map_or(RenderPoint::new(center.x, center.y + 0.3), |q| p(q.cell));
-                    f.push_primitive(
-                        2,
-                        garden_segment(from, center, 0.12 + 0.06 * f32::from(t.size), color),
-                    );
-                }
+            let m = moved(t);
+            for (z, primitive) in self.tissue_drawing(&scene, t, Self::color(&scene, t)) {
+                f.push_primitive(
+                    z,
+                    match m {
+                        Some(m) => m.primitive(primitive),
+                        None => primitive,
+                    },
+                );
             }
         }
         if self.bids {
@@ -828,7 +906,10 @@ impl TreeBed {
                 if r.bid.action == TreeAction::Wait {
                     continue;
                 }
-                let at = p(cell_of(r));
+                // A bid's marks ride the body of the point that made it.
+                let point = scene.tissues.get(&r.view.point.tissue);
+                let mark = |at: RenderPoint| point.map_or(at, |t| place(t, at));
+                let at = mark(p(cell_of(r)));
                 let color = match r.outcome {
                     Outcome::Won(_) => WON,
                     Outcome::Refused(_) => REFUSED,
@@ -837,7 +918,7 @@ impl TreeBed {
                 if let Outcome::Won(Some(i)) = r.outcome {
                     f.push_primitive(
                         4,
-                        garden_segment(at, p(r.view.candidates[i].cell), 0.1, WON),
+                        garden_segment(at, mark(p(r.view.candidates[i].cell)), 0.1, WON),
                     );
                 }
                 f.push_primitive(
@@ -851,7 +932,7 @@ impl TreeBed {
             .filter(|t| self.inspect || !matches!(t.role, Role::Root | Role::Runner))
         {
             let corners = [[-0.45, -0.45], [0.45, -0.45], [0.45, 0.45], [-0.45, 0.45]]
-                .map(|[dx, dy]| bed.point(t.cell, Vec2::new(dx, dy)));
+                .map(|[dx, dy]| place(&t, bed.point(t.cell, Vec2::new(dx, dy))));
             for i in 0..4 {
                 f.push_primitive(
                     5,
@@ -899,6 +980,8 @@ impl TreeBed {
                     "COMPLETE"
                 } else if self.paused {
                     "PAUSED"
+                } else if self.wood.physical {
+                    "physical wood, growth waits"
                 } else {
                     "physiology running"
                 },
@@ -919,14 +1002,25 @@ impl TreeBed {
             self.grove_summary(),
             self.grass_summary(),
             self.bid_summary(),
-            format!(
-                "Light work rays {} footprints {} colliders {} | probes {} | dropped {}ms",
-                self.work.rays,
-                self.work.footprint_tests,
-                self.work.collider_records,
-                self.probes,
-                self.dropped_ms
-            ),
+            // Light is not measured while growth waits, so the physical wood
+            // takes the light's line.
+            if self.wood.physical {
+                self.wood_summary()
+            } else {
+                let fallen = if self.wood.fallen.is_empty() {
+                    String::new()
+                } else {
+                    format!(" | {}", self.wood_summary())
+                };
+                format!(
+                    "Light work rays {} footprints {} colliders {} | probes {} | dropped {}ms{fallen}",
+                    self.work.rays,
+                    self.work.footprint_tests,
+                    self.work.collider_records,
+                    self.probes,
+                    self.dropped_ms
+                )
+            },
         ];
         if let Some(t) = self.selection() {
             let owner = match o.parents.get(&t.organism) {
@@ -934,8 +1028,19 @@ impl TreeBed {
                 Some(parent) => format!("tree {} from a seed of {parent}", t.organism),
                 None => format!("tree {}", t.organism),
             };
+            let hinge =
+                self.hinges()
+                    .into_iter()
+                    .find(|h| h.tissue == t.id)
+                    .map_or(String::new(), |h| {
+                        format!(
+                            " | hinge {:.2} of safe, turned {:.2}°",
+                            h.utilization,
+                            h.turn.to_degrees()
+                        )
+                    });
             lines.push(format!(
-                "Tissue {} | {owner} {:?} | size {} | health {} | reserves {:?} | shade {} shortage {}",
+                "Tissue {} | {owner} {:?} | size {} | health {} | reserves {:?} | shade {} shortage {}{hinge}",
                 t.id,
                 t.role,
                 t.size,
@@ -980,6 +1085,43 @@ impl TreeBed {
         }
         f
     }
+}
+
+/// What drawing a tissue needs to know of the bed: its tissues, the trees
+/// that own them, which trees are still seeds, and what each tissue grew from.
+struct Scene<'a> {
+    o: &'a plants::Observation,
+    owners: BTreeMap<u64, &'a Tree>,
+    seeds: BTreeSet<u64>,
+    tissues: BTreeMap<u64, &'a Tissue>,
+    parents: BTreeMap<u64, u64>,
+}
+
+impl<'a> Scene<'a> {
+    fn parent(&self, id: u64) -> Option<&'a Tissue> {
+        self.parents.get(&id).map(|p| self.tissues[p])
+    }
+
+    /// The wood whose body carries a tissue: a wood tissue's own, or the wood
+    /// a needle or cone grows on.
+    fn carrier(&self, t: &Tissue) -> Option<u64> {
+        match t.role {
+            Role::Wood => Some(t.id),
+            Role::Shoot | Role::Cone => self
+                .parent(t.id)
+                .filter(|p| p.role == Role::Wood)
+                .map(|p| p.id),
+            _ => None,
+        }
+    }
+}
+
+/// A branch is a tree's wood beside its trunk.
+fn branch(owners: &BTreeMap<u64, &Tree>, t: &Tissue) -> bool {
+    t.role == Role::Wood
+        && owners
+            .get(&t.organism)
+            .is_some_and(|tree| t.cell[0] != tree.origin[0])
 }
 
 /// A filled oval, upright or lying.

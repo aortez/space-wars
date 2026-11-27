@@ -5324,6 +5324,7 @@ version = "0.1.0"
 dependencies = [
  "engine-common",
  "engine-core",
+ "engine-material",
  "engine-rapier",
  "engine-terrain",
 ]

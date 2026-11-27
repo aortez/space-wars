@@ -23,7 +23,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Garden Lab: up/down chooses a control; Space or gamepad bottom face activates it. Left/right moves the opaque shade. Controls include pause/step, speed, light, nutrients, water, shade, inspection, cutting, fresh planting, tissue limits 1–128 and spread 0–8 cells. Limits apply in place; full supplies do not guarantee affordable growth. R restarts; Esc/Start opens host pause. Green living, amber stressed, grey dead; cyan lines show real connections. A pink outline identifies the selected tissue. Physiology ticks are 1000ms, default viewing is 1x, maximum 16x, run limit 480 ticks. Moss controls place deliberate patches on dirt and a movable rock, turn the rock, break its edge, remove it or scrape a strip; olive moss tolerates the dim room, while darkness and the rock's shaded underside still kill it. Light also cycles to dark. The last control shows the tree bed, a conifer beside grass with its own controls and clock (16x to start, up to 64x, 1200-tick run): its sun shines a little from the left, from overhead or a little from the right, its tree's wood and needles let part of the light through, bids show yellow when won, red when refused and grey when outbid, and a control cuts the selected or lowest branch.",
+    controls_help: "Garden Lab: up/down chooses a control; Space or gamepad bottom face activates it. Left/right moves the opaque shade. Controls include pause/step, speed, light, nutrients, water, shade, inspection, cutting, fresh planting, tissue limits 1–128 and spread 0–8 cells. Limits apply in place; full supplies do not guarantee affordable growth. R restarts; Esc/Start opens host pause. Green living, amber stressed, grey dead; cyan lines show real connections. A pink outline identifies the selected tissue. Physiology ticks are 1000ms, default viewing is 1x, maximum 16x, run limit 480 ticks. Moss controls place deliberate patches on dirt and a movable rock, turn the rock, break its edge, remove it or scrape a strip; olive moss tolerates the dim room, while darkness and the rock's shaded underside still kill it. Light also cycles to dark. The last control shows the tree bed, a conifer beside grass with its own controls and clock (16x to start, up to 64x, 2000-tick run): its sun shines a little from the left, from overhead or a little from the right, its tree's wood and needles let part of the light through, bids show yellow when won, red when refused and grey when outbid, and a control cuts the selected or lowest branch. Physical wood hangs the trees' wood on hinges under gravity while growth waits: light or heavy snow lands on the selected wood or else the lowest branch's tip, and a branch that breaks or is cut falls to the dirt as grey dead wood.",
     create,
 };
 
@@ -188,6 +188,29 @@ impl ClientScenario for GardenLabClientScenario {
             let selected = bed
                 .selection()
                 .and_then(|t| records.iter().find(|v| v["id"] == t.id).cloned());
+            // The wood as bodies: whether it is physical, each living wood
+            // tissue's hinge with its load over its safe limit, its turn in
+            // radians and how far its wood's end has dropped, the snow, and
+            // what has fallen.
+            let hinges: Vec<_> = bed
+                .hinges()
+                .iter()
+                .map(|h| {
+                    serde_json::json!({
+                        "tissue":h.tissue,"cell":h.cell,"utilization":h.utilization,
+                        "turn":h.turn,"droop":h.droop,
+                    })
+                })
+                .collect();
+            let snow = bed.wood.snow.map(|s| {
+                serde_json::json!({
+                    "mass":s.mass,"heavy":s.heavy(),"on":s.on,"fastened":s.fastened,"share":s.share(),
+                })
+            });
+            let wood = serde_json::json!({
+                "physical":bed.wood.physical,"hinges":hinges,"snow":snow,
+                "fallen":bed.wood.fallen.len(),"breaks":bed.wood.breaks,"summary":bed.wood_summary(),
+            });
             serde_json::json!({
                 "tick":bo.tick,"seed":bo.seed,
                 "run_state":if bo.tick >= scenario_garden_lab::TREE_MAX_TICKS { "complete" } else if bed.paused { "lab_paused" } else { "running" },
@@ -202,6 +225,7 @@ impl ClientScenario for GardenLabClientScenario {
                 "intake":bo.ledger.intake,"maintenance":bo.ledger.maintenance,
                 "growth":bo.ledger.growth,"loss":bo.ledger.loss,"unmet":bo.ledger.unmet,
                 "probes":bed.probes,"work":[bed.work.rays,bed.work.footprint_tests,bed.work.collider_records],
+                "wood":wood,
             })
         });
         // Selection walks bed tissue, then standing rock tissue.
@@ -710,5 +734,85 @@ mod tests {
         }
         run(&mut s, 600);
         capture("sapling-in-grass", &s);
+    }
+    #[test]
+    fn garden_render_contract_tree_bed_physical_wood_bends_breaks_and_falls() {
+        let output =
+            std::env::var_os("SPACEWARS_GARDEN_RENDER_ARTIFACTS").map(std::path::PathBuf::from);
+        if let Some(dir) = &output {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        let near = |p: &slint::Rgb8Pixel, c: [u8; 3]| {
+            (i16::from(p.r) - i16::from(c[0])).abs() < 12
+                && (i16::from(p.g) - i16::from(c[1])).abs() < 12
+                && (i16::from(p.b) - i16::from(c[2])).abs() < 12
+        };
+        // Living wood, grey dead wood and snow, at both viewports.
+        let capture = |name: &str, s: &GardenLabState| -> Vec<[usize; 3]> {
+            let frame = GardenLabScenario::render_frame(s);
+            let mut counts = Vec::new();
+            for (w, h) in [(1280.0, 720.0), (800.0, 480.0)] {
+                let viewport = Viewport::new(w, h);
+                let pixels = raster(&frame, viewport);
+                let count = |c: [u8; 3]| pixels.as_slice().iter().filter(|p| near(p, c)).count();
+                counts.push([
+                    count([140, 92, 51]),
+                    count([128, 102, 102]),
+                    count([224, 240, 255]),
+                ]);
+                let export = svg(&frame, viewport);
+                assert!(!export.contains("NaN"));
+                if let Some(dir) = &output {
+                    let stem = format!("tree-{name}-{}x{}", w as u32, h as u32);
+                    write_png(&dir.join(format!("{stem}-raster.png")), &pixels);
+                    std::fs::write(dir.join(format!("{stem}-vector.svg")), &export).unwrap();
+                }
+            }
+            if let Some(dir) = &output {
+                let bed = s.shown_tree_bed().unwrap();
+                let state = serde_json::json!({"simulation_seconds":bed.plants.observe().tick,
+                    "tree":bed.tree_summary(),"wood":bed.wood_summary(),"preview_only":true});
+                std::fs::write(
+                    dir.join(format!("tree-{name}-state.json")),
+                    serde_json::to_vec_pretty(&state).unwrap(),
+                )
+                .unwrap();
+            }
+            counts
+        };
+        let mut s = GardenLabScenario::init((), 42);
+        s.command(Command::TreeBed);
+        let bed = s.tree_bed.as_mut().unwrap();
+        while bed.plants.observe().tick < 600 {
+            bed.tick();
+        }
+        // The bodies move a step for each displayed update.
+        let step = |s: &mut GardenLabState, seconds: f32| {
+            for _ in 0..(seconds * 60.0).round() as u32 {
+                s.advance(std::time::Duration::from_secs_f32(1.0 / 60.0));
+            }
+        };
+        s.command(Command::PhysicalWood);
+        step(&mut s, 8.0);
+        let settled = capture("wood-settled", &s);
+        // Heavy snow bends the lowest branch toward the grass nearly to
+        // breaking within its second of building up, then breaks it away.
+        s.command(Command::HeavySnow);
+        step(&mut s, 0.9);
+        assert_eq!(s.shown_tree_bed().unwrap().wood.breaks, 0);
+        let laden = capture("wood-heavy-snow", &s);
+        step(&mut s, 3.0);
+        assert_eq!(s.shown_tree_bed().unwrap().wood.breaks, 1);
+        let fallen = capture("wood-fallen", &s);
+        for ((settled, laden), fallen) in settled.into_iter().zip(laden).zip(fallen) {
+            let [wood, dead, _] = settled;
+            assert!(laden[2] > 50, "snow invisible: {laden:?}");
+            assert!(fallen[2] > 50, "snow lost: {fallen:?}");
+            assert!(fallen[1] > dead + 100, "fallen wood invisible: {fallen:?}");
+            assert!(
+                fallen[0] < wood,
+                "the branch still drawn living: {fallen:?}"
+            );
+        }
     }
 }

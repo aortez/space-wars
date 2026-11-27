@@ -115,7 +115,7 @@
     },
     {
       "test": "garden_lab::garden_lab_tree_bed_grows_cuts_and_returns_in_both_renderers",
-      "reason": "The tree bed's growth at 64x, a cut branch and the return to the grass bed in both renderers; Garden Lab's headless scenario and client tests, including the tree bed's, stay on PRs."
+      "reason": "The tree bed's growth at 64x, a cut branch, physical wood under snow and the return to the grass bed in both renderers; Garden Lab's headless scenario and client tests, including the tree bed's, stay on PRs."
     },
     {
       "test": "garden_lab::garden_lab_pause_step_and_renderers_smoke",
