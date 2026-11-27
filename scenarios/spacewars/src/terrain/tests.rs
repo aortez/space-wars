@@ -177,6 +177,42 @@ fn a_shot_digs_the_crater_a_shell_did() {
 }
 
 #[test]
+fn a_payload_that_strikes_terrain_digs_a_shells_crater_and_bursts_once() {
+    // A shell falls on the planet's top beside a rock, with a payload and
+    // without.
+    let strike = |blast: Option<Blast>| {
+        let mut state = fixture();
+        let top = state.planets[0].position + Vec2::Y * 60.0;
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            top + Vec2::new(8.0, 10.0),
+            Vec2::ZERO,
+            3.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::WHITE,
+        ));
+        let mut shell =
+            DebrisState::new_shell(0, state.tick, top + Vec2::Y * 20.0, Vec2::Y * -300.0, 0.0);
+        shell.inertial_mass = Some(weapons::ROUND_MASS);
+        shell.blast = blast;
+        state.debris.push(shell);
+        let mut bursts = 0;
+        for _ in 0..30 {
+            step(&mut state);
+            bursts += usize::from(!state.blast_hits.is_empty());
+        }
+        assert_eq!(state.terrain_cannon_hits(), 1, "one crater");
+        assert!(state.physics.shot_ids().is_empty());
+        (state.terrain_removed_cells(), bursts)
+    };
+    let (cells, bursts) = strike(Some(crate::shots::TEST_BLAST));
+    // Its payload bursts once, and reaches the rock, and the crater is the
+    // one a shell digs: the blast digs no more.
+    assert_eq!(bursts, 1);
+    assert_eq!((cells, 0), strike(None));
+}
+
+#[test]
 fn complete_tunnel_passes_lasers_and_a_real_ship_between_both_terrain_bodies() {
     let mut state = fixture();
     let center = state.planets[0].position;

@@ -412,6 +412,23 @@ pub(crate) fn apply_lasers(world: &mut SpacewarsState, pilots: &mut [SurfacePilo
     }
 }
 
+/// Charges a match's pods and pilots on foot what payloads' blasts cost them,
+/// as [`apply_lasers`] charges a beam's, before full-ship deaths change those
+/// vehicles into pods.
+pub(crate) fn apply_blasts(world: &mut SpacewarsState, pilots: &mut [SurfacePilot]) {
+    for pilot in pilots {
+        for (entity, _) in damage_targets(world, pilot) {
+            for index in 0..world.blast_hits.len() {
+                let hit = world.blast_hits[index];
+                // A blast's charge already counts how exposed the target is.
+                if hit.target == entity {
+                    damage_target(world, pilot, entity, hit.health, PilotDamageCause::Missile);
+                }
+            }
+        }
+    }
+}
+
 /// Solver contacts supply actual closing speed; resting support and manifold
 /// duplicates cannot drain health. Consume a missile once on an exposed actor.
 pub(crate) fn apply_contacts(

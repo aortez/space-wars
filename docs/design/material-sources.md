@@ -405,6 +405,34 @@ damage of their own, so a shell whose shot is refused charges nothing.
   flight and 48 parked. A pod there is outside the model and still takes
   nothing.
 
+### Payloads
+
+A shell can carry a payload, though no ship's shell does; the tanks' rounds
+will ([#239](https://github.com/aortez/space-wars/issues/239)). The payload
+bursts by the blast rule ([In the physics world](#in-the-physics-world)) where
+its shot stops, or where its shell dies earlier in the step, such as to a
+laser or on terrain. A shell that leaves the game retires without a burst. A
+blast meets each body a weapon can harm as circles within its collision
+shapes, which `weapon::body_circles` lists: a ball as itself, a capsule as a
+row of balls along it, and a box or other convex polygon as a row of up to 16
+along its long axis, each the widest the shape holds there. The bodies take
+circles only while a payload flies, so lasers and other shells meet them as
+they did.
+
+- A body's share costs it health through its region's `HealthMap`, where a
+  shot's hit is charged. A tank takes it as a round's hit, naming the seat
+  whose round it was. In a match, a pod or a pilot on foot takes it as a
+  missile's hit unless ejection protection covers it.
+- The blast's push carries into the game's own record of each body's motion,
+  so it lasts.
+- Terrain takes the shell's crater and nothing more. Terrain, planets and the
+  sun don't shield what lies behind them from the blast, as terrain doesn't in
+  Scorched.
+- A blast passes shells by, as in Scorched and the Clock: a shell beside a
+  burst flies on, neither charged nor pushed.
+- A shell whose payload bursts is spent and leaves no breakup fragment.
+- Combat telemetry counts a shell's hit and not a blast's.
+
 ### Lasers as beams
 
 Each ship's laser is a `Weapons` beam. Each tick a laser shines, it fires one

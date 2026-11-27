@@ -73,7 +73,7 @@ The weapons:
 
 | Game | Weapon | How it delivers | Details |
 | --- | --- | --- | --- |
-| Spacewars | cannon shell | a `Weapons` shot that stops on the body its strongest contact pushed and charges that body's region | [cannon shells as shots](material-sources.md#cannon-shells-as-shots) |
+| Spacewars | cannon shell | a `Weapons` shot that stops on the body its strongest contact pushed and charges that body's region. A payload, which only the tanks' rounds will carry, bursts where the shot stops or its shell dies, over the bodies near it | [cannon shells as shots](material-sources.md#cannon-shells-as-shots), [payloads](material-sources.md#payloads) |
 | Spacewars | laser | a `Weapons` beam. Each tick's pulse carries 8,950 divided by how far the beam has grown, and a body takes the share its thickness spans of the beam's height of 2 | [lasers as beams](material-sources.md#lasers-as-beams) |
 | Scorched and Clock | shell | swept by ray each step. Its hit is a mass of 7 at its speed, and its payload of 28,000 bursts over the tanks within 5 units of their surface | [Scorched tanks](material-sources.md#scorched-tanks), [armor and shells](../scorched-earth.md#armor-and-shells) |
 

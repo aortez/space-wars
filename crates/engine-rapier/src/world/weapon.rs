@@ -30,6 +30,9 @@ use engine_material::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
+mod circles;
+pub use circles::body_circles;
+
 /// Something a weapon's energy can reach.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Recipient {

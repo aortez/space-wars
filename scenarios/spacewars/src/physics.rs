@@ -373,7 +373,6 @@ impl SpacewarsPhysics {
     }
 
     /// The physics ids of the shells that shots carry now.
-    #[cfg(test)]
     pub(super) fn shot_ids(&self) -> Vec<u64> {
         self.weapons.shots().map(|(id, _)| id).collect()
     }
@@ -420,18 +419,22 @@ impl SpacewarsPhysics {
         self.weapons.take_events()
     }
 
-    /// Retires the live shots that `done` picks by id, with their bodies.
-    pub(super) fn retire_shots(&mut self, mut done: impl FnMut(u64) -> bool) {
-        let ids: Vec<u64> = self
-            .weapons
-            .shots()
-            .map(|(id, _)| id)
-            .filter(|id| done(*id))
-            .collect();
-        for id in ids {
-            let _ = self.weapons.retire(&mut self.world, id);
+    /// Ends the live shots in `ended` by id, with their bodies, and returns
+    /// what they did. A shot marked to burst releases its blast where it is,
+    /// and the rest retire without one.
+    pub(super) fn end_shots(
+        &mut self,
+        ended: &[(u64, bool)],
+        recipients: &mut impl Recipients,
+    ) -> Vec<WeaponEvent> {
+        for &(id, burst) in ended {
+            let _ = if burst {
+                self.weapons.detonate(&mut self.world, id, recipients)
+            } else {
+                self.weapons.retire(&mut self.world, id)
+            };
         }
-        self.weapons.take_events();
+        self.weapons.take_events()
     }
 
     #[cfg(feature = "sensor-profile")]
