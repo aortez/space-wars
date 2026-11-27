@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crow flock matrix</title>
+<style>
+:root{color-scheme:light dark;--bg:#f4f4f2;--fg:#1d1d1b;--muted:#5d5d58;--line:#c9c9c3}
+@media (prefers-color-scheme:dark){:root{--bg:#161615;--fg:#ececea;--muted:#a3a39d;--line:#3b3b38}}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}p{margin:0 0 12px;color:var(--muted);max-width:72ch}
+#bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+#seek{flex:1;min-width:160px}#time{font-variant-numeric:tabular-nums;min-width:5ch}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+figure{margin:0;border:1px solid var(--line);border-radius:6px;padding:6px}
+img{display:block;width:100%;height:auto;background:#000}
+figcaption{margin-top:4px;font-size:12px;color:var(--muted)}figcaption b{color:var(--fg);font-weight:600}
+#error{color:#c0392b}
+</style>
+<h1>Crow flock matrix</h1>
+<p>Frames from the native Rust simulation and raster renderer, 15 a second, every case from the same moment of its visit: one to four crows on a landscape and a portrait face; a flock on each other font, the Serif one in 12-hour time with the date on (the live client's text overlay draws the date line, so these frames show the room the face leaves for it, not its text); flocks of shy and of hardy crows in Heavy Rain from 3 s; a flock beside the water a shower left; a flock whose face turns to 11:11 at 10 s; and a flock under Falling from 9 s.</p>
+<div id="bar"><button id="play">Pause</button><select id="speed"><option value="1">1×</option><option value="0.5">½×</option><option value="0.25">¼×</option></select><input id="seek" type="range" min="0" value="0"><span id="time">0.00 s</span></div>
+<div id="error"></div><div id="grid"></div>
+<script>
+const $=id=>document.getElementById(id),FPS=15;let cases=[],frame=-1,seconds=0,playing=true,last=null;
+function summary(crows){if(!crows.length)return'no crows';const n={};for(const[,p]of crows)n[p]=(n[p]||0)+1;return`${crows.length} crow${crows.length>1?'s':''}: `+Object.entries(n).map(([p,k])=>`${k} ${p}`).join(', ');}
+function show(){const end=Math.max(...cases.map(c=>c.samples.length))-1,i=Math.min(end,Math.round(seconds*FPS));if(i===frame)return;frame=i;for(const c of cases){const j=Math.min(i,c.samples.length-1),f=n=>`${c.name}/frame-${String(n).padStart(4,'0')}.png`;c.img.src=f(j);c.text.textContent=summary(c.samples[j]);for(let a=1;a<=2&&j+a<c.samples.length;a++)new Image().src=f(j+a);}$('seek').max=end;$('seek').value=i;$('time').textContent=(i/FPS).toFixed(2)+' s';}
+function animate(now){if(playing&&last!==null){seconds+=(now-last)/1000*Number($('speed').value);const end=(Math.max(...cases.map(c=>c.samples.length))-1)/FPS;if(seconds>end)seconds=0;}last=now;show();requestAnimationFrame(animate);}
+$('play').onclick=()=>{playing=!playing;$('play').textContent=playing?'Pause':'Play';};
+$('seek').oninput=e=>{seconds=Number(e.target.value)/FPS;playing=false;$('play').textContent='Play';show();};
+fetch('manifest.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(`manifest.json: ${r.status}`);return r.json();}).then(data=>{cases=data;for(const c of cases){const fig=document.createElement('figure'),cap=document.createElement('figcaption'),name=document.createElement('b');c.img=document.createElement('img');c.img.alt=`${c.name} at the current time`;c.img.width=c.width;c.img.height=c.height;c.text=document.createElement('span');name.textContent=c.name+' ';cap.append(name,c.text);fig.append(c.img,cap);$('grid').append(fig);}requestAnimationFrame(animate);}).catch(e=>{$('error').textContent=`Could not load the captures: ${e.message}. Serve this directory over HTTP.`;});
+</script>
+</html>

@@ -7,6 +7,7 @@ use engine_common::{ClockEventKind, ClockEventProfile, Scenario};
 use scenario_clock::{ClockAction, ClockConfig, ClockReading, ClockScenario};
 use std::time::Duration;
 
+mod flock;
 mod ground;
 
 #[test]

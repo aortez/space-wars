@@ -227,7 +227,7 @@ impl ClientScenario for ClockClientScenario {
             let scripted = if dt.is_zero() {
                 Vec::new()
             } else {
-                driver.next_actions()
+                driver.next_actions(&mut self.state)
             };
             return ClockScenario::step(&mut self.state, &scripted, dt);
         }

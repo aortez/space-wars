@@ -11,7 +11,7 @@ bench_warmup=2
 bench_width=1024
 bench_height=768
 bench_scales=1,2
-bench_cases=idle,falling,color-cycle,meltdown,duck,marquee,digit-slide,rain,aquarium,grass,residents,spider,tanks
+bench_cases=idle,falling,color-cycle,meltdown,duck,marquee,digit-slide,rain,aquarium,grass,residents,spider,tanks,crow,flock,rain-crow,rain-flock
 bench_renderer=raster
 bench_recipe=clock-wave
 bench_seed=7
@@ -40,7 +40,7 @@ usage() {
         '  --width N         Logical viewport width (default: 1024)' \
         '  --height N        Logical viewport height (default: 768)' \
         '  --scales LIST     Comma-separated raster scales (default: 1,2)' \
-        '  --cases LIST      Comma-separated case IDs (default: all thirteen)' \
+        '  --cases LIST      Comma-separated case IDs (default: all seventeen)' \
         '  --renderer NAME   raster or vector (default: raster)' \
         '  --recipe NAME     Fixed Marquee recipe (default: clock-wave)' \
         '  --seed N          Fixed seed (default: 7)' \
@@ -93,7 +93,7 @@ for bench_scale in "${bench_scale_list[@]}"; do
 done
 for bench_case in "${bench_case_list[@]}"; do
     case "$bench_case" in
-        idle|falling|color-cycle|meltdown|duck|marquee|digit-slide|rain|aquarium|grass|residents|spider|tanks) ;;
+        idle|falling|color-cycle|meltdown|duck|marquee|digit-slide|rain|aquarium|grass|residents|spider|tanks|crow|flock|rain-crow|rain-flock) ;;
         *) printf 'Unknown case: %s\n' "$bench_case" >&2; exit 2 ;;
     esac
     if [[ -n "${bench_seen_cases[$bench_case]:-}" ]]; then

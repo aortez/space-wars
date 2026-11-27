@@ -387,7 +387,7 @@ enum HostCommand {
     /// Run the existing deterministic Clock fixture visibly, without changing saved settings.
     /// Requires an active Clock; restarts the fixture at 08:08. Normal restart exits it.
     ClockBenchmark {
-        #[arg(value_parser = ["idle", "rain", "aquarium"])]
+        #[arg(value_parser = ["idle", "rain", "aquarium", "crow", "flock", "rain-crow", "rain-flock"])]
         fixture: String,
         /// The fixture's theme; turning changes between Christmas and Normal,
         /// fading on every frame.
@@ -1010,7 +1010,15 @@ mod tests {
 
     #[test]
     fn parses_only_explicit_clock_benchmark_fixtures_and_themes() {
-        for expected in ["idle", "rain", "aquarium"] {
+        for expected in [
+            "idle",
+            "rain",
+            "aquarium",
+            "crow",
+            "flock",
+            "rain-crow",
+            "rain-flock",
+        ] {
             let args = Args::try_parse_from([
                 "spacewars-cli",
                 "host",
