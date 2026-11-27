@@ -21,7 +21,7 @@ mod render;
 mod scene;
 mod shell;
 mod split;
-pub use branch::{Branch, Placement};
+pub use branch::{BEND_CHECKPOINT_STEP, Branch, Placement};
 pub use pair::{Pair, PairBody};
 pub use render::controls as render_controls;
 pub use shell::{Shell, ShellStage, Tuft};
@@ -61,6 +61,7 @@ pub enum Case {
     RegionSplit,
     BranchFailure,
     ShellThroughMoss,
+    BranchBends,
 }
 /// Initial condition of one free body along the +x contact normal.
 #[derive(Clone, Copy)]
@@ -73,7 +74,7 @@ pub(crate) struct BodySetup {
     pub velocity: f32,
 }
 impl Case {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::Elastic,
         Self::PlasticReturn,
         Self::Support,
@@ -86,6 +87,7 @@ impl Case {
         Self::RegionSplit,
         Self::BranchFailure,
         Self::ShellThroughMoss,
+        Self::BranchBends,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -101,6 +103,21 @@ impl Case {
             Self::RegionSplit => "Wood split & rebuilt",
             Self::BranchFailure => "Branch gives way",
             Self::ShellThroughMoss => "Shell through moss",
+            Self::BranchBends => "Branch bends",
+        }
+    }
+    /// The two branch cases: one welded, one on a hinge that bends.
+    pub fn is_branch(self) -> bool {
+        matches!(self, Self::BranchFailure | Self::BranchBends)
+    }
+    /// Physical time one step advances. The lab steps in slow motion, about
+    /// 68 times slower than real time, but the bending branch only four times
+    /// slower, so that it swings at a pace one can follow.
+    pub fn dt(self) -> f32 {
+        if self == Self::BranchBends {
+            branch::BEND_DT
+        } else {
+            PHYSICS_DT
         }
     }
     /// The two free bodies of a paired collision, incoming body first. Both
@@ -150,6 +167,7 @@ impl Case {
             Self::RegionSplit => (0.0, split::GAP, 174),
             Self::BranchFailure => (Load::Light.weight(), 0.0, 1024),
             Self::ShellThroughMoss => (0.0, 0.0, shell::WINDOW),
+            Self::BranchBends => (Load::Released.weight(), 0.0, branch::BEND_WINDOW),
         }
     }
     pub fn next(self) -> Self {
@@ -238,7 +256,7 @@ pub struct MaterialLabState {
     pub stopped: Option<String>,
     load_changes: Vec<LoadChange>,
     progress: split::Progress,
-    /// The step that severed the branch case's weld.
+    /// The step that severed a branch case's weld or hinge.
     severed_at: Option<u32>,
     /// The shell case's weapon source and the moss it reaches.
     range: Option<shell::Range>,
@@ -272,7 +290,7 @@ impl MaterialLabState {
                 ..Default::default()
             })
     }
-    /// Remaining capacity of the support's material, or of the branch's weld.
+    /// Remaining capacity of the support's material, or of the branch's joint.
     pub fn remaining(&self) -> f64 {
         if let Some(branch) = self.branch() {
             return branch.remaining;
@@ -303,7 +321,7 @@ impl MaterialLabState {
     pub fn paired_failure(&self) -> Option<PairedCompressionFailure> {
         self.world.material_paired_compression_failure()
     }
-    /// A support, a layer or the branch's weld has failed.
+    /// A support, a layer or the branch's joint has failed.
     pub fn collapsed(&self) -> bool {
         self.failure().is_some() || self.paired_failure().is_some() || self.severed_at.is_some()
     }
@@ -311,23 +329,18 @@ impl MaterialLabState {
     /// summary.
     pub fn elapsed(&self) -> f64 {
         if self.ordinary() {
-            f64::from(self.steps) * f64::from(PHYSICS_DT)
+            f64::from(self.steps) * f64::from(self.case.dt())
         } else {
             self.summary().elapsed
         }
     }
     /// The split, branch and shell cases run on ordinary steps.
     fn ordinary(&self) -> bool {
-        [
-            Case::RegionSplit,
-            Case::BranchFailure,
-            Case::ShellThroughMoss,
-        ]
-        .contains(&self.case)
+        self.case.is_branch() || [Case::RegionSplit, Case::ShellThroughMoss].contains(&self.case)
     }
     /// The platen's weight, or the weight's load on the branch.
     pub fn weight(&self) -> f32 {
-        if self.case == Case::BranchFailure {
+        if self.case.is_branch() {
             return self.branch_weight();
         }
         -self.world.gravity().y * 20.0
@@ -357,7 +370,7 @@ impl MaterialLabState {
         if self.steps == 0 {
             return Err("Start the run or single step before changing the load.".into());
         }
-        if self.case == Case::BranchFailure {
+        if self.case.is_branch() {
             return self.set_branch_load(load);
         }
         let changed = self.weight() != load.weight();
@@ -382,7 +395,7 @@ impl MaterialLabState {
         if self.case == Case::RegionSplit {
             return self.stopped.is_none().then(|| self.split_guidance());
         }
-        if self.case == Case::BranchFailure {
+        if self.case.is_branch() {
             return self.stopped.is_none().then(|| self.branch_guidance());
         }
         if self.case == Case::ShellThroughMoss {
@@ -431,7 +444,7 @@ impl MaterialLabState {
                 Phase::Separated
             };
         }
-        if self.case == Case::BranchFailure {
+        if self.case.is_branch() {
             return self.branch_phase();
         }
         if self.case == Case::ShellThroughMoss {
@@ -467,7 +480,7 @@ impl MaterialLabState {
         if self.case == Case::RegionSplit {
             return self.advance_split();
         }
-        if self.case == Case::BranchFailure {
+        if self.case.is_branch() {
             return self.advance_branch();
         }
         if self.case == Case::ShellThroughMoss {
@@ -574,10 +587,11 @@ impl MaterialLabState {
         };
         // Fixed-load cases have no command list in their save envelope.
         let plain = self.load_changes.is_empty()
-            && ![Case::LoadRelease, Case::BranchFailure].contains(&self.case);
+            && self.case != Case::LoadRelease
+            && !self.case.is_branch();
         let mut bytes = if self.case == Case::ShellThroughMoss {
             SHELL_SAVE_MAGIC
-        } else if self.case == Case::BranchFailure {
+        } else if self.case.is_branch() {
             BRANCH_SAVE_MAGIC
         } else if self.case == Case::RegionSplit {
             SPLIT_SAVE_MAGIC

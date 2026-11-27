@@ -31,6 +31,7 @@ pub(crate) use clearance::{SolidDependency, SolidObstacles};
 mod connection;
 pub use connection::{
     ConnectionFailure, ConnectionLoadSample, ConnectionRejection, ConnectionSpec, ConnectionState,
+    hinge_stiffness,
 };
 #[cfg(feature = "query-diagnostics")]
 mod connectivity;
@@ -3956,6 +3957,7 @@ pub(crate) fn from_rapier(value: Vector) -> Vec2 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    mod bending;
     mod carry;
     mod cloning;
     mod compound;
