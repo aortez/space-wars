@@ -27,7 +27,7 @@ pub fn combat_tanks(state: &ScorchedState) -> [CombatTank; 2] {
             .position
             .x;
         let toward = if other_x >= x { 1.0 } else { -1.0 };
-        let (pivot, muzzle) = state.muzzle(player);
+        let Barrel { pivot, muzzle } = state.barrel(player);
         CombatTank {
             drive: snapshot(state, player, toward),
             away_ground: state.check_drive_direction(player, -toward),

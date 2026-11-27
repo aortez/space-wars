@@ -212,8 +212,8 @@ fn target_motion_and_obstructions_are_not_power_brackets() {
 #[test]
 fn off_arena_shot_reports_a_terminal_observation_and_unblocks_firing() {
     let mut state = flat(GrainShape::Round, CpuPolicy::Calibrated);
-    state.tanks[0].elevation = 5.0_f32.to_radians();
-    state.tanks[0].speed = 48.0;
+    state.tanks[0].elevation = cannon::MIN_ELEVATION;
+    state.tanks[0].speed = cannon::MAX_POWER;
     state.tanks[0].facing = -1.0;
     state.fire(0);
     state.tanks[0].next_shot = u64::MAX;

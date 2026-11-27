@@ -27,14 +27,16 @@ pub(super) fn terrain() -> Terrain {
 impl Duel {
     pub(super) fn aim_at_roof(&mut self, physics: &mut PhysicsWorld) {
         self.tanks[1].elevation = 65.0_f32.to_radians();
-        let (_, muzzle) = self.muzzle(physics, 1);
+        let muzzle = self.barrel(physics, 1).muzzle;
         let target = Vec2::new(-4.0, 8.0);
         let dx = (muzzle.x - target.x).abs();
         let dy = target.y - muzzle.y;
         let angle = self.tanks[1].elevation;
         let denominator = 2.0 * angle.cos().powi(2) * (dx * angle.tan() - dy);
         if denominator > 0.0 {
-            self.tanks[1].speed = (GRAVITY * dx * dx / denominator).sqrt().clamp(12.0, 48.0);
+            self.tanks[1].speed = (GRAVITY * dx * dx / denominator)
+                .sqrt()
+                .clamp(cannon::MIN_POWER, cannon::MAX_POWER);
         }
     }
     pub(super) fn advance_roof(&mut self, physics: &mut PhysicsWorld) {

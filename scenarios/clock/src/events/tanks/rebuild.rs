@@ -49,8 +49,8 @@ const WATCHED: f64 = 0.5;
 /// Earth: one that bursts this near the tank's place scatters the dirt.
 pub const SCATTER_REACH: f32 = 5.0;
 /// How far the turret's pivot stands above the middle of the hull, in the
-/// duel's units, where Scorched Earth turns the barrel.
-pub const PIVOT: f32 = 0.85;
+/// duel's units, where the tanks' shared cannon turns the barrel.
+pub const PIVOT: f32 = engine_rapier::cannon::PIVOT_HEIGHT;
 /// Half the tank's width over its wheels, and how far its wheels reach below
 /// the middle of its hull and its hull above it, in the duel's units.
 pub const TANK_HALF_WIDTH: f32 = 1.85;

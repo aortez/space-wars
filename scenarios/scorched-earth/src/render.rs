@@ -258,7 +258,7 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
                 );
             }
         }
-        let (pivot, muzzle) = state.muzzle(i);
+        let Barrel { pivot, muzzle } = state.barrel(i);
         circle(&mut frame, pivot, 0.7, color);
         line(&mut frame, pivot, muzzle, color, 5.0);
         text(

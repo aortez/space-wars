@@ -109,10 +109,11 @@ impl Duel {
             0.8
         };
         let y = first[1] + grade * (site.x - first[0]);
-        let pivot =
-            Vec2::new(site.x, y + clearance * pitch.cos()) + Vec2::Y.rotate_radians(pitch) * 0.85;
         let facing = (Geometry::read(self, physics, player).target.x - site.x).signum();
-        let barrel = Vec2::new(facing * elevation.cos(), elevation.sin()) * 2.8;
+        let direction = cannon::direction(elevation, facing, Vec2::Y);
+        let origin = Vec2::new(site.x, y + clearance * pitch.cos());
+        let pivot = Barrel::new(origin, pitch, direction).pivot;
+        let barrel = direction * cannon::BARREL_LENGTH;
         if self
             .cast_ray(
                 physics,

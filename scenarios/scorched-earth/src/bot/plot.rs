@@ -202,10 +202,10 @@ impl Plot {
         elevation: f32,
         casts: &mut u32,
     ) -> Result<Trace, &'static str> {
-        let (pivot, muzzle, direction) = barrel(self.shooter, self.facing, elevation);
+        let (Barrel { pivot, muzzle }, direction) = barrel(self.shooter, self.facing, elevation);
         let power = firing_power(muzzle, direction, self.shooter.velocity, self.target)
             .ok_or("unreachable")?
-            .clamp(12.0, state.placement.max_power());
+            .clamp(cannon::MIN_POWER, state.placement.max_power());
         *casts += 1;
         // As in `fire`, the barrel cannot reach through the ground or a tank.
         if state
@@ -256,14 +256,14 @@ impl Plot {
     /// The direction the reaching arc leaves the barrel in.
     pub(crate) fn direction(&self) -> Option<Vec2> {
         let arc = self.reaching()?;
-        Some(barrel(self.shooter, self.facing, arc.elevation).2)
+        Some(barrel(self.shooter, self.facing, arc.elevation).1)
     }
 
     /// How long the reaching arc's shell flies until it bursts, in ticks.
     /// Its speed across is constant, so it reaches where it bursts then.
     pub(crate) fn flight_ticks(&self) -> Option<u32> {
         let arc = self.reaching()?;
-        let (_, muzzle, direction) = barrel(self.shooter, self.facing, arc.elevation);
+        let (Barrel { muzzle, .. }, direction) = barrel(self.shooter, self.facing, arc.elevation);
         let across = direction.x * arc.power + self.shooter.velocity.x;
         let ticks = ((arc.end.x - muzzle.x) / across / DT).ceil();
         Some(if ticks.is_finite() {
@@ -284,12 +284,11 @@ impl Plot {
     }
 }
 
-/// The barrel's pivot and muzzle at `elevation` from `pose`, and its direction,
-/// as `Duel::muzzle` places them.
-fn barrel(pose: Pose, facing: f32, elevation: f32) -> (Vec2, Vec2, Vec2) {
-    let direction = Vec2::new(facing * elevation.cos(), elevation.sin());
-    let pivot = pose.position + Vec2::Y.rotate_radians(pose.angle) * 0.85;
-    (pivot, pivot + direction * 2.8, direction)
+/// The barrel at `elevation` from `pose`, as `Duel::barrel` places it, and the
+/// direction it points.
+fn barrel(pose: Pose, facing: f32, elevation: f32) -> (Barrel, Vec2) {
+    let direction = cannon::direction(elevation, facing, Vec2::Y);
+    (Barrel::new(pose.position, pose.angle, direction), direction)
 }
 
 /// The launch speed along `direction` whose arc from `muzzle` passes through
@@ -421,13 +420,13 @@ impl Duel {
             angle: motion.angle,
             velocity: motion.linear_velocity,
         };
-        let (_, muzzle, direction) = barrel(pose, facing, arc.elevation);
+        let (Barrel { muzzle, .. }, direction) = barrel(pose, facing, arc.elevation);
         let tank = &mut self.tanks[player];
         tank.facing = facing;
         tank.elevation = arc.elevation;
         tank.speed = firing_power(muzzle, direction, pose.velocity, target)
             .map_or(arc.power, |power| {
-                power.clamp(12.0, self.placement.max_power())
+                power.clamp(cannon::MIN_POWER, self.placement.max_power())
             });
     }
 }
@@ -446,7 +445,9 @@ impl Duel {
         plot: &Plot,
     ) -> Option<u64> {
         let arc = plot.reaching()?;
-        if self.retired[player].is_some() || self.shells.len() >= MAX_SHELLS {
+        if self.retired[player].is_some()
+            || cannon::room(self.shells_of(player), self.shells.len()).is_err()
+        {
             return None;
         }
         let motion = self.motion(physics, self.tanks[player].body)?;
@@ -455,10 +456,10 @@ impl Duel {
             angle: motion.angle,
             velocity: motion.linear_velocity,
         };
-        let (_, muzzle, direction) = barrel(pose, plot.facing, arc.elevation);
+        let (Barrel { muzzle, .. }, direction) = barrel(pose, plot.facing, arc.elevation);
         let speed = firing_power(muzzle, direction, pose.velocity, plot.target)
             .map_or(arc.power, |power| {
-                power.clamp(12.0, self.placement.max_power())
+                power.clamp(cannon::MIN_POWER, self.placement.max_power())
             });
         let tank = &mut self.tanks[player];
         tank.facing = plot.facing;
