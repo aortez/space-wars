@@ -242,10 +242,37 @@ fn a_blast_bound_inside_a_target_starts_just_past_its_edge() {
     // From there the wheel no longer takes every direction, and the hull
     // takes a share of the rest.
     let reaches = blast_reach(moved, 10.0, 1.0, &[wheel, hull]).unwrap();
-    assert!(coupling(&reaches, 1) < 0.6);
+    assert!((0.45..0.5).contains(&coupling(&reaches, 1)));
     assert!(coupling(&reaches, 2) > 0.0);
     let centered = blast_center(ORIGIN, &[wheel]);
     assert!(centered.x == 0.0 && close(centered.y, 0.5 * 1.001));
+}
+
+/// Whether any of `targets` holds `point`.
+fn held(point: Vec2, targets: &[Target]) -> bool {
+    targets
+        .iter()
+        .any(|target| point.distance_to(target.center) <= target.radius)
+}
+
+#[test]
+fn a_blast_bound_inside_overlapping_targets_starts_outside_them_all() {
+    // A hull of three overlapping circles. Straight out of the first from a
+    // point it shares with the second lands inside the second, and straight
+    // out of the second lands back inside the first.
+    let hull = [-1.1, 0.0, 1.1].map(|x| target(1, x, 0.0, 0.7, 1.0));
+    let bound = Vec2::new(-0.5, 0.0);
+    let moved = blast_center(bound, &hull);
+    assert!(!held(moved, &hull), "{moved:?}");
+    // It leaves through the nearest edge, the hull's side rather than an end.
+    assert!(moved.distance_to(bound) < 0.75, "{moved:?}");
+    // Two bodies that touch hold a center in the crevice between them, which
+    // it leaves where their edges cross.
+    let pair = [target(1, 0.0, 0.0, 2.0, 1.0), target(2, 2.4, 0.0, 0.5, 1.0)];
+    let crevice = Vec2::new(1.95, 0.0);
+    let moved = blast_center(crevice, &pair);
+    assert!(!held(moved, &pair), "{moved:?}");
+    assert!(moved.distance_to(crevice) < 0.6, "{moved:?}");
 }
 
 #[test]

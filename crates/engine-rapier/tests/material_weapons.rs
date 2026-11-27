@@ -652,18 +652,69 @@ fn a_blast_bound_inside_a_body_starts_just_outside_it() {
     weapons.launch(&world, spec(SHOT, Some(PAYLOAD))).unwrap();
     weapons.detonate(&mut world, SHOT, &mut field).unwrap();
     let events = weapons.take_events();
-    let center = events
-        .iter()
-        .find_map(|event| match event {
-            WeaponEvent::Burst { center, .. } => Some(*center),
-            _ => None,
-        })
-        .unwrap();
+    let center = burst_center(&events);
     assert!((center - Vec2::new(6.4 - 0.5 * 1.001, 0.0)).length() < 1.0e-5);
     // From just outside, the ball fills nearly half the directions rather
     // than all of them.
     let blast = delivered(&events, Part::Payload, ball);
     assert!((0.4..0.5).contains(&(blast[0].ledger.available / PAYLOAD.energy)));
+}
+
+/// Where the one blast among `events` started.
+fn burst_center(events: &[WeaponEvent]) -> Vec2 {
+    let centers: Vec<Vec2> = events
+        .iter()
+        .filter_map(|event| match event {
+            WeaponEvent::Burst { center, .. } => Some(*center),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(centers.len(), 1, "{events:?}");
+    centers[0]
+}
+
+/// Each push among `events`: the recipient whose share paid, and what it paid.
+fn pushes(events: &[WeaponEvent]) -> Vec<(Recipient, f32)> {
+    events
+        .iter()
+        .filter_map(|event| match event {
+            WeaponEvent::Pushed {
+                recipient, energy, ..
+            } => Some((*recipient, *energy)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// A dynamic ball of `entity` at `at`, of `radius` and `mass`.
+fn ball(world: &mut PhysicsWorld, entity: u64, at: Vec2, radius: f32, mass: f32) -> BodyId {
+    assert!(world.insert_body(
+        body(entity),
+        BodySpec {
+            position: at,
+            can_sleep: false,
+            ..Default::default()
+        },
+        &[ColliderSpec {
+            density: mass / (std::f32::consts::PI * radius * radius),
+            ..ColliderSpec::ball(collider(entity, 0), radius)
+        }],
+    ));
+    body(entity)
+}
+
+/// Holds a shot at `at` and bursts it with `blast`, returning the events.
+fn burst_at(
+    world: &mut PhysicsWorld,
+    field: &mut Field,
+    at: Vec2,
+    blast: Blast,
+) -> Vec<WeaponEvent> {
+    let mut weapons = Weapons::new();
+    shot_body(world, SHOT, at, Vec2::ZERO);
+    weapons.launch(world, spec(SHOT, Some(blast))).unwrap();
+    weapons.detonate(world, SHOT, field).unwrap();
+    weapons.take_events()
 }
 
 /// A ball of `kind` and `mass` at x = 6.5, whose armor the host keeps, and a
@@ -746,10 +797,170 @@ fn a_blasts_push_on_a_body_is_paid_from_its_share_first() {
     assert!(close(f64::from(paid.unwrap()), share));
     assert!((velocity - whole * (share / cost).sqrt() as f32).length() < 1.0e-4);
     assert!(close(armor, 0.0));
-    // A fixed ball can't move, so its armor takes its whole share.
-    let (velocity, _, paid, armor, share) = pushed(BodyKind::Fixed, 2.0);
-    assert_eq!((velocity, paid), (Vec2::ZERO, None));
+    // A fixed ball can't move, so its share pays for no push and its armor
+    // takes all of it.
+    let (_, _, paid, armor, share) = pushed(BodyKind::Fixed, 2.0);
+    assert_eq!(paid, None);
     assert!(close(armor, share));
+}
+
+#[test]
+fn a_blast_pushes_a_body_once_however_many_of_its_regions_take_shares() {
+    let at = Vec2::new(6.5, 0.0);
+    let mut world = world();
+    ball(&mut world, BALL, at, 0.5, 2.0);
+    // The ball carries two regions, one for each half, and the material
+    // response keeps both.
+    let halves = [0, 1].map(|part| {
+        let token = world
+            .create_loading_region(
+                RegionId {
+                    entity: PhysicsId::new(BALL),
+                    part,
+                },
+                body(BALL),
+            )
+            .unwrap();
+        world
+            .register_loading_material(token, armor(), PLATE_SECTION)
+            .unwrap();
+        Recipient::Region(token)
+    });
+    let ends = [Vec2::new(0.0, 0.25), Vec2::new(0.0, -0.25)].map(|offset| at + offset);
+    let mut field = Field::new(&[])
+        .with_circle(halves[0], ends[0], 0.25)
+        .with_circle(halves[1], ends[1], 0.25);
+    let blast = Blast {
+        push: Some(PUSH),
+        ..PAYLOAD
+    };
+    let events = burst_at(&mut world, &mut field, Vec2::new(5.0, 0.0), blast);
+    // 1.5 from the blast, the push changes the ball's velocity by 3, and the
+    // first half's share pays for it.
+    let cost = 0.5 * world.body_mass(body(BALL)).unwrap() * 9.0;
+    let paid = pushes(&events);
+    assert_eq!(paid.len(), 1, "{paid:?}");
+    assert_eq!(paid[0].0, halves[0]);
+    assert!((paid[0].1 - cost).abs() < 1.0e-3, "{paid:?}");
+    let velocity = world.motion(body(BALL)).unwrap().linear_velocity;
+    assert!(
+        (velocity - Vec2::new(3.0, 0.0)).length() < 1.0e-4,
+        "{velocity:?}"
+    );
+    // The first half takes the rest of its share and the second all of its.
+    let targets = [0, 1].map(|key| Target {
+        key,
+        center: ends[key as usize],
+        radius: 0.25,
+        thickness: 1.0,
+    });
+    let reach = blast_reach(Vec2::new(5.0, 0.0), 6.0, 1.0, &targets).unwrap();
+    for (half, paid) in halves.into_iter().zip([f64::from(cost), 0.0]) {
+        let key = token(half).id.part as u64;
+        let share = f64::from(reach.iter().find(|r| r.key == key).unwrap().coupling) * 5000.0;
+        let charged = delivered(&events, Part::Payload, half);
+        assert!(close(f64::from(charged[0].ledger.available), share - paid));
+    }
+}
+
+#[test]
+fn a_blast_leaves_pushing_protected_and_unmodeled_bodies_to_the_host() {
+    let mut world = world();
+    let mut field = Field::new(&[]);
+    // A ball whose armor the host shields, and one outside the model, each
+    // light and 1.5 from the blast.
+    let (shielded_at, unmodeled_at) = (Vec2::new(6.5, 0.0), Vec2::new(3.5, 0.0));
+    ball(&mut world, BALL, shielded_at, 0.5, 2.0);
+    let rover = ball(&mut world, ROVER, unmodeled_at, 0.5, 2.0);
+    let entity = PhysicsId::new(BALL);
+    field.bodies.insert(BALL_HULL, (entity, armor()));
+    let shielded = Recipient::Body {
+        key: BALL_HULL,
+        entity,
+    };
+    field.shielded.push(shielded);
+    let unmodeled = Recipient::Unmodeled(rover);
+    let mut field =
+        field
+            .with_circle(shielded, shielded_at, 0.5)
+            .with_circle(unmodeled, unmodeled_at, 0.5);
+    let blast = Blast {
+        push: Some(PUSH),
+        ..PAYLOAD
+    };
+    let events = burst_at(&mut world, &mut field, Vec2::new(5.0, 0.0), blast);
+    assert!(pushes(&events).is_empty(), "{events:?}");
+    for (recipient, reason) in [
+        (shielded, Exclusion::Protected),
+        (unmodeled, Exclusion::Unmodeled),
+    ] {
+        assert!(events.iter().any(|event| matches!(
+            event,
+            WeaponEvent::Excluded { recipient: r, reason: why, part: Part::Payload, .. }
+                if *r == recipient && *why == reason
+        )));
+        let velocity = world.motion(body_of(recipient)).unwrap().linear_velocity;
+        assert_eq!(velocity, Vec2::ZERO);
+    }
+}
+
+#[test]
+fn a_blast_bound_inside_tissue_starts_where_it_was_bound() {
+    let mut world = world();
+    // A blade at x = 5 holds the shot's center, and a blast passes tissue as
+    // a shot does rather than moving out of it.
+    let mut field = Field::new(&[5.0]);
+    let at = Vec2::new(5.05, 0.0);
+    let events = burst_at(&mut world, &mut field, at, PAYLOAD);
+    assert!(burst_center(&events).distance_to(at) < 1.0e-6);
+}
+
+#[test]
+fn a_blast_that_moves_out_of_a_body_reaches_what_lies_near_its_new_start() {
+    let mut world = world();
+    let mut field = Field::new(&[]);
+    // A big ball holds the shot's center 1 from its own, so the blast moves
+    // out to x = 4.998. A small ball lies 6.25 past the blast's reach from
+    // where the shot burst, but 5.25 within it from where the blast starts.
+    let (big_at, small_at) = (Vec2::new(7.0, 0.0), Vec2::new(-0.502, 0.0));
+    let shape = ColliderSpec::ball(collider(BALL, 0), 2.0);
+    let big = hosted(&mut world, &mut field, BALL, BALL_HULL, big_at, shape);
+    let shape = ColliderSpec::ball(collider(ROVER, 0), 0.25);
+    let small = hosted(&mut world, &mut field, ROVER, ROVER_HULL, small_at, shape);
+    let mut field = field
+        .with_circle(big, big_at, 2.0)
+        .with_circle(small, small_at, 0.25);
+    let events = burst_at(&mut world, &mut field, Vec2::new(6.0, 0.0), PAYLOAD);
+    let center = burst_center(&events);
+    assert!((center - Vec2::new(7.0 - 2.0 * 1.001, 0.0)).length() < 1.0e-5);
+    assert_eq!(delivered(&events, Part::Payload, small).len(), 1);
+}
+
+#[test]
+fn a_blast_that_moves_into_another_body_moves_on_out_of_both() {
+    let mut world = world();
+    let mut field = Field::new(&[]);
+    // Straight out of the big ball, the blast would start inside the small
+    // one, which lies 6.8 from where the shot burst, beyond the blast's
+    // reach, so the first look doesn't find it.
+    let (big_at, small_at) = (Vec2::new(-1.0, 0.0), Vec2::new(7.3, 0.0));
+    let shape = ColliderSpec::ball(collider(BALL, 0), 8.0);
+    let big = hosted(&mut world, &mut field, BALL, BALL_HULL, big_at, shape);
+    let shape = ColliderSpec::ball(collider(ROVER, 0), 0.5);
+    let small = hosted(&mut world, &mut field, ROVER, ROVER_HULL, small_at, shape);
+    let mut field = field
+        .with_circle(big, big_at, 8.0)
+        .with_circle(small, small_at, 0.5);
+    let events = burst_at(&mut world, &mut field, Vec2::ZERO, PAYLOAD);
+    let center = burst_center(&events);
+    assert!(center.distance_to(big_at) > 8.0, "{center:?}");
+    assert!(center.distance_to(small_at) > 0.5, "{center:?}");
+    // From the crevice between them, each takes a share and neither all.
+    for recipient in [big, small] {
+        let share = delivered(&events, Part::Payload, recipient);
+        assert_eq!(share.len(), 1);
+        assert!(f64::from(share[0].ledger.available) < 0.6 * 5000.0);
+    }
 }
 
 #[test]
@@ -1591,6 +1802,46 @@ fn launches_need_a_free_id_and_a_free_dynamic_body() {
                 ..spec(3, None)
             },
         ),
+        // A push reaches some way, at a finite speed that isn't negative.
+        weapons.launch(
+            &world,
+            spec(
+                3,
+                Some(Blast {
+                    push: Some(BlastPush {
+                        radius: 0.0,
+                        ..PUSH
+                    }),
+                    ..PAYLOAD
+                }),
+            ),
+        ),
+        weapons.launch(
+            &world,
+            spec(
+                3,
+                Some(Blast {
+                    push: Some(BlastPush {
+                        speed: f32::NAN,
+                        ..PUSH
+                    }),
+                    ..PAYLOAD
+                }),
+            ),
+        ),
+        weapons.launch(
+            &world,
+            spec(
+                3,
+                Some(Blast {
+                    push: Some(BlastPush {
+                        speed: -1.0,
+                        ..PUSH
+                    }),
+                    ..PAYLOAD
+                }),
+            ),
+        ),
     ];
     let geometry = WeaponError::Source(SourceError::Material(MaterialError::InvalidGeometry));
     assert_eq!(
@@ -1600,6 +1851,9 @@ fn launches_need_a_free_id_and_a_free_dynamic_body() {
             Err(WeaponError::Exists),
             Err(WeaponError::InvalidBody),
             Err(WeaponError::InvalidBody),
+            Err(geometry),
+            Err(geometry),
+            Err(geometry),
             Err(geometry),
             Err(geometry),
             Err(geometry),

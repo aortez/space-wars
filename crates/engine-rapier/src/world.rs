@@ -985,6 +985,13 @@ impl PhysicsWorld {
         self.entities.keys().copied()
     }
 
+    /// The bodies of `entity`, none if the world has no such entity.
+    pub fn entity_bodies(&self, entity: PhysicsId) -> &[BodyId] {
+        self.entities
+            .get(&entity)
+            .map_or(&[], |record| record.bodies.as_slice())
+    }
+
     /// Every body's stable identity.
     pub fn body_ids(&self) -> impl ExactSizeIterator<Item = BodyId> + '_ {
         self.bodies.iter().map(|entry| entry.id)

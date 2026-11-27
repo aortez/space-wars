@@ -284,27 +284,78 @@ fn reaches(targets: &[Target], spread: &Spread, width: impl Fn(usize) -> f64) ->
         .collect()
 }
 
-/// Where a blast bound for `center` starts: `center` itself, or, where one of
-/// `targets` holds it, just past that target's edge, straight out from the
-/// target's center, so that the blast doesn't meet the target in every
-/// direction. A center at a target's very center moves out along +y. Each
-/// target is checked once, in order, so moving out of one can leave the center
-/// inside a target checked before it.
+/// Where a blast bound for `center` starts, so that it doesn't meet a target
+/// in every direction: `center` itself if none of `targets` holds it, and
+/// otherwise the nearest point to it, just past their edges, that none of them
+/// holds. Such a point lies straight out from a target's center, or where the
+/// edges of two targets cross, and a center at a target's very center moves
+/// out along +y. If every such point lies inside a target, the blast starts
+/// just past the edge of the first target that holds `center`, straight out
+/// from its center.
 pub fn blast_center(center: Vec2, targets: &[Target]) -> Vec2 {
-    let mut center = center;
-    for target in targets {
-        let offset = center - target.center;
-        let distance = offset.length();
-        if distance <= target.radius {
-            let direction = if distance > 0.0 {
-                offset / distance
-            } else {
-                Vec2::Y
-            };
-            center = target.center + direction * target.radius * 1.001;
-        }
+    let holds = |point: Vec2| {
+        targets
+            .iter()
+            .any(|target| point.distance_to(target.center) <= target.radius)
+    };
+    let Some(first) = targets
+        .iter()
+        .find(|target| center.distance_to(target.center) <= target.radius)
+    else {
+        return center;
+    };
+    let crossings = targets.iter().enumerate().flat_map(|(at, a)| {
+        targets[at + 1..]
+            .iter()
+            .flat_map(move |b| crossing_points(a, b).into_iter().flatten())
+    });
+    targets
+        .iter()
+        .map(|target| past_edge(target, center))
+        .chain(crossings)
+        .filter(|&point| !holds(point))
+        .min_by(|a, b| a.distance_to(center).total_cmp(&b.distance_to(center)))
+        .unwrap_or_else(|| past_edge(first, center))
+}
+
+/// The point just past `target`'s edge, straight out from its center through
+/// `point`, or along +y from its very center.
+fn past_edge(target: &Target, point: Vec2) -> Vec2 {
+    let offset = point - target.center;
+    let distance = offset.length();
+    let direction = if distance > 0.0 {
+        offset / distance
+    } else {
+        Vec2::Y
+    };
+    target.center + direction * target.radius * 1.001
+}
+
+/// The points just outside both of two targets where their edges cross, if
+/// they cross.
+fn crossing_points(a: &Target, b: &Target) -> [Option<Vec2>; 2] {
+    let between = b.center - a.center;
+    let distance = between.length();
+    let crossed = a.radius > 0.0
+        && b.radius > 0.0
+        && distance > 0.0
+        && distance <= a.radius + b.radius
+        && distance >= (a.radius - b.radius).abs();
+    if !crossed {
+        return [None, None];
     }
-    center
+    let axis = between / distance;
+    let along =
+        (distance * distance + a.radius * a.radius - b.radius * b.radius) / (2.0 * distance);
+    let across = (a.radius * a.radius - along * along).max(0.0).sqrt();
+    let normal = Vec2::new(-axis.y, axis.x);
+    [1.0, -1.0].map(|side| {
+        let point = a.center + axis * along + normal * (across * side);
+        // Out from both edges at once.
+        let out = (point - a.center) / a.radius + (point - b.center) / b.radius;
+        let length = out.length();
+        (length > 1.0e-6).then(|| point + out * (0.001 * a.radius.min(b.radius) / length))
+    })
 }
 
 fn take(target: &Target, height: f32) -> f64 {
