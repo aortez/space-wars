@@ -170,6 +170,58 @@ fn rounds_fail_a_tank_on_the_eighth_hit_and_name_the_seat_that_fired() {
     assert!(state.world.tank_snapshot(tank).is_none());
 }
 
+/// A payload that bursts beside a tank charges it as a round's hit does, and
+/// names the seat whose round it was.
+#[test]
+fn a_blast_charges_a_tank_beside_it_as_a_round_and_names_the_seat_that_fired() {
+    let (mut state, tank) = fixture();
+    let target = MechanicalEntity::Tank(tank.entity());
+    let chassis = state.world.physics.tanks.bodies()[0];
+    let world = &state.world.physics.world;
+    let center = world.center_of_mass(chassis).unwrap();
+    let velocity = world.motion(chassis).unwrap().linear_velocity;
+    // The first seat's round falls on a rock below and beside the tank, which
+    // leaves the tank in the open, and bursts there.
+    state.world.debris.push(DebrisState::new(
+        DebrisKind::Asteroid,
+        center + Vec2::new(-6.0, -3.0),
+        velocity,
+        1.5,
+        0.01,
+        Color::WHITE,
+    ));
+    let mut shell = DebrisState::new_shell(
+        0,
+        state.world.tick,
+        center + Vec2::new(-6.0, 12.0),
+        velocity - Vec2::Y * 300.0,
+        0.0,
+    );
+    shell.owner_id = Some(0);
+    shell.inertial_mass = Some(weapons::ROUND_MASS);
+    shell.blast = Some(crate::shots::TEST_BLAST);
+    state.world.debris.push(shell);
+    let before = health(&state, tank);
+    for _ in 0..30 {
+        idle(&mut state, 1);
+        if !state.world.blast_hits.is_empty() {
+            break;
+        }
+    }
+    let hits = state.world.blast_hits.iter();
+    let blasted: f32 = hits
+        .filter(|hit| hit.target == target)
+        .map(|hit| hit.health)
+        .sum();
+    assert!(blasted > 0.0, "{:?}", state.world.blast_hits);
+    let lost = before - health(&state, tank);
+    assert!((lost - blasted).abs() < 1.0e-3, "{lost} {blasted}");
+    let last = last_damage(&state, tank).unwrap();
+    assert_eq!(last.cause, TankDamageCause::Round);
+    assert_eq!(last.source, Some(FIRST_SEAT));
+    assert_eq!(last.tick, state.world.tick);
+}
+
 /// From 40 units off, the laser fails a tank in 9.33 seconds, sooner than the
 /// 13.87 it takes to fail a ship's hull. A round's work grows with the depth
 /// of plate behind the face it strikes, and a beam's does not.

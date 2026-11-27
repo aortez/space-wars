@@ -51,7 +51,7 @@ use engine_gravity::{
 };
 use engine_rapier::{
     rover::{RoverControl, RoverSnapshot, RoverSpec},
-    world::{BodyMotion, PhysicsStepMetrics},
+    world::{BodyMotion, PhysicsStepMetrics, weapon::Blast},
 };
 use physics::{MechanicalContact, MechanicalEntity};
 use serde::{Deserialize, Serialize};
@@ -427,6 +427,8 @@ pub struct SpacewarsState {
     gravity_participants: Vec<GravityParticipant>,
     /// What each shell's shot charged in this step, by the shell's physics id.
     shot_hits: BTreeMap<u64, shots::ShotHit>,
+    /// What each payload's blast charged the bodies it reached in this step.
+    blast_hits: Vec<shots::BlastHit>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -617,6 +619,9 @@ pub struct DebrisState {
     physics_id: u64,
     /// Whether a material weapon shot carries this shell (#330).
     shot: bool,
+    /// The blast a shell's payload releases where its shot ends, if it
+    /// carries one. A ship's shells carry none.
+    blast: Option<Blast>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1362,6 +1367,7 @@ impl Scenario for SpacewarsScenario {
             gravity_solver: GravitySolver::new(),
             gravity_participants: Vec::new(),
             shot_hits: BTreeMap::new(),
+            blast_hits: Vec::new(),
         }
     }
 
@@ -1566,6 +1572,7 @@ impl SpacewarsScenario {
 
         terrain::queue_cannon_hits(state);
         shots::settle(state, surface_pilots, shots, dt);
+        surface_sortie::match_rules::apply_blasts(state, surface_pilots);
         let contacts = state.physics.contacts();
         let port_intersections = state.physics.spaceport_contacts();
         let accepted_ports = if experimental {
@@ -5395,6 +5402,7 @@ impl DebrisState {
             inertial_mass: None,
             physics_id: 0,
             shot: false,
+            blast: None,
         }
     }
 

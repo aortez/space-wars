@@ -166,6 +166,61 @@ fn ejection_protection_from_rounds_ends_when_the_old_rules_do() {
     }
 }
 
+/// A payload that bursts beside a pod or a pilot on foot charges it, as a
+/// shell's hit does, unless ejection protection covers it.
+#[test]
+fn a_blast_charges_a_pod_and_a_pilot_on_foot_unless_protection_covers_them() {
+    for target in [Target::Pod, Target::OnFoot] {
+        for covered in [false, true] {
+            let case = format!("{target:?}, covered {covered}");
+            let mut state = fixture(target);
+            if covered {
+                let tick = state.world.tick;
+                let vitals = state.pilots[1].vitals.as_mut().unwrap();
+                vitals.protect_ejection(tick);
+            }
+            // A round falls on a rock below and beside the target, which
+            // leaves the target in the open, and bursts there.
+            let motion = state.impact_motion(1).unwrap();
+            let center = motion.center_of_mass;
+            state.world.debris.push(DebrisState::new(
+                DebrisKind::Asteroid,
+                center + Vec2::new(-6.0, -3.0),
+                motion.velocity,
+                1.5,
+                0.01,
+                Color::WHITE,
+            ));
+            let mut shell = DebrisState::new_shell(
+                0,
+                state.world.tick,
+                center + Vec2::new(-6.0, 12.0),
+                motion.velocity - Vec2::Y * 300.0,
+                0.0,
+            );
+            shell.inertial_mass = Some(weapons::ROUND_MASS);
+            shell.blast = Some(crate::shots::TEST_BLAST);
+            state.world.debris.push(shell);
+            let before = health(&state, target);
+            for _ in 0..30 {
+                idle(&mut state, 1);
+                if !state.world.blast_hits.is_empty() {
+                    break;
+                }
+            }
+            assert!(!state.world.blast_hits.is_empty(), "{case}: it must burst");
+            let hits = state.world.blast_hits.iter();
+            let blasted: f32 = hits
+                .filter(|hit| hit.target == entity(target))
+                .map(|hit| hit.health)
+                .sum();
+            assert_eq!(blasted > 0.0, !covered, "{case}: {blasted}");
+            let lost = before - health(&state, target);
+            assert!((lost - blasted).abs() < 1.0e-3, "{case}: {lost} {blasted}");
+        }
+    }
+}
+
 /// A round from 8 units off the target's center of mass, closing at 300.
 fn launch(state: &mut SurfaceSortieState) {
     launch_at(state, 300.0);
