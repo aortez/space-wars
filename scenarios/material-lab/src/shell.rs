@@ -27,6 +27,7 @@ pub const PAYLOAD: Blast = Blast {
     energy: 5000.0,
     radius: 6.0,
     height: 1.0,
+    push: None,
 };
 /// The fixed plate's center and half extents. Its face is at x = 5.5.
 pub const PLATE_CENTER: Vec2 = Vec2::new(6.0, 0.0);
@@ -350,6 +351,7 @@ impl Range {
                 }
                 WeaponEvent::Retired { ledger, .. } => self.retired = Some(ledger),
                 WeaponEvent::Excluded { .. }
+                | WeaponEvent::Pushed { .. }
                 | WeaponEvent::Refused { .. }
                 | WeaponEvent::Traced { .. } => {}
             }

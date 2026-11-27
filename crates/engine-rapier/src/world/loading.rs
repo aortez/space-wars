@@ -873,6 +873,11 @@ impl PhysicsWorld {
     pub fn loading_region_is_live(&self, token: RegionToken) -> bool {
         self.loading.as_ref().is_some_and(|s| s.live(token))
     }
+    /// The body a live region belongs to.
+    pub fn loading_region_body(&self, token: RegionToken) -> Option<BodyId> {
+        let entry = self.loading.as_ref()?.regions.get(&token.id)?;
+        (entry.token == token).then_some(entry.body)
+    }
     /// Last positive step's captures, or empty after a paused/invalid step.
     pub fn loading_batches(&self) -> &[ContactBatch] {
         self.loading.as_ref().map_or(&[], |s| &s.batches)

@@ -14,8 +14,8 @@ use engine_rapier::world::loading::charges::{
 use engine_rapier::world::loading::response::ResponseRejection;
 use engine_rapier::world::loading::{CaptureConfig, ContactSource, RegionId, RegionToken};
 use engine_rapier::world::weapon::{
-    BeamSpec, Blast, Exclusion, Pulse, Reachable, Recipient, Recipients, ShotSpec, WeaponError,
-    WeaponEvent, Weapons, projectile_impact,
+    BeamSpec, Blast, BlastPush, Exclusion, Pulse, Reachable, Recipient, Recipients, ShotSpec,
+    WeaponError, WeaponEvent, Weapons, projectile_impact,
 };
 use engine_rapier::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, CollisionGroups,
@@ -52,6 +52,12 @@ const PAYLOAD: Blast = Blast {
     energy: 5000.0,
     radius: 6.0,
     height: 1.0,
+    push: None,
+};
+/// A push of 4 at a blast's center, falling to nothing 6 from it.
+const PUSH: BlastPush = BlastPush {
+    radius: 6.0,
+    speed: 4.0,
 };
 
 struct Meadow;
@@ -630,6 +636,120 @@ fn hard_bodies_shadow_what_lies_behind_them() {
     );
     assert_eq!(delivered(&events, Part::Payload, plate).len(), 1);
     assert!(world.motion(body(SHOT)).is_none());
+}
+
+#[test]
+fn a_blast_bound_inside_a_body_starts_just_outside_it() {
+    let mut world = world();
+    let mut field = Field::new(&[]);
+    // The ball's circle holds the shot's center, 0.4 from its own.
+    let shape = ColliderSpec::ball(collider(BALL, 0), 0.5);
+    let at = Vec2::new(6.4, 0.0);
+    let ball = hosted(&mut world, &mut field, BALL, BALL_HULL, at, shape);
+    let mut field = field.with_circle(ball, at, 0.5);
+    let mut weapons = Weapons::new();
+    shot_body(&mut world, SHOT, Vec2::new(6.0, 0.0), Vec2::ZERO);
+    weapons.launch(&world, spec(SHOT, Some(PAYLOAD))).unwrap();
+    weapons.detonate(&mut world, SHOT, &mut field).unwrap();
+    let events = weapons.take_events();
+    let center = events
+        .iter()
+        .find_map(|event| match event {
+            WeaponEvent::Burst { center, .. } => Some(*center),
+            _ => None,
+        })
+        .unwrap();
+    assert!((center - Vec2::new(6.4 - 0.5 * 1.001, 0.0)).length() < 1.0e-5);
+    // From just outside, the ball fills nearly half the directions rather
+    // than all of them.
+    let blast = delivered(&events, Part::Payload, ball);
+    assert!((0.4..0.5).contains(&(blast[0].ledger.available / PAYLOAD.energy)));
+}
+
+/// A ball of `kind` and `mass` at x = 6.5, whose armor the host keeps, and a
+/// shot held at x = 5 beside it that bursts with a push. Answers the ball's
+/// velocity after, its mass, what its share paid for the push, what its armor
+/// was delivered, and its whole share.
+fn pushed(kind: BodyKind, mass: f32) -> (Vec2, f32, Option<f32>, f64, f64) {
+    const RADIUS: f32 = 0.5;
+    let at = Vec2::new(6.5, 0.0);
+    let mut world = world();
+    let mut field = Field::new(&[]);
+    assert!(world.insert_body(
+        body(BALL),
+        BodySpec {
+            kind,
+            position: at,
+            can_sleep: false,
+            ..Default::default()
+        },
+        &[ColliderSpec {
+            density: mass / (std::f32::consts::PI * RADIUS * RADIUS),
+            ..ColliderSpec::ball(collider(BALL, 0), RADIUS)
+        }],
+    ));
+    let entity = PhysicsId::new(BALL);
+    field.bodies.insert(BALL_HULL, (entity, armor()));
+    let ball = Recipient::Body {
+        key: BALL_HULL,
+        entity,
+    };
+    let mut field = field.with_circle(ball, at, RADIUS);
+    let mut weapons = Weapons::new();
+    shot_body(&mut world, SHOT, Vec2::new(5.0, 0.0), Vec2::ZERO);
+    let blast = Blast {
+        push: Some(PUSH),
+        ..PAYLOAD
+    };
+    weapons.launch(&world, spec(SHOT, Some(blast))).unwrap();
+    weapons.detonate(&mut world, SHOT, &mut field).unwrap();
+    let events = weapons.take_events();
+    let paid = events.iter().find_map(|event| match event {
+        WeaponEvent::Pushed {
+            recipient, energy, ..
+        } if *recipient == ball => Some(*energy),
+        _ => None,
+    });
+    let armor = delivered(&events, Part::Payload, ball);
+    let circle = Target {
+        key: 0,
+        center: at,
+        radius: RADIUS,
+        thickness: 1.0,
+    };
+    let reach = blast_reach(Vec2::new(5.0, 0.0), 6.0, 1.0, &[circle]).unwrap();
+    (
+        world.motion(body(BALL)).unwrap().linear_velocity,
+        world.body_mass(body(BALL)).unwrap(),
+        paid,
+        f64::from(armor[0].ledger.available),
+        f64::from(reach[0].coupling) * f64::from(PAYLOAD.energy),
+    )
+}
+
+#[test]
+fn a_blasts_push_on_a_body_is_paid_from_its_share_first() {
+    // 1.5 from the blast, the push would change the ball's velocity by 3.
+    let whole = Vec2::new(3.0, 0.0);
+    // A light ball's share pays for the whole push, and its armor takes the
+    // rest.
+    let (velocity, mass, paid, armor, share) = pushed(BodyKind::Dynamic, 2.0);
+    let cost = 0.5 * f64::from(mass) * 9.0;
+    assert!((velocity - whole).length() < 1.0e-4);
+    assert!(close(f64::from(paid.unwrap()), cost));
+    assert!(close(armor, share - cost));
+    // A heavy ball's share pays for part of the push, so it moves as far as
+    // that part takes it, and its armor takes nothing.
+    let (velocity, mass, paid, armor, share) = pushed(BodyKind::Dynamic, 200.0);
+    let cost = 0.5 * f64::from(mass) * 9.0;
+    assert!(share < cost);
+    assert!(close(f64::from(paid.unwrap()), share));
+    assert!((velocity - whole * (share / cost).sqrt() as f32).length() < 1.0e-4);
+    assert!(close(armor, 0.0));
+    // A fixed ball can't move, so its armor takes its whole share.
+    let (velocity, _, paid, armor, share) = pushed(BodyKind::Fixed, 2.0);
+    assert_eq!((velocity, paid), (Vec2::ZERO, None));
+    assert!(close(armor, share));
 }
 
 #[test]

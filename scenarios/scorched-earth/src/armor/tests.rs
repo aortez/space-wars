@@ -278,23 +278,6 @@ fn a_shell_stopped_by_terrain_reports_its_hit_without_charging_it() {
 }
 
 #[test]
-fn a_shell_bursts_outside_every_tank() {
-    let targets = [Target {
-        key: 0,
-        center: Vec2::ZERO,
-        radius: 1.0,
-        thickness: TANK_THICKNESS,
-    }];
-    let moved = outside(&targets, Vec2::new(0.5, 0.0));
-    assert!(moved.x > 1.0 && moved.x < 1.01 && moved.y == 0.0);
-    assert!(outside(&targets, Vec2::ZERO).y > 1.0);
-    assert_eq!(outside(&targets, Vec2::new(2.0, 0.0)), Vec2::new(2.0, 0.0));
-    // A burst on the edge would otherwise meet the tank in every direction.
-    let reach = blast_reach(moved, BLAST_REACH, TANK_THICKNESS, &targets).unwrap();
-    assert!(reach[0].coupling < 0.51);
-}
-
-#[test]
 fn a_direct_hit_costs_about_a_third_of_a_tank() {
     for suspension in [false, true] {
         let mut state = settled(suspension);

@@ -9,8 +9,8 @@ use engine_material::fixtures::{TICK, shell, tank};
 use engine_material::{
     ContactBody, Crossing, Face, Impact, MaterialError, Outcome, Overlap, Projectile, Pulses,
     Reach, Region, SOFT_TISSUE, Section, Share, Source, SourceSpec, SustainedLoad, Target,
-    TissueIntegrity, TissueMaterial, TissueTable, WOOD, beam_reach, blast_reach, deformation_depth,
-    effective_mass, footprint_overlaps, sweep_crossings,
+    TissueIntegrity, TissueMaterial, TissueTable, WOOD, beam_reach, blast_center, blast_reach,
+    deformation_depth, effective_mass, footprint_overlaps, sweep_crossings,
 };
 
 fn target(key: u64, x: f32, y: f32, radius: f32, thickness: f32) -> Target {
@@ -228,6 +228,24 @@ fn a_blast_inside_a_target_meets_it_first_everywhere() {
     let reaches = blast_reach(ORIGIN, 10.0, 1.0, &[blade, outside]).unwrap();
     assert!(close(coupling(&reaches, 1), 0.3));
     assert!(close(coupling(&reaches, 2), 0.7 * subtends(1.0, 5.0)));
+}
+
+#[test]
+fn a_blast_bound_inside_a_target_starts_just_past_its_edge() {
+    let wheel = target(1, 0.0, 0.0, 0.5, 1.0);
+    let hull = target(2, 3.0, 0.0, 1.0, 1.0);
+    let open = Vec2::new(0.0, 2.0);
+    assert_eq!(blast_center(open, &[wheel, hull]), open);
+    // Out from the wheel's center through the point the blast was bound for.
+    let moved = blast_center(Vec2::new(0.3, 0.0), &[wheel, hull]);
+    assert!(close(moved.x, 0.5 * 1.001) && moved.y == 0.0);
+    // From there the wheel no longer takes every direction, and the hull
+    // takes a share of the rest.
+    let reaches = blast_reach(moved, 10.0, 1.0, &[wheel, hull]).unwrap();
+    assert!(coupling(&reaches, 1) < 0.6);
+    assert!(coupling(&reaches, 2) > 0.0);
+    let centered = blast_center(ORIGIN, &[wheel]);
+    assert!(centered.x == 0.0 && close(centered.y, 0.5 * 1.001));
 }
 
 #[test]

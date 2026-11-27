@@ -284,6 +284,29 @@ fn reaches(targets: &[Target], spread: &Spread, width: impl Fn(usize) -> f64) ->
         .collect()
 }
 
+/// Where a blast bound for `center` starts: `center` itself, or, where one of
+/// `targets` holds it, just past that target's edge, straight out from the
+/// target's center, so that the blast doesn't meet the target in every
+/// direction. A center at a target's very center moves out along +y. Each
+/// target is checked once, in order, so moving out of one can leave the center
+/// inside a target checked before it.
+pub fn blast_center(center: Vec2, targets: &[Target]) -> Vec2 {
+    let mut center = center;
+    for target in targets {
+        let offset = center - target.center;
+        let distance = offset.length();
+        if distance <= target.radius {
+            let direction = if distance > 0.0 {
+                offset / distance
+            } else {
+                Vec2::Y
+            };
+            center = target.center + direction * target.radius * 1.001;
+        }
+    }
+    center
+}
+
 fn take(target: &Target, height: f32) -> f64 {
     (f64::from(target.thickness) / f64::from(height)).min(1.0)
 }

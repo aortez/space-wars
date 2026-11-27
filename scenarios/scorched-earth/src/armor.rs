@@ -29,11 +29,11 @@ use super::*;
 use crate::host::Placement;
 use engine_material::{
     ARMOR, ContactGeometry, Face, Impact, MAX_LENGTH, MIN_LENGTH, Projectile, SHELL, Section,
-    Share, Source, SourceId, SourceSpec, Target, blast_reach, patch_width_from_radii,
+    Share, Source, SourceId, SourceSpec, Target, blast_center, blast_reach, patch_width_from_radii,
     sweep_crossings,
 };
 use engine_rapier::world::RayHit;
-use engine_rapier::world::weapon::{Reachable, Recipient, Recipients, projectile_impact};
+use engine_rapier::world::weapon::{Reachable, Recipient, Recipients, pay_push, projectile_impact};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Represented depth of a tank into the screen, and of a burst's front, so a
@@ -132,27 +132,6 @@ impl Tank {
         }
         work - left
     }
-}
-
-/// Moves a shell's burst `center` out of any target circle that holds it, to
-/// just past that circle's edge. A shell's ray can pass closer to a wheel than
-/// the shell's radius allows, so a burst off the ground beside a wheel can
-/// land inside it, where it would meet the tank in every direction. A scripted
-/// burst inside a tank stays there.
-fn outside(targets: &[Target], mut center: Vec2) -> Vec2 {
-    for target in targets {
-        let offset = center - target.center;
-        let distance = offset.length();
-        if distance <= target.radius {
-            let direction = if distance > 0.0 {
-                offset / distance
-            } else {
-                Vec2::Y
-            };
-            center = target.center + direction * target.radius * 1.001;
-        }
-    }
-    center
 }
 
 /// What one shell's hit and burst did to the tanks' armor.
@@ -402,18 +381,13 @@ impl Duel {
             .clone()
             .map(|reach| {
                 let slot = reach.key as usize;
-                let share = f64::from(reach.coupling) * payload;
-                let paid = f64::from(pushes[slot].energy).min(share);
+                let (paid, coupling) = pay_push(payload, reach.coupling, pushes[slot].energy);
                 pushed[slot] = paid as f32;
                 Share {
                     key: reach.key,
                     region: &self.tanks[slot].armor,
                     face: Face::new(reach.width, ARMOR_SECTION),
-                    coupling: if payload > 0.0 {
-                        ((share - paid) / payload) as f32
-                    } else {
-                        reach.coupling
-                    },
+                    coupling,
                 }
             })
             .collect();
@@ -495,9 +469,12 @@ impl Duel {
                 None => struck.unmodeled = load.energy(),
             }
         }
-        let center = outside(
-            &self.armor_targets(physics),
+        // A shell's ray can pass closer to a wheel than the shell's radius
+        // allows, so a burst off the ground beside a wheel could start inside
+        // it, where it would meet the tank in every direction.
+        let center = blast_center(
             point + hit.normal * SHELL_RADIUS,
+            &self.armor_targets(physics),
         );
         let released = self.burst(
             physics,
