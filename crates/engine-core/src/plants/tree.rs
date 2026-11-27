@@ -12,6 +12,9 @@ pub const POLICY: u64 = 0x7472_6565_0000_0001;
 /// The most empty cells a host measures light at per decision: one lighting
 /// query batch.
 pub const MAX_PROBES: usize = crate::lighting::MAX_RECEIVERS;
+/// The most cells a seed may drift across, and fall.
+const MAX_DRIFT: u16 = 64;
+const MAX_FALL: usize = 1024;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Traits {
@@ -35,7 +38,22 @@ pub struct Traits {
     /// needles two fifths.
     pub wood_transmits: u16,
     pub needle_transmits: u16,
-    /// The planted seed's finite reserves.
+    /// The size the tree grows a cone at. A cone ripens to size three before
+    /// it drops with its seed.
+    pub cone_size: u16,
+    /// The most living cones the tree carries at once.
+    pub max_cones: u16,
+    /// The most organisms grown from the tree's seeds that hold tissue at
+    /// once, living or dead.
+    pub max_offspring: u16,
+    /// The most cells the wind carries a falling seed to either side.
+    pub seed_drift: u16,
+    /// A seed sprouts only into a cell lit at least `sprout_light`, from dirt
+    /// watered at least `sprout_water`, both in thousandths.
+    pub sprout_light: u16,
+    pub sprout_water: u16,
+    /// The finite reserves each seed holds: the planted seed's, and those of
+    /// each seed a cone drops, which the tree's stores pay for.
     pub starting_reserves: Resources,
 }
 impl Default for Traits {
@@ -51,6 +69,12 @@ impl Default for Traits {
             foliage_per_wood_size: 6,
             wood_transmits: 750,
             needle_transmits: 600,
+            cone_size: 1,
+            max_cones: 2,
+            max_offspring: 3,
+            seed_drift: 8,
+            sprout_light: 400,
+            sprout_water: 250,
             starting_reserves: [40; 3],
         }
     }
@@ -61,6 +85,7 @@ impl Traits {
         match role {
             Role::Root => self.root_size,
             Role::Wood => self.wood_size,
+            Role::Cone => self.cone_size,
             _ => self.needle_size,
         }
     }
@@ -77,8 +102,9 @@ pub enum Kind {
     RootTip,
     Root,
     Needle,
+    Cone,
 }
-const KINDS: [Kind; 7] = [
+const KINDS: [Kind; 8] = [
     Kind::Leader,
     Kind::Trunk,
     Kind::BranchTip,
@@ -86,6 +112,7 @@ const KINDS: [Kind; 7] = [
     Kind::RootTip,
     Kind::Root,
     Kind::Needle,
+    Kind::Cone,
 ];
 
 /// What already holds a cell: this tree's tissue by role, or another plant's.
@@ -94,6 +121,7 @@ pub enum Holder {
     Wood,
     Needle,
     Root,
+    Cone,
     Other,
 }
 
@@ -117,6 +145,12 @@ pub struct Whole {
     pub roots: u16,
     pub dead: u16,
     pub max_tissues: u16,
+    /// Living cones, and organisms grown from the tree's seeds, with the
+    /// most of each the world allows.
+    pub cones: u16,
+    pub max_cones: u16,
+    pub offspring: u16,
+    pub max_offspring: u16,
     /// The highest wood above the origin, and the deepest root below it.
     pub height: i32,
     pub depth: i32,
@@ -163,9 +197,9 @@ pub struct Candidate {
     pub along: i8,
     pub outward: i8,
     pub holder: Option<Holder>,
-    /// Whether the world would place wood, a needle or a root here now,
-    /// before cost.
-    pub open: [bool; 3],
+    /// Whether the world would place wood, a needle, a root or a cone here
+    /// now, before cost.
+    pub open: [bool; 4],
     /// Light measured at the empty cell, if the host probed it.
     pub light: Option<u16>,
     /// Nutrient and water supply fractions a root would take here, if dirt.
@@ -190,6 +224,8 @@ pub enum Action {
     Thicken,
     /// Drop the point and everything beyond it.
     Shed,
+    /// Drop a ripe cone with its seed, which the wind carries to the ground.
+    Release,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -214,19 +250,28 @@ impl Bid {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Refusal {
     Dead,
-    /// Needles grow nothing, roots grow roots, only the seed starts a trunk,
-    /// and wood grows wood and needles.
+    /// Needles and cones grow nothing, roots grow roots, only the seed starts
+    /// a trunk, wood grows wood, needles and cones, and only a cone drops a
+    /// seed.
     Role,
+    /// The tree, its cones, its offspring or the world's organisms are at
+    /// their limit.
     Population,
-    /// No ranked candidate is open, or another bid claimed it first.
+    /// No ranked candidate is open, another bid claimed it first, or the
+    /// wind would carry a seed where it cannot lie.
     Space,
     /// Wood on the way already supplies all the foliage its size allows.
     Load,
     Size,
+    /// Too little light: a needle's own, or at the cell a seed sprouts into.
     Shade,
     Shortage,
     /// A tissue that grew from nothing cannot be shed.
     Seed,
+    /// Only a ripe cone drops its seed.
+    Unripe,
+    /// A seed sprouts only from dirt watered at least `sprout_water`.
+    Dry,
     /// Shed earlier in this decision.
     Shed,
     /// The tree's connected stores cannot pay for it after the bids before it.
@@ -278,6 +323,7 @@ fn slot(role: Role) -> Option<usize> {
         Role::Wood => Some(0),
         Role::Shoot => Some(1),
         Role::Root => Some(2),
+        Role::Cone => Some(3),
         Role::Runner | Role::Moss => None,
     }
 }
@@ -291,6 +337,28 @@ fn step(cell: [i32; 2], delta: [i32; 2]) -> Option<[i32; 2]> {
 
 fn count(n: usize) -> u16 {
     n.min(usize::from(u16::MAX)) as u16
+}
+
+/// At most `budget` of the cells, in cell order: a window that moves with the
+/// tick, so every cell is measured within a few decisions.
+fn rotate(cells: Vec<[i32; 2]>, tick: u64, budget: usize) -> Vec<[i32; 2]> {
+    if cells.len() <= budget {
+        return cells;
+    }
+    let start = (tick as usize).wrapping_mul(budget) % cells.len();
+    let mut chosen: Vec<_> = (0..budget)
+        .map(|i| cells[(start + i) % cells.len()])
+        .collect();
+    chosen.sort_unstable();
+    chosen
+}
+
+/// A fixed integer hash, so the wind blows alike on every platform.
+fn mix(mut x: u64) -> u64 {
+    x = x.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    x = (x ^ (x >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    x = (x ^ (x >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    x ^ (x >> 31)
 }
 
 /// The tree's own tissue as it grew. Growth joins each new, higher ID to its
@@ -342,9 +410,16 @@ struct Decision {
     spent: BTreeMap<TissueId, Resources>,
     /// Foliage this decision grows beyond each wood tissue.
     added: BTreeMap<TissueId, u16>,
+    /// Living cones, the tree's offspring and the world's organisms,
+    /// counting what this decision has committed.
+    cones: u16,
+    offspring: u16,
+    organisms: usize,
     intents: Vec<Intent>,
 }
 
+/// A tree is the organism of this policy whose tissue holds its origin on its
+/// support: the seed, planted or dropped by a cone.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tree {
     pub traits: Traits,
@@ -367,9 +442,18 @@ impl Tree {
             || traits.max_tissues == 0
             || traits.max_tissues > 1024
             || traits.foliage_per_wood_size == 0
-            || [traits.root_size, traits.wood_size, traits.needle_size].contains(&0)
+            || [
+                traits.root_size,
+                traits.wood_size,
+                traits.needle_size,
+                traits.cone_size,
+            ]
+            .contains(&0)
             || traits.wood_transmits >= 1000
             || traits.needle_transmits >= 1000
+            || traits.seed_drift > MAX_DRIFT
+            || traits.sprout_light > 1000
+            || traits.sprout_water > 1000
         {
             return Err(Rejection::Invalid);
         }
@@ -435,12 +519,26 @@ impl Tree {
         f32::from(thousandths) / 1000.0
     }
 
-    fn own<'a>(&self, o: &'a Observation) -> impl Iterator<Item = &'a Tissue> {
+    /// The organism whose tissue holds the tree's origin, if any.
+    pub fn organism(&self, o: &Observation) -> Option<OrganismId> {
+        o.tissues
+            .iter()
+            .find(|t| {
+                t.cell == self.origin && t.policy == POLICY && t.support == Some(self.support)
+            })
+            .map(|t| t.organism)
+    }
+
+    /// The tree's tissue: its organism's, on its support, of the roles a
+    /// tree grows.
+    pub fn own<'a>(&self, o: &'a Observation) -> impl Iterator<Item = &'a Tissue> {
         let support = Some(self.support);
+        let organism = self.organism(o);
         o.tissues.iter().filter(move |t| {
-            t.policy == POLICY
+            Some(t.organism) == organism
+                && t.policy == POLICY
                 && t.support == support
-                && matches!(t.role, Role::Root | Role::Wood | Role::Shoot)
+                && matches!(t.role, Role::Root | Role::Wood | Role::Shoot | Role::Cone)
         })
     }
 
@@ -503,11 +601,19 @@ impl Tree {
     /// light at before planning. Beyond `MAX_PROBES` the set rotates with the
     /// tick, so every cell is measured within a few decisions.
     pub fn probes(&self, o: &Observation, env: &impl Environment) -> Vec<[i32; 2]> {
+        rotate(
+            self.probe_cells(o, env).into_iter().collect(),
+            o.tick,
+            MAX_PROBES,
+        )
+    }
+
+    fn probe_cells(&self, o: &Observation, env: &impl Environment) -> BTreeSet<[i32; 2]> {
         let occupied: BTreeSet<[i32; 2]> = o.tissues.iter().map(|t| t.cell).collect();
         let mut cells = BTreeSet::new();
         for t in self
             .own(o)
-            .filter(|t| t.health > 0 && t.role != Role::Shoot)
+            .filter(|t| t.health > 0 && matches!(t.role, Role::Wood | Role::Root))
         {
             for delta in self.steps() {
                 let Some(cell) = step(t.cell, delta) else {
@@ -521,16 +627,7 @@ impl Tree {
                 }
             }
         }
-        let cells: Vec<_> = cells.into_iter().collect();
-        if cells.len() <= MAX_PROBES {
-            return cells;
-        }
-        let start = (o.tick as usize).wrapping_mul(MAX_PROBES) % cells.len();
-        let mut chosen: Vec<_> = (0..MAX_PROBES)
-            .map(|i| cells[(start + i) % cells.len()])
-            .collect();
-        chosen.sort_unstable();
-        chosen
+        cells
     }
 
     /// Every point's view, in tissue order.
@@ -565,6 +662,7 @@ impl Tree {
                     (true, Role::Wood) => Holder::Wood,
                     (true, Role::Shoot) => Holder::Needle,
                     (true, Role::Root) => Holder::Root,
+                    (true, Role::Cone) => Holder::Cone,
                     _ => Holder::Other,
                 };
                 (t.cell, holder)
@@ -589,6 +687,7 @@ impl Tree {
                     Role::Wood => Kind::Branch,
                     Role::Root if !grew(Role::Root, false) => Kind::RootTip,
                     Role::Root => Kind::Root,
+                    Role::Cone => Kind::Cone,
                     _ => Kind::Needle,
                 };
                 let light = (t.health > 0 && t.role == Role::Shoot)
@@ -622,14 +721,14 @@ impl Tree {
                             along: 0,
                             outward: 0,
                             holder: None,
-                            open: [false; 3],
+                            open: [false; 4],
                             light: None,
                             soil: None,
                         };
                     };
                     let [h, a] = self.frame(cell);
                     let holder = holders.get(&cell).copied();
-                    let open = [Role::Wood, Role::Shoot, Role::Root].map(|role| {
+                    let open = [Role::Wood, Role::Shoot, Role::Root, Role::Cone].map(|role| {
                         holder.is_none()
                             && env.support_valid(Some(self.support), cell)
                             && env.space_available(cell, role, self.traits.size(role))
@@ -661,8 +760,12 @@ impl Tree {
         exposure: &BTreeMap<TissueId, Exposure>,
     ) -> Whole {
         let c = &o.config;
+        let organism = self.organism(o);
         let mut whole = Whole {
             max_tissues: count(self.traits.max_tissues),
+            max_cones: self.traits.max_cones,
+            offspring: count(o.parents.values().filter(|p| Some(**p) == organism).count()),
+            max_offspring: self.traits.max_offspring,
             ..Whole::default()
         };
         for t in shape.tissues.values() {
@@ -707,6 +810,7 @@ impl Tree {
                     whole.wood = whole.wood.saturating_add(1);
                     whole.height = whole.height.max(height);
                 }
+                Role::Cone => whole.cones = whole.cones.saturating_add(1),
                 _ => {
                     whole.roots = whole.roots.saturating_add(1);
                     whole.depth = whole.depth.max(-height);
@@ -727,6 +831,18 @@ impl Tree {
         senses: &impl Senses,
         brain: &mut impl TreeBrain,
     ) -> Round {
+        self.plan_within(o, env, senses, brain, o.config.max_intents)
+    }
+
+    /// A plan of at most `budget` intents, for a tick the tree shares.
+    pub fn plan_within(
+        &self,
+        o: &Observation,
+        env: &impl Environment,
+        senses: &impl Senses,
+        brain: &mut impl TreeBrain,
+        budget: usize,
+    ) -> Round {
         if !o
             .tick
             .is_multiple_of(u64::from(self.traits.decision_interval_ticks))
@@ -741,7 +857,7 @@ impl Tree {
         let mut order: Vec<usize> = (0..views.len()).collect();
         order.sort_by_key(|&i| (Reverse(bids[i].priority), views[i].point.tissue));
         let mut d = Decision {
-            budget: self.traits.bids_per_decision.min(o.config.max_intents),
+            budget: self.traits.bids_per_decision.min(budget),
             population: views.len(),
             total: o.tissues.len(),
             claimed: BTreeSet::new(),
@@ -749,6 +865,14 @@ impl Tree {
             pools: component_pools(o),
             spent: BTreeMap::new(),
             added: BTreeMap::new(),
+            cones: views.first().map_or(0, |v| v.whole.cones),
+            offspring: views.first().map_or(0, |v| v.whole.offspring),
+            organisms: o
+                .tissues
+                .iter()
+                .map(|t| t.organism)
+                .collect::<BTreeSet<_>>()
+                .len(),
             intents: Vec::new(),
         };
         let mut outcomes = vec![Outcome::Waited; views.len()];
@@ -798,9 +922,11 @@ impl Tree {
         if !p.alive {
             return Outcome::Refused(Refusal::Dead);
         }
+        let t = shape.tissues[&p.tissue];
         let proposal = match bid.action {
-            Action::Grow(role) => self.grow(o, view, bid, role, d),
-            _ => self.thicken(env, shape.tissues[&p.tissue], p),
+            Action::Grow(role) => self.grow(o, env, t, view, bid, role, d),
+            Action::Release => self.release(o, env, t, p, d),
+            _ => self.thicken(env, t, p),
         };
         let (cost, intent) = match proposal {
             Ok(proposal) => proposal,
@@ -837,19 +963,34 @@ impl Tree {
             }
         }
         let mut chosen = None;
-        if let Intent::Grow { cell, .. } = intent {
-            d.claimed.insert(cell);
-            d.population += 1;
-            d.total += 1;
-            chosen = view.candidates.iter().position(|c| c.cell == cell);
+        match intent {
+            Intent::Grow { cell, role, .. } => {
+                d.claimed.insert(cell);
+                d.population += 1;
+                d.total += 1;
+                d.cones += u16::from(role == Role::Cone);
+                chosen = view.candidates.iter().position(|c| c.cell == cell);
+            }
+            Intent::Release { cell, .. } => {
+                // The cone leaves the tree, and its seed is a new organism.
+                d.claimed.insert(cell);
+                d.population -= 1;
+                d.cones -= 1;
+                d.offspring += 1;
+                d.organisms += 1;
+            }
+            _ => {}
         }
         d.intents.push(intent);
         Outcome::Won(chosen)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn grow(
         &self,
         o: &Observation,
+        env: &impl Environment,
+        t: &Tissue,
         view: &View,
         bid: &Bid,
         role: Role,
@@ -857,28 +998,45 @@ impl Tree {
     ) -> Result<(Resources, Intent), Refusal> {
         let p = &view.point;
         let slot = slot(role).ok_or(Refusal::Role)?;
+        let sprout = role == Role::Wood && !p.attached;
         let allowed = match p.kind {
-            Kind::Needle => false,
-            Kind::Root | Kind::RootTip => role == Role::Root || (role == Role::Wood && !p.attached),
+            Kind::Needle | Kind::Cone => false,
+            Kind::Root | Kind::RootTip => role == Role::Root || sprout,
             Kind::Leader | Kind::Trunk | Kind::BranchTip | Kind::Branch => role != Role::Root,
         };
         if !allowed {
             return Err(Refusal::Role);
         }
-        if d.population >= self.traits.max_tissues || d.total >= o.config.max_tissues {
+        if d.population >= self.traits.max_tissues
+            || d.total >= o.config.max_tissues
+            || (role == Role::Cone && d.cones >= self.traits.max_cones)
+        {
             return Err(Refusal::Population);
         }
         let size = self.traits.size(role);
         if size > o.config.max_size {
             return Err(Refusal::Size);
         }
-        let cell = bid
+        let candidate = bid
             .ranking
             .iter()
             .filter_map(|&i| view.candidates.get(i))
             .find(|c| c.open[slot] && !d.claimed.contains(&c.cell))
-            .ok_or(Refusal::Space)?
-            .cell;
+            .ok_or(Refusal::Space)?;
+        let cell = candidate.cell;
+        if sprout {
+            // A seed sprouts only into light, from watered dirt. A cell the
+            // host did not measure this tick waits for a reading.
+            if candidate
+                .light
+                .is_none_or(|light| light < self.traits.sprout_light)
+            {
+                return Err(Refusal::Shade);
+            }
+            if env.exposure(t).water < self.traits.sprout_water {
+                return Err(Refusal::Dry);
+            }
+        }
         Ok((
             scaled(o.config.growth_per_size[role.index()], size),
             Intent::Grow {
@@ -889,6 +1047,78 @@ impl Tree {
                 support: Some(self.support),
             },
         ))
+    }
+
+    /// A ripe cone drops, and the tree's stores pay its seed's reserves.
+    fn release(
+        &self,
+        o: &Observation,
+        env: &impl Environment,
+        t: &Tissue,
+        p: &Point,
+        d: &Decision,
+    ) -> Result<(Resources, Intent), Refusal> {
+        if p.kind != Kind::Cone {
+            return Err(Refusal::Role);
+        }
+        if p.target.is_some() {
+            return Err(Refusal::Unripe);
+        }
+        if d.offspring >= self.traits.max_offspring || d.organisms >= o.config.max_organisms {
+            return Err(Refusal::Population);
+        }
+        let cell = self
+            .landing(o, env, t)
+            .filter(|cell| !d.claimed.contains(cell))
+            .ok_or(Refusal::Space)?;
+        let stores = self.traits.starting_reserves;
+        Ok((
+            stores,
+            Intent::Release {
+                cone: t.id,
+                role: Role::Root,
+                size: self.traits.root_size,
+                cell,
+                support: Some(self.support),
+                stores,
+            },
+        ))
+    }
+
+    /// Where a cone's seed lands: the wind carries it up to `seed_drift`
+    /// cells across, drawn from the runtime's seed, the tick and the cone,
+    /// and it falls straight down through air and plants alike to the first
+    /// cell that is not air. It lands only on free dirt; anywhere else the
+    /// cone keeps its seed for another gust.
+    pub fn landing(
+        &self,
+        o: &Observation,
+        env: &impl Environment,
+        cone: &Tissue,
+    ) -> Option<[i32; 2]> {
+        let reach = u64::from(self.traits.seed_drift);
+        let draw = mix(o.seed ^ mix(o.tick ^ mix(cone.id)));
+        let drift = (draw % (2 * reach + 1)) as i32 - reach as i32;
+        let air = |cell| {
+            env.support_valid(Some(self.support), cell)
+                && env.space_available(cell, Role::Shoot, self.traits.needle_size)
+        };
+        let mut cell = step(cone.cell, self.side().map(|v| v * drift))?;
+        if !air(cell) {
+            return None;
+        }
+        let down = self.up.map(|v| -v);
+        for _ in 0..MAX_FALL {
+            cell = step(cell, down)?;
+            if !air(cell) {
+                let free = o.tissues.iter().all(|t| t.cell != cell);
+                return (free
+                    && env.support_valid(Some(self.support), cell)
+                    && env.space_available(cell, Role::Root, self.traits.root_size))
+                .then_some(cell);
+            }
+        }
+        None
     }
 
     fn thicken(
@@ -914,11 +1144,123 @@ impl Tree {
     }
 }
 
+/// The trees of this policy on one support: those a host planted, and those
+/// grown from their seeds. A seed a grove tree's cone drops becomes a tree of
+/// its own with its parent's traits, and a tree whose tissue has all died is
+/// cleared away. Every tree bids to the same brain.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Grove {
+    pub trees: Vec<Tree>,
+}
+
+/// What one tending did: the organisms of the seeds it took in as trees,
+/// and of the trees it cleared away.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Tending {
+    pub adopted: Vec<OrganismId>,
+    pub cleared: Vec<OrganismId>,
+}
+
+impl Grove {
+    /// Each tree's organism, for the trees with tissue.
+    pub fn owners(&self, o: &Observation) -> BTreeMap<OrganismId, &Tree> {
+        self.trees
+            .iter()
+            .filter_map(|tree| Some((tree.organism(o)?, tree)))
+            .collect()
+    }
+
+    /// Cells to measure light at for every tree. A seed's are measured at
+    /// every decision; beyond `MAX_PROBES`, the rest rotate with the tick.
+    pub fn probes(&self, o: &Observation, env: &impl Environment) -> Vec<[i32; 2]> {
+        let (mut seeds, mut rest) = (BTreeSet::new(), BTreeSet::new());
+        for tree in &self.trees {
+            let cells = tree.probe_cells(o, env);
+            if tree.own(o).any(|t| t.role == Role::Wood) {
+                rest.extend(cells);
+            } else {
+                seeds.extend(cells);
+            }
+        }
+        let seeds: Vec<_> = seeds.into_iter().take(MAX_PROBES).collect();
+        let rest = rest.into_iter().filter(|c| !seeds.contains(c)).collect();
+        let mut chosen = rotate(rest, o.tick, MAX_PROBES - seeds.len());
+        chosen.extend(seeds);
+        chosen.sort_unstable();
+        chosen
+    }
+
+    /// Every tree's decision, in the grove's order, with at most `budget`
+    /// intents among them: the share of the tick's intents the host leaves
+    /// the grove.
+    pub fn plan(
+        &self,
+        o: &Observation,
+        env: &impl Environment,
+        senses: &impl Senses,
+        brain: &mut impl TreeBrain,
+        budget: usize,
+    ) -> Vec<Round> {
+        let mut left = budget.min(o.config.max_intents);
+        self.trees
+            .iter()
+            .map(|tree| {
+                let round = tree.plan_within(o, env, senses, brain, left);
+                left -= round.intents.len();
+                round
+            })
+            .collect()
+    }
+
+    /// After a tick: each seed a grove tree released becomes a tree, and the
+    /// trees whose tissue has all died are removed with their tissue.
+    pub fn tend(&mut self, plants: &mut Plants) -> Result<Tending, Rejection> {
+        let o = plants.observe();
+        let parents: BTreeMap<OrganismId, Tree> = self
+            .owners(&o)
+            .into_iter()
+            .map(|(organism, tree)| (organism, tree.clone()))
+            .collect();
+        let mut tending = Tending::default();
+        for t in &o.tissues {
+            let Some(parent) = o.parents.get(&t.organism).and_then(|p| parents.get(p)) else {
+                continue;
+            };
+            if t.policy == POLICY
+                && !parents.contains_key(&t.organism)
+                && !tending.adopted.contains(&t.organism)
+            {
+                tending.adopted.push(t.organism);
+                self.trees.push(Tree {
+                    origin: t.cell,
+                    ..parent.clone()
+                });
+            }
+        }
+        let mut dead = Vec::new();
+        self.trees.retain(|tree| {
+            let own: Vec<&Tissue> = tree.own(&o).collect();
+            let alive = own.iter().any(|t| t.health > 0);
+            if !alive {
+                tending.cleared.extend(own.first().map(|t| t.organism));
+                dead.extend(own.iter().map(|t| t.id));
+            }
+            alive
+        });
+        if !dead.is_empty() {
+            plants.remove_many(&dead)?;
+        }
+        Ok(tending)
+    }
+}
+
 /// The hand-written conifer brain. The leader climbs while energy keeps up,
 /// branches come out in tiers and reach further the lower they sit, needles
 /// go where the light is and mature there, roots grow when water or
 /// nutrients run short, wood thickens as the needles beyond it fill what it
-/// supplies, and shaded needles, dead tissue and bare tips are dropped.
+/// supplies, and shaded needles, dead tissue and bare tips are dropped. Once
+/// grown, with stores to spare, it hangs cones below its branch tips, ripens
+/// them and drops them with their seeds.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Conifer {
     /// Height of the lowest branch tier, and the cells between tiers.
@@ -989,6 +1331,12 @@ impl Conifer {
     /// The surplus the tree keeps before it builds wood it will not need yet.
     fn margin(w: &Whole) -> i64 {
         6 + w.upkeep[2] as i64 / 4
+    }
+
+    /// More than the tree can use: energy coming in beyond upkeep, and every
+    /// store at least half full.
+    fn plenty(w: &Whole) -> bool {
+        Self::net(w) > 0 && (0..3).all(|r| w.stores[r] * 2 >= w.capacity[r])
     }
 
     /// Open candidates for this role, brightest first.
@@ -1076,7 +1424,18 @@ impl Conifer {
     fn trunk(&self, view: &View) -> Bid {
         let (w, p) = (&view.whole, &view.point);
         if w.needles == 0 {
-            let ranking = Self::by_light(view, Role::Shoot, &[SIDES[0], SIDES[1], UP], None);
+            // The first needle goes beside the trunk. Hemmed in on both sides,
+            // as among grass blades, the leader climbs past them first rather
+            // than cap itself with a needle.
+            let ranking = Self::by_light(view, Role::Shoot, &SIDES, None);
+            if ranking.is_empty() && p.kind == Kind::Leader && view.candidates[UP].open[0] {
+                return grow(Role::Wood, 1000, vec![UP]);
+            }
+            let ranking = if ranking.is_empty() {
+                Self::by_light(view, Role::Shoot, &[UP], None)
+            } else {
+                ranking
+            };
             return grow(Role::Shoot, 1000, ranking);
         }
         let tier = p.height >= self.first_tier
@@ -1135,6 +1494,18 @@ impl Conifer {
         }
         options.extend(self.needle(view, &[UP]));
         options.extend(Self::thicken(p));
+        // A grown tree with plenty hangs cones below its branch tips, the
+        // highest first, while its seeds may still find room.
+        if tip
+            && w.height >= self.max_height
+            && w.cones < w.max_cones
+            && w.offspring < w.max_offspring
+            && Self::plenty(w)
+            && view.candidates[DOWN].open[slot(Role::Cone).unwrap_or(0)]
+        {
+            let high = p.height.clamp(0, 50) as i16;
+            options.push(grow(Role::Cone, 200 + high, vec![DOWN]));
+        }
         let up = &view.candidates[UP];
         let dark = up.holder.is_some() || up.light.is_some_and(|l| l < self.needle_light);
         if options.is_empty()
@@ -1151,6 +1522,24 @@ impl Conifer {
             return act(Action::Shed, 100);
         }
         best(options)
+    }
+
+    /// A cone ripens while the tree has plenty, and drops once ripe while
+    /// the tree's seeds may still find room.
+    fn cone(view: &View) -> Bid {
+        let (w, p) = (&view.whole, &view.point);
+        if p.target.is_none() {
+            return if w.offspring < w.max_offspring {
+                act(Action::Release, 240)
+            } else {
+                Bid::wait()
+            };
+        }
+        if p.shortage_ticks == 0 && Self::plenty(w) {
+            act(Action::Thicken, 220)
+        } else {
+            Bid::wait()
+        }
     }
 }
 impl TreeBrain for Conifer {
@@ -1179,6 +1568,7 @@ impl TreeBrain for Conifer {
                 act(Action::Thicken, 260 + need)
             }
             Kind::Needle => Bid::wait(),
+            Kind::Cone => Self::cone(view),
             Kind::Root | Kind::RootTip => self.root(view),
             Kind::Leader | Kind::Trunk => self.trunk(view),
             Kind::Branch | Kind::BranchTip => self.branch(view),
@@ -1186,13 +1576,14 @@ impl TreeBrain for Conifer {
     }
 }
 
-/// Encoder version 1. A view encodes as `COMMON` features of the tree and the
-/// point, then `PER_CANDIDATE` features for each of the four candidates in
-/// view order. Values lie in -1..=1. A reading the world did not take encodes
-/// as zero beside a zero "known" flag, never as darkness or drought.
-pub const ENCODER: u32 = 1;
-pub const COMMON: usize = 42;
-pub const PER_CANDIDATE: usize = 15;
+/// Encoder version 2, which adds cones and offspring. A view encodes as
+/// `COMMON` features of the tree and the point, then `PER_CANDIDATE` features
+/// for each of the four candidates in view order. Values lie in -1..=1. A
+/// reading the world did not take encodes as zero beside a zero "known" flag,
+/// never as darkness or drought.
+pub const ENCODER: u32 = 2;
+pub const COMMON: usize = 45;
+pub const PER_CANDIDATE: usize = 17;
 pub const INPUTS: usize = COMMON + 4 * PER_CANDIDATE;
 
 pub fn encode(view: &View) -> [f32; INPUTS] {
@@ -1209,7 +1600,7 @@ pub fn encode(view: &View) -> [f32; INPUTS] {
     let per_tree = |n: u16| fraction(u64::from(n), u64::from(w.max_tissues));
     let flag = |b: bool| if b { 1.0 } else { 0.0 };
     let mut x = Vec::with_capacity(INPUTS);
-    // The whole tree: 16 features.
+    // The whole tree: 18 features.
     for r in 0..3 {
         x.push(fraction(w.stores[r], w.capacity[r]));
     }
@@ -1235,7 +1626,9 @@ pub fn encode(view: &View) -> [f32; INPUTS] {
     ));
     x.push(scale(w.height as f32, 32.0));
     x.push(scale(w.depth as f32, 16.0));
-    // The point: 26 features.
+    x.push(fraction(u64::from(w.cones), u64::from(w.max_cones)));
+    x.push(fraction(u64::from(w.offspring), u64::from(w.max_offspring)));
+    // The point: 27 features.
     for kind in KINDS {
         x.push(flag(p.kind == kind));
     }
@@ -1265,13 +1658,14 @@ pub fn encode(view: &View) -> [f32; INPUTS] {
     x.push(p.target.map_or(0.0, |target| {
         fraction(p.development.iter().sum(), target.iter().sum())
     }));
-    // Each candidate: 15 features.
+    // Each candidate: 17 features.
     for c in &view.candidates {
         for holder in [
             None,
             Some(Holder::Wood),
             Some(Holder::Needle),
             Some(Holder::Root),
+            Some(Holder::Cone),
             Some(Holder::Other),
         ] {
             x.push(flag(c.holder == holder));

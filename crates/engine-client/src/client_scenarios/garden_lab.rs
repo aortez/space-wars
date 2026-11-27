@@ -150,10 +150,26 @@ impl ClientScenario for GardenLabClientScenario {
             })
         });
         // The tree bed's tissue records add each tissue's last light reading,
-        // null where it takes none, and each of the tree's points' kind, bid
+        // null where it takes none, and each of the trees' points' kind, bid
         // and outcome from the last decision. A point born since has not bid.
+        // Each tree of the grove gives its organism, the seed's cell, the
+        // organism whose cone dropped it, if one did, and whether it has
+        // sprouted.
         let tree_bed = s.tree_bed.as_ref().map(|bed| {
             let bo = bed.plants.observe();
+            let trees: Vec<_> = bed
+                .grove
+                .trees
+                .iter()
+                .map(|tree| {
+                    let organism = tree.organism(&bo);
+                    serde_json::json!({
+                        "organism":organism,"origin":tree.origin,
+                        "parent":organism.and_then(|o| bo.parents.get(&o)),
+                        "sprouted":tree.own(&bo).any(|t| t.role == Role::Wood),
+                    })
+                })
+                .collect();
             let records: Vec<_> = bo
                 .tissues
                 .iter()
@@ -179,7 +195,9 @@ impl ClientScenario for GardenLabClientScenario {
                 "intensity":bed.intensity,"sun":scenario_garden_lab::SUNS[bed.sun].0,
                 "availability":bed.availability,"shade":bed.shade,"shade_x":bed.shade_x,
                 "inspect":bed.inspect,"bids":bed.bids,"control":bed.control,"cuts":bed.cuts,
-                "tree_summary":bed.tree_summary(),"grass_summary":bed.grass_summary(),"bid_summary":bed.bid_summary(),
+                "tree_summary":bed.tree_summary(),"grove_summary":bed.grove_summary(),
+                "grass_summary":bed.grass_summary(),"bid_summary":bed.bid_summary(),
+                "trees":trees,"dropped":bed.dropped,"cleared":bed.cleared,
                 "tissues":records,"selected_tissue":selected,"connections":bo.connections,
                 "intake":bo.ledger.intake,"maintenance":bo.ledger.maintenance,
                 "growth":bo.ledger.growth,"loss":bo.ledger.loss,"unmet":bo.ledger.unmet,
@@ -581,7 +599,7 @@ mod tests {
         }
     }
     #[test]
-    fn garden_render_contract_tree_bed_draws_wood_needles_bids_and_grass() {
+    fn garden_render_contract_tree_bed_draws_wood_needles_bids_grass_cones_and_seeds() {
         let output =
             std::env::var_os("SPACEWARS_GARDEN_RENDER_ARTIFACTS").map(std::path::PathBuf::from);
         if let Some(dir) = &output {
@@ -592,8 +610,9 @@ mod tests {
                 && (i16::from(p.g) - i16::from(c[1])).abs() < 12
                 && (i16::from(p.b) - i16::from(c[2])).abs() < 12
         };
-        // Wood, needles, blades and winning bids, at both viewports.
-        let capture = |name: &str, s: &GardenLabState| -> Vec<[usize; 4]> {
+        // Wood, needles, blades, winning bids, cones and seeds, at both
+        // viewports.
+        let capture = |name: &str, s: &GardenLabState| -> Vec<[usize; 6]> {
             let frame = GardenLabScenario::render_frame(s);
             assert!(frame.layers.iter().flat_map(|l| &l.primitives).any(|p| matches!(
                 p,
@@ -609,6 +628,8 @@ mod tests {
                     count([26, 179, 89]),
                     count([64, 255, 77]),
                     count([255, 230, 51]),
+                    count([166, 77, 31]),
+                    count([230, 199, 128]),
                 ]);
                 let export = svg(&frame, viewport);
                 assert!(!export.contains("NaN"));
@@ -622,7 +643,8 @@ mod tests {
             if let Some(dir) = &output {
                 let bed = s.shown_tree_bed().unwrap();
                 let state = serde_json::json!({"simulation_seconds":bed.plants.observe().tick,
-                    "tree":bed.tree_summary(),"grass":bed.grass_summary(),"bids":bed.bid_summary(),
+                    "tree":bed.tree_summary(),"grove":bed.grove_summary(),
+                    "grass":bed.grass_summary(),"bids":bed.bid_summary(),
                     "preview_only":true});
                 std::fs::write(
                     dir.join(format!("tree-{name}-state.json")),
@@ -642,19 +664,19 @@ mod tests {
         };
         run(&mut s, 200);
         // While it grows, some bids win every decision and show yellow.
-        for [wood, needles, blades, won] in capture("growing", &s) {
+        for [wood, needles, blades, won, ..] in capture("growing", &s) {
             assert!(wood > 200, "wood invisible: {wood}");
             assert!(needles > 20, "needles invisible: {needles}");
             assert!(blades > 20, "blades invisible: {blades}");
             assert!(won > 5, "winning bids invisible: {won}");
         }
         s.command(Command::Bids);
-        for [.., won] in capture("bids-off", &s) {
+        for [.., won, _, _] in capture("bids-off", &s) {
             assert_eq!(won, 0, "bids drawn while off");
         }
         s.command(Command::Bids);
         run(&mut s, 600);
-        let full = capture("cone", &s);
+        let full = capture("grown", &s);
         s.command(Command::CutBranch);
         let cut = capture("cut", &s);
         for ([wood, needles, ..], [cut_wood, cut_needles, ..]) in full.into_iter().zip(cut) {
@@ -662,5 +684,31 @@ mod tests {
         }
         run(&mut s, 800);
         capture("stub", &s);
+        // Planted fresh, by tick 612 the grown tree hangs a ripe cone and a
+        // young one below its lowest branches, and its first seed lies under
+        // the crown.
+        s.command(Command::PlantTree);
+        run(&mut s, 612);
+        let cones = capture("cones", &s);
+        for &[.., cone, seed] in &cones {
+            assert!(cone > 20, "cones invisible: {cone}");
+            assert!(seed > 5, "seeds invisible: {seed}");
+        }
+        // By tick 1000 its seeds beyond the crown have grown into young trees.
+        run(&mut s, 1000);
+        for ([wood, ..], [young, ..]) in cones.into_iter().zip(capture("seedlings", &s)) {
+            assert!(young > wood, "young trees invisible: {young} after {wood}");
+        }
+        // A seed planted in the grass at tick 100 has sprouted between its
+        // blades by tick 110, and stays a sapling.
+        s.command(Command::PlantTree);
+        run(&mut s, 100);
+        s.command(Command::PlantSeedling);
+        run(&mut s, 110);
+        for [wood, needles, blades, ..] in capture("seedling-in-grass", &s) {
+            assert!(wood > 200 && needles > 20 && blades > 20);
+        }
+        run(&mut s, 600);
+        capture("sapling-in-grass", &s);
     }
 }

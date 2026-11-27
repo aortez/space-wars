@@ -25,7 +25,10 @@ use std::{collections::BTreeMap, time::Duration};
 
 pub mod tree_bed;
 use tree_bed::next_light;
-pub use tree_bed::{SUNS, TREE_CONTROLS, TREE_GRASS_ORIGIN, TREE_MAX_TICKS, TREE_ORIGIN, TreeBed};
+pub use tree_bed::{
+    SUNS, TREE_CONTROLS, TREE_GRASS_ORIGIN, TREE_MAX_TICKS, TREE_ORIGIN, TREE_SEEDLING_ORIGIN,
+    TreeBed,
+};
 
 pub const TICK_MS: u64 = 1000;
 pub const MAX_TICKS: u64 = 480;
@@ -86,6 +89,7 @@ pub enum Command {
     CutBranch,
     PlantTree,
     Sun,
+    PlantSeedling,
 }
 impl Command {
     pub fn action(self) -> Action {
@@ -134,6 +138,7 @@ impl Command {
             Self::CutBranch,
             Self::PlantTree,
             Self::Sun,
+            Self::PlantSeedling,
         ]
         .get(*v as usize)
         .copied()
@@ -786,7 +791,8 @@ impl GardenLabState {
             | Command::Bids
             | Command::CutBranch
             | Command::PlantTree
-            | Command::Sun => {}
+            | Command::Sun
+            | Command::PlantSeedling => {}
         }
     }
     /// Time passes only for the bed that is shown.
@@ -1035,7 +1041,7 @@ impl Scenario for GardenLabScenario {
                     RenderPoint::new(center.x - 0.35, center.y),
                     RenderPoint::new(center.x + 0.35, center.y),
                 ),
-                Role::Wood => (
+                Role::Wood | Role::Cone => (
                     RenderPoint::new(center.x, center.y - 0.5),
                     RenderPoint::new(center.x, center.y + 0.5),
                 ),
@@ -1438,7 +1444,7 @@ mod garden_lab_contract {
     fn admission_is_historical_and_shortages_do_not_bypass_costs() {
         let mut s = GardenLabScenario::init((), 42);
         let config = plants::Config {
-            maintenance_per_size: [[30; 3]; 5],
+            maintenance_per_size: [[30; 3]; 6],
             ..plants::Config::default()
         };
         let mut plants = Plants::new(config, 42).unwrap();

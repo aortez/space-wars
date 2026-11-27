@@ -737,6 +737,9 @@ fn development_targets_by_role_and_size() {
         (Role::Wood, 1, Some(wood)),
         (Role::Wood, 15, Some(wood)),
         (Role::Wood, 16, None),
+        (Role::Cone, 1, Some(config.development_per_size)),
+        (Role::Cone, 2, Some(config.development_per_size)),
+        (Role::Cone, 3, None),
         (Role::Root, 1, None),
         (Role::Runner, 1, None),
         (Role::Moss, 1, None),
@@ -811,6 +814,146 @@ fn shedding_drops_a_tissue_and_what_grew_from_it_and_loses_their_shares() {
     step(&mut p, &env, &[Intent::Shed { tissue: 6 }]);
     assert_eq!(p.ledger.results, vec![Ok(())]);
     assert_eq!(p.tissues.keys().copied().collect::<Vec<_>>(), vec![1, 2, 3]);
+    let (after, l) = (sum(&p), &p.ledger);
+    let spent: Resources =
+        std::array::from_fn(|i| after[i] + l.maintenance[i] + l.growth[i] + l.loss[i]);
+    assert_eq!(spent, std::array::from_fn(|i| before[i] + l.intake[i]));
+}
+
+#[test]
+fn a_ripe_cone_drops_with_a_seed_that_its_stores_pay_for() {
+    let mut p = plant();
+    let env = Env::default();
+    let root = p
+        .seed(42, Role::Root, 3, [0, 0], None, [60; 3], &env)
+        .unwrap();
+    // A trunk with a needle above it and a cone beside it.
+    for intent in [
+        grow(root, Role::Wood, [0, 1]),
+        grow(2, Role::Shoot, [0, 2]),
+        grow(2, Role::Cone, [1, 1]),
+    ] {
+        step(&mut p, &env, &[intent]);
+        assert_eq!(p.ledger.results, vec![Ok(())]);
+    }
+    let release = |tissue, cell, stores| Intent::Release {
+        cone: tissue,
+        role: Role::Root,
+        size: 1,
+        cell,
+        support: None,
+        stores,
+    };
+    let refused = |p: &mut Plants, intent: Intent, rejection| {
+        let before = p.clone();
+        assert_eq!(p.apply(&intent, &env), Err(rejection), "{intent:?}");
+        assert_eq!(*p, before);
+    };
+    // An unripe cone does not drop, nor does anything but a cone.
+    refused(&mut p, release(4, [5, 0], [5; 3]), Rejection::Invalid);
+    refused(&mut p, release(3, [5, 0], [5; 3]), Rejection::Invalid);
+    while p.tissues[&4].size < 3 {
+        step(&mut p, &env, &[Intent::Develop { tissue: 4 }]);
+        assert_eq!(p.ledger.results, vec![Ok(())]);
+    }
+    // A ripe cone's seed must fit a free cell, hold no more than its tissue
+    // can, cost no more than the stores hold, and fit the organism limit.
+    let pool = sum(&p);
+    refused(&mut p, release(4, [0, 1], [5; 3]), Rejection::Space);
+    refused(&mut p, release(4, [5, 0], [21; 3]), Rejection::Invalid);
+    let mut short = p.clone();
+    for t in short.tissues.values_mut() {
+        t.stores[1] = 0;
+    }
+    refused(
+        &mut short,
+        release(4, [5, 0], [5; 3]),
+        Rejection::Unaffordable,
+    );
+    let mut full = p.clone();
+    full.config.max_organisms = 1;
+    refused(
+        &mut full,
+        release(4, [5, 0], [5; 3]),
+        Rejection::OrganismLimit,
+    );
+    // The cone leaves with its edge, and its seed is a new organism holding
+    // exactly the stores it was given. Nothing is created: every unit the
+    // seed holds left the tree's stores.
+    let (loss, cone_share) = (p.ledger.loss, p.tissues[&4].stores);
+    assert_ne!(cone_share, [0; 3]);
+    assert_eq!(p.apply(&release(4, [5, 0], [5, 6, 7]), &env), Ok(()));
+    assert_eq!(
+        p.tissues.keys().copied().collect::<Vec<_>>(),
+        vec![1, 2, 3, 5]
+    );
+    assert_eq!(p.edges, BTreeSet::from([(1, 2), (2, 3)]));
+    let seed = &p.tissues[&5];
+    assert_eq!(
+        (
+            seed.organism,
+            seed.policy,
+            seed.role,
+            seed.cell,
+            seed.stores
+        ),
+        (2, 42, Role::Root, [5, 0], [5, 6, 7])
+    );
+    assert_eq!(p.ledger.loss, loss);
+    assert_eq!(sum(&p), pool);
+    let tree: Resources = std::array::from_fn(|i| {
+        p.tissues
+            .values()
+            .filter(|t| t.organism == 1)
+            .map(|t| t.stores[i])
+            .sum()
+    });
+    assert_eq!(tree, [pool[0] - 5, pool[1] - 6, pool[2] - 7]);
+    assert_eq!(p.observe().parents, BTreeMap::from([(2, 1)]));
+    // The seed grew from nothing, so it cannot be shed, and its lineage goes
+    // when its tissue does.
+    refused(&mut p, Intent::Shed { tissue: 5 }, Rejection::Invalid);
+    p.remove(5).unwrap();
+    assert!(p.observe().parents.is_empty());
+}
+
+#[test]
+fn a_cone_with_tissue_grown_from_it_does_not_drop_and_drops_balance_a_tick() {
+    let mut p = plant();
+    let env = Env::default();
+    let root = p
+        .seed(42, Role::Root, 3, [0, 0], None, [60; 3], &env)
+        .unwrap();
+    for intent in [
+        grow(root, Role::Wood, [0, 1]),
+        grow(2, Role::Shoot, [0, 2]),
+        grow(2, Role::Cone, [1, 1]),
+        grow(2, Role::Cone, [-1, 1]),
+    ] {
+        step(&mut p, &env, &[intent]);
+    }
+    while p.tissues[&4].size < 3 || p.tissues[&5].size < 3 {
+        step(
+            &mut p,
+            &env,
+            &[Intent::Develop { tissue: 4 }, Intent::Develop { tissue: 5 }],
+        );
+    }
+    // Something grown from a cone keeps it on the tree.
+    step(&mut p, &env, &[grow(5, Role::Shoot, [-1, 2])]);
+    assert_eq!(p.ledger.results, vec![Ok(())]);
+    let release = |cone, cell| Intent::Release {
+        cone,
+        role: Role::Root,
+        size: 1,
+        cell,
+        support: None,
+        stores: [5; 3],
+    };
+    let before = sum(&p);
+    step(&mut p, &env, &[release(5, [-5, 0]), release(4, [5, 0])]);
+    assert_eq!(p.ledger.results, vec![Err(Rejection::Invalid), Ok(())]);
+    // The tick's ledger balances with the drop in it.
     let (after, l) = (sum(&p), &p.ledger);
     let spent: Resources =
         std::array::from_fn(|i| after[i] + l.maintenance[i] + l.growth[i] + l.loss[i]);

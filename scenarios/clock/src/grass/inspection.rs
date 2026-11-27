@@ -23,6 +23,7 @@ pub(crate) fn snapshot(state: &crate::ClockState) -> Option<ClockGrassInspection
                 engine_core::plants::Role::Shoot => "shoot",
                 engine_core::plants::Role::Moss => "moss",
                 engine_core::plants::Role::Wood => "wood",
+                engine_core::plants::Role::Cone => "cone",
             }
             .into(),
             size: t.size,
