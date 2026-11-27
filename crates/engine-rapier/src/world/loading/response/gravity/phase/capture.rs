@@ -93,6 +93,7 @@ impl Scene {
             // Admission proved zero other forces/constraints. No general guard
             // is bypassed: this raw solve now has zero gravity and zero duration.
             external_constraints: false,
+            passes: crate::world::PassThrough(&world.passes),
         };
         let started = Instant::now();
         if world.collect_events {

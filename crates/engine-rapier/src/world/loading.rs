@@ -3,7 +3,10 @@
 //! independent patches must have different source IDs even on the same region.
 
 use super::*;
-use rapier2d::prelude::{ContactModificationContext, PhysicsHooks, SolverContactBatchContext};
+use rapier2d::prelude::{
+    ContactModificationContext, PairFilterContext, PhysicsHooks, SolverContactBatchContext,
+    SolverFlags,
+};
 
 pub mod charges;
 pub mod response;
@@ -729,11 +732,20 @@ pub(super) struct Hooks<'a> {
     pub drives: surface_drive::DriveHooks<'a>,
     pub loading: Option<Mutex<&'a mut LoadingState>>,
     pub external_constraints: bool,
+    /// The entities that pass through each other, which make no contact.
+    pub passes: PassThrough<'a>,
 }
 
 impl PhysicsHooks for Hooks<'_> {
     fn report_applied_contact_impulses(&self) -> bool {
         self.report_applied_contact_impulses
+    }
+
+    fn filter_contact_pair(&self, context: &PairFilterContext) -> Option<SolverFlags> {
+        (!self
+            .passes
+            .between(context.colliders, context.collider1, context.collider2))
+        .then_some(SolverFlags::COMPUTE_IMPULSES)
     }
 
     fn modify_solver_contacts(&self, context: &mut ContactModificationContext) {

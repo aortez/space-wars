@@ -12,8 +12,8 @@ use std::{
 
 use engine_core::Vec2;
 use rapier2d::prelude::{
-    ActiveEvents, BroadPhaseBvh, CCDSolver, Collider, ColliderBuilder, ColliderHandle, ColliderSet,
-    CollisionEvent, ContactPair, EventHandler, GenericJoint, Group, ImpulseJoint,
+    ActiveEvents, ActiveHooks, BroadPhaseBvh, CCDSolver, Collider, ColliderBuilder, ColliderHandle,
+    ColliderSet, CollisionEvent, ContactPair, EventHandler, GenericJoint, Group, ImpulseJoint,
     ImpulseJointHandle, ImpulseJointSet, IntegrationParameters, InteractionGroups,
     InteractionTestMode, IslandManager, LockedAxes, MassProperties, MultibodyJointSet, NarrowPhase,
     PhysicsPipeline, PhysicsWorld as RapierWorld, Pose, QueryFilter, QueryFilterFlags, Ray,
@@ -94,6 +94,9 @@ const COMPRESSION_SNAPSHOT_TAG: u64 = 0x434f_4d50_5245_5353;
 /// Marks the weights carried into a step not yet taken, which follow
 /// whatever else a snapshot holds and only when there are any.
 const CARRIED_WEIGHT_SNAPSHOT_TAG: u64 = 0x4341_5252_4945_4457;
+/// Marks the entities that pass through others, each with the other, which
+/// follow the carried weights and only when there are any.
+const PASS_THROUGH_SNAPSHOT_TAG: u64 = 0x5041_5353_5448_5255;
 /// Marks a capture that admits speculative arrivals. The tag carries nothing
 /// else and comes first among a snapshot's tagged sections.
 const SPECULATIVE_ARRIVALS_SNAPSHOT_TAG: u64 = 0x5350_4543_4152_5256;
@@ -736,6 +739,34 @@ struct EntityRecord {
     joints: Vec<JointId>,
 }
 
+/// Which entities' colliders pass through each other's, as
+/// [`PhysicsWorld::pass_through`] lets them. The step's hooks ask it about each
+/// contact pair with a collider marked for filtering.
+#[derive(Clone, Copy)]
+struct PassThrough<'a>(&'a BTreeMap<PhysicsId, PhysicsId>);
+
+impl PassThrough<'_> {
+    /// Whether any entity passes through another.
+    fn any(self) -> bool {
+        !self.0.is_empty()
+    }
+
+    /// Whether the colliders `a` and `b` pass through each other.
+    fn between(self, colliders: &ColliderSet, a: ColliderHandle, b: ColliderHandle) -> bool {
+        let entity = |handle| {
+            colliders
+                .get(handle)
+                .and_then(|collider| decode_collider(collider.user_data))
+                .map(|id| id.entity)
+        };
+        let (Some(a), Some(b)) = (entity(a), entity(b)) else {
+            return false;
+        };
+        let passes = |from: PhysicsId, to: PhysicsId| self.0.get(&from) == Some(&to);
+        passes(a, b) || passes(b, a)
+    }
+}
+
 /// Canonical application mechanics world.
 pub struct PhysicsWorld {
     pub(crate) raw: RapierWorld,
@@ -753,6 +784,9 @@ pub struct PhysicsWorld {
     loading: Option<loading::LoadingState>,
     /// Bodies whose weight the next step carries; see [`Self::carry_weight`].
     carried_weights: Vec<RigidBodyHandle>,
+    /// The entities whose colliders pass through another's, each with the
+    /// other; see [`Self::pass_through`].
+    passes: BTreeMap<PhysicsId, PhysicsId>,
     /// Structural connections by identity, live or severed.
     connections: BTreeMap<JointId, connection::ConnectionRecord>,
     /// The connections the last step severed; see [`Self::severed_connections`].
@@ -800,6 +834,7 @@ impl Clone for PhysicsWorld {
                 collect_events: self.collect_events,
                 loading: None,
                 carried_weights: self.carried_weights.clone(),
+                passes: self.passes.clone(),
                 connections: self.connections.clone(),
                 // Transient, like the contact events: a snapshot drops it too.
                 severed_connections: Vec::new(),
@@ -941,6 +976,7 @@ impl PhysicsWorld {
             collect_events: config.collect_events,
             loading: None,
             carried_weights: Vec::new(),
+            passes: BTreeMap::new(),
             connections: BTreeMap::new(),
             severed_connections: Vec::new(),
         }
@@ -1293,6 +1329,84 @@ impl PhysicsWorld {
         true
     }
 
+    /// Lets the colliders of `entity` and of `other` pass through each other
+    /// until [`Self::end_pass_through`], as a round leaving the tank that
+    /// fired it does. From the next step the two make no contact, even where
+    /// they rest on each other, while each still meets everything else. Only
+    /// contacts stop: sensors and queries still see both. That step wakes
+    /// `entity`'s bodies and any near them. An entity passes through one other
+    /// at a time, the last named here. False when the world lacks either
+    /// entity, or for `other` the same as `entity`.
+    pub fn pass_through(&mut self, entity: PhysicsId, other: PhysicsId) -> bool {
+        if entity == other || !self.entities.contains_key(&other) {
+            return false;
+        }
+        let Some(record) = self.entities.get(&entity) else {
+            return false;
+        };
+        for id in record.colliders.clone() {
+            self.filter_contact_pairs(id, true);
+        }
+        self.passes.insert(entity, other);
+        true
+    }
+
+    /// Ends what [`Self::pass_through`] began for `entity`: from the next step
+    /// its colliders meet the other entity's again, and that step wakes
+    /// `entity`'s bodies and any near them. False for an entity that passes
+    /// through nothing.
+    pub fn end_pass_through(&mut self, entity: PhysicsId) -> bool {
+        if self.passes.remove(&entity).is_none() {
+            return false;
+        }
+        let colliders = self
+            .entities
+            .get(&entity)
+            .map_or_else(Vec::new, |record| record.colliders.clone());
+        for id in colliders {
+            self.filter_contact_pairs(id, false);
+        }
+        true
+    }
+
+    /// Ends every pass-through that names `entity` as the one passed through.
+    fn end_passes_naming(&mut self, entity: PhysicsId) {
+        let named: Vec<_> = self
+            .passes
+            .iter()
+            .filter(|&(_, other)| *other == entity)
+            .map(|(from, _)| *from)
+            .collect();
+        for from in named {
+            self.end_pass_through(from);
+        }
+    }
+
+    /// The entity whose colliders `entity`'s pass through, if any.
+    pub fn passes_through(&self, entity: PhysicsId) -> Option<PhysicsId> {
+        self.passes.get(&entity).copied()
+    }
+
+    /// Marks the collider `id` for the step's hooks to filter its contact
+    /// pairs, or unmarks it. Rapier looks at a pair again only once one of its
+    /// colliders changes, and skips pairs at rest, so this changes the
+    /// collider's place on its body to the same place. On the next step Rapier
+    /// then wakes the body and any near it, and recomputes the body's mass
+    /// from its colliders, which comes out the same.
+    fn filter_contact_pairs(&mut self, id: ColliderId, filter: bool) {
+        let Some(handle) = self.collider_handle(id) else {
+            return;
+        };
+        if let Some(collider) = self.raw.colliders.get_mut(handle) {
+            let mut hooks = collider.active_hooks();
+            hooks.set(ActiveHooks::FILTER_CONTACT_PAIRS, filter);
+            collider.set_active_hooks(hooks);
+            if let Some(&place) = collider.position_wrt_parent() {
+                collider.set_position_wrt_parent(place);
+            }
+        }
+    }
+
     pub fn remove_entity(&mut self, entity: PhysicsId) -> bool {
         let Some(record) = self.entities.get(&entity).cloned() else {
             return false;
@@ -1317,12 +1431,17 @@ impl PhysicsWorld {
             self.remove_collider_mapping(collider);
         }
         self.entities.remove(&entity);
+        // It passes through nothing now, and nothing passes through it.
+        self.end_pass_through(entity);
+        self.end_passes_naming(entity);
         true
     }
 
     /// Move `entity` into `target` as it is. Its bodies keep their pose,
     /// velocity, mass, sleep state and gravity scale, its colliders keep every
-    /// property, and all of them keep their identities. Only contact history
+    /// property, and all of them keep their identities. It passes through
+    /// what it passed through here, if anything, and what passed through it
+    /// here no longer does. Only contact history
     /// stays behind, as it would for a body inserted there. Refused, changing
     /// neither world, when the entity has joints or connections, severed ones
     /// included, when `target` already has it, or when the two worlds differ
@@ -1339,6 +1458,10 @@ impl PhysicsWorld {
             return false;
         }
         let record = self.entities.remove(&entity).expect("a checked entity");
+        if let Some(other) = self.passes.remove(&entity) {
+            target.passes.insert(entity, other);
+        }
+        self.end_passes_naming(entity);
         self.invalidate_gravity(GravityInvalidation::ExternalEdit);
         target.invalidate_gravity(GravityInvalidation::ExternalEdit);
         if let Some(loading) = &mut self.loading {
@@ -1976,6 +2099,7 @@ impl PhysicsWorld {
             external_constraints: self.raw.gravity != Vector::ZERO
                 || !self.raw.impulse_joints.is_empty()
                 || self.raw.multibody_joints.iter().next().is_some(),
+            passes: PassThrough(&self.passes),
         };
         let restored_hooks =
             hooks
@@ -1986,7 +2110,7 @@ impl PhysicsWorld {
             self.contact_event_collector.clear();
             self.raw
                 .step_with_events(&hooks, &self.contact_event_collector);
-        } else if !drives.is_empty() || capture_loading {
+        } else if !drives.is_empty() || capture_loading || hooks.passes.any() {
             self.raw.step_with_events(&hooks, &());
         } else {
             self.raw.step();
@@ -3109,6 +3233,12 @@ impl PhysicsWorld {
             bincode::serialize_into(&mut bytes, &self.carried_weights)
                 .map_err(|error| PhysicsWorldError(error.to_string()))?;
         }
+        if !self.passes.is_empty() {
+            bincode::serialize_into(&mut bytes, &PASS_THROUGH_SNAPSHOT_TAG)
+                .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            bincode::serialize_into(&mut bytes, &self.passes)
+                .map_err(|error| PhysicsWorldError(error.to_string()))?;
+        }
         self.serialize_connections(&mut bytes)?;
         Ok(bytes)
     }
@@ -3292,7 +3422,7 @@ impl PhysicsWorld {
             }
         }
         // Optional tagged sections follow in a fixed order: speculative
-        // arrivals, carried weights, then connections.
+        // arrivals, carried weights, pass-throughs, then connections.
         let next_tag = |reader: &mut std::io::Cursor<&[u8]>| {
             if reader.position() < bytes.len() as u64 {
                 bincode::deserialize_from::<_, u64>(reader)
@@ -3313,6 +3443,12 @@ impl PhysicsWorld {
         let mut carried_weights = Vec::new();
         if tag == Some(CARRIED_WEIGHT_SNAPSHOT_TAG) {
             carried_weights = bincode::deserialize_from(&mut reader)
+                .map_err(|error| PhysicsWorldError(error.to_string()))?;
+            tag = next_tag(&mut reader)?;
+        }
+        let mut passes = BTreeMap::new();
+        if tag == Some(PASS_THROUGH_SNAPSHOT_TAG) {
+            passes = bincode::deserialize_from(&mut reader)
                 .map_err(|error| PhysicsWorldError(error.to_string()))?;
             tag = next_tag(&mut reader)?;
         }
@@ -3381,6 +3517,7 @@ impl PhysicsWorld {
             collect_events: snapshot.collect_events,
             loading,
             carried_weights,
+            passes,
             connections,
             severed_connections: Vec::new(),
         };
@@ -3461,6 +3598,9 @@ impl PhysicsWorld {
             .or_default()
             .colliders
             .push(id);
+        if self.passes.contains_key(&id.entity) {
+            self.filter_contact_pairs(id, true);
+        }
     }
 
     fn body_mut(&mut self, id: BodyId) -> Option<&mut RigidBody> {
@@ -3970,6 +4110,7 @@ mod tests {
     mod compound;
     mod connection;
     mod contact_impulses;
+    mod pass_through;
     mod proximity;
     mod tether;
 
