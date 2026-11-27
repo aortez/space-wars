@@ -471,7 +471,7 @@ fn swept_shell_hits_ground_instead_of_skipping_through_it() {
 }
 
 #[test]
-fn a_tank_with_four_shells_in_flight_holds_fire_while_the_other_fires() {
+fn a_tank_at_its_cap_of_rounds_holds_fire_while_the_other_fires() {
     let mut state = ScorchedState::new(ScorchedConfig::default(), 42);
     for id in 1..=cannon::MAX_ROUNDS_PER_CANNON as u64 {
         state.shells.push(Shell {

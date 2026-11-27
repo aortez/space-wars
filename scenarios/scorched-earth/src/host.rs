@@ -603,7 +603,7 @@ impl HostedDuel {
             .shells
             .iter()
             .find(|shell| shell.source.id() == source.id)?;
-        let through = if shell.age < 8 {
+        let through = if shell.age < cannon::CLEARANCE_TICKS {
             Some(self.duel.tanks[shell.owner].body.entity)
         } else {
             through

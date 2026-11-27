@@ -72,7 +72,10 @@ fn wider_hills_reserve_their_chunks_and_support_custom_landings() {
     }
     assert!(duel.duel.shots > 0);
     assert!(
-        duel.duel.tanks.iter().any(|tank| tank.speed > 48.0),
+        duel.duel
+            .tanks
+            .iter()
+            .any(|tank| tank.speed > cannon::MAX_POWER),
         "wider duels retain enough firing range"
     );
     assert!(duel.material_balance(&world).is_ok());
@@ -470,7 +473,7 @@ fn a_host_points_a_tanks_barrel_either_way_and_below_the_level() {
         duel.point_barrel(1, direction);
         let [pivot, muzzle] = duel.tanks(&world)[1].barrel;
         let barrel = muzzle - pivot;
-        assert!((barrel.length() - 2.8 * 2.0).abs() < 1e-4);
+        assert!((barrel.length() - cannon::BARREL_LENGTH * 2.0).abs() < 1e-4);
         assert!(
             (barrel.normalized() - direction.normalized()).length() < 1e-5,
             "{barrel:?} along {direction:?}"
@@ -510,6 +513,22 @@ fn a_host_plots_a_shot_at_a_point_fires_it_once_the_duel_is_over_and_traces_its_
         assert!(direction.x < 0.0 && direction.y > 0.0, "{direction:?}");
         let flight = aim.flight_ticks().unwrap();
         let (shots, observations) = (duel.shots(), duel.shot_observations().len());
+        // A host's shot skips the reload, but not the cap on a cannon's rounds.
+        for id in 1..=cannon::MAX_ROUNDS_PER_CANNON as u64 {
+            duel.duel.shells.push(Shell {
+                owner: 1,
+                position: Vec2::new(0.0, 500.0),
+                velocity: Vec2::ZERO,
+                age: 10,
+                flight: None,
+                source: armor::shell(1_000_000 + id, None, 1.0),
+                keys: Default::default(),
+            });
+        }
+        assert!(duel.fire_aim(&mut world, &aim).is_none());
+        duel.duel
+            .shells
+            .retain(|shell| shell.source.id() < 1_000_000);
         let source = duel.fire_aim(&mut world, &aim).expect("a shot");
         assert_eq!(duel.shots(), shots + 1);
         let [pivot, muzzle] = duel.tanks(&world)[1].barrel;

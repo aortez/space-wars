@@ -4,9 +4,10 @@
 //! rules and is their testbed. A cannon's barrel turns on a pivot above its
 //! hull. It aims `elevation` above the horizontal toward one side, its
 //! `facing`, where the horizontal is square to the world's up rather than to
-//! the hull, so a tilted tank aims as a level one does. A round leaves at
-//! `power` relative to the barrel. Lengths and speeds are in the frame a host
-//! fires in, and ticks are fixed steps of a sixtieth of a second.
+//! the hull, so a tilted tank aims as a level one does. A round leaves the
+//! barrel at its power, carried by the hull's velocity. Lengths and speeds are
+//! in the firing game's own units, which a host such as the Clock may scale,
+//! and ticks are fixed steps of a sixtieth of a second.
 
 use engine_core::Vec2;
 
@@ -14,10 +15,10 @@ use engine_core::Vec2;
 pub const MIN_ELEVATION: f32 = 5.0_f32.to_radians();
 /// The highest a barrel aims above the horizontal, in radians.
 pub const MAX_ELEVATION: f32 = 85.0_f32.to_radians();
-/// The slowest a round leaves the barrel, relative to it.
+/// The slowest a round leaves the barrel, relative to its hull.
 pub const MIN_POWER: f32 = 12.0;
-/// The fastest a round leaves the barrel, relative to it, across a field as
-/// wide as Scorched's own. A host may raise it for a wider field.
+/// The fastest a round leaves the barrel, relative to its hull, across a field
+/// as wide as Scorched's own. A host may raise it for a wider field.
 pub const MAX_POWER: f32 = 48.0;
 /// The ticks a cannon takes to reload after it fires.
 pub const RELOAD_TICKS: u64 = 75;
@@ -67,8 +68,8 @@ impl Barrel {
     /// Where a round leaves the barrel. A barrel can't fire through the ground
     /// or another body, so a round leaves where something stands in the
     /// barrel, or else at the muzzle. `cast` traces from the pivot along
-    /// `muzzle - pivot`, past the firing tank's own bodies, and answers the
-    /// first point it meets.
+    /// `muzzle - pivot`, no farther than the muzzle and past the firing tank's
+    /// own bodies, and answers the first point it meets.
     pub fn exit(self, cast: impl FnOnce(Vec2, Vec2) -> Option<Vec2>) -> Vec2 {
         cast(self.pivot, self.muzzle - self.pivot).unwrap_or(self.muzzle)
     }
