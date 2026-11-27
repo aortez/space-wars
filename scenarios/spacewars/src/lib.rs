@@ -50,6 +50,7 @@ use engine_gravity::{
     GravityBackend, GravityConfig, GravityId, GravityParticipant, GravitySolver, GravityStepMetrics,
 };
 use engine_rapier::{
+    cannon,
     rover::{RoverControl, RoverSnapshot, RoverSpec},
     world::{BodyMotion, PhysicsStepMetrics, weapon::Blast},
 };
@@ -622,6 +623,8 @@ pub struct DebrisState {
     /// The blast a shell's payload releases where its shot ends, if it
     /// carries one. A ship's shells carry none.
     blast: Option<Blast>,
+    /// The tank that fired this shell, if it is a tank's round.
+    tank_round: Option<tanks::TankRound>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1513,8 +1516,10 @@ impl SpacewarsScenario {
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
 
         let lifecycle_started = Instant::now();
+        state.fire_tanks();
         let lifecycle = reconcile_physics(state, dt);
         shots::launch(state);
+        state.clear_rounds();
         let lifecycle_time = lifecycle_started.elapsed() + terrain_time;
 
         motion_diagnostics_time +=
@@ -2817,14 +2822,18 @@ fn apply_world_gravity_with_pilots(
     }
     let debris_responds = tick.is_multiple_of(ASTEROID_GRAVITY_FRAME_MODULUS);
     gravity_participants.extend(debris.iter().filter(|debris| !debris.dead).map(|debris| {
+        // A tank's round falls as the tank that fired it does, every tick.
+        let scale = if debris.tank_round.is_some() {
+            1.0
+        } else if debris_responds {
+            ASTEROID_GRAVITY_SCALE
+        } else {
+            0.0
+        };
         GravityParticipant::target(
             tagged_gravity_id(GRAVITY_DEBRIS_TAG, debris.physics_id),
             debris.position,
-            if debris_responds {
-                ASTEROID_GRAVITY_SCALE
-            } else {
-                0.0
-            },
+            scale,
         )
     }));
 
@@ -3285,10 +3294,7 @@ fn resolve_physics_collisions(
                     tick: state.tick + 1,
                     cause: tanks::TankDamageCause::Round,
                     amount: damage,
-                    source: shell
-                        .owner_id
-                        .and_then(PlayerId::from_index)
-                        .map(Allegiance::Player),
+                    source: shell.side(),
                 };
                 state.physics.tanks.damage(id, hit);
                 // Its sparks keep the old shell's size, set by how fast it
@@ -3881,7 +3887,12 @@ fn spawn_debris_breakup_fragments(state: &mut SpacewarsState) {
     let mut fragments = Vec::new();
 
     for (debris_index, debris) in state.debris.iter_mut().enumerate() {
-        if !debris.dead || debris.fragmented || debris.kind == DebrisKind::Fragment {
+        // A tank's round leaves no wreck, however it ends.
+        if !debris.dead
+            || debris.fragmented
+            || debris.kind == DebrisKind::Fragment
+            || debris.tank_round.is_some()
+        {
             continue;
         }
 
@@ -5403,6 +5414,7 @@ impl DebrisState {
             physics_id: 0,
             shot: false,
             blast: None,
+            tank_round: None,
         }
     }
 
@@ -5430,6 +5442,59 @@ impl DebrisState {
         shell.owner_id = Some(owner_id);
         shell.spawn_tick = spawn_tick;
         shell
+    }
+
+    /// A round from the cannon of the tank `round` names, fired at
+    /// `spawn_tick` from `position`: a shell of the shared cannon's round's
+    /// size and mass that carries its payload. No seat owns it, and its hits
+    /// name its tank's side.
+    pub fn new_tank_round(
+        round: tanks::TankRound,
+        spawn_tick: u64,
+        position: Vec2,
+        velocity: Vec2,
+    ) -> Self {
+        // A round's hits are its shot's, as a shell's are.
+        let mut shell = Self::new(
+            DebrisKind::Shell,
+            position,
+            velocity,
+            cannon::ROUND_RADIUS,
+            0.0,
+            Color::DIM_GREY,
+        );
+        shell.omega = CANNON_SHELL_OMEGA;
+        shell.life = 1.0;
+        shell.life_max = 1.0;
+        shell.spawn_tick = spawn_tick;
+        shell.inertial_mass = Some(cannon::ROUND_MASS);
+        shell.blast = Some(cannon::BLAST);
+        shell.tank_round = Some(round);
+        shell
+    }
+
+    /// The side a shell's hits name: the side of the tank whose round it is,
+    /// or the player in its owner's seat.
+    pub fn side(&self) -> Option<Allegiance> {
+        match self.tank_round {
+            Some(round) => Some(round.allegiance),
+            None => self
+                .owner_id
+                .and_then(PlayerId::from_index)
+                .map(Allegiance::Player),
+        }
+    }
+
+    /// The seat a shell's hits count for in the match rules: its owner's, or
+    /// the seat of the player whose tank fired it.
+    pub fn seat(&self) -> Option<usize> {
+        match self.tank_round {
+            Some(round) => match round.allegiance {
+                Allegiance::Player(player) => Some(player.index()),
+                Allegiance::Government(_) => None,
+            },
+            None => self.owner_id,
+        }
     }
 
     pub fn new_fragment(
@@ -6672,6 +6737,31 @@ fn render_debris(frame: &mut RenderFrame, debris: &DebrisState) {
     }
 
     if debris.kind == DebrisKind::Shell {
+        if debris.tank_round.is_some() {
+            // A tank's round looks like a shell of its own size.
+            let scale = cannon::ROUND_RADIUS / CANNON_SHELL_RADIUS;
+            let transform = Transform2 {
+                translation: debris.position,
+                scale: Vec2::splat(scale),
+                rotation_radians: debris.rotation_radians,
+                pivot: Vec2::ZERO,
+            };
+            frame.push_primitive(
+                DEBRIS_LAYER,
+                RenderPrimitive::Polygon(RenderPolygon {
+                    points: SHELL_BODY
+                        .iter()
+                        .map(|point| render_point(transform.transform_point(*point)))
+                        .collect(),
+                    fill: Some(Fill::new(render_color(debris.color))),
+                    stroke: Some(Stroke::new(
+                        RenderColor::rgba(0.74, 0.78, 0.84, 0.85),
+                        0.75 * scale,
+                    )),
+                }),
+            );
+            return;
+        }
         if debris.rail_launched {
             weapons::render_round(
                 frame,
@@ -6724,6 +6814,7 @@ fn render_debris_mark(frame: &mut RenderFrame, debris: &DebrisState) {
     let radius = match debris.kind {
         DebrisKind::Asteroid => debris.radius.max(2.0),
         DebrisKind::Fragment => debris.radius.max(1.25),
+        DebrisKind::Shell if debris.tank_round.is_some() => cannon::ROUND_RADIUS,
         DebrisKind::Shell => 1.5,
     };
     frame.push_primitive(

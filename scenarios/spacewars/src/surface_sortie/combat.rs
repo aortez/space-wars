@@ -460,8 +460,24 @@ pub(crate) fn record_hits(world: &SpacewarsState, pilots: &mut [SurfacePilot]) {
             continue;
         };
         if debris.kind == DebrisKind::Shell {
-            record_missile_hit(pilots, hit.ship, debris.owner_id, world.tick + 1);
+            record_missile_hit(pilots, hit.ship, debris.seat(), world.tick + 1);
         }
+    }
+    for hit in &world.blast_hits {
+        let (MechanicalEntity::Ship(target) | MechanicalEntity::Spaceling(target)) = hit.target
+        else {
+            continue;
+        };
+        // A blast's hit is its shell's, counted once: a shell that struck the
+        // body counted its hit there already.
+        if shots::charged(world, hit.source, hit.target).is_some() {
+            continue;
+        }
+        let seat = match hit.side {
+            Some(Allegiance::Player(player)) => Some(player.index()),
+            _ => None,
+        };
+        record_missile_hit(pilots, target, seat, world.tick + 1);
     }
 }
 pub(super) fn record_missile_hit(

@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use engine_core::Vec2;
 use engine_rapier::{
+    cannon,
     rover::{RoverAssembly, RoverSnapshot, RoverSpawnPose, RoverSpec},
     world::{
         BodyId as PhysicsBodyId, BodyKind, BodyMotion, BodyRole, BodySpec, ColliderId,
@@ -156,6 +157,11 @@ pub(super) fn tank_spec() -> RoverSpec {
 
 pub(super) fn tank_material_groups() -> CollisionGroups {
     CollisionGroups::new(GROUP_TANK, GROUP_MATERIAL)
+}
+
+/// What a tank's round meets: every solid, from launch.
+pub(super) fn tank_round_groups() -> CollisionGroups {
+    debris_collision_groups(None, true)
 }
 
 pub(super) fn spacewars_rover_spec() -> RoverSpec {
@@ -1431,7 +1437,9 @@ impl SpacewarsPhysics {
                     // with terrain/debris/opponent vehicles during breakup grace.
                     tick.saturating_sub(item.spawn_tick) >= RECOVERY_BREAKUP_GRACE_TICKS
                 } else {
-                    item.spawn_tick < tick
+                    // A tank's round is armed from launch. Its clearance keeps
+                    // it off the tank that fired it.
+                    item.tank_round.is_some() || item.spawn_tick < tick
                 },
                 kind: item.kind,
             };
@@ -1660,6 +1668,9 @@ impl SpacewarsPhysics {
                     ])
                     .to_vec(),
             ),
+            DebrisKind::Shell if debris.tank_round.is_some() => {
+                ColliderSpec::ball(collider_id(entity, DEBRIS_ROLE, 0), cannon::ROUND_RADIUS)
+            }
             DebrisKind::Shell => ColliderSpec::convex_polygon(
                 collider_id(entity, DEBRIS_ROLE, 0),
                 SHELL_BODY.to_vec(),
@@ -1668,6 +1679,9 @@ impl SpacewarsPhysics {
         let area = match debris.kind {
             DebrisKind::Asteroid => core::f32::consts::PI * debris.radius * debris.radius,
             DebrisKind::Fragment => triangle_area(debris.fragment_shape.unwrap_or(SHELL_BODY)),
+            DebrisKind::Shell if debris.tank_round.is_some() => {
+                core::f32::consts::PI * cannon::ROUND_RADIUS * cannon::ROUND_RADIUS
+            }
             DebrisKind::Shell => triangle_area(SHELL_BODY),
         };
         collider.density = debris.mass() / area.max(f32::EPSILON);

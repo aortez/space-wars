@@ -186,10 +186,19 @@ impl HealthMap {
 
     /// Rock, or a shell's casing, weighing what the debris weighed when it
     /// was made. Rock gives way a patch's depth behind a struck face, and a
-    /// shell crushes through its radius. The debris breaks below
-    /// `DEBRIS_DEATH_LIFE_FACTOR` of its full health, while its region still
-    /// holds that much of its capacity.
+    /// shell crushes through its radius. A tank's round is the shared
+    /// cannon's casing. The debris breaks below `DEBRIS_DEATH_LIFE_FACTOR` of
+    /// its full health, while its region still holds that much of its
+    /// capacity.
     pub fn debris(debris: &DebrisState) -> Self {
+        if debris.tank_round.is_some() {
+            return Self {
+                material: SHELL,
+                section: cannon::CASING,
+                volume: cannon::CASING_VOLUME,
+                full_health: debris.life_max,
+            };
+        }
         let (material, depth) = match debris.kind {
             DebrisKind::Shell => (SHELL, debris.base_radius),
             DebrisKind::Asteroid | DebrisKind::Fragment => (ASTEROID_ROCK, ROCK_DEPTH),

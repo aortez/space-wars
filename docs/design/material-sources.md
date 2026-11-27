@@ -307,6 +307,7 @@ around its collision shape's perimeter.
 | Pilot on foot | pilot tissue | the pilot's capsule, 0.3 deep | 2,632, for 100 health | 26.3 |
 | Asteroid, chip or breakup fragment | asteroid rock | what the body weighed when made, giving way 1 deep behind a struck face | 4,398 per unit of radius | 1,400 |
 | Cannon shell | shell | what the shell weighed when fired | 375 for a round, or 4,712 for a classic shell, for 1 health | 375 or 4,712 |
+| Tank's round | shell | the shared cannon's casing, 0.025 | 75, for 1 health | 75 |
 | Rover hull | hull | plate around the chassis's 11.2 perimeter, 2 deep | 8,960, for 25 health | 358.4 |
 | Tank armor | tank armor | plate around the chassis's 11.2 perimeter, 2 deep | 58,240, for 100 health | 582.4 |
 
@@ -383,6 +384,10 @@ damage of their own, so a shell whose shot is refused charges nothing.
   bounces off the edge of the universe. Planets, the sun, terrain and the edge
   stop it uncharged, and terrain still takes its crater.
 - An armed shell can hit its own ship, as before.
+- A tank's round meets every solid from launch, so its body is never
+  replaced. It passes through its own tank on its first 8 steps instead, and
+  its shot expires after 600 ticks without a burst, as
+  [Tank fire](../surface-expedition.md#tank-fire) says.
 - In a match, a pod or a pilot on foot takes a shot's hit unless ejection
   protection covers it, and a protected one still stops the shell. Outside a
   match, pods and pilots are outside the model and stop a shell uncharged: a
@@ -407,8 +412,9 @@ damage of their own, so a shell whose shot is refused charges nothing.
 
 ### Payloads
 
-A shell can carry a payload, though no ship's shell does; the tanks' rounds
-will ([#239](https://github.com/aortez/space-wars/issues/239)). The payload
+A shell can carry a payload. No ship's shell does, and each tank's round
+carries the shared cannon's, as [Tank fire](../surface-expedition.md#tank-fire)
+says ([#239](https://github.com/aortez/space-wars/issues/239)). The payload
 bursts by the blast rule ([In the physics world](#in-the-physics-world)) where
 its shot stops, or where its shell dies earlier in the step, such as to a
 laser or on terrain. A shell that leaves the game retires without a burst. A
@@ -420,9 +426,12 @@ circles only while a payload flies, so lasers and other shells meet them as
 they did.
 
 - A body's share costs it health through its region's `HealthMap`, where a
-  shot's hit is charged. A tank takes it as a round's hit, naming the seat
-  whose round it was. In a match, a pod or a pilot on foot takes it as a
-  missile's hit unless ejection protection covers it.
+  shot's hit is charged. A tank takes it as a round's hit, naming the side
+  whose round it was: the player whose ship fired it, or the side of the tank
+  that did. In a match, a pod or a pilot on foot takes it as a missile's hit
+  unless ejection protection covers it. A match records it as the shell's hit
+  on a ship, a pod or a pilot on foot, unless the shell struck that body
+  directly, which the match recorded already.
 - The blast's push carries into the game's own record of each body's motion,
   so it lasts.
 - Terrain takes the shell's crater and nothing more. Terrain, planets and the

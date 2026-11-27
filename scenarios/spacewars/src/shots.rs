@@ -43,8 +43,10 @@ pub(super) struct ShotHit {
 /// What a payload's blast charged one body it reached, in that body's health.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct BlastHit {
-    /// The seat of the shell's owner, if it has one.
-    pub owner: Option<usize>,
+    /// The shell whose payload burst.
+    pub source: u64,
+    /// The side the shell's hits name, if any.
+    pub side: Option<Allegiance>,
     pub target: MechanicalEntity,
     /// The body's entity in the physics.
     pub entity: PhysicsId,
@@ -56,6 +58,7 @@ pub(super) struct BlastHit {
 /// Launches each shell that has a body in the world and no shot yet. A shell
 /// whose shot is refused charges nothing.
 pub(super) fn launch(state: &mut SpacewarsState) {
+    let dt = state.config.delta_time();
     let SpacewarsState {
         debris, physics, ..
     } = state;
@@ -66,16 +69,26 @@ pub(super) fn launch(state: &mut SpacewarsState) {
         let Some(region) = map.region(shell.life) else {
             continue;
         };
+        let (radius, lifetime) = if shell.tank_round.is_some() {
+            // A tank's round flies as long as the shared cannon's does, and
+            // then vanishes. Its shot loses a step's time on each step, so
+            // half a step short of its ticks ends it on its last step,
+            // however the sum rounds.
+            let ticks = cannon::ROUND_LIFETIME_TICKS as f32 - 0.5;
+            (cannon::ROUND_RADIUS, ticks * dt)
+        } else {
+            // A ship's shell flies until it stops, at the edge of the universe
+            // if nothing else.
+            (CANNON_SHELL_RADIUS, f32::MAX)
+        };
         shell.shot = physics.launch_shot(ShotSpec {
             id: shell.physics_id,
             owner: shell.owner_id.map(|owner| owner as u64),
             body: physics::primary_body(PhysicsId::new(shell.physics_id)),
             region,
             section: map.section,
-            radius: CANNON_SHELL_RADIUS,
-            // A shell flies until it stops, at the edge of the universe if
-            // nothing else.
-            lifetime: f32::MAX,
+            radius,
+            lifetime,
             blast: shell.blast,
             // An armed shell can hit its own ship, as before.
             protected: None,
@@ -210,7 +223,8 @@ pub(super) fn settle(
                     (physics::classify_entity(entity), centers.get(&source))
                 {
                     blast_hits.push(BlastHit {
-                        owner: bodies.debris(source).and_then(|shell| shell.owner_id),
+                        source,
+                        side: bodies.debris(source).and_then(|shell| shell.side()),
                         target,
                         entity,
                         center,
@@ -353,10 +367,7 @@ fn charge_blasts(state: &mut SpacewarsState) {
                     tick: state.tick + 1,
                     cause: tanks::TankDamageCause::Round,
                     amount: hit.health,
-                    source: hit
-                        .owner
-                        .and_then(PlayerId::from_index)
-                        .map(Allegiance::Player),
+                    source: hit.side,
                 };
                 state.physics.tanks.damage(id, damage);
             }
@@ -734,7 +745,8 @@ mod tests {
             panic!("{:?}", state.blast_hits);
         };
         assert_eq!(hit.target, MechanicalEntity::Debris(rock));
-        assert!(hit.health > 0.0 && hit.owner == Some(1));
+        let side = Some(Allegiance::Player(PlayerId::PLAYER_2));
+        assert!(hit.health > 0.0 && hit.side == side);
         assert!(hit.center.distance_to(at) < 3.0, "{:?}", hit.center);
         assert!(state.debris.iter().all(|d| d.kind != DebrisKind::Fragment));
         assert!(state.shot_hits.is_empty());
