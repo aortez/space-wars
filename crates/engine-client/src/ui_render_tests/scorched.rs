@@ -101,7 +101,7 @@ fn duel(dodging: bool) -> ScorchedState {
             course_goal_driving: true,
             ..Default::default()
         },
-        42,
+        5,
     )
 }
 

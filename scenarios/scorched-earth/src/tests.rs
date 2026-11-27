@@ -494,6 +494,29 @@ fn a_tank_at_its_cap_of_rounds_holds_fire_while_the_other_fires() {
 }
 
 #[test]
+fn a_spinning_hull_launches_its_shell_with_the_barrels_own_velocity() {
+    let mut state = ScorchedState::new(ScorchedConfig::default(), 42);
+    state.tanks[0].next_shot = 0;
+    let body = state.tanks[0].body;
+    assert!(state.physics.set_velocity(body, Vec2::ZERO, 2.0, true));
+    let pivot = state.placement.point_to_world(state.barrel(0).pivot);
+    state.fire(0);
+    let tank = state.tanks[0];
+    let shell = state.shells.last().unwrap();
+    // The barrel holds its aim as the hull spins, so all of it moves as its
+    // pivot does. The pivot stands 0.95 units from the hull's center of mass,
+    // so the spin alone carries it at 1.9 u/s.
+    let carried = state.physics.velocity_at_point(body, pivot).unwrap() / state.placement.scale;
+    assert!(carried.length() > 1.8, "{carried:?}");
+    let launched = tank.direction() * tank.speed + carried;
+    assert!(
+        (shell.velocity - launched).length() < 1e-4,
+        "{:?}",
+        shell.velocity
+    );
+}
+
+#[test]
 fn full_width_seed_can_drive_both_tanks() {
     let mut state = ScorchedState::new(
         ScorchedConfig {

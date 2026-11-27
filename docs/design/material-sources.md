@@ -201,8 +201,8 @@ the host lists `Body` circles for it that cover its colliders.
   so the host can draw it, and a `Pushed` event what each share paid. Scorched
   Earth's shells burst by the same rule, through `blast_center`, `body_push`,
   `pay_push` and `bought`, except that a Scorched burst pushes only each
-  tank's hull, from the point the shell struck rather than from where the
-  blast starts.
+  tank's hull, from where the blast starts, and throws loose dirt from the
+  point the shell struck.
 - **Beams.** `fire` traces one pulse by ray cast to the first solid surface of
   the beam's collision groups within the range the host gives the pulse,
   which can grow pulse by pulse as a beam extends. The pulse carries the
@@ -702,8 +702,9 @@ Scorched's shells:
 - a hit charged once and a burst released once on both running gears, one
   payload divided between two tanks, the reach and its bot notices, terrain
   hits reported and not charged, and bursts kept outside every tank;
-- the calibration: about a third of a tank for a direct hit, so a tank falls to
-  the third or fourth, and near misses costing less the farther they land;
+- the calibration: about a third of a tank for a direct hit, within a point at
+  the cannon's lowest and highest power, so a tank falls to the third or
+  fourth, and near misses costing less the farther they land;
 - the same damage at scales 1 and 3, and a retired tank's share and airborne
   shell;
 - a host's moss passed once by a shell that then hits as it would without it, a

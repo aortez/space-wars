@@ -1454,12 +1454,12 @@ Started with `--seed 1003`, Clock's first event, if it is Tanks, throws its
 loser's spaceling clear whichever tank loses, and it waits for the rescue
 beam. Started with `--seed 2610`, the spaceling gets out in a pod and waits
 for the rescue beam; with `--seed 455`, it is thrown clear and stows away;
-with `--seed 1774`, it is thrown clear and surrenders; with `--seed 228`, it
-is thrown clear and the winner takes a parting shot at it; and with
+with `--seed 1774`, it is thrown clear and surrenders; with `--seed 18182`,
+it is thrown clear and the winner takes a parting shot at it; and with
 `--seed 9715`, it is thrown clear and left stranded. Both sides of those
-fights roll the same way. With `--seed 8799`, the left tank's spaceling is
+fights roll the same way. With `--seed 18495`, the left tank's spaceling is
 thrown clear and rebuilds its tank, and the winner does not see it go back;
-the right tank's would be left stranded.
+the right tank's would not get out.
 
 Each loser has an authored conversion of 24 half-unit cells: six native
 area/mass units at dirt density one, scaled by the square of placement scale.
@@ -1903,13 +1903,13 @@ engine-client tanks_shells_burst_on_the_face` regenerates all ten.
 
 | | The dodged shell bursts | Setting off, then the burst, four times larger |
 | --- | --- | --- |
-| 1024×768 | ![The left tank moved right, with the shell it dodged bursting where it stood](screenshots/clock/tanks-1024x768-dodged.png) | ![The left tank, then 2.5 units to the right, with the burst where it stood](screenshots/clock/tanks-1024x768-dodge-zoom.png) |
-| 800×480 | ![The left tank moved right, with the shell it dodged bursting where it stood](screenshots/clock/tanks-800x480-dodged.png) | ![The left tank, then 3.7 units to the right, with the burst where it stood](screenshots/clock/tanks-800x480-dodge-zoom.png) |
+| 1024×768 | ![The left tank moved right, with the shell it dodged bursting where it stood](screenshots/clock/tanks-1024x768-dodged.png) | ![The left tank, then 2.6 units to the right, with the burst where it stood](screenshots/clock/tanks-1024x768-dodge-zoom.png) |
+| 800×480 | ![The right tank moved left, with the shell it dodged bursting where it stood](screenshots/clock/tanks-800x480-dodged.png) | ![The right tank, then 3.8 units to the left, with the burst where it stood](screenshots/clock/tanks-800x480-dodge-zoom.png) |
 
-At 4:3, a 27-damage hit sends the left tank, Plotting + dodge, 2.5 units
-toward the shooter, and the next shell bursts where it stood, for 5 damage.
-At 5:3, the left tank, also Plotting + dodge, drives 3.7 units toward the
-shooter after a 28-damage hit, and the next shell does 4. Each picture
+At 4:3, a 28-damage hit sends the left tank, Plotting + dodge, 2.6 units
+toward the shooter, and the next shell bursts where it stood, for 6 damage.
+At 5:3, the right tank, also Plotting + dodge, drives 3.8 units toward the
+shooter after a 28-damage hit, and the next shell does 5. Each picture
 keeps every shell fired since the hit as a trail.
 `SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
 engine-client tanks_dodge_the_next_shell` regenerates all four.
@@ -1929,20 +1929,19 @@ engine-client tanks_blow_apart_and_turn_to_dirt` regenerates all four.
 
 | | The rescue, as the winner beams up | Getting out, standing, waving and the rescue beam, five or six times larger |
 | --- | --- | --- |
-| 1024×768, thrown | ![The left tank in its wide beam, and the right tank's spaceling lifted in a narrow beam](screenshots/clock/tanks-1024x768-thrown-rescue.png) | ![The spaceling in the air after the blast, down where it landed beside a cooling piece of the wreck, waving, then lifted in its beam](screenshots/clock/tanks-1024x768-thrown-zoom.png) |
+| 1024×768, thrown | ![The left tank in its wide beam, and the right tank's spaceling lifted in a narrow beam](screenshots/clock/tanks-1024x768-thrown-rescue.png) | ![The spaceling in the air after the blast, down where it landed near a cooling piece of the wreck, waving, then lifted in its beam](screenshots/clock/tanks-1024x768-thrown-zoom.png) |
 | 1024×768, pod | ![The right tank in its wide beam, and the left tank's spaceling lifted in a narrow beam beside its open pod](screenshots/clock/tanks-1024x768-pod-rescue.png) | ![The pod thrown out of the fireball, landed with its hatch opening, the spaceling climbing out, waving beside it, then lifted in its beam](screenshots/clock/tanks-1024x768-pod-zoom.png) |
 | 800×480, thrown | ![The left tank in its wide beam, and the right tank's spaceling lifted in a narrow beam](screenshots/clock/tanks-800x480-thrown-rescue.png) | ![The spaceling thrown up out of the fireball, down where it landed, waving, then lifted in its beam](screenshots/clock/tanks-800x480-thrown-zoom.png) |
-| 800×480, pod | ![The left tank in its wide beam, and the right tank's spaceling lifted in a narrow beam beside its open pod](screenshots/clock/tanks-800x480-pod-rescue.png) | ![The pod thrown out of the fireball, landed with its hatch opening, the spaceling climbing out, waving beside it, then lifted in its beam](screenshots/clock/tanks-800x480-pod-zoom.png) |
+| 800×480, pod | ![The right tank in its wide beam, and the left tank's spaceling lifted in a narrow beam beside its open pod](screenshots/clock/tanks-800x480-pod-rescue.png) | ![The pod thrown out of the fireball, landed with its hatch opening, the spaceling climbing out, waving beside it, then lifted in its beam](screenshots/clock/tanks-800x480-pod-zoom.png) |
 
 Seed 1003 throws the loser's spaceling clear, and seed 2610 sends it out in a
 pod, at both sizes. A thrown strip shows the spaceling 0.4 s after the blast,
-tumbling clear of the fireball, then down where it landed, waving, and lifted
-out 1.25 s into the beam-up. A pod strip shows the pod in flight 0.5 s after
-the blast, landed with its hatch opening, the spaceling climbing out, waving
-beside the pod, and lifted out.
-`SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
-engine-client tanks_spacelings_get_out_and_are_beamed_up` regenerates all
-eight.
+tumbling out of the fireball, then down where it landed, waving, and lifted out
+1.25 s into the beam-up. A pod strip shows the pod in flight a quarter of a
+second after the blast, landed with its hatch opening, the spaceling climbing
+out, waving beside the pod, and lifted out. `SPACEWARS_TANKS_ARTIFACTS=<dir>
+cargo test --locked --profile ci -p engine-client
+tanks_spacelings_get_out_and_are_beamed_up` regenerates all eight.
 
 | | Riding out on the winner's roof, as it beams up | Running for the winner, climbing over its turret, sitting behind it and riding out, five or six times larger |
 | --- | --- | --- |
@@ -1967,10 +1966,10 @@ engine-client tanks_spacelings_stow_away_or_surrender` regenerates all ten.
 
 | | The parting shell's flight, as it bursts | The escape | Covered, running clear, the shell coming down, its burst and the escape, five or six times larger |
 | --- | --- | --- | --- |
-| 1024×768 | ![The left tank's shell arcing over the valley and bursting where the right tank's spaceling stood, the spaceling standing clear of it](screenshots/clock/tanks-1024x768-parting-shot.png) | ![The right tank's spaceling running off the right side of the battlefield, the left tank's barrel still raised along its arc](screenshots/clock/tanks-1024x768-parting-escape.png) | ![The spaceling facing the winner as it fires, running clear, standing clear as the shell comes down and bursts where it stood, then running away over the hills](screenshots/clock/tanks-1024x768-parting-zoom.png) |
-| 800×480 | ![The left tank's shell arcing over the valley and bursting where the right tank's spaceling stood, the spaceling standing clear of it](screenshots/clock/tanks-800x480-parting-shot.png) | ![The right tank's spaceling rising past the face on its jetpack, trailing smoke](screenshots/clock/tanks-800x480-parting-escape.png) | ![The spaceling facing the winner as it fires, running clear, standing clear as the shell comes down and bursts where it stood, then rising on its jetpack](screenshots/clock/tanks-800x480-parting-zoom.png) |
+| 1024×768 | ![The right tank's shell arcing over the valley and bursting where the left tank's spaceling stood, the spaceling standing clear of it](screenshots/clock/tanks-1024x768-parting-shot.png) | ![The left tank's spaceling running off the left side of the battlefield, the right tank's barrel still raised along its arc](screenshots/clock/tanks-1024x768-parting-escape.png) | ![The spaceling facing the winner as it fires, running clear, standing clear as the shell comes down and bursts where it stood, then running away over the hills](screenshots/clock/tanks-1024x768-parting-zoom.png) |
+| 800×480 | ![The right tank's shell arcing over the valley and bursting where the left tank's spaceling stood, the spaceling standing clear of it](screenshots/clock/tanks-800x480-parting-shot.png) | ![The left tank's spaceling rising past the face on its jetpack, trailing smoke](screenshots/clock/tanks-800x480-parting-escape.png) | ![The spaceling facing the winner as it fires, running clear, standing clear as the shell comes down and bursts where it stood, then rising on its jetpack](screenshots/clock/tanks-800x480-parting-zoom.png) |
 
-Seed 228 throws the loser's spaceling clear, and the winner takes a parting
+Seed 18182 throws the loser's spaceling clear, and the winner takes a parting
 shot at it, at both sizes. Each first picture keeps the shell's whole flight as
 a trail. At 4:3 the spaceling runs off the side; at 5:3 the side lies farther
 off, and it rises out of view on its jetpack. The escape shows it a fifth of a
@@ -1984,10 +1983,10 @@ engine-client tanks_the_winner_takes_a_parting_shot` regenerates all six.
 
 | | The dirt halfway home | The rebuilt tank's shell, as it bursts | By its dirt, the dirt crawling home, the last cells coming in and climbing in, five or six times larger |
 | --- | --- | --- | --- |
-| 1024×768 | ![The left tank's spaceling standing by its tank's dirt, the cells rising from the hills, the right tank waiting](screenshots/clock/tanks-1024x768-rebuild-crawl.png) | ![The rebuilt left tank's shell arcing over the middle hill and bursting on the right tank](screenshots/clock/tanks-1024x768-rebuild-shot.png) | ![The spaceling by the dirt, the cells rising toward the tank's place, the tank's shape nearly whole, then the tank in puffs of dust with the spaceling climbing onto it](screenshots/clock/tanks-1024x768-rebuild-zoom.png) |
-| 800×480 | ![The left tank's spaceling standing by its tank's dirt, the cells rising from the hills, the right tank waiting](screenshots/clock/tanks-800x480-rebuild-crawl.png) | ![The rebuilt left tank's shell arcing over the middle hill and bursting on the right tank](screenshots/clock/tanks-800x480-rebuild-shot.png) | ![The spaceling by the dirt, the cells rising toward the tank's place, the tank's shape nearly whole, then the tank in puffs of dust with the spaceling climbing onto it](screenshots/clock/tanks-800x480-rebuild-zoom.png) |
+| 1024×768 | ![The left tank's spaceling standing by its tank's dirt, the cells rising from the hills, the right tank waiting](screenshots/clock/tanks-1024x768-rebuild-crawl.png) | ![The rebuilt left tank's shell arcing over the valley and bursting on the right tank](screenshots/clock/tanks-1024x768-rebuild-shot.png) | ![The spaceling by the dirt, the cells rising toward the tank's place, the tank's shape nearly whole, then the tank in puffs of dust with the spaceling climbing onto it](screenshots/clock/tanks-1024x768-rebuild-zoom.png) |
+| 800×480 | ![The left tank's spaceling standing by its tank's dirt, the cells rising from the hills, the right tank waiting](screenshots/clock/tanks-800x480-rebuild-crawl.png) | ![The rebuilt left tank's shell arcing over the valley and bursting on the right tank](screenshots/clock/tanks-800x480-rebuild-shot.png) | ![The spaceling by the dirt, the cells rising toward the tank's place, the tank's shape nearly whole, then the tank in puffs of dust with the spaceling climbing onto it](screenshots/clock/tanks-800x480-rebuild-zoom.png) |
 
-Seed 8799 throws the left tank's spaceling clear, the left tank loses at both
+Seed 18495 throws the left tank's spaceling clear, the left tank loses at both
 sizes, and its spaceling rebuilds it; the winner does not see it go back.
 Each strip shows the spaceling by its dirt a tenth of a second after the
 dirt sets off, the dirt 2 s into its crawl home, the last cells coming in at
@@ -2335,39 +2334,41 @@ The run data stays local.
 
 | | On a digit with its flag | Sheltering from the rain | Off the hills on its jetpack, planting its flag, walking the floor, sheltering, and in its beam, five or six times larger |
 | --- | --- | --- | --- |
-| 1024×768 | ![The clock with the hills gone, the spaceling a speck on top of the 3 beside its flag](screenshots/clock/tanks-1024x768-stranded-flag.png) | ![Rain falling on the clock and pooling on the floor around a rubber duck, the spaceling a speck sheltering in the 3, on top of its lower right stroke under the upper one, its flag still on top of the 3](screenshots/clock/tanks-1024x768-stranded-rain.png) | ![The spaceling rising on its jetpack over the withdrawing hills, planting its flag on a digit block, walking the floor, standing on a block under another with rain water around it, then fading in its beam](screenshots/clock/tanks-1024x768-stranded-zoom.png) |
+| 1024×768 | ![The clock with the hills gone, the spaceling a speck on top of the 2's lower left stroke beside its flag](screenshots/clock/tanks-1024x768-stranded-flag.png) | ![Rain falling on the clock and pooling on the floor around a rubber duck, the spaceling a speck sheltering in the 1, on top of its lower stroke under the upper one, its flag still on top of the 2](screenshots/clock/tanks-1024x768-stranded-rain.png) | ![The spaceling rising on its jetpack over the withdrawing hills, planting its flag on a digit block, walking the floor, standing on a block under another with rain water around it, then fading in its beam](screenshots/clock/tanks-1024x768-stranded-zoom.png) |
 | 800×480 | ![The clock with the hills gone, the spaceling a speck on top of the 3 beside its flag](screenshots/clock/tanks-800x480-stranded-flag.png) | ![Rain falling on the clock and pooling on the floor around a rubber duck, the spaceling a speck sheltering in the 3, on top of its lower right stroke under the upper one, its flag still on top of the 3](screenshots/clock/tanks-800x480-stranded-rain.png) | ![The spaceling rising on its jetpack over the withdrawing hills, planting its flag on a digit block, walking the floor, standing on a block under another with rain water around it, then fading in its beam](screenshots/clock/tanks-800x480-stranded-zoom.png) |
 
 Seed 9715 rolls alike for both sides: whichever tank loses, its spaceling is
-thrown clear and draws no beam, so the hills leave it behind at both sizes.
-The first picture shows it 4 s after it planted its flag on top of the 3,
-once the hills have gone, and the second 14 s into the rain, sheltering on
-the top of the 3's lower right stroke, under its upper one. Each strip shows
-it 0.2 s after the hills begin to withdraw, half a second into planting its
-flag, two-thirds of a second into a walk on the floor, 14 s into its
-shelter, and 0.83 s into the beam that comes when the minute turns 20
-minutes after the hills left it, each frame centered on the spaceling.
+thrown clear and draws no beam, so the hills leave it behind at both sizes. At
+4:3 it plants its flag on top of the 2's lower left stroke and shelters on the
+top of the 1's lower stroke, under its upper one; at 5:3 it plants its flag on
+top of the 3 and shelters on the top of the 3's lower right stroke, under its
+upper one. The first picture shows it 4 s after it planted its flag, once the
+hills have gone, and the second 14 s into the rain. Each strip shows it 0.2 s
+after the hills begin to withdraw, half a second into planting its flag,
+two-thirds of a second into a walk on the floor, 14 s into its shelter, and
+0.83 s into the beam that comes when the minute turns 20 minutes after the
+hills left it, each frame centered on the spaceling.
 `SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
 engine-client tanks_the_hills_leave_a_spaceling` regenerates all six.
 
 | | Running from Falling's bars | Killed by one | Grass on its dirt | Stopped as the bars begin, running, clear of them; then running, the blow, lying dead, turning to dirt, and grass, five or six times larger |
 | --- | --- | --- | --- | --- |
-| 1024×768 | ![Falling's bars coming down across the clock, the drain open between the floor's two banks, the spaceling a speck running along the right bank](screenshots/clock/tanks-1024x768-stranded-dodge.png) | ![Falling's bars piled on both banks, the spaceling a speck under those at the right](screenshots/clock/tanks-1024x768-stranded-clobbered.png) | ![The clock whole again, a tuft of grass on the floor at the right](screenshots/clock/tanks-1024x768-stranded-grass.png) | ![The spaceling standing on the floor, running, standing clear; then running, under a bar as it comes down, lying dulled under the bars, fading to the color of earth over a patch of dirt, and a green tuft of grass on the dirt](screenshots/clock/tanks-1024x768-stranded-falling-zoom.png) |
-| 800×480 | ![Falling's bars coming down across the clock, the drain open between the floor's two banks, the spaceling a speck on the right bank](screenshots/clock/tanks-800x480-stranded-dodge.png) | ![Falling's bars piled on both banks, the spaceling under those at the right](screenshots/clock/tanks-800x480-stranded-clobbered.png) | ![The clock whole again, a tuft of grass on the floor at the right](screenshots/clock/tanks-800x480-stranded-grass.png) | ![The spaceling standing on the floor, a bar coming down beside it, standing clear among the fallen bars; then running, under a bar as it comes down, lying dulled under the bars, fading to the color of earth over a patch of dirt, and a green tuft of grass on the dirt](screenshots/clock/tanks-800x480-stranded-falling-zoom.png) |
+| 1024×768 | ![Falling's bars coming down across the clock, the drain open between the floor's two banks, the spaceling a speck running along the right bank](screenshots/clock/tanks-1024x768-stranded-dodge.png) | ![Falling's bars coming down onto both banks, the spaceling a speck under a bar on the left bank](screenshots/clock/tanks-1024x768-stranded-clobbered.png) | ![The clock whole again, a tuft of grass on the floor at the left](screenshots/clock/tanks-1024x768-stranded-grass.png) | ![The spaceling standing on the floor, running, standing clear as the bars come down; then running, under a bar as it comes down, lying dulled on the floor beside a bar, fading to the color of earth over a patch of dirt, and a green tuft of grass on the dirt](screenshots/clock/tanks-1024x768-stranded-falling-zoom.png) |
+| 800×480 | ![Falling's bars coming down across the clock, the drain open between the floor's two banks, the spaceling a speck on the right bank](screenshots/clock/tanks-800x480-stranded-dodge.png) | ![Falling's bars piled on both banks, the spaceling under those at the right](screenshots/clock/tanks-800x480-stranded-clobbered.png) | ![The clock whole again, a tuft of grass on the floor at the right](screenshots/clock/tanks-800x480-stranded-grass.png) | ![The spaceling standing on the floor, running, standing clear among the fallen bars; then running, under a bar as it comes down, lying dulled under the bars, fading to the color of earth over a patch of dirt, and a green tuft of grass on the dirt](screenshots/clock/tanks-800x480-stranded-falling-zoom.png) |
 
 In the run of seed 9715's fight, Falling began as the spaceling set out on
-its sixth walk on the floor. The first picture shows it half a second into
-its run, and it came through untouched. In a run of the same fight, Falling
-began 1.25 s into its third walk at 4:3 and its seventh at 5:3. The second
-picture shows the moment a bar came down on it and killed it, and the third
-the grass on its dirt about 20 s after its remains had gone. Each strip
-shows the first run a tenth of a second in, its walk stopped, half a
-second into its run, and half a second after it stood clear, then the
-second run a fifth of a second into its run, at the blow, half a second
-after it, halfway through its turning to dirt, and the grass, each frame
-centered on the spaceling or on where it lay. `SPACEWARS_TANKS_ARTIFACTS=<dir>
-cargo test --locked --profile ci -p engine-client
-tanks_a_spaceling_left_on_the_clock` regenerates all eight.
+its sixth walk on the floor at 4:3 and its fourth at 5:3. The first picture
+shows it half a second into its run, and it came through untouched. In a run
+of the same fight, Falling began 1.25 s into its first walk at 4:3 and its
+seventh at 5:3. The second picture shows the moment a bar came down on it
+and killed it, and the third the grass on its dirt about 20 s after its
+remains had gone. Each strip shows the first run a tenth of a second in, its
+walk stopped, half a second into its run, and half a second after it stood
+clear, then the second run a fifth of a second into its run, at the blow,
+half a second after it, halfway through its turning to dirt, and the grass,
+each frame centered on the spaceling or on where it lay.
+`SPACEWARS_TANKS_ARTIFACTS=<dir> cargo test --locked --profile ci -p
+engine-client tanks_a_spaceling_left_on_the_clock` regenerates all eight.
 
 ### Cell swaps
 

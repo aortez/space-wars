@@ -425,7 +425,7 @@ fn tanks_dodge_the_next_shell_after_a_hit() {
     // after hits. On the HyperPixel's 5:3, two plotting tanks that dodge.
     for (size, seed, cpu) in [
         ((1024, 768), 201, ["Plotting + dodge", "Plotting + move"]),
-        ((800, 480), 234, ["Plotting + dodge", "Plotting + dodge"]),
+        ((800, 480), 90, ["Plotting + dodge", "Plotting + dodge"]),
     ] {
         let viewport = Viewport::new(size.0 as f32, size.1 as f32);
         let state = face_fight(viewport, seed);
@@ -605,7 +605,7 @@ fn tanks_spacelings_get_out_and_are_beamed_up() {
                 // lifted out by its beam, the empty pod left behind.
                 Ejection::Pod => (
                     vec![
-                        end + 30,
+                        end + 15,
                         first(Phase::Opening) + 16,
                         first(Phase::ClimbingOut) + 8,
                         first(Phase::Waving) + 20,
@@ -742,7 +742,7 @@ fn tanks_spacelings_stow_away_or_surrender() {
 fn tanks_the_winner_takes_a_parting_shot_and_the_spaceling_flees() {
     use engine_common::{ClockTanksEnding as Ending, ClockTanksSurvivorPhase as Phase};
     let camera = Camera::new();
-    let seed = 228;
+    let seed = 18182;
     // Both sides of this fight are thrown clear and draw the parting shot,
     // so whichever tank loses, the winner fires one last shell at its
     // spaceling, which dodges it, then runs off the side of the battlefield
@@ -845,12 +845,12 @@ fn tanks_a_spaceling_rebuilds_its_tank_for_a_sudden_death() {
         ClockTanksSurvivorPhase as Phase,
     };
     let camera = Camera::new();
-    let seed = 8799;
-    // Both sides of this fight are thrown clear and draw the rebuild, and the
-    // winner lets the dirt be, so whichever tank loses, its spaceling runs
-    // back to the tank's dirt, sees it crawl home and climbs in. Here the
-    // left tank loses at both sizes, and once rebuilt, it fires first in the
-    // sudden death and destroys the winner.
+    let seed = 18495;
+    // The left side of this fight is thrown clear and draws the rebuild, and
+    // the winner lets the dirt be. The left tank loses at both sizes, so its
+    // spaceling runs back to the tank's dirt, sees it crawl home and climbs
+    // in, and once rebuilt, the tank fires first in the sudden death and
+    // destroys the winner.
     for (size, patch, scale) in [((1024, 768), (112, 64), 5), ((800, 480), (88, 48), 6)] {
         let viewport = Viewport::new(size.0 as f32, size.1 as f32);
         let name = format!("{}x{}", size.0, size.1);
@@ -1077,10 +1077,13 @@ fn tanks_a_spaceling_left_on_the_clock_runs_from_fallings_bars() {
     use engine_common::ClockStrandedPhase as Phase;
     let camera = Camera::new();
     // Seed 9715's hills leave a spaceling behind at both sizes, as above. On
-    // the walk named for each size, a bar kills it.
+    // its `clear`th walk on the floor, it runs clear of Falling's bars; on its
+    // `fatal`th, a bar kills it.
     let seed = 9715;
-    for (size, patch, scale, fatal) in [((1024, 768), (72, 60), 5, 3), ((800, 480), (60, 48), 6, 7)]
-    {
+    for (size, patch, scale, clear, fatal) in [
+        ((1024, 768), (72, 60), 5, 6, 1),
+        ((800, 480), (60, 48), 6, 4, 7),
+    ] {
         let viewport = Viewport::new(size.0 as f32, size.1 as f32);
         camera.window.set_size(PhysicalSize::new(size.0, size.1));
         let name = format!("{}x{}", size.0, size.1);
@@ -1136,9 +1139,9 @@ fn tanks_a_spaceling_left_on_the_clock_runs_from_fallings_bars() {
         let feet = |state: &scenario_clock::ClockState| spaceling(state).unwrap().position_milli;
         let mut strip = Vec::new();
 
-        // At the start of its sixth walk, it stops to look up as the bars
+        // At the start of the `clear` walk, it stops to look up as the bars
         // begin to come down, and runs clear of them along its bank.
-        let mut state = falling(6, 0);
+        let mut state = falling(clear, 0);
         steps(&mut state, 6);
         strip.push(shot(&state, feet(&state)));
         until(&mut state, Phase::Dodging, 30);
@@ -1158,9 +1161,9 @@ fn tanks_a_spaceling_left_on_the_clock_runs_from_fallings_bars() {
         assert_eq!(it.knockdowns, knockdowns, "{name}: untouched");
         assert!(it.dodges >= 1 && it.phase == Phase::Standing && it.perch.is_none());
 
-        // With Falling 1.25 s into that walk, it runs, and a bar comes down
-        // on it and kills it. Its remains lie dulled, turn to dirt, and grass
-        // grows from the dirt.
+        // With Falling 1.25 s into the `fatal` walk, it runs, and a bar comes
+        // down on it and kills it. Its remains lie dulled, turn to dirt, and
+        // grass grows from the dirt.
         let mut state = falling(fatal, 75);
         until(&mut state, Phase::Dodging, 30);
         steps(&mut state, 12);

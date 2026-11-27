@@ -9,7 +9,7 @@ use engine_common::{
 use engine_core::Vec2;
 use engine_material::{Region, Source};
 use engine_rapier::{
-    cannon::{self, Barrel},
+    cannon::{self, Barrel, Carriage},
     terrain::{
         GrainShape, LooseTerrain, LooseTerrainConfig, TerrainAssembly, TerrainFragment, TerrainSpec,
     },

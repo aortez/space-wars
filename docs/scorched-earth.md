@@ -68,7 +68,9 @@ its width. Elevation ranges from 5° to 85° above the horizontal. A cannon
 reloads for 1.25 seconds after each shot, and the CPUs wait 5 seconds between
 theirs. At most 8 shells fly at once, 4 of them from one tank, and a shell
 expires after 10 seconds. A shell starts where something stands in the barrel
-and passes through its own tank for its first 8 ticks.
+and passes through its own tank for its first 8 ticks. The barrel holds its
+aim as the hull turns, so it moves as its pivot does, and the shell leaves
+with the velocity the hull gives the pivot, its spin as well as its motion.
 
 ## Armor and shells
 
@@ -76,51 +78,62 @@ A tank's health is the integrity of one armor region, on a 0 to 100 scale.
 Shells charge it through the [material laws](design/material-damage.md) as
 [weapon sources](design/material-sources.md#scorched-tanks), which replaced
 the rule of `42 × (1 − d / 6)` health within six units of a tank's middle in
-[#331](https://github.com/aortez/space-wars/issues/331). Each shell has a
-kinetic part, its mass of 7 at its launch speed, and a payload of 28,000.
+[#331](https://github.com/aortez/space-wars/issues/331). Each shell is the
+cannon's round: a kinetic part, its mass of 0.25 at its launch speed, and a
+payload of 30,500 that does most of a hit's harm.
 
 - A shell that strikes a tank charges that tank's armor once. The impact is
-  measured from the shell's velocity and the tank's motion, so a harder shot
-  hits harder. A shell that strikes terrain or loose dirt charges nothing, and
-  its energy is reported as unmodeled.
+  measured from the shell's velocity and the tank's motion, but the round is
+  light: at 48 u/s its kinetic part carries under 1% of its payload's energy,
+  so a hit costs about the same however hard it was fired. A shell that
+  strikes terrain or loose dirt charges nothing, and its energy is reported as
+  unmodeled.
 - The shell then bursts a shell's radius off the surface it struck, never
   inside a tank. Its payload reaches the circles standing in for each tank
   within 5 units of their surface. Each tank's share is the directions it
   fills, so one burst never gives out more than its payload. Terrain neither
   takes a share nor shields a tank.
-- Craters, pushes, arming after eight ticks, the shell limits, self-damage, the
-  out-of-world rule and a host's retirement work as before.
+- The burst digs its crater and throws loose dirt where the shell struck, and
+  pushes each tank's hull from where it bursts: outward, at up to 4 u/s,
+  falling off to nothing 6 units out. A tank's push comes out of its share of
+  the payload.
+- Arming after eight ticks, the shell limits, self-damage, the out-of-world
+  rule and a host's retirement work as before.
 
 A tank's contacts charge the same armor, as
 [Armor and contacts](#armor-and-contacts) describes.
 
-The calibration keeps the old cost of a direct hit, about a third of a tank, so
-a tank falls to the third or fourth. Damage now depends on where and how hard a
-shell lands. These are strikes on the settled seed-42 tanks, by the shell's
-speed when it arrives, against the old rule at the same points:
+The calibration keeps the cost of a direct hit at about a third of a tank, so
+a tank falls to the third or fourth. Damage depends on where a shell lands and
+hardly on how hard. These are shells dropped from 6 units above the settled
+seed-42 tanks, or fired at them from 6 units up and 6 to the left, at the
+speed given, in health lost. Beside the shared round is the heavier one the
+tanks fired before it, of mass 7 with a payload of 28,000:
 
-| Shell | Old | Rigid tracks | Sprung wheels |
-| --- | --- | --- | --- |
-| Direct hit from above at 15 / 25 / 35 u/s | 38–39 | 33 / 35 / 38 | 33 / 35 / 38 |
-| Direct hit from above at 48 u/s | 38–39 | 44 | 43 |
-| Direct hit near the hull's end at 25 / 35 u/s | 31–32 | 25 / 28 | 25 / 27 |
-| Direct hit at 45° at 25 / 35 u/s | 36 | 32 / 34 | 29 / 30 |
-| On the ground 2.5 units from the tank's middle | 24 | 12 | 15 |
-| 3 units | 21 | 9 | 11 |
-| 4 units | 14 | 6 | 7 |
-| 5 units | 7 | 4 | 5 |
-| 6 units | 0 | 3 | 4 |
-| 7 units | 0 | 0 | 0 |
+| Shell | Rigid tracks | Sprung wheels | Rigid, mass 7 | Sprung, mass 7 |
+| --- | --- | --- | --- | --- |
+| On top at 15 / 25 / 35 / 48 u/s | 34.2 / 34.3 / 34.5 / 34.7 | 34.4 / 34.5 / 34.7 / 34.9 | 33.4 / 35.5 / 38.6 / 44.2 | 33.4 / 35.3 / 38.2 / 43.2 |
+| On top 1.5 units right of its middle at 25 / 35 u/s | 23.1 / 23.2 | 23.1 / 23.2 | 24.3 / 26.6 | 23.8 / 25.7 |
+| On top 1.5 units left of its middle at 25 / 35 u/s | 23.1 / 23.2 | 22.8 / 22.8 | 24.3 / 26.6 | 21.1 / 21.3 |
+| At 45° at 25 / 35 u/s | 26.7 / 30.4 | 22.1 / 26.9 | 26.7 / 31.4 | 21.3 / 26.5 |
+| On the ground 2.5 units from the tank's middle, at 25 u/s | 13.0 | 16.2 | 11.9 | 14.8 |
+| 3 units | 9.3 | 11.6 | 8.5 | 10.6 |
+| 4 units | 6.0 | 7.4 | 5.5 | 6.8 |
+| 5 units | 4.5 | 5.4 | 4.1 | 5.0 |
+| 6 units | 3.5 | 4.3 | 3.2 | 3.9 |
+| 7 units | 0 | 0 | 0 | 0 |
 
 A burst near a tank's end or off its side sees less of the tank than one on
-its top, so it does less. Near misses fall off faster than under the old rule:
-2.5 to 4 units out, they cost about half as much. The reach is measured to a
-tank's surface, so a burst beside a tank still costs a few points just past
-the old six units, out to about 7 units from its middle, while one above it
-reaches only 5.6 units over its middle. The armor tests pin these bands:
-direct hits at 15 to 35 u/s cost 28 to 40, a tank falls to the third or
-fourth, and near misses cost less the farther they land, with nothing past the
-reach.
+its top, so it does less. The heavier round's hits rose with its speed, by
+about a third from 15 to 48 u/s; the shared round's cost the same to within a
+point. Its larger payload costs a near miss about a tenth more. The rule the
+armor replaced cost 38 to 39 for a direct hit and fell to nothing 6 units
+from a tank's middle. The reach is measured to a tank's surface, so a burst
+beside a tank still costs a few points out to about 7 units from its middle,
+while one above it reaches only 5.6 units over its middle. The armor tests
+pin these bands: direct hits cost 28 to 40, at the cannon's lowest and highest
+power within a point of each other, a tank falls to the third or fourth, and
+near misses cost less the farther they land, with nothing past the reach.
 
 ### Calibration review, 2026-11-15
 
@@ -153,6 +166,43 @@ seeds across that range.
   destination move. Two checkpoints come earlier, three appear only with the
   armor, and eleven searches find none either way. Damage totals differ, as
   expected.
+
+### Shared round review, 2026-11-27
+
+The tanks of Scorched Earth and the Clock share one round, which Spacewars'
+tanks will fire too
+([#239](https://github.com/aortez/space-wars/issues/239)). The runs compare
+the round the tanks fired before against the shared one. They are kept
+locally in `shared-round-20261127`, with the temporary probes and the summary
+scripts that made them.
+
+The payload is set so that a direct hit costs what it did, over the hits
+Scorched's own CPUs land. Ordinary duels, 32 per policy and shape (seeds 1,
+32, …, 962, rigid tracks, each to its first kill), list every shell that
+strikes a tank without killing it, at a median of 27 u/s. These cost 28.56 on
+average with the round before, and 27.15, 27.66, 28.11 and 28.54 with
+payloads of 29,000, 29,500, 30,000 and 30,500. Near misses cost 7.7 on
+average against 7.3. Every duel still ends in a kill, the first at these
+medians:
+
+| First kill | Angular dirt | Round dirt | Angular dirt, mass 7 | Round dirt, mass 7 |
+| --- | --- | --- | --- | --- |
+| Sweep | 32.5 s | 33.3 s | 32.7 s | 32.9 s |
+| Learning + move | 31.9 s | 33.3 s | 32.7 s | 35.5 s |
+| Plotting + move | 18.4 s | 21.8 s | 22.0 s | 22.0 s |
+
+Plotting + move's duels end sooner on average, at 19.9 and 20.9 s against
+21.1 and 21.3. Its medians are sensitive to the payload: with 30,000, they
+are 21.7 and 22.6 s.
+
+Clock's Tanks event, 24 fights on Clock seeds 1, 42, …, 944 at 5:3 and 24 at
+4:3, lasts about as long. At 5:3, 22 fights end in a kill, as before, at a
+median of 24.7 s against 23.8. Seed 493 now ends in a kill, at 55.1 s the
+longest, against 49.6 before, and seed 452 now runs to the end of the window,
+where the healthier tank wins, as 83 does with either round. At 4:3 every
+fight ends in a kill, at a median of 22.7 s against 22.6. The CPUs dodge about
+as well: 50 of the 64 shells dodged at 5:3 and 31 of 44 at 4:3 cost the
+dodging tank less than 10, against 43 of 57 and 33 of 48.
 
 ## Armor and contacts
 
@@ -546,10 +596,14 @@ second later.
 A plot begins a second before the next shot is due, once the tank's last shell
 has landed, and begins again if the tank moves more than a unit or tilts more
 than 8°. A full plot is about 10,000 rays. At most 512 are cast in a tick, so a
-plot takes about 20 ticks, and the shot waits for it. Firing keeps the plotted
-elevation and aims its power at where the target is then, which is the plotted
-power when the target has not moved. A plotted tank learns nothing from its
-shots.
+plot takes about 20 ticks, and the shot waits for it. Each arc leaves the
+barrel as the hull carried it when the plot began. Firing keeps the plotted
+elevation and aims its power at where the target is then, from where the tank
+is then and as its hull carries the barrel then. That is the plotted power when
+neither tank has moved and the hull carries the barrel as it did when the plot
+began. A tank whose hull was still moving when its plot began, as one landing
+at the start of a duel may be, fires a different arc through the target, one
+the plot didn't trace. A plotted tank learns nothing from its shots.
 
 It moves after enemy hits as Learning + move does, except that it counts as
 confident while its last plot found an arc that reaches. With a plotted hit it
@@ -642,7 +696,7 @@ for both.
 
 In a duel of two Plotting + dodge tanks, the right tank's shell hits the left
 one, which dodges the next shell by driving under it. The shell bursts behind
-it and costs it 6 health:
+it and costs it 7.5 health:
 
 | The hit | Dodging the next shell | The dodged shell's burst |
 | --- | --- | --- |
@@ -2335,9 +2389,10 @@ It calls the existing [shared loose-terrain layer](shared-loose-terrain.md):
 2. At impact, `PreparedRelease` plans the affected fields before changing them.
    Admission covers the complete event. `LooseTerrain::commit` transfers removed
    cells into conserved grains and detached material fields.
-3. `RadialImpulse` throws nearby loose material and kicks tank hulls. A tank's
-   kick comes out of its share of the payload. Rapier supplies gravity and
-   contact response in the same world as the terrain.
+3. `RadialImpulse` throws nearby loose material from where the shell struck,
+   and kicks tank hulls from where it bursts. A tank's kick comes out of its
+   share of the payload. Rapier supplies gravity and contact response in the
+   same world as the terrain.
 4. `LooseTerrain::settle` returns eligible quiet groups to existing terrain
    through the ordinary deposit boundary. Published geometry and collision
    shapes update together, with actor clearance checked by the shared layer.

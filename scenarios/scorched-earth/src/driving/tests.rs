@@ -418,14 +418,17 @@ fn cpu_finishes_small_step_courses_and_stays_before_the_trench_with_both_gears()
 #[test]
 fn frozen_two_probe_failures_continue_with_the_candidate_without_resetting() {
     use crate::driving_lab::{physics_snapshot, snapshot, step_reference_support_trial};
-    // Source identities and original hashes are retained in the driving-course
-    // receipt. These assertions prevent an improved initialization masquerading
-    // as a successful continuation of the old blocked state.
+    // Source identities and the original hashes are retained in the
+    // driving-course receipt. These hashes were taken again for the shared
+    // round, whose first shell flies differently while the hull still rocks;
+    // the blocked state itself matches the receipt. These assertions prevent
+    // an improved initialization masquerading as a successful continuation of
+    // the old blocked state.
     for (shape, suspension, tick, expected) in [
-        (GrainShape::Round, false, 110, 0xbda8ac8a19b60dde),
-        (GrainShape::Hexagon, false, 110, 0x2cdeab9d8283fa5e),
-        (GrainShape::Round, true, 124, 0x1f184cbfc30b6952),
-        (GrainShape::Hexagon, true, 124, 0x051dc2ddda702a82),
+        (GrainShape::Round, false, 110, 0x71db19b79c588dc5),
+        (GrainShape::Hexagon, false, 110, 0x388807b2b2416b45),
+        (GrainShape::Round, true, 124, 0x13e59430cde4e2b2),
+        (GrainShape::Hexagon, true, 124, 0x08cf04364bc8c362),
     ] {
         let mut original = ScorchedState::new(
             ScorchedConfig {
