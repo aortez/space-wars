@@ -162,7 +162,7 @@ impl Placement {
     }
 
     pub(crate) fn max_power(&self) -> f32 {
-        48.0 * (self.terrain_width as f32 / FIELD_WIDTH as f32).sqrt()
+        cannon::MAX_POWER * (self.terrain_width as f32 / FIELD_WIDTH as f32).sqrt()
     }
 
     pub(crate) fn hill(&self, x: f32, seed: u64) -> f32 {
@@ -685,7 +685,7 @@ impl HostedDuel {
                     min: Vec2::new(a.min.x.min(b.min.x), a.min.y.min(b.min.y)),
                     max: Vec2::new(a.max.x.max(b.max.x), a.max.y.max(b.max.y)),
                 });
-            let (pivot, muzzle) = self.duel.muzzle(world, slot);
+            let Barrel { pivot, muzzle } = self.duel.barrel(world, slot);
             TankState {
                 body: tank.body,
                 motion,

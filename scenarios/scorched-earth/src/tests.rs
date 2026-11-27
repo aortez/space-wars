@@ -471,6 +471,29 @@ fn swept_shell_hits_ground_instead_of_skipping_through_it() {
 }
 
 #[test]
+fn a_tank_with_four_shells_in_flight_holds_fire_while_the_other_fires() {
+    let mut state = ScorchedState::new(ScorchedConfig::default(), 42);
+    for id in 1..=cannon::MAX_ROUNDS_PER_CANNON as u64 {
+        state.shells.push(Shell {
+            owner: 0,
+            position: Vec2::new(0.0, 60.0),
+            velocity: Vec2::ZERO,
+            age: 10,
+            flight: None,
+            source: armor::shell(id, None, 1.0),
+            keys: Default::default(),
+        });
+    }
+    for tank in &mut state.tanks {
+        tank.next_shot = 0;
+    }
+    state.fire(0);
+    state.fire(1);
+    assert_eq!(state.shells_of(0), cannon::MAX_ROUNDS_PER_CANNON);
+    assert_eq!(state.shells_of(1), 1);
+}
+
+#[test]
 fn full_width_seed_can_drive_both_tanks() {
     let mut state = ScorchedState::new(
         ScorchedConfig {

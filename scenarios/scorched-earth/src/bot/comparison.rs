@@ -386,7 +386,7 @@ mod tests {
         );
 
         let mut blocked = fork(&state, 0, Choice::Current);
-        let (pivot, muzzle) = blocked.muzzle(0);
+        let Barrel { pivot, muzzle } = blocked.barrel(0);
         let id = PhysicsId::new(99_999);
         assert!(blocked.physics.insert_body(
             BodyId::new(id, BodyRole::PRIMARY),

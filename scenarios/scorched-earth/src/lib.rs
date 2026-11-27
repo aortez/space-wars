@@ -9,6 +9,7 @@ use engine_common::{
 use engine_core::Vec2;
 use engine_material::{Region, Source};
 use engine_rapier::{
+    cannon::{self, Barrel},
     terrain::{
         GrainShape, LooseTerrain, LooseTerrainConfig, TerrainAssembly, TerrainFragment, TerrainSpec,
     },
@@ -56,8 +57,11 @@ const CELL_SIZE: f32 = 0.5;
 const FIELD_WIDTH: u32 = 193;
 const FIELD_HEIGHT: u32 = 129;
 const BLAST_RADIUS: f32 = 2.5;
-pub const MAX_SHELLS: usize = 8;
-pub const SHELL_LIFETIME_TICKS: u32 = 10 * FIXED_HZ;
+/// The most shells in flight in a duel, the cannon's limit on a world's
+/// rounds.
+pub const MAX_SHELLS: usize = cannon::MAX_ROUNDS;
+/// The ticks a shell flies before it expires, the cannon's round lifetime.
+pub const SHELL_LIFETIME_TICKS: u32 = cannon::ROUND_LIFETIME_TICKS;
 pub const MAX_TERRAIN_FRAGMENTS: usize = 64;
 /// Native rigid-hull geometry shared by collision and embedded presentation.
 pub const RIGID_TANK_HULL: [Vec2; 6] = [
@@ -157,7 +161,7 @@ struct Tank {
 }
 impl Tank {
     fn direction(self) -> Vec2 {
-        Vec2::new(self.facing * self.elevation.cos(), self.elevation.sin())
+        cannon::direction(self.elevation, self.facing, Vec2::Y)
     }
 }
 

@@ -61,8 +61,14 @@ selected CPU policy. The playable default is **Learning + move**; the bottom-rig
 button cycles **Sweep → Learning → Learning + move → Learning + dodge →
 Plotting + move → Plotting + dodge**, restarting the same seed for comparison. The headless default retains the
 original seeded sweep.
-Power is muzzle speed (12–48 world units/s); elevation ranges from 5° to 85°.
-Human shots have a 1.25-second cooldown.
+The tanks fire by the engine's shared tank cannon (`engine_rapier::cannon`),
+and Scorched is the testbed for its rules. Power is muzzle speed, 12–48 world
+units/s, and a host's wider field raises the top power with the square root of
+its width. Elevation ranges from 5° to 85° above the horizontal. A cannon
+reloads for 1.25 seconds after each shot, and the CPUs wait 5 seconds between
+theirs. At most 8 shells fly at once, 4 of them from one tank, and a shell
+expires after 10 seconds. A shell starts where something stands in the barrel
+and passes through its own tank for its first 8 ticks.
 
 ## Armor and shells
 

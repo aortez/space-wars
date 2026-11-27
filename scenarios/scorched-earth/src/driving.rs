@@ -320,7 +320,7 @@ impl Duel {
                 -1.0
             };
             let distance = (target.x - motion.position.x).abs();
-            let (pivot, muzzle) = self.muzzle(physics, player);
+            let Barrel { pivot, muzzle } = self.barrel(physics, player);
             let blocked_barrel = self
                 .cast_ray(
                     physics,

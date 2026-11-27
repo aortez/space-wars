@@ -4,8 +4,9 @@ use engine_rapier::world::{RayHit, weapon::Recipients};
 
 /// The ray a shell at `position` casts across its next tick of flight, and the
 /// movement that tick covers if the ray meets nothing. The ray passes through
-/// the shooter for the shell's first eight ticks. Fired shells and the plotted
-/// CPU's traced shells both fly by it.
+/// the shooter while the shell clears it, for its first
+/// `cannon::CLEARANCE_TICKS` ticks. Fired shells and the plotted CPU's traced
+/// shells both fly by it.
 pub(crate) fn shell_ray(
     physics: &PhysicsWorld,
     placement: &host::Placement,
@@ -17,7 +18,7 @@ pub(crate) fn shell_ray(
     shell_ray_through(
         physics,
         placement,
-        (age < 8).then_some(shooter),
+        (age < cannon::CLEARANCE_TICKS).then_some(shooter),
         position,
         velocity,
     )
@@ -373,11 +374,10 @@ impl Duel {
     pub(crate) fn fighting(&self) -> bool {
         self.tanks.iter().all(|t| t.health > 0.0)
     }
-    pub(crate) fn muzzle(&self, physics: &PhysicsWorld, player: usize) -> (Vec2, Vec2) {
+    pub(crate) fn barrel(&self, physics: &PhysicsWorld, player: usize) -> Barrel {
         let tank = self.tanks[player];
         let motion = self.motion(physics, tank.body).unwrap();
-        let pivot = motion.position + Vec2::Y.rotate_radians(motion.angle) * 0.85;
-        (pivot, pivot + tank.direction() * 2.8)
+        Barrel::new(motion.position, motion.angle, tank.direction())
     }
     pub(crate) fn fire(&mut self, physics: &mut PhysicsWorld, player: usize) {
         if self.config.undercut
@@ -386,13 +386,25 @@ impl Duel {
             || self.config.bombardment_seconds > 0
             || !self.firing
             || !self.fighting()
-            || self.tick < self.tanks[player].next_shot
-            || self.shells.len() >= MAX_SHELLS
+            || cannon::may_fire(
+                self.tick,
+                self.tanks[player].next_shot,
+                self.shells_of(player),
+                self.shells.len(),
+            )
+            .is_err()
         {
             return;
         }
         self.launch(physics, player, true);
-        self.tanks[player].next_shot = self.tick + 75;
+        self.tanks[player].next_shot = self.tick + cannon::RELOAD_TICKS;
+    }
+    /// How many of `player`'s shells are in flight.
+    pub(crate) fn shells_of(&self, player: usize) -> usize {
+        self.shells
+            .iter()
+            .filter(|shell| shell.owner == player)
+            .count()
     }
     /// Launches a shell from `player`'s barrel as it points, at its speed,
     /// and answers its id. A shell the duel fires records its flight for the
@@ -405,23 +417,30 @@ impl Duel {
     ) -> u64 {
         let tank = self.tanks[player];
         let motion = self.motion(physics, tank.body).unwrap();
-        let (pivot, muzzle) = self.muzzle(physics, player);
-        // The barrel cannot shoot through the ground or another actor.
-        let position = self
-            .cast_ray(
+        let barrel = self.barrel(physics, player);
+        let position = barrel.exit(|pivot, along| {
+            self.cast_ray(
                 physics,
                 pivot,
-                muzzle - pivot,
+                along,
                 RayCastOptions {
-                    max_distance: (muzzle - pivot).length(),
+                    max_distance: along.length(),
                     exclude_entity: Some(tank.body.entity),
                     ..Default::default()
                 },
             )
-            .map_or(muzzle, |hit| hit.point);
+            .map(|hit| hit.point)
+        });
         let velocity = tank.direction() * tank.speed + motion.linear_velocity;
-        let flight = recorded
-            .then(|| self.record_launch(physics, player, position, velocity, position != muzzle));
+        let flight = recorded.then(|| {
+            self.record_launch(
+                physics,
+                player,
+                position,
+                velocity,
+                position != barrel.muzzle,
+            )
+        });
         let owner = Some(tank.body.entity.value());
         let id = self.shots + 1;
         self.shells.push(Shell {
@@ -465,16 +484,16 @@ impl Duel {
         };
         self.tanks[player].facing = if target.x >= origin.x { 1.0 } else { -1.0 };
         self.tanks[player].elevation = angle;
-        self.tanks[player].speed =
-            (speed * (0.93 + phase as f32 * 0.025)).clamp(12.0, self.placement.max_power());
+        self.tanks[player].speed = (speed * (0.93 + phase as f32 * 0.025))
+            .clamp(cannon::MIN_POWER, self.placement.max_power());
     }
     pub(crate) fn clamp_aim(&mut self) {
         let max_power = self.placement.max_power();
         let tank = &mut self.tanks[self.selected];
         tank.elevation = tank
             .elevation
-            .clamp(5.0_f32.to_radians(), 85.0_f32.to_radians());
-        tank.speed = tank.speed.clamp(12.0, max_power);
+            .clamp(cannon::MIN_ELEVATION, cannon::MAX_ELEVATION);
+        tank.speed = tank.speed.clamp(cannon::MIN_POWER, max_power);
     }
     pub(crate) fn prepare_controls(
         &mut self,
@@ -679,8 +698,8 @@ impl Duel {
 }
 
 impl ScorchedState {
-    pub(crate) fn muzzle(&self, player: usize) -> (Vec2, Vec2) {
-        self.duel.muzzle(&self.physics, player)
+    pub(crate) fn barrel(&self, player: usize) -> Barrel {
+        self.duel.barrel(&self.physics, player)
     }
     pub(crate) fn fire(&mut self, player: usize) {
         self.duel.fire(&mut self.physics, player)

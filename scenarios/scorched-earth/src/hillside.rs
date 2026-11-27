@@ -46,14 +46,16 @@ impl Duel {
         // Solve only the initial aim. Once fired, the ordinary swept shell can
         // hit any terrain, grain or actor along its actual trajectory.
         self.tanks[1].elevation = 34.0_f32.to_radians();
-        let (_, muzzle) = self.muzzle(physics, 1);
+        let muzzle = self.barrel(physics, 1).muzzle;
         let target = Vec2::new(4.0, 0.25);
         let dx = (muzzle.x - target.x).abs();
         let dy = target.y - muzzle.y;
         let angle = self.tanks[1].elevation;
         let denominator = 2.0 * angle.cos().powi(2) * (dx * angle.tan() - dy);
         if denominator > 0.0 {
-            self.tanks[1].speed = (GRAVITY * dx * dx / denominator).sqrt().clamp(12.0, 48.0);
+            self.tanks[1].speed = (GRAVITY * dx * dx / denominator)
+                .sqrt()
+                .clamp(cannon::MIN_POWER, cannon::MAX_POWER);
         }
     }
     pub(super) fn advance_hillside(&mut self, physics: &mut PhysicsWorld) {

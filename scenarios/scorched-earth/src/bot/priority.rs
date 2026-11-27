@@ -137,9 +137,10 @@ impl Duel {
         elevation: f32,
     ) -> bool {
         let geometry = Geometry::read(self, physics, player);
-        let pivot = geometry.shooter + Vec2::Y.rotate_radians(geometry.pitch) * 0.85;
         let facing = (geometry.target.x - geometry.shooter.x).signum();
-        let barrel = Vec2::new(facing * elevation.cos(), elevation.sin()) * 2.8;
+        let direction = cannon::direction(elevation, facing, Vec2::Y);
+        let pivot = Barrel::new(geometry.shooter, geometry.pitch, direction).pivot;
+        let barrel = direction * cannon::BARREL_LENGTH;
         self.cast_ray(
             physics,
             pivot,
