@@ -1,7 +1,7 @@
-//! Cheap resident visitors: a visit of up to [`MAX_CROWS`] crows, each with a
-//! body in the run's arena. No wall-clock sampling. Perch feet use the same
-//! lit-cell geometry as rendering, and a visit brings a perch body for each
-//! column its crows may land on.
+//! Cheap resident visitors: a crow alone or, now and then, a flock of up to
+//! [`MAX_CROWS`], each with a body in the run's arena. No wall-clock
+//! sampling. Perch feet use the same lit-cell geometry as rendering, and a
+//! visit brings a perch body for each column its crows may land on.
 pub(crate) mod body;
 mod environment;
 pub(crate) mod flight;
@@ -36,6 +36,40 @@ const SPOT_DEPTH: f32 = 0.25;
 /// How far a standing crow may be pushed across, in pitches, before it has
 /// been knocked off its spot.
 const KNOCKED_OFF: f32 = 0.5;
+/// How often an admission brings a flock instead of a crow alone.
+const FLOCK_CHANCE: f64 = 0.25;
+/// The salt of the stream that decides how many crows a visit brings,
+/// "flocksiz".
+const FLOCK_SALT: u64 = 0x666c_6f63_6b73_697a;
+/// The room a crow takes up, in pitches: across, its silhouette's 1.47 and a
+/// sliver more, and up and down, its height of 1.16 and a sliver more. No
+/// crow of a visit chooses a spot within its room across of another, at any
+/// height, so each reads on its own, and a crow in flight follows only one
+/// within its room up or down, in its lane.
+const ROOM_ACROSS: f32 = 1.6;
+const ROOM_UP: f32 = 1.2;
+/// How far behind the crow before it each crow of a flock comes in, in
+/// pitches.
+const ENTRY_GAP: f32 = 2.4;
+/// How far ahead, in pitches, a crow in flight looks for another flying
+/// the same way in its lane.
+const FOLLOW_RANGE: f32 = 3.0;
+/// The gap, in pitches, a crow keeps behind another it follows: more than its
+/// room across, since it is slow to brake and comes in closer than it aims.
+const FOLLOW_GAP: f32 = 2.0;
+/// How fast across, in pitches a second, a crow ahead flies while it cruises.
+/// One slower is slowing to come down or climbing out, and a crow behind
+/// passes it rather than wait at its back.
+const FOLLOW_SPEED: f32 = 4.0;
+/// How quickly a crow closes on the gap it keeps behind another, per second
+/// of the distance it has still to close.
+const CLOSING_RATE: f32 = 4.0;
+/// The most a flock's entry lanes rise above the cruising height, in
+/// pitches, where the canopy leaves room.
+const LANE_RISE: f32 = 0.9;
+/// The share of that rise each crow of a flock comes in at, by its place in
+/// the flock's line.
+const LANES: [f32; MAX_CROWS] = [0.0, 0.6, 0.25, 1.0];
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Perch {
@@ -64,41 +98,72 @@ impl Target {
     }
 }
 
-/// The perches and spots on the ground that a visit's other crows stand on
-/// or are going to. A crow chooses none of them, so no two crows of a visit
-/// come down on the same spot.
+/// The room a visit's other crows take up: the columns of the spots they are
+/// going to and of where they are, until each has gone. A crow chooses no
+/// perch or spot on the ground there, so no two crows of a visit come down on
+/// or beside each other, or into a column another is climbing out of or
+/// coming down through. How they move tells a crow in flight which to follow.
 #[derive(Clone, Copy, Default)]
 pub(crate) struct Claimed {
-    targets: [Option<Target>; MAX_CROWS],
+    /// Where each other crow is going, by member.
+    targets: [Option<Vec2>; MAX_CROWS],
+    /// Where each other crow is, by member.
+    positions: [Option<Vec2>; MAX_CROWS],
+    /// How each other crow is moving, by member.
+    velocities: [Option<Vec2>; MAX_CROWS],
 }
 
 impl Claimed {
     /// What the crows of `crows` other than `member` have claimed.
     fn by_others(crows: &[Option<Crow>; MAX_CROWS], member: usize) -> Self {
+        let other = |index: usize| crows[index].as_ref().filter(|_| index != member);
         Self {
-            targets: std::array::from_fn(|other| {
-                crows[other]
-                    .as_ref()
-                    .filter(|_| other != member)
-                    .and_then(|crow| crow.target)
-            }),
+            targets: std::array::from_fn(|index| other(index).and_then(Crow::destination)),
+            positions: std::array::from_fn(|index| other(index).map(|crow| crow.position)),
+            velocities: std::array::from_fn(|index| other(index).map(|crow| crow.flight.velocity)),
         }
     }
 
-    /// Whether another crow has claimed the perch `key`.
-    fn perch(self, key: [u8; 3]) -> bool {
-        self.targets
-            .iter()
-            .flatten()
-            .any(|target| target.key() == Some(key))
+    /// The most speed across that a crow at `position`, flying with
+    /// `velocity`, may ask for so that it keeps [`FOLLOW_GAP`] behind each
+    /// other crow cruising ahead of it in its lane, the same way: that crow's
+    /// speed, and a closing speed that falls to nothing as the gap does, or
+    /// less once it is too close. A crow coming the other way, standing, or
+    /// slowing to come down or climbing out, or out of its lane, it passes.
+    fn following(self, position: Vec2, velocity: Vec2, layout: Layout) -> f32 {
+        let mut limit = f32::INFINITY;
+        if velocity.x.abs() < layout.pitch * 0.2 {
+            return limit;
+        }
+        for (at, moving) in self.positions.iter().zip(self.velocities) {
+            let (Some(at), Some(moving)) = (at, moving) else {
+                continue;
+            };
+            let gap = (at.x - position.x) * velocity.x.signum();
+            if moving.x * velocity.x <= 0.0
+                || moving.x.abs() < layout.pitch * FOLLOW_SPEED
+                || gap <= 0.0
+                || gap > layout.pitch * FOLLOW_RANGE
+                || (at.y - position.y).abs() >= layout.pitch * ROOM_UP
+            {
+                continue;
+            }
+            let closing = (gap - layout.pitch * FOLLOW_GAP) * CLOSING_RATE;
+            limit = limit.min((moving.x.abs() + closing).max(0.0));
+        }
+        limit
     }
 
-    /// Whether another crow has claimed the spot on the ground at `feet`.
-    fn spot(self, feet: Vec2) -> bool {
+    /// Whether a crow standing with its feet at `feet` would crowd another
+    /// crow of the visit: be within [`ROOM_ACROSS`] of the spot that crow is
+    /// going to, or of where it is, at any height, since each climbs out of
+    /// its spot and comes down to it through the column above it.
+    fn crowds(self, feet: Vec2, layout: Layout) -> bool {
         self.targets
             .iter()
+            .chain(&self.positions)
             .flatten()
-            .any(|target| matches!(target, Target::Ground(spot) if *spot == feet))
+            .any(|at| (at.x - feet.x).abs() < layout.pitch * ROOM_ACROSS)
     }
 }
 
@@ -161,6 +226,9 @@ pub(crate) struct Crow {
     from: Vec2,
     to: Vec2,
     duration: u64,
+    /// How far above the cruising height the crow comes in: its lane in its
+    /// flock's line, and none for a crow alone.
+    lane: f32,
     rng: StdRng,
     hops: u32,
     escapes: u32,
@@ -175,7 +243,10 @@ pub(crate) struct Crow {
 
 impl Crow {
     /// Crow `member` of a visit, setting out for one of `candidates` that
-    /// `environment` leaves it.
+    /// `environment` leaves it. It comes in from the left if `from_left`
+    /// says so, as a flock's later crows come in from the side the first
+    /// drew; a crow without it draws its side.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         layout: Layout,
         seed: u64,
@@ -184,9 +255,10 @@ impl Crow {
         water_tolerance: ClockCrowWaterTolerance,
         candidates: &[Option<Perch>; PERCH_COLUMNS],
         environment: Environment<'_>,
+        from_left: Option<bool>,
     ) -> Self {
         let mut rng = StdRng::seed_from_u64(seed);
-        let facing_right = rng.random_bool(0.5);
+        let facing_right = from_left.unwrap_or_else(|| rng.random_bool(0.5));
         let position = Vec2::new(
             if facing_right {
                 layout.bounds_min.x - layout.pitch * 2.0
@@ -209,6 +281,7 @@ impl Crow {
             from: position,
             to: position,
             duration: MAX_FLIGHT_TICKS,
+            lane: 0.0,
             rng,
             hops: 0,
             escapes: 0,
@@ -232,7 +305,42 @@ impl Crow {
     fn cruise_height(layout: Layout) -> f32 {
         // Fly above the tallest possible digit, with room for raised wings.
         // Keeping this relative to the face avoids enormous portrait detours.
-        (layout.pitch * 5.2).min(layout.canopy_y - layout.pitch * 1.6 - 8.0)
+        (layout.pitch * 5.2).min(Self::ceiling(layout))
+    }
+
+    /// The highest a crow's feet go while it crosses the face, which leaves
+    /// room under the canopy for its raised wings.
+    fn ceiling(layout: Layout) -> f32 {
+        layout.canopy_y - layout.pitch * 1.6 - 8.0
+    }
+
+    /// How far a flock's entry lanes may rise above the cruising height: as
+    /// far as the ceiling leaves room, up to [`LANE_RISE`] pitches.
+    fn lane_rise(layout: Layout) -> f32 {
+        (Self::ceiling(layout) - Self::cruise_height(layout)).clamp(0.0, layout.pitch * LANE_RISE)
+    }
+
+    /// The height the crow crosses the face at: its lane on the way in, and
+    /// the cruising height every crow keeps after that.
+    fn cruise(&self) -> f32 {
+        Self::cruise_height(self.layout)
+            + if self.phase == Phase::Entering {
+                self.lane
+            } else {
+                0.0
+            }
+    }
+
+    /// Moves the crow back to `place` in its flock's line on the way in, that
+    /// many gaps further out than the first, and up into a lane `lane` above
+    /// the cruising height. It sets out from there as it would have from the
+    /// first place.
+    fn line_up(&mut self, place: usize, lane: f32) {
+        let outward = self.position.x.signum();
+        self.position += Vec2::new(outward * place as f32 * ENTRY_GAP * self.layout.pitch, lane);
+        self.lane = lane;
+        self.from = self.position;
+        self.flight.retarget(self.position, false, self.layout);
     }
 
     fn choose(
@@ -245,7 +353,7 @@ impl Crow {
         let mut selected = None;
         for candidate in candidates.iter().flatten().copied() {
             if self.target.and_then(Target::key) == Some(candidate.key)
-                || environment.claimed.perch(candidate.key)
+                || environment.claimed.crowds(candidate.feet, self.layout)
                 || environment.wet_feet(candidate.feet, self.layout, self.water_tolerance)
             {
                 continue;
@@ -262,6 +370,20 @@ impl Crow {
             }
         }
         selected
+    }
+
+    /// Whether a crow that has found nowhere to go has somewhere all the
+    /// same, but for the room the visit's other crows take up: a perch other
+    /// than its own that is dry enough for it.
+    fn crowded_out(
+        &self,
+        candidates: &[Option<Perch>; PERCH_COLUMNS],
+        environment: Environment<'_>,
+    ) -> bool {
+        candidates.iter().flatten().any(|candidate| {
+            self.target.and_then(Target::key) != Some(candidate.key)
+                && !environment.wet_feet(candidate.feet, self.layout, self.water_tolerance)
+        })
     }
 
     fn travel(&mut self, target: Target, phase: Phase) {
@@ -350,7 +472,7 @@ impl Crow {
                     .flatten()
                     .copied()
                     .filter(|p| {
-                        !environment.claimed.perch(p.key)
+                        !environment.claimed.crowds(p.feet, self.layout)
                             && !environment.wet_feet(p.feet, self.layout, self.water_tolerance)
                     })
                     .min_by(|a, b| {
@@ -392,7 +514,7 @@ impl Crow {
         if let Some(target) = spots
             .into_iter()
             .flatten()
-            .filter(|spot| !environment.claimed.spot(*spot))
+            .filter(|spot| !environment.claimed.crowds(*spot, self.layout))
             .min_by(|a, b| {
                 (a.x - self.position.x)
                     .abs()
@@ -503,6 +625,13 @@ impl Crow {
                     self.hop();
                 } else if let Some(target) = self.choose(&candidates, false, environment) {
                     self.travel(Target::Digit(target), Phase::Flying);
+                } else if self.crowded_out(&candidates, environment) {
+                    // Every other perch is in the room of another crow of
+                    // the visit for now. It looks around again before it
+                    // tries once more, until the visit's deadline.
+                    self.phase_tick = 0;
+                    self.duration = self.rng.random_range(50..=120);
+                    self.stand();
                 } else {
                     self.leave();
                 }
@@ -537,12 +666,16 @@ impl Crow {
                 self.flight.retarget(self.position, true, self.layout);
             }
         }
-        self.flight.steer(
+        let limit = environment
+            .claimed
+            .following(self.position, self.flight.velocity, self.layout);
+        self.flight.steer_within(
             self.position,
             self.to,
-            Self::cruise_height(self.layout),
+            self.cruise(),
             self.layout,
             leaving,
+            limit,
         );
         if self.flight.velocity.x.abs() > self.layout.pitch * 0.2 {
             self.facing_right = self.flight.velocity.x > 0.0;
@@ -633,11 +766,13 @@ impl Crow {
 }
 
 /// A visit of crows: one admission of up to [`MAX_CROWS`] birds, and the
-/// perches they share. Each crow has its own body, flight, target, random
-/// stream, temperament and wetness, and leaves when it is done, and a crow
-/// that has left is not replaced. The crows come with the visit and step
-/// with it, so all that remain start for home by its deadline and none
-/// outlasts it. The visit is over when its last crow has left.
+/// perches they share. A flock comes in together from one side, in a loose
+/// line, and then each crow goes its own way: it has its own body, flight,
+/// target, random stream, temperament and wetness, keeps out of the others'
+/// room, and leaves when it is done, and a crow that has left is not
+/// replaced. The crows come with the visit and step with it, so all that
+/// remain start for home by its deadline and none outlasts it. The visit is
+/// over when its last crow has left.
 pub(crate) struct CrowVisit {
     layout: Layout,
     /// The crows by member, which stays a crow's identity when others leave:
@@ -649,7 +784,11 @@ pub(crate) struct CrowVisit {
 impl CrowVisit {
     /// A visit of `size` crows. Its first crow takes `seed`, so that a visit
     /// of one is the crow that has always come, and each other crow takes a
-    /// seed of its own derived from it.
+    /// seed of its own derived from it. Each chooses where it is going in
+    /// turn, out of the room of those before it. A flock then comes in from
+    /// the side its first crow drew, led by the crow going furthest, so none
+    /// overtakes another on the way in, and each of the rest comes in a gap
+    /// further back than the one before it, in a lane of its own.
     pub fn new(
         layout: Layout,
         seed: u64,
@@ -665,12 +804,13 @@ impl CrowVisit {
         );
         let candidates = perches(layout, segments, event);
         let mut crows = [const { None }; MAX_CROWS];
+        let mut from_left = None;
         for member in 0..size {
             let environment = Environment {
                 claimed: Claimed::by_others(&crows, member),
                 ..Environment::default()
             };
-            crows[member] = Some(Crow::new(
+            let crow = Crow::new(
                 layout,
                 member_seed(seed, member),
                 visit_id,
@@ -678,7 +818,29 @@ impl CrowVisit {
                 water_tolerance,
                 &candidates,
                 environment,
-            ));
+                from_left,
+            );
+            from_left = Some(crow.position.x < 0.0);
+            crows[member] = Some(crow);
+        }
+        if let Some(from_left) = from_left.filter(|_| size > 1) {
+            // How far in from the flock's side a crow is going; a crow with
+            // nowhere to go crosses the whole face, so it leads.
+            let reach = |member: usize| {
+                crows[member]
+                    .as_ref()
+                    .and_then(Crow::destination)
+                    .map_or(f32::INFINITY, |to| if from_left { to.x } else { -to.x })
+            };
+            let mut line: [usize; MAX_CROWS] = std::array::from_fn(|member| member);
+            line[..size].sort_by(|a, b| reach(*b).total_cmp(&reach(*a)).then(a.cmp(b)));
+            let rise = Crow::lane_rise(layout);
+            for (place, member) in line[..size].iter().enumerate() {
+                crows[*member]
+                    .as_mut()
+                    .expect("a crow of the flock")
+                    .line_up(place, LANES[place] * rise);
+            }
         }
         Self {
             layout,
@@ -819,6 +981,19 @@ impl CrowVisit {
     /// Each crow's diagnostics, by member.
     pub fn diagnostics(&self) -> Vec<ClockCrowState> {
         self.crows().map(Crow::diagnostics).collect()
+    }
+}
+
+/// How many crows a visit whose seed is `seed` brings: one, as a rule, and
+/// one time in four a flock of two, three or four, each as likely. The draw
+/// has a stream of its own, so it changes nothing that the visit's crows or
+/// the rest of the Clock draw.
+pub fn visit_size(seed: u64) -> usize {
+    let mut rng = StdRng::seed_from_u64(seed ^ FLOCK_SALT);
+    if rng.random_bool(FLOCK_CHANCE) {
+        rng.random_range(2..=MAX_CROWS)
+    } else {
+        1
     }
 }
 

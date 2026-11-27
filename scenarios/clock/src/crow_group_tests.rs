@@ -62,17 +62,22 @@ fn cooldown() -> u64 {
 }
 
 /// Each crow of a visit has its member, a body of its own in the arena and a
-/// stream of its own, and no two set out for the same perch. The first sets
-/// out as a crow alone does.
+/// stream of its own, and no two set out for the same perch. The first
+/// chooses as a crow alone does, though its place in a flock's line may set
+/// it out from further back.
 #[test]
 fn each_crow_of_a_visit_has_its_own_member_body_and_perch() {
-    let alone = visit(5.0 / 3.0, 3, 1).crow_state();
+    let alone = visit(5.0 / 3.0, 3, 1).crow_state().unwrap();
     for size in 1..=MAX_CROWS {
         let mut state = visit(5.0 / 3.0, 3, size);
         let crows = state.crow_states();
         assert_eq!(members(&state), (0..size as u8).collect::<Vec<_>>());
         assert!(crows.iter().all(|crow| crow.visit_id == state.event_id()));
-        assert_eq!(state.crow_state(), alone);
+        let first = state.crow_state().unwrap();
+        assert_eq!(
+            (first.target, first.water_tolerance, first.facing_right),
+            (alone.target, alone.water_tolerance, alone.facing_right)
+        );
         let mut targets: Vec<_> = crows.iter().map(|crow| crow.target.unwrap()).collect();
         targets.sort_unstable();
         targets.dedup();

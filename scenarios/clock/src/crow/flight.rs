@@ -142,6 +142,20 @@ impl Flight {
         layout: Layout,
         leaving: bool,
     ) {
+        self.steer_within(position, target, cruise, layout, leaving, f32::INFINITY);
+    }
+
+    /// Steers as [`Flight::steer`] does, but asks for no more speed across
+    /// than `limit`, to keep behind another bird.
+    pub fn steer_within(
+        &mut self,
+        position: Vec2,
+        target: Vec2,
+        cruise: f32,
+        layout: Layout,
+        leaving: bool,
+        limit: f32,
+    ) {
         let scale = layout.pitch;
         let gravity = gravity(layout);
         let width = layout.bounds_max.x - layout.bounds_min.x;
@@ -166,7 +180,9 @@ impl Flight {
         };
         // Critically damped near the target: do not overshoot and turn around
         // repeatedly during the final approach.
-        let desired_x = ((aim.x - position.x) * 2.5 * haste).clamp(-speed, speed);
+        let desired_x = ((aim.x - position.x) * 2.5 * haste)
+            .clamp(-speed, speed)
+            .clamp(-limit, limit);
         let acceleration_x =
             ((desired_x - self.velocity.x) * 10.0).clamp(-speed * 3.0, speed * 3.0);
         // Forward motion supports some weight while gliding, but never all of it.
