@@ -25,7 +25,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Material Lab: impact, compression and rebound in slow motion. Starts paused. Up/down chooses a control; Space or gamepad bottom face activates. Run/Pause, Single step, Restart case and Next case control playback. Release load, Apply light load and Apply heavy load change the force without advancing time; then Run or Single step to observe the response. The Load, release & return case pauses after yielding and separation to guide these changes. Wood strikes wood and Wood meets armor are free two-body collisions: both bodies recoil, each material shows its own deformation, damage and capacity, one ledger accounts for the shared energy, and the load controls do not apply. Support gives way uses a smaller wood layer under a fixed load, pauses when it collapses, and resumes into free fall with the failure retained. Wood pair gives way uses a smaller layer on body A, pauses when it fails, and resumes with both bodies coasting; body B retains its capacity and damage, and the shared ledger includes both elastic releases. Wood split & rebuilt strikes fixed wood with a small armor block, then pauses after each step of its sequence: the back quarter splits off onto a fragment, the rest moves to a replacement body, and the striker returns for a second strike. Each part keeps its share of the damage. Branch gives way welds a wood branch to a fixed trunk under a weight near its tip and pauses at a checkpoint: the light load costs the weld nothing however long it holds, the heavy load drains its capacity until it severs, and the lab pauses again before the branch falls with the weight. Shell through moss fires a shell through three tufts of moss into a fixed armor plate: each tuft on its path is cut without slowing it, and the lab pauses once the last one is cut; then the plate takes the measured hit, and the shell bursts where it stops, cutting the tuft in the open while the plate shadows the one behind it. One source ledger accounts for the kinetic part and the payload, and the load controls do not apply. Save pauses and replaces one persistent slot; Load restores paused, including load history. Saves survive restarting the application. Each run has a bounded observation window. Esc/Start opens host pause; R restarts the lab. Displacement is magnified 20x; displayed time and work are physical values.",
+    controls_help: "Material Lab: impact, compression and rebound in slow motion. Starts paused. Up/down chooses a control; Space or gamepad bottom face activates. Run/Pause, Single step, Restart case and Next case control playback. Release load, Apply light load and Apply heavy load change the force without advancing time; then Run or Single step to observe the response. The Load, release & return case pauses after yielding and separation to guide these changes. Wood strikes wood and Wood meets armor are free two-body collisions: both bodies recoil, each material shows its own deformation, damage and capacity, one ledger accounts for the shared energy, and the load controls do not apply. Support gives way uses a smaller wood layer under a fixed load, pauses when it collapses, and resumes into free fall with the failure retained. Wood pair gives way uses a smaller layer on body A, pauses when it fails, and resumes with both bodies coasting; body B retains its capacity and damage, and the shared ledger includes both elastic releases. Wood split & rebuilt strikes fixed wood with a small armor block, then pauses after each step of its sequence: the back quarter splits off onto a fragment, the rest moves to a replacement body, and the striker returns for a second strike. Each part keeps its share of the damage. Branch gives way welds a wood branch to a fixed trunk under a weight near its tip and pauses at a checkpoint: the light load costs the weld nothing however long it holds, the heavy load drains its capacity until it severs, and the lab pauses again before the branch falls with the weight. Branch bends joins the same branch to the trunk by a hinge with its bending stiffness and runs four times slower than real time: it starts level with its load released, swings down under its own weight and pauses at a checkpoint; the light load bends it further, Release load lets it spring back, and the heavy load swings it past its safe moment until the hinge breaks. Shell through moss fires a shell through three tufts of moss into a fixed armor plate: each tuft on its path is cut without slowing it, and the lab pauses once the last one is cut; then the plate takes the measured hit, and the shell bursts where it stops, cutting the tuft in the open while the plate shadows the one behind it. One source ledger accounts for the kinetic part and the payload, and the load controls do not apply. Save pauses and replaces one persistent slot; Load restores paused, including load history. Saves survive restarting the application. Each run has a bounded observation window. Esc/Start opens host pause; R restarts the lab. Displacement is magnified 20x; displayed time and work are physical values.",
     create,
 };
 const COMMAND_KIND: u32 = 1;
@@ -549,6 +549,81 @@ mod tests {
             tick(s, false);
         }
         assert!(s.message.starts_with("Run complete"));
+    }
+    #[test]
+    fn material_lab_bending_branch_swings_slowly_and_restores_mid_swing() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut adapter = create(
+            0,
+            &Settings::default(),
+            Viewport::new(800.0, 480.0),
+            ScenarioStartMode::Normal,
+            &ScenarioAsset::MaterialLab(dir.path().join("material-lab.bin")),
+        )
+        .unwrap();
+        let s = adapter
+            .as_any_mut()
+            .downcast_mut::<MaterialLabClientScenario>()
+            .unwrap();
+        s.selected = 3;
+        while s.state.case != Case::BranchBends {
+            tick(s, true);
+        }
+        // Run swings the branch down under its own weight, 1/240 s a tick,
+        // a quarter of the displayed time, until the checkpoint.
+        s.selected = 0;
+        tick(s, true);
+        let mut ticks = 0;
+        while !s.state.paused {
+            tick(s, false);
+            ticks += 1;
+        }
+        assert_eq!(ticks, scenario_material_lab::BEND_CHECKPOINT_STEP);
+        assert!((s.state.elapsed() - 2.0).abs() < 1e-6);
+        assert!(s.state.branch().unwrap().deflection.unwrap() < -0.05);
+        // The light load, then a save mid-swing.
+        s.selected = 7;
+        tick(s, true);
+        assert!(s.message.starts_with("Load set to 1000"), "{}", s.message);
+        s.selected = 1;
+        for _ in 0..5 {
+            tick(s, true);
+        }
+        s.selected = 4;
+        tick(s, true);
+        settle(s);
+        assert!(s.message.starts_with("Saved at 2.02083 s"), "{}", s.message);
+        let saved = s.state.snapshot_bytes().unwrap();
+        s.selected = 1;
+        for _ in 0..30 {
+            tick(s, true);
+        }
+        let later = s.state.snapshot_bytes().unwrap();
+        // Load returns to the save, and the swing continues exactly.
+        s.selected = 5;
+        tick(s, true);
+        settle(s);
+        assert_eq!(s.state.snapshot_bytes().unwrap(), saved);
+        s.selected = 1;
+        for _ in 0..30 {
+            tick(s, true);
+        }
+        assert_eq!(s.state.snapshot_bytes().unwrap(), later);
+        // The heavy load breaks the hinge, and the lab pauses.
+        s.selected = 8;
+        tick(s, true);
+        s.selected = 0;
+        tick(s, true);
+        while !s.state.paused {
+            tick(s, false);
+        }
+        assert_eq!(
+            s.message,
+            "The hinge has severed. Run to watch the branch fall."
+        );
+        s.selected = 6;
+        tick(s, true);
+        assert!(s.message.starts_with("The hinge has severed. Restart"));
     }
     #[test]
     fn material_lab_shell_case_pauses_at_the_last_tuft_and_restores_before_the_hit() {

@@ -1,8 +1,9 @@
-//! The branch case, drawn to scale: the trunk, the branch and the weight on
-//! it, with the weld's load against its safe limit and its capacity.
+//! The branch cases, drawn to scale: the trunk, the branch and the weight on
+//! it, with the weld's or hinge's load against its safe limit and its
+//! capacity.
 use super::{AMBER, CYAN, INK, ROW, history, line, rect, text};
 use crate::{
-    Branch, MaterialLabState, Placement,
+    Branch, Case, MaterialLabState, Placement,
     branch::{BRANCH_HALF, TRUNK_CENTER, TRUNK_HALF, WEIGHT_HALF},
 };
 use engine_common::{
@@ -52,7 +53,7 @@ pub fn draw(f: &mut RenderFrame, s: &MaterialLabState, b: &Branch) {
         if b.tip_load == 0.0 { AMBER } else { CYAN },
     );
     scene(f, b);
-    let last = table(f, b, 5.8);
+    let last = table(f, b, s.case == Case::BranchBends, 5.8);
     let y = last - 2.0 * ROW;
     bars(f, b, y);
     history(f, s, 0.5, y - 2.0 * ROW - 0.2);
@@ -116,7 +117,7 @@ fn scene(f: &mut RenderFrame, b: &Branch) {
         line(f, weight.x - 0.3, tip + 0.3, weight.x, tip, AMBER);
         line(f, weight.x + 0.3, tip + 0.3, weight.x, tip, AMBER);
     }
-    // The weld across the root section: cyan while it holds, amber while an
+    // The joint across the root section: cyan while it holds, amber while an
     // overload drains it, and grey where it was once it has severed.
     let color = if b.severed_at.is_some() {
         C::rgb(0.38, 0.44, 0.5)
@@ -144,23 +145,24 @@ fn scene(f: &mut RenderFrame, b: &Branch) {
     );
 }
 
-/// The weld's load and capacity under a heading from `top`. Once the weld
-/// has severed, the load is the one it severed under. Returns the last row's
-/// height.
-fn table(f: &mut RenderFrame, b: &Branch, top: f32) -> f32 {
+/// The joint's load and capacity under a heading from `top`, with a hinge's
+/// bend. Once the joint has severed, the load is the one it severed under.
+/// Returns the last row's height.
+fn table(f: &mut RenderFrame, b: &Branch, bends: bool, top: f32) -> f32 {
     text(
         f,
         0.5,
         top,
-        if b.severed_at.is_some() {
-            "SEVERED WELD  /  LOAD AT SEVERING"
-        } else {
-            "WELD AT THE ROOT"
+        match (bends, b.severed_at.is_some()) {
+            (false, true) => "SEVERED WELD  /  LOAD AT SEVERING",
+            (false, false) => "WELD AT THE ROOT",
+            (true, true) => "SEVERED HINGE  /  LOAD AT SEVERING",
+            (true, false) => "HINGE AT THE ROOT",
         },
         13.0,
         CYAN,
     );
-    let rows = [
+    let mut rows = vec![
         ("Root moment", format!("{:.1}", b.load.moment.abs())),
         ("Safe moment", format!("{:.0}", b.safe_moment)),
         ("Utilization", format!("{:.3}", b.load.utilization)),
@@ -181,6 +183,22 @@ fn table(f: &mut RenderFrame, b: &Branch, top: f32) -> f32 {
         ),
         ("Branch drop", format!("{:.4}", b.drop.max(0.0))),
     ];
+    if bends {
+        // How far the branch droops below, or rises above, where it was
+        // joined.
+        rows.push((
+            "Bend",
+            b.deflection.map_or("severed".into(), |turn| {
+                // Adding zero turns a level branch's -0.00 into 0.00.
+                let down = -turn.to_degrees() + 0.0;
+                if down >= 0.0 {
+                    format!("{down:.2}° down")
+                } else {
+                    format!("{:.2}° up", -down)
+                }
+            }),
+        ));
+    }
     let row = |i: usize| top - (i + 1) as f32 * ROW;
     for (i, (label, value)) in rows.iter().enumerate() {
         text(f, 0.5, row(i), *label, 14.0, INK);

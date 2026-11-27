@@ -35,14 +35,14 @@ pub fn support_region(case: Case) -> Region {
         Region::with_remaining(WOOD, VOLUME, 1200.0).unwrap()
     }
 }
-/// Material tokens are in body order; an ideal rigid platen has none, the
-/// branch case's material is its weld's, and the shell case's shell has none.
+/// Material tokens are in body order; an ideal rigid platen has none, a
+/// branch case's material is its joint's, and the shell case's shell has none.
 pub fn build(case: Case) -> (PhysicsWorld, [Option<RegionToken>; 2]) {
     if case == Case::RegionSplit {
         return striker_and_wood();
     }
-    if case == Case::BranchFailure {
-        return (branch::build(), [None, None]);
+    if case.is_branch() {
+        return (branch::build(case == Case::BranchBends), [None, None]);
     }
     if case == Case::ShellThroughMoss {
         let (world, plate) = shell::build();

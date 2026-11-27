@@ -1,14 +1,14 @@
-# Material Lab: loading, recovery, collapse, splits, welds and weapons (#327, #328, #329)
+# Material Lab: loading, recovery, collapse, splits, welds, hinges and weapons (#327, #328, #329, #224)
 
 `material-lab` is the first application scenario using the bounded native
 [impact-to-support path](material-impact-support.md), its
 [changing-load extension](material-changing-load.md) and the
-[paired-material path](material-paired-compression.md). Three cases instead
+[paired-material path](material-paired-compression.md). Four cases instead
 use ordinary steps: one with the [native response](material-native-response.md)
-to show a [region split](material-region-split.md), one with a
-[connection load](material-connection-loads.md), a weld that gives way, and one
-with a [weapon source](material-sources.md), a shell fired through moss into a
-plate. Select
+to show a [region split](material-region-split.md), two with a
+[connection load](material-connection-loads.md), a weld that gives way and a
+hinge that bends, and one with a [weapon source](material-sources.md), a shell
+fired through moss into a plate. Select
 **Show all scenarios** in the launcher, choose **Material Lab**, then start.
 Direct launch:
 
@@ -29,8 +29,9 @@ Next case walks the five load-controlled platen cases, the two
 [free-pair collisions](#free-pair-collisions), then the
 [collapsing support](#collapsing-support), [paired collapse](#paired-collapse),
 [split and rebuild](#split-and-rebuild),
-[branch gives way](#branch-gives-way) and
-[shell through moss](#shell-through-moss), for twelve cases in total.
+[branch gives way](#branch-gives-way),
+[shell through moss](#shell-through-moss) and
+[branch bends](#branch-bends), for thirteen cases in total.
 
 ## Platen cases and playback
 
@@ -282,6 +283,60 @@ weld takes no more load. Pause, Single step and Save/Load work throughout, and
 Restart returns to an undamaged weld. The run ends at the case's 1024-step
 window if the weld never severs.
 
+## Branch bends
+
+**Branch bends** shows a
+[connection that bends](material-connection-loads.md#connections-that-bend):
+the trunk, branch and weight of Branch gives way, with the branch on a hinge
+rather than a weld. The hinge's spring has the law's bending stiffness for its
+beam, so the branch sags under its load and springs back when the load is
+lifted, and an overload still drains the hinge until it severs.
+
+Its steps are 1/240 s where the lab's other cases take 1/4096 s, so each
+displayed update shows a quarter of real time rather than about a 68th, and the
+branch's three or so swings a second play at a little under one. The finer step
+also keeps the solver's give small. Under the lab's gravity of 400, the solver
+leaves each joint a steady give of about the gravity times a substep squared.
+Stepped in real time, at 1/60 s, the fastened weight sat 0.006 below where it
+was fastened and the branch hung about 1% past its balance. At 1/240 s the
+weight sits 0.0004 low, and once the swing has died down the branch hangs
+within 0.05% of its balance.
+
+The hinge's beam is the weld's with a represented depth of 320 rather than
+256. That puts its safe moment at 40000, two and a half times the moment of
+the branch's own weight, its capacity at 38400 (`toughness 60 * volume 640`)
+and its stiffness at 166667 per radian. Released level, a branch swings down
+to nearly twice the bend it comes to rest at, so on the weld's beam it would
+swing to 96% of its safe moment. The weight is fastened to the branch's top
+face by a joint far stronger than any load in the case, so it rides each
+swing. Resting loose, it leaves the branch as the branch first drops, faster
+than it falls, and a released weight is thrown off as the branch springs back.
+
+The case starts level with its load released. Run swings the branch down
+under its own weight. Its first swing reaches 10.6 degrees, 1.93 times the
+bend it rests at, and 0.77 of the safe moment. It then rings about that bend
+for many seconds: wood's damping counts only the branch's own inertia, so the
+fastened weight's lets it ring longer. The lab pauses at step 480 (2 s). Over
+the next six seconds, while the swing is still dying away, the bend averages
+5.46 degrees, within 0.4% of the 5.48 at which the spring holds the branch's
+weight at its lever arm as it lies, and the hinge's moment averages that
+weight's within 0.4%. Nothing charges the hinge.
+
+Apply light load bends it to an average of 6.69 degrees, within 0.05% of its
+balance under that load, and Release load lets it spring back to an average of
+5.48, within 0.05% of its balance. Apply heavy load swings it past its safe
+moment. 27 steps (0.11 s) later, at 22.0 degrees and 1.6 times the safe
+moment, the overload has drained the hinge and it severs. The lab pauses, the
+phase reads Falling and the history records Severed. Run then lets the branch
+fall with the weight still fastened on. It is already swinging down fast, so
+the run completes nine steps (0.04 s) later, before the branch falls past the
+trunk's foot and over the controls drawn below.
+
+The table is the welded branch's under the heading HINGE AT THE ROOT, with a
+Bend row for how far the branch droops below level. Save and Load work
+throughout, mid-swing included. The run ends at its window, a minute of
+physical time and four on screen, if the hinge never severs.
+
 ## Shell through moss
 
 **Shell through moss** shows a
@@ -373,7 +428,9 @@ steps, so the replay repeats them. Its native snapshot keeps the
 response-enabled v3 layout throughout. Branch gives way uses `MATLAB07`, with
 the `MATLAB02` fields and command list even before any load change; the replay
 applies its commands on ordinary steps. Its native snapshot keeps the v1
-layout, with the weld in the connection section. Shell through moss uses
+layout, with the weld in the connection section. Branch bends uses `MATLAB07`
+too, with its own case tag, and its native snapshot keeps the v1 layout with
+the hinge and the fastening in the connection section. Shell through moss uses
 `MATLAB08`, with the `MATLAB01` fields and no command list; the replay flies
 the shell again. Its native snapshot keeps the response-enabled v3 layout
 throughout. Existing case tags and lab envelopes retain their layouts. Native saves retain their v1–v23 compatibility.
@@ -444,6 +501,22 @@ the raster renderer and severs again on the same step. It then checks the
 refused load, runs the fall to completion and restarts. It is in the full UI
 suite.
 
+The bending-branch scenario test draws every state. It checks that the first
+swing charges nothing and stays within the safe moment, and how far it
+reaches. Over six seconds at a time, it checks the mean bend against the
+spring's balance and the mean moment against the weights', first under the
+branch's own weight, then under the light load, then released again. It then
+checks that the weight stays fastened, the severing within 32 steps of the
+heavy load, the pause and the history and the refused load. The branch must
+fall further than it would from rest and end above the trunk's foot. Save
+tests cover the start, mid-swing, the checkpoint, each load change and the
+step after, and every step from the severing to the end, with exact
+continuation. They also cover the `MATLAB07` layout and its case tag, the
+native snapshot's v1 layout, and a save relabelled as the welded branch's,
+which refuses. A client test runs the case to the checkpoint at a quarter of
+real time, saves mid-swing under the light load, restores and continues
+exactly, then breaks the hinge and checks the refused load.
+
 The main shell-case scenario test draws every state. At the pause after the
 last tuft on the path, it checks the cut tufts and each pass's work, the
 shell's speed and course, the untouched plate and the history. At the plate it
@@ -466,7 +539,8 @@ material response for existing gameplay, add fracture/topology consequences, or
 broaden the native solver's geometry or connection-loading support. The two
 explicit collapse cases demonstrate bounded #328 failure consequences; other
 cases keep their refusal on exhaustion. The split case's fragment is cut by the
-lab, not by a failure, and the branch case's severing removes only its weld.
+lab, not by a failure, and each branch case's severing removes only its weld
+or hinge.
 The shell case's shell stops at its first hard contact, and its blast meets the
 plate as four circles the lab admits. A moving rigid platen over one material,
 and debris after failure, remain later Lab slices.

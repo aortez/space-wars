@@ -189,6 +189,10 @@ fixed trunk. Its beam is the branch's own square section over its length.
 
 Material Lab's [Branch gives way](material-lab.md#branch-gives-way) case runs
 one weld through a safe load, an overload and its severing in both renderers.
+Its [Branch bends](material-lab.md#branch-bends) case runs the same branch on
+a hinge at a quarter of real time: it sags from level under its own weight,
+bends further under a light load, springs back when it is lifted and breaks
+under the heavy one.
 
 `world::tests::bending` runs the same branch on a hinge, at both scales, in
 wood-like brittle material with wood's damping of 0.2. The hinge's stiffness
@@ -248,6 +252,12 @@ settles all the way.
   swing has died out. In the sag fixture, it slept after 2.7 s 13% short of its
   balance in metres and after 4 s 3% past it at Clock's scale. It keeps that
   pose and that last load until something wakes it.
+- **Coarse steps under strong gravity:** the solver leaves each joint a
+  steady give of about gravity times a substep squared, and a hinge rests past
+  its balance by a share that grows with it. Under Material Lab's gravity of
+  400 per unit, a branch stepped at 60 Hz with four substeps hung about 1% past
+  its balance, with its fastened weight 0.006 low, so Branch bends steps at
+  240 Hz, where they are within 0.05% and 0.0004.
 - **Final substep only:** the load is the final substep's. A hit reaches the
   weld only as the load it leaves in that substep, and a jolt that ends before
   it goes unseen.

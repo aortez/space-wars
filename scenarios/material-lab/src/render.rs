@@ -57,6 +57,8 @@ pub fn frame(s: &MaterialLabState) -> RenderFrame {
         10.3,
         if s.case == Case::ShellThroughMoss {
             "MATERIAL LAB  /  WEAPON SOURCE"
+        } else if s.case == Case::BranchBends {
+            "MATERIAL LAB  /  BENDING CONNECTION"
         } else if s.case == Case::BranchFailure {
             "MATERIAL LAB  /  CONNECTION FAILURE"
         } else if s.case == Case::RegionSplit {
@@ -217,10 +219,10 @@ fn platen(f: &mut RenderFrame, s: &MaterialLabState, a: &DynamicCompressionSumma
     history(f, s, 0.5, bar_y - 0.7);
 }
 /// The latest contact observations, and why a finished run stopped. The
-/// branch and shell cases have no contacts to number: the weld severs, and
-/// the shell's source reports what it reached.
+/// branch and shell cases have no contacts to number: the branch's joint
+/// severs, and the shell's source reports what it reached.
 fn history(f: &mut RenderFrame, s: &MaterialLabState, x: f32, y: f32) {
-    let unnumbered = [Case::BranchFailure, Case::ShellThroughMoss].contains(&s.case);
+    let unnumbered = s.case.is_branch() || s.case == Case::ShellThroughMoss;
     text(
         f,
         x,

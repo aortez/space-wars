@@ -211,6 +211,7 @@ fn qualified_cases_finish_with_expected_material_behavior() {
             Case::RegionSplit,
             Case::BranchFailure,
             Case::ShellThroughMoss,
+            Case::BranchBends,
         ]
         .contains(c)
             && c.free_pair().is_none()
@@ -1158,6 +1159,226 @@ fn branch_case_load_changes_are_bounded() {
     s.set_load(Load::Light).unwrap();
     assert!(s.set_load(Load::Heavy).unwrap_err().contains("limit"));
     assert_eq!(s.snapshot_bytes().unwrap(), bytes);
+}
+
+/// The bend at which the bending branch rests under `load`: where its
+/// hinge's spring holds the branch's weight at its center and the load at the
+/// weight's center, each at its lever arm as the branch lies. The weight's
+/// center is half a unit above the branch's top face, so it moves outward as
+/// the branch turns down.
+fn bending_balance(load: Load) -> f32 {
+    let stiffness = engine_rapier::world::hinge_stiffness(&branch::hinge());
+    let own = branch::BRANCH_MASS * branch::GRAVITY;
+    let rise = branch::BRANCH_HALF.y + branch::WEIGHT_HALF.y;
+    let mut turn = 0.0_f32;
+    for _ in 0..64 {
+        let (sin, cos) = turn.sin_cos();
+        let moment = own * branch::BRANCH_HALF.x * cos
+            + load.weight() * (branch::WEIGHT_REACH * cos + rise * sin);
+        turn = moment / stiffness;
+    }
+    turn
+}
+
+/// Run the bending branch for `seconds` under `load`. Its swing has not died
+/// away, so check over the many swings of that time: its mean droop is within
+/// 1% of its balance, and its hinge's mean moment within 1% of the weights'
+/// own at their lever arms as they lie. Nothing charges the hinge. Returns its
+/// mean droop.
+fn bending_rest(s: &mut MaterialLabState, seconds: u32, load: Load) -> f32 {
+    let (mut droop, mut moment, mut statics) = (0.0_f64, 0.0_f64, 0.0_f64);
+    let steps = (f64::from(seconds) / f64::from(branch::BEND_DT)).round() as u32;
+    for _ in 0..steps {
+        s.advance();
+        render::frame(s);
+        let b = s.branch().unwrap();
+        assert_eq!(b.load.charged, 0.0, "{b:?}");
+        assert!(b.load.utilization < 1.0, "{b:?}");
+        droop -= f64::from(b.deflection.unwrap());
+        moment -= f64::from(b.load.moment);
+        statics += f64::from(
+            branch::BRANCH_MASS * branch::GRAVITY * b.branch.x + load.weight() * b.weight.x,
+        );
+    }
+    let droop = (droop / f64::from(steps)) as f32;
+    let balance = bending_balance(load);
+    assert!(
+        (droop - balance).abs() < 0.01 * balance,
+        "{load:?}: {droop} against {balance}"
+    );
+    assert!(
+        (moment - statics).abs() < 0.01 * statics,
+        "{load:?}: {moment} against {statics}"
+    );
+    droop
+}
+
+#[test]
+fn bending_branch_sags_springs_back_and_breaks_under_the_heavy_load() {
+    let mut s = MaterialLabState::new(Case::BranchBends);
+    let start = s.branch().unwrap();
+    assert_eq!((start.tip_load, start.deflection), (0.0, Some(0.0)));
+    assert_eq!((start.safe_moment, s.phase()), (40000.0, Phase::Holding));
+    assert_eq!(
+        s.guidance(),
+        Some("Run to watch the branch sag and swing; the lab will pause.")
+    );
+    // Released level, the branch swings down under its own weight to about
+    // twice the bend it comes to rest at, within its safe moment, and rings.
+    s.paused = false;
+    let (mut peak, mut lowest) = (0.0_f32, 0.0_f32);
+    while !s.paused {
+        s.advance();
+        render::frame(&s);
+        let b = s.branch().unwrap();
+        assert_eq!(b.load.charged, 0.0, "{b:?}");
+        peak = peak.max(b.load.utilization);
+        lowest = lowest.max(-b.deflection.unwrap());
+    }
+    assert_eq!(s.steps, branch::BEND_CHECKPOINT_STEP);
+    assert!((s.elapsed() - 2.0).abs() < 1e-6, "{}", s.elapsed());
+    assert!(peak < 0.85, "{peak}");
+    let balance = bending_balance(Load::Released);
+    assert!(lowest > 1.7 * balance && lowest < 2.0 * balance, "{lowest}");
+    assert_eq!(
+        s.guidance(),
+        Some("Apply a load, then Run; the heavy load breaks the hinge.")
+    );
+    s.paused = false;
+    let resting = bending_rest(&mut s, 6, Load::Released);
+    // The light load bends it further, and lifting it lets the branch spring
+    // back to where it rested. Nothing charges the hinge.
+    s.set_load(Load::Light).unwrap();
+    assert_eq!(
+        s.guidance(),
+        Some("Release load to let it spring back, or apply heavy load.")
+    );
+    let loaded = bending_rest(&mut s, 6, Load::Light);
+    assert!(
+        loaded > resting + 1.0_f32.to_radians(),
+        "{loaded} {resting}"
+    );
+    s.set_load(Load::Released).unwrap();
+    let back = bending_rest(&mut s, 6, Load::Released);
+    assert!((back - resting).abs() < 0.01 * resting, "{back} {resting}");
+    let b = s.branch().unwrap();
+    assert_eq!((b.spent, s.phase()), (0.0, Phase::Holding));
+    // The weight rides the branch, fastened where it was placed.
+    let fastened = |b: &branch::Branch| {
+        let (sin, cos) = b.branch.angle.sin_cos();
+        let (dx, dy) = (b.weight.x - b.branch.x, b.weight.y - b.branch.y);
+        (
+            dx * cos + dy * sin,
+            dy * cos - dx * sin,
+            b.weight.angle - b.branch.angle,
+        )
+    };
+    let place = fastened(&b);
+    assert!(
+        (place.0 - 1.5).abs() < 1e-3 && (place.1 - 0.75).abs() < 1e-3,
+        "{place:?}"
+    );
+    assert!(place.2.abs() < 1e-3, "{place:?}");
+    // The heavy load swings it past its safe moment, and the overload drains
+    // the hinge within a few steps.
+    s.set_load(Load::Heavy).unwrap();
+    assert_eq!(
+        s.guidance(),
+        Some("Run until the hinge gives way; the lab will pause.")
+    );
+    let before = s.steps;
+    run_until_paused(&mut s);
+    let severed = s.branch().unwrap();
+    assert_eq!(s.severed_at, Some(s.steps));
+    assert!(s.steps - before <= 32, "{}", s.steps - before);
+    assert_eq!((severed.remaining, severed.deflection), (0.0, None));
+    assert!(severed.load.utilization > 1.0 && severed.excess.unwrap() >= 0.0);
+    assert_eq!((severed.time_to_failure, s.phase()), (None, Phase::Falling));
+    assert_eq!(
+        s.guidance(),
+        Some("The hinge has severed. Run to watch the branch fall.")
+    );
+    assert!(
+        s.set_load(Load::Light)
+            .unwrap_err()
+            .starts_with("The hinge has severed")
+    );
+    // The branch falls with the weight still fastened on, faster than from
+    // rest since it was swinging down, and ends above the trunk's foot.
+    run_until_paused(&mut s);
+    assert!(s.stopped.as_ref().unwrap().starts_with("Run complete"));
+    assert_eq!(s.steps, s.severed_at.unwrap() + branch::BEND_FALL_STEPS);
+    let end = s.branch().unwrap();
+    let fall = branch::BEND_FALL_STEPS as f32 * branch::BEND_DT;
+    assert!(
+        end.drop > severed.drop + 0.5 * branch::GRAVITY * fall * fall,
+        "{end:?}"
+    );
+    let (sin, cos) = end.branch.angle.sin_cos();
+    let lowest =
+        end.branch.y - sin.abs() * branch::BRANCH_HALF.x - cos.abs() * branch::BRANCH_HALF.y;
+    assert!(
+        lowest > branch::TRUNK_CENTER.y - branch::TRUNK_HALF.y,
+        "{lowest}"
+    );
+    let after = fastened(&end);
+    assert!(
+        (after.0 - place.0).abs() < 1e-3 && (after.1 - place.1).abs() < 1e-3,
+        "{after:?}"
+    );
+    assert_eq!(s.events.len(), 1);
+}
+
+#[test]
+fn bending_branch_saves_replay_its_swing_and_load_changes() {
+    let mut s = MaterialLabState::new(Case::BranchBends);
+    let mut saved = 0;
+    while s.stopped.is_none() {
+        match s.steps {
+            600 => s.set_load(Load::Light).unwrap(),
+            640 => s.set_load(Load::Heavy).unwrap(),
+            _ => {}
+        }
+        // Mid-swing, at the checkpoint, beside each load change, and at and
+        // after the severing.
+        if [0, 1, 20, branch::BEND_CHECKPOINT_STEP, 600, 601, 640, 641].contains(&s.steps)
+            || s.severed_at.is_some()
+        {
+            saved += 1;
+            let bytes = s.snapshot_bytes().unwrap();
+            assert_eq!(&bytes[..8], BRANCH_SAVE_MAGIC);
+            // The native snapshot keeps the v1 layout, with the hinge and the
+            // fastening in its connection section.
+            let world = s.world.snapshot_bytes().unwrap();
+            assert_eq!(u32::from_le_bytes(world[..4].try_into().unwrap()), 1);
+            let mut loaded = restored(&s);
+            assert_eq!(loaded.branch(), s.branch());
+            assert_eq!(
+                (&loaded.events, loaded.severed_at),
+                (&s.events, s.severed_at)
+            );
+            // A save never passes as the welded branch's.
+            let mut save: (Save, Vec<LoadChange>) = codec().deserialize(&bytes[8..]).unwrap();
+            save.0.case = Case::BranchFailure;
+            let mut forged = BRANCH_SAVE_MAGIC.to_vec();
+            forged.extend(codec().serialize(&save).unwrap());
+            assert!(MaterialLabState::from_snapshot_bytes(&forged).is_err());
+            // A restored run continues exactly.
+            loaded.advance();
+            s.advance();
+            assert_eq!(
+                loaded.snapshot_bytes().unwrap(),
+                s.snapshot_bytes().unwrap()
+            );
+            continue;
+        }
+        s.advance();
+    }
+    assert!(saved > 10, "{saved}");
+    assert_eq!(
+        codec().serialize(&Case::BranchBends).unwrap(),
+        12_u32.to_le_bytes()
+    );
 }
 
 /// The step the shell's sweep reaches and cuts the last tuft on its path, and
