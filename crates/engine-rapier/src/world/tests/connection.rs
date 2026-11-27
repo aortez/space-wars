@@ -4,21 +4,21 @@
 use super::*;
 use engine_material::{Beam, Connection, ConnectionLoad, FailureMode, Material};
 
-const DT: f32 = 1.0 / 60.0;
-const TRUNK: PhysicsId = PhysicsId::new(1);
-const BRANCH: PhysicsId = PhysicsId::new(2);
-const TWIN: PhysicsId = PhysicsId::new(3);
+pub(super) const DT: f32 = 1.0 / 60.0;
+pub(super) const TRUNK: PhysicsId = PhysicsId::new(1);
+pub(super) const BRANCH: PhysicsId = PhysicsId::new(2);
+pub(super) const TWIN: PhysicsId = PhysicsId::new(3);
 
 #[derive(Debug, Clone, Copy)]
-struct Scale {
-    g: f32,
-    length_unit: f32,
+pub(super) struct Scale {
+    pub(super) g: f32,
+    pub(super) length_unit: f32,
     /// World units per fixture unit.
-    k: f32,
+    pub(super) k: f32,
 }
 
 /// Clock's scale, and metres, as for the tethers.
-const SCALES: [Scale; 2] = [
+pub(super) const SCALES: [Scale; 2] = [
     Scale {
         g: 400.0,
         length_unit: 20.0,
@@ -31,16 +31,16 @@ const SCALES: [Scale; 2] = [
     },
 ];
 
-fn body(entity: PhysicsId) -> BodyId {
+pub(super) fn body(entity: PhysicsId) -> BodyId {
     BodyId::new(entity, BodyRole::PRIMARY)
 }
 
-fn weld_id(entity: PhysicsId) -> JointId {
+pub(super) fn weld_id(entity: PhysicsId) -> JointId {
     JointId::new(entity, JointRole::new(1))
 }
 
 /// A fixed trunk, one unit wide and four high, centered on the origin.
-fn world(scale: Scale, iterations: usize) -> PhysicsWorld {
+pub(super) fn world(scale: Scale, iterations: usize) -> PhysicsWorld {
     let mut world = PhysicsWorld::new(PhysicsWorldConfig {
         gravity: Vec2::new(0.0, -scale.g),
         length_unit: scale.length_unit,
@@ -85,7 +85,7 @@ fn grow_at(world: &mut PhysicsWorld, scale: Scale, entity: PhysicsId, x: f32) {
 }
 
 /// The branch's own square section, over its whole length.
-fn beam(scale: Scale) -> Beam {
+pub(super) fn beam(scale: Scale) -> Beam {
     Beam::new(0.5 * scale.k, 0.5 * scale.k, 4.0 * scale.k)
 }
 
@@ -123,6 +123,7 @@ fn weld(
             root: Vec2::new(side * 0.5 * scale.k, 0.0),
             axis: Vec2::new(side, 0.0),
             connection: Connection::new(material, beam(scale)).unwrap(),
+            bends: false,
         },
     )
 }
@@ -237,6 +238,7 @@ fn a_hanging_body_pulls_its_root_along_the_beam() {
                         root: Vec2::new(0.0, -2.0 * scale.k),
                         axis: Vec2::new(0.0, -2.0),
                         connection: Connection::new(material(1.0e6, 1.0), beam(scale)).unwrap(),
+                        bends: false,
                     },
                 )
                 .unwrap();
@@ -276,6 +278,7 @@ fn each_weld_of_a_chain_carries_everything_beyond_it() {
                     root: Vec2::new(4.5 * scale.k, 0.0),
                     axis: Vec2::X,
                     connection: Connection::new(strong, beam(scale)).unwrap(),
+                    bends: false,
                 },
             )
             .unwrap();
@@ -511,6 +514,7 @@ fn a_connection_needs_a_free_identity_two_bodies_a_direction_and_capacity() {
         root: Vec2::new(0.5 * scale.k, 0.0),
         axis: Vec2::X,
         connection: Connection::new(strong, beam(scale)).unwrap(),
+        bends: false,
     };
     let rope = JointId::new(BRANCH, JointRole::new(2));
     assert!(world.insert_tether(
@@ -572,6 +576,7 @@ fn a_connection_needs_a_free_identity_two_bodies_a_direction_and_capacity() {
             other,
             ConnectionSpec {
                 connection: exhausted,
+                bends: false,
                 ..spec
             },
             ConnectionRejection::Exhausted,

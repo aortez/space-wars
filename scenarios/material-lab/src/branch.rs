@@ -106,6 +106,7 @@ pub(crate) fn build() -> PhysicsWorld {
                 root: Vec2::ZERO,
                 axis: Vec2::X,
                 connection: weld(),
+                bends: false,
             },
         )
         .unwrap();

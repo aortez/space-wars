@@ -3956,6 +3956,7 @@ pub(crate) fn from_rapier(value: Vector) -> Vec2 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    mod bending;
     mod carry;
     mod cloning;
     mod compound;

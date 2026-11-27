@@ -9,7 +9,10 @@ an overload charges until the capacity runs out. The connection then severs:
 its weld leaves at the end of that step, both bodies carry on under ordinary
 physics, and its record stays as one failure observation. Hosts use it for
 branches, limbs and fixtures that hold until they are overloaded, and decide
-what a severing means.
+what a severing means. A connection that [bends](#connections-that-bend)
+(#224) is a hinge instead of a weld: a spring with the beam's own bending
+stiffness holds the held body's turn, so a branch sags under its load and
+springs back when the load is lifted.
 
 ## Welds and identity
 
@@ -62,6 +65,38 @@ slight deflection within the step.
 A sleeping pair keeps its last impulses, so a resting load keeps its last
 reading and an overload keeps charging while the branch sleeps.
 
+## Connections that bend
+
+With `ConnectionSpec::bends`, the connection is a hinge at the root rather than
+a weld. Its two linear axes are locked, as a weld's are, and a spring holds its
+turn: a Rapier motor, force-based so that its stiffness is a real moment per
+radian, aimed at the angle the bodies were joined at. Its stiffness is
+`hinge_stiffness`, the connection law's own rotation stiffness
+`stiffness * I / length` for the beam. A settled hinge therefore turns by the
+law's elastic rotation for the moment it carries. Nothing else holds or resets
+the angle: a heavier load bends the branch further, a lifted one lets it
+spring back, and the rest angle never moves.
+
+The spring's damping is set when the connection is inserted, from the held
+body's moment of inertia about the root, `J`. It is `2 z sqrt(k J)`, where `k`
+is the stiffness and `z = -ln(1 - damping) / 4 pi` is the damping ratio at which
+a free swing of that body alone loses the material's `damping`, its fraction of
+stored elastic energy, each cycle. That ratio is at most critical. Wood's
+damping of 0.2 gives a ratio of 0.018, so a branch rings for a while.
+
+The spring's impulse is a solver row of its own, so it is the moment at the
+root. Neither locked linear row adds to that moment, since both act at the
+root. Rapier orthogonalizes the two linear rows in the bodies' mass metric, the
+one along the beam first, and the world undoes that as it does for a weld.
+`ConnectionState::deflection` is the held body's turn about the root since the
+bodies were joined, read from their poses and positive counterclockwise. A weld
+reports its own slight give, which reads zero in the tests, and a severed
+connection reports none.
+
+A hinge is charged as a weld is, from the moment and axial force it carried.
+Its turn is all elastic, so it measures no plastic rotation either, and the
+law's fallback progression stands in for it.
+
 ## Charging and severing
 
 Each step makes one `engine_material::connection` call with the step's duration
@@ -76,8 +111,8 @@ before contact events are rebuilt.
 
 When a charge exhausts the capacity, the step records a `ConnectionFailure`
 with the work the overload asked beyond what was left. Then it removes the weld
-and lists the connection in `severed_connections()`, so a severing never
-happens mid-solve. Removing the weld wakes both bodies, which keep their
+or hinge and lists the connection in `severed_connections()`, so a severing
+never happens mid-solve. Removing the joint wakes both bodies, which keep their
 motion. The next step clears the list. A severed record keeps the load of the
 step that severed it, and nothing charges it again.
 
@@ -99,10 +134,14 @@ section, in identity order. Each record holds its bodies, its material's
 numeric parameters, its beam, its exact f64 remaining capacity, its last load
 and any failure. A world without connections writes no section, so its saves
 are unchanged byte for byte and no snapshot version changes. A build without
-connections refuses a save that has them, as trailing snapshot data. Restoring
-checks each record against the saved joints. A live connection needs its own
-fixed weld between its own bodies, and a severed one needs no joint. A record
-must hold a failure exactly when its capacity is exhausted. As for registered
+connections refuses a save that has them, as trailing snapshot data. A hinge's
+spring is saved with the joints, so a record that bends holds nothing more and
+the section's layout is unchanged. Restoring checks each record against the
+saved joints. A live connection needs its own fixed weld or its own hinge
+between its own bodies, and a severed one needs no joint. A hinge's spring must
+have its beam's stiffness, a force-based model, a rest angle of zero, unbounded
+force and finite damping. A record must hold a failure exactly when its
+capacity is exhausted. As for registered
 regions, material names are not saved: a restored connection's material is
 named `connection`. Clones copy the records. The severed list is transient, as
 contact events are, so neither a save nor a clone keeps it.
@@ -151,13 +190,64 @@ fixed trunk. Its beam is the branch's own square section over its length.
 Material Lab's [Branch gives way](material-lab.md#branch-gives-way) case runs
 one weld through a safe load, an overload and its severing in both renderers.
 
+`world::tests::bending` runs the same branch on a hinge, at both scales, in
+wood-like brittle material with wood's damping of 0.2. The hinge's stiffness
+turns the level branch's moment into 0.05 radians, and its balance is the
+turn at which the spring holds the weight at its lever arm as it then lies,
+`k turn = weight * reach * cos(turn)`. The branch never sleeps, so that it
+settles all the way.
+
+- **Sag:** released level, the branch swings down to 1.87 times its balance at
+  60 Hz and settles within a minute. It rests 0.03% past its balance at 60 Hz
+  with four substeps, 0.001% at 240 Hz and 0.004% with eight. With one substep
+  it rests 2.8% past: the solver takes the spring's row before the two locked
+  rows in each substep, so it converges a little past the balance. Either way
+  the moment it reports matches the weight at its lever arm within 2e-6, and
+  the shear is the weight within the 0.2% the test allows. It charges nothing.
+- **Settling back:** three times the weight bends it to 0.148, within 0.03% of
+  its balance. Lifted, the branch springs back to 0.036 above level and settles
+  within 0.01% of where it rested, with its capacity untouched.
+- **Thickness:** a beam twice as high turns the same branch 7.94 times less at
+  Clock's scale and 7.95 in metres, where the balances give 7.97. The stiffer
+  hinge settles 0.4% past its balance.
+- **Direction:** a branch on the trunk's left turns counterclockwise by the
+  same amount as the right one turns clockwise. A load that lifts the right
+  branch turns it counterclockwise by as much.
+- **Chain:** in two branches end to end, damped nearly critically, each hinge's
+  moment is the weight beyond it at its lever arm as the branches now lie,
+  within 0.2%. Both turn clockwise, the outer one less.
+- **Impact:** a stone as heavy as the branch falls onto its end. The hinge is
+  stiffer, turning the level branch 0.02, and safe to eight times the
+  branch's own moment, with almost no capacity beyond. Dropped from a quarter
+  of a unit above the branch's top face, the stone swings it to 0.79 of its
+  safe stress, then rests on it at 0.34, turned 2.74 times as far as the
+  branch alone. The moment matches the two weights at their lever arms as
+  they lie within 2e-5. Lifted off, the branch springs back to where it
+  rested. Dropped from two units, the same stone breaks the hinge four steps
+  after it lands.
+- **Overload:** a hinge at twice its safe stress whose capacity lasts 240 steps
+  of the level branch's charge severs on step 233 at Clock's scale and 234 in
+  metres, a few steps sooner than a steady load would, since it swings while
+  overloaded. The charges sum to the capacity within 1e-5 of it. The branch
+  then falls onto fixed ground and rests flat on it.
+- **Saves and clones:** a world saved 40 steps into an overload is restored,
+  and the original is cloned. Both copies swing and sever exactly as the
+  original, and the restored world writes the same save bytes.
+
 ## Limits
 
 - **No shear:** the law does not model shear, so `shear` is reported but
   never charged.
-- **No sag:** the weld is rigid. A yielding branch neither sags nor keeps a bend
-  before it breaks, and the law's fallback progression stands in for plastic
-  rotation.
+- **Elastic sag only:** a weld does not sag at all, and a hinge's turn is all
+  elastic. A yielding branch keeps no bend before it breaks, and the law's
+  fallback progression stands in for plastic rotation.
+- **Damping set once:** a hinge's damping comes from the held body's inertia
+  when it is inserted. A body that gains mass later keeps that damping, and a
+  hinge that holds a chain is damped as if it held its first body alone.
+- **Sleep mid-swing:** a branch that may sleep can fall asleep before its
+  swing has died out. In the sag fixture, it slept after 2.7 s 13% short of its
+  balance in metres and after 4 s 3% past it at Clock's scale. It keeps that
+  pose and that last load until something wakes it.
 - **Final substep only:** the load is the final substep's. A hit reaches the
   weld only as the load it leaves in that substep, and a jolt that ends before
   it goes unseen.

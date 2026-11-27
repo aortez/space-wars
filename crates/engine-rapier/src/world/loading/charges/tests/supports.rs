@@ -167,6 +167,7 @@ fn a_chassis_welded_onto_a_foot_loads_the_foots_support_and_motion_is_unchanged(
                     root: Vec2::Y * 0.5,
                     axis: Vec2::Y,
                     connection: Connection::new(ARMOR, Beam::new(1.0, 2.0, 0.5)).unwrap(),
+                    bends: false,
                 },
             )
             .unwrap();
