@@ -12,16 +12,21 @@
 //! bound to a loading region, so the contact response refuses the batches it
 //! arrives in, as it refuses any unbound contact, and leaves the shot's hit to
 //! its source.
+//!
+//! A blast starts at the nearest point outside the bodies near where it
+//! bursts. If it pushes, each share of it pays for the push on its recipient's
+//! bodies first, and the recipient's region takes the rest.
 
 use super::loading::RegionToken;
 use super::{BodyId, BodyKind, BodyMotion, CollisionGroups, PhysicsId, PhysicsWorld};
 use super::{ColliderId, RayCastOptions};
+use crate::terrain::RadialImpulse;
 use engine_core::Vec2;
 use engine_material::{
     ContactBody, ContactGeometry, Face, Impact, MAX_LENGTH, MIN_LENGTH, MaterialError, Outcome,
     Part, Projectile, Pulses, Region, Section, Share, Source, SourceError, SourceId, SourceLedger,
-    SourceSpec, Target, beam_reach, blast_reach, closing_speed, effective_mass, lever,
-    patch_width_from_radii, point_velocity, sweep_crossings,
+    SourceSpec, Target, beam_reach, blast_center, blast_reach, closing_speed, effective_mass,
+    lever, patch_width_from_radii, point_velocity, sweep_crossings,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -105,12 +110,76 @@ pub trait Recipients {
     }
 }
 
-/// A payload's energy, how far its blast reaches and the height of its front.
+/// A payload's energy, how far its blast reaches, the height of its front, and
+/// how hard it pushes the bodies of the recipients that take shares of it, if
+/// it pushes them.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Blast {
     pub energy: f32,
     pub radius: f32,
     pub height: f32,
+    pub push: Option<BlastPush>,
+}
+
+/// How hard a blast pushes the bodies of the recipients that take a share of
+/// it: outward from its center, at `speed` there and falling off linearly to
+/// nothing at `radius`, at each body's center of mass. Only dynamic bodies
+/// move, and a body is pushed once, by the first recipient that stands for it,
+/// however many regions it carries. A push on a body of mass `m` that changes
+/// its velocity by `dv` costs `m * dv^2 / 2`, the energy it gives the body in
+/// the body's own frame, however the body was moving. A recipient's share
+/// pays for the push on its bodies first, and its region takes the rest, so
+/// the push and the charge never sum past the share. A share too small for the
+/// whole push pays for part of it, and the bodies move as far as that part
+/// takes them. The bodies of recipients that take no share, such as protected
+/// or unmodeled ones, are the host's to push.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BlastPush {
+    pub radius: f32,
+    pub speed: f32,
+}
+
+/// The most times a blast moves out of the bodies near where it bursts, asking
+/// the host again for what lies near each new start. A start that bodies still
+/// hold after that stays where the last move left it.
+const BLAST_MOVES: usize = 4;
+
+/// The push `impulse` gives `body`, if it is a dynamic body in `world`: the
+/// velocity change at its center of mass, and that change's kinetic energy.
+pub fn body_push(
+    world: &PhysicsWorld,
+    body: BodyId,
+    impulse: RadialImpulse,
+) -> Option<(Vec2, f32)> {
+    if world.body_kind(body)? != BodyKind::Dynamic {
+        return None;
+    }
+    let center = world.center_of_mass(body)?;
+    let mass = world.body_mass(body)?;
+    let delta = impulse.velocity_change(center);
+    Some((delta, 0.5 * mass * delta.length_squared()))
+}
+
+/// A share of a payload of `budget` at `coupling` that pays first for a push
+/// costing `cost`: the energy it pays, which is the whole cost or the whole
+/// share, whichever is less, and the coupling it leaves for its recipient's
+/// region.
+pub fn pay_push(budget: f64, coupling: f32, cost: f32) -> (f64, f32) {
+    let share = f64::from(coupling) * budget;
+    let paid = f64::from(cost).min(share);
+    let left = if budget > 0.0 {
+        ((share - paid) / budget) as f32
+    } else {
+        coupling
+    };
+    (paid, left)
+}
+
+/// The velocity change that `paid` energy buys of a push that would change a
+/// velocity by `delta` for `cost`: all of it when the push is paid in full,
+/// and otherwise the part whose energy is what was paid.
+pub fn bought(delta: Vec2, cost: f32, paid: f32) -> Vec2 {
+    delta * (paid / cost).sqrt()
 }
 
 /// A shot to launch. Its body must already be in the world, moving at its
@@ -206,9 +275,17 @@ pub enum WeaponEvent {
         body: BodyId,
         point: Vec2,
     },
-    /// A shot's blast released at `center`, before its deliveries. The push it
-    /// gives bodies is the host's physics.
+    /// A shot's blast released at `center`, before its deliveries: the
+    /// nearest point outside the bodies near where the shot burst, as far as
+    /// the weapons' moves found one.
     Burst { source: SourceId, center: Vec2 },
+    /// A blast's push on a recipient's bodies, after its deliveries. `energy`
+    /// is what the recipient's share paid for it.
+    Pushed {
+        source: SourceId,
+        recipient: Recipient,
+        energy: f32,
+    },
     /// A beam's pulse ran from `start` to `end`, where it met `body`, if any.
     Traced {
         source: SourceId,
@@ -373,6 +450,16 @@ impl Front {
         }
         (front, invalid)
     }
+
+    /// The circles of the front's bodies, which a blast starts outside. It
+    /// may start inside tissue, which shots pass through.
+    fn bodies(&self) -> Vec<Target> {
+        self.targets
+            .iter()
+            .filter(|target| !matches!(self.recipients[target.key as usize], Recipient::Tissue(_)))
+            .copied()
+            .collect()
+    }
 }
 
 /// One recipient's share of a release or a pulse, before the source sees it.
@@ -448,9 +535,13 @@ impl Weapons {
         let mass = world.body_mass(spec.body).ok_or(WeaponError::InvalidBody)?;
         let motion = world.motion(spec.body).ok_or(WeaponError::InvalidBody)?;
         spec.section.validate()?;
-        let blast_ok = spec
-            .blast
-            .is_none_or(|blast| length_ok(blast.radius) && length_ok(blast.height));
+        let blast_ok = spec.blast.is_none_or(|blast| {
+            length_ok(blast.radius)
+                && length_ok(blast.height)
+                && blast.push.is_none_or(|push| {
+                    positive(push.radius) && push.speed.is_finite() && push.speed >= 0.0
+                })
+        });
         if !(length_ok(spec.radius) && positive(spec.lifetime) && blast_ok) {
             return Err(MaterialError::InvalidGeometry.into());
         }
@@ -1022,7 +1113,9 @@ impl Weapons {
         }
     }
 
-    /// Releases a shot's blast at `center`, if it carries one.
+    /// Releases a shot's blast bound for `center`, if it carries one. The blast
+    /// starts at the nearest point outside the bodies near `center`, and the
+    /// front is what the host admits near where it starts.
     fn burst(
         &mut self,
         world: &mut PhysicsWorld,
@@ -1035,21 +1128,47 @@ impl Weapons {
         };
         let id = shot.source.id();
         let own = shot.body.entity;
-        let (front, invalid) = Front::new(
-            recipients
-                .near(center, blast.radius)
-                .into_iter()
-                .filter(|circle| circle.recipient.entity() != Some(own))
-                .collect(),
-        );
+        let near = |center: Vec2| {
+            Front::new(
+                recipients
+                    .near(center, blast.radius)
+                    .into_iter()
+                    .filter(|circle| circle.recipient.entity() != Some(own))
+                    .collect(),
+            )
+        };
+        // Moving out of the bodies near the center can bring others in reach,
+        // or into one, so the blast asks again near each new start, as many
+        // times as `BLAST_MOVES`.
+        let (mut front, mut invalid) = near(center);
+        let mut start = center;
+        for _ in 0..BLAST_MOVES {
+            let next = blast_center(start, &front.bodies());
+            if next == start {
+                break;
+            }
+            start = next;
+            (front, invalid) = near(start);
+        }
         // The blast's radius and height were checked at launch, so only a
         // center that is not finite fails here, and such a shot cannot burst.
-        let Ok(reaches) = blast_reach(center, blast.radius, blast.height, &front.targets) else {
+        let Ok(reaches) = blast_reach(start, blast.radius, blast.height, &front.targets) else {
             return;
         };
-        self.events.push(WeaponEvent::Burst { source: id, center });
+        self.events.push(WeaponEvent::Burst {
+            source: id,
+            center: start,
+        });
         self.events.extend(refused(id, Part::Payload, invalid));
+        let budget = shot.source.ledger().payload.budget;
+        let impulse = blast.push.map(|push| RadialImpulse {
+            center: start,
+            radius: push.radius,
+            speed: push.speed,
+        });
         let mut entries = Vec::new();
+        let mut pushes = Vec::new();
+        let mut claimed: Vec<BodyId> = Vec::new();
         for reach in reaches {
             let recipient = front.recipients[reach.key as usize];
             let energy = blast.energy * reach.coupling;
@@ -1064,7 +1183,29 @@ impl Weapons {
                 continue;
             }
             match entry(world, recipients, recipient, reach.width, reach.coupling) {
-                Ok(entry) => entries.push(entry),
+                Ok(mut entry) => {
+                    if let Some(impulse) = impulse {
+                        let mine: Vec<BodyId> = bodies(world, &*recipients, recipient)
+                            .into_iter()
+                            .filter(|body| !claimed.contains(body))
+                            .collect();
+                        claimed.extend(&mine);
+                        let moved: Vec<(BodyId, Vec2, f32)> = mine
+                            .into_iter()
+                            .filter_map(|body| {
+                                let (delta, cost) = body_push(world, body, impulse)?;
+                                Some((body, delta, cost))
+                            })
+                            .collect();
+                        let cost: f32 = moved.iter().map(|(_, _, cost)| cost).sum();
+                        if cost > 0.0 {
+                            let (paid, coupling) = pay_push(budget, entry.coupling, cost);
+                            entry.coupling = coupling;
+                            pushes.push((recipient, moved, cost, paid as f32));
+                        }
+                    }
+                    entries.push(entry);
+                }
                 Err(reason) => self.events.push(WeaponEvent::Excluded {
                     source: id,
                     part: Part::Payload,
@@ -1077,7 +1218,23 @@ impl Weapons {
         let shares = shares(&mut shot.keys, &entries);
         let delivered = shot.source.release(&shares);
         drop(shares);
+        let released = delivered.is_ok();
         self.deliver(world, recipients, id, Part::Payload, entries, delivered);
+        if !released {
+            return;
+        }
+        for (recipient, moved, cost, paid) in pushes {
+            if paid > 0.0 {
+                for (body, delta, _) in moved {
+                    world.apply_velocity_delta(body, bought(delta, cost, paid), true);
+                }
+                self.events.push(WeaponEvent::Pushed {
+                    source: id,
+                    recipient,
+                    energy: paid,
+                });
+            }
+        }
     }
 
     /// Absorbs each entry's outcome into its recipient and reports it, or
@@ -1189,6 +1346,21 @@ fn entry(
         face: Face::new(width, section),
         coupling,
     })
+}
+
+/// The bodies a recipient stands for: the bodies of its entity that the host
+/// keeps under its key, or the body its registered region belongs to.
+fn bodies(world: &PhysicsWorld, recipients: &impl Recipients, recipient: Recipient) -> Vec<BodyId> {
+    match recipient {
+        Recipient::Body { key, entity } => world
+            .entity_bodies(entity)
+            .iter()
+            .copied()
+            .filter(|&body| recipients.body(body) == Some(key))
+            .collect(),
+        Recipient::Region(token) => world.loading_region_body(token).into_iter().collect(),
+        Recipient::Tissue(_) | Recipient::Unmodeled(_) => Vec::new(),
+    }
 }
 
 /// The section of the region the host keeps for `recipient`, if it keeps one.

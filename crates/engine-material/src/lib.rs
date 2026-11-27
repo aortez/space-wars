@@ -38,8 +38,8 @@ pub use impact::{
 pub use ledger::{LEDGER_TOLERANCE, Outcome, WorkLedger};
 pub use material::{FailureMode, Material};
 pub use reach::{
-    Crossing, Overlap, PathReach, Reach, Target, beam_reach, blast_reach, footprint_overlaps,
-    sweep_crossings,
+    Crossing, Overlap, PathReach, Reach, Target, beam_reach, blast_center, blast_reach,
+    footprint_overlaps, sweep_crossings,
 };
 pub use reference::{ALL_REFERENCE, ARMOR, HULL, ROCK, SHELL, SOFT_TISSUE, WOOD};
 pub use region::{Connection, Region};

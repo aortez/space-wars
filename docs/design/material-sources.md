@@ -53,8 +53,9 @@ armor, a face 1 wu wide, 1 wu thick and 0.2 wu deep is safe to 20, and a
 share of 1500 charges it 1465 of its 200,000.
 
 Nothing rebounds from a deposit, so its recoverable part needs no response. A
-deposit charges the material only. The push a blast or a beam gives a body is
-the host's physics, as the blast impulse is today.
+deposit charges the material only. A blast that pushes pays for the push on
+each recipient's bodies from that recipient's share first, and the deposit
+takes the rest (see Blasts below). A beam's push is the host's physics.
 
 ## Grass and other nonblocking recipients
 
@@ -187,7 +188,21 @@ the host lists `Body` circles for it that cover its colliders.
 - **Blasts.** A shot that stops releases its payload where the step left it,
   divided by `blast_reach` among the tissue and body circles the host admits.
   `detonate` releases it wherever the shot is, for a fuse the host decides on.
-  A `Burst` event gives the center, so the host can push bodies and draw it.
+  The blast starts outside the bodies near it: where their circles hold the
+  center, `blast_center` moves it to the nearest point just past their edges
+  that none holds, so no body takes every direction. Moving out can bring
+  other bodies in reach, so the weapons ask the host again near each new
+  start, a few times at most. A blast with a `BlastPush` pushes the dynamic
+  bodies of each recipient that takes a share, outward from its start and
+  weaker with distance, each body once. The share pays for the push first and
+  the recipient's region takes the rest; a share too small for the whole push
+  buys the part it can. Protected and unmodeled recipients take no share, so
+  pushing their bodies is the host's affair. A `Burst` event gives the start,
+  so the host can draw it, and a `Pushed` event what each share paid. Scorched
+  Earth's shells burst by the same rule, through `blast_center`, `body_push`,
+  `pay_push` and `bought`, except that a Scorched burst pushes only each
+  tank's hull, from the point the shell struck rather than from where the
+  blast starts.
 - **Beams.** `fire` traces one pulse by ray cast to the first solid surface of
   the beam's collision groups within the range the host gives the pulse,
   which can grow pulse by pulse as a beam extends. The pulse carries the
@@ -481,7 +496,9 @@ for any impact. Each part's `PartLedger` records its `budget`, the energy its
 recipients received (`delivered`), the irreversible work they took
 (`absorbed`), and the `excess` they could not take. A hard hit's excess
 includes the projectile's own: a shell spent on armor adds what it could not
-take. For the payload, `budget - delivered` is what never reached a recipient.
+take. For the payload, `budget - delivered` is what no recipient's region
+took: what never reached a recipient, and what shares paid for a blast's
+push.
 For the beam it also holds what the host kept back from pulses it weakened.
 Neither is ever negative: a share rounds down rather than past what is left.
 

@@ -1,6 +1,6 @@
 use super::*;
 use engine_rapier::terrain::{PreparedRelease, RadialImpulse, TerrainBodyMut};
-use engine_rapier::world::weapon::Recipients;
+use engine_rapier::world::weapon::{Recipients, body_push, bought};
 use engine_terrain::{Brush, EditMode, TerrainEdit, TerrainError};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -194,30 +194,27 @@ impl Duel {
         // the share pays for.
         for (slot, (push, paid)) in pushes.iter().zip(released.pushed).enumerate() {
             if paid > 0.0 {
-                let delta = push.delta * (paid / push.energy).sqrt();
+                let delta = bought(push.delta, push.energy, paid);
                 physics.apply_velocity_delta(self.tanks[slot].body, delta, true);
             }
         }
         released
     }
 
-    /// Each tank's push from `impulse`, by slot. A push's energy is the body's
-    /// mass times half its velocity change squared, in Scorched's units: a
-    /// world at another scale carries energies times the scale's fourth power.
+    /// Each tank's push from `impulse` on its hull, by slot, in Scorched's
+    /// units: a world at another scale carries energies times the scale's
+    /// fourth power. A hull that can't move, such as one the bot lab fixes in
+    /// place, takes none.
     fn tank_pushes(&self, physics: &PhysicsWorld, impulse: RadialImpulse) -> [armor::Push; 2] {
         let scale = self.placement.scale;
         self.tanks.each_ref().map(|tank| {
-            let (Some(center), Some(mass)) = (
-                physics.center_of_mass(tank.body),
-                physics.body_mass(tank.body),
-            ) else {
-                return armor::Push::default();
-            };
-            let delta = impulse.velocity_change(center);
-            armor::Push {
-                delta,
-                energy: 0.5 * mass * delta.length_squared() / scale.powi(4),
-            }
+            body_push(physics, tank.body, impulse).map_or_else(
+                armor::Push::default,
+                |(delta, energy)| armor::Push {
+                    delta,
+                    energy: energy / scale.powi(4),
+                },
+            )
         })
     }
 
