@@ -66,7 +66,7 @@ impl Environment for Bed {
         Self::inside(cell)
             && match role {
                 Role::Root | Role::Runner => cell[1] < 0,
-                Role::Shoot | Role::Wood => cell[1] >= 0,
+                Role::Shoot | Role::Wood | Role::Cone => cell[1] >= 0,
                 Role::Moss => false,
             }
     }
@@ -95,9 +95,9 @@ fn planted(traits: Traits) -> (Plants, Tree) {
     (plants, tree)
 }
 
-/// Rows from the top. The tree's wood is `#`, its needles `*` and its roots
-/// `r`; grass blades are `,`, runners `~` and grass roots `;`; dead tissue is
-/// `x` and empty dirt `:`.
+/// Rows from the top. The trees' wood is `#`, their needles `*`, cones `o`
+/// and roots `r`; grass blades are `,`, runners `~` and grass roots `;`; dead
+/// tissue is `x` and empty dirt `:`.
 fn draw(o: &Observation) -> String {
     let at: BTreeMap<[i32; 2], &Tissue> = o.tissues.iter().map(|t| (t.cell, t)).collect();
     let mut rows = Vec::new();
@@ -109,6 +109,7 @@ fn draw(o: &Observation) -> String {
                     Some(t) => match (t.policy == POLICY, t.role) {
                         (true, Role::Wood) => '#',
                         (true, Role::Shoot) => '*',
+                        (true, Role::Cone) => 'o',
                         (true, _) => 'r',
                         (false, Role::Shoot) => ',',
                         (false, Role::Runner) => '~',
@@ -141,6 +142,38 @@ fn grow_under(
     }
     history.push(plants.observe());
     (history, rounds)
+}
+
+/// The conifer and the trees grown from its seeds, with the bed's light and
+/// soil set before each tick: the bed before each tick and after the last,
+/// and each tick's decisions.
+fn grow_grove(
+    ticks: u64,
+    conditions: impl Fn(u64) -> (u16, [u16; 2]),
+) -> (Vec<Observation>, Vec<Vec<Round>>) {
+    let (mut plants, tree) = planted(Traits::default());
+    let mut grove = Grove { trees: vec![tree] };
+    let mut brain = Conifer::default();
+    let (mut history, mut rounds) = (Vec::new(), Vec::new());
+    for _ in 0..ticks {
+        let o = plants.observe();
+        let bed = Bed::new(&o, conditions(o.tick));
+        let decisions = grove.plan(&o, &bed, &bed, &mut brain, o.config.max_intents);
+        let intents: Vec<Intent> = decisions
+            .iter()
+            .flat_map(|r| r.intents.iter().cloned())
+            .collect();
+        plants.tick(o.tick, false, 1, &intents, &bed).unwrap();
+        grove.tend(&mut plants).unwrap();
+        history.push(o);
+        rounds.push(decisions);
+    }
+    history.push(plants.observe());
+    (history, rounds)
+}
+
+fn total(o: &Observation) -> Resources {
+    std::array::from_fn(|i| o.tissues.iter().map(|t| t.stores[i]).sum())
 }
 
 fn living(o: &Observation, role: Role) -> impl Iterator<Item = &Tissue> {
@@ -686,7 +719,7 @@ fn views_measure_neighbors_in_the_trees_frame() {
     assert_eq!(up.holder, Some(Holder::Needle));
     assert_eq!((down.cell, down.along, down.outward), ([x + 1, 0], -1, 0));
     assert_eq!(down.light, Some(0));
-    assert_eq!(down.open, [true, true, false]);
+    assert_eq!(down.open, [true, true, false, true]);
     assert_eq!(
         (right.cell, right.outward, right.light),
         ([x + 2, 1], 1, Some(1000))
@@ -698,7 +731,7 @@ fn views_measure_neighbors_in_the_trees_frame() {
     // The seed's down is dirt a root could take.
     let seed = &views[0];
     assert_eq!(seed.candidates[DOWN_].soil, Some([1000; 2]));
-    assert_eq!(seed.candidates[DOWN_].open, [false, false, true]);
+    assert_eq!(seed.candidates[DOWN_].open, [false, false, true, false]);
     assert_eq!(seed.candidates[UP_].holder, Some(Holder::Wood));
     // Needle 6 counts toward everything it grew from, back to the seed. Wood
     // of size one supplies six sizes of foliage, and the trunk's base already
@@ -731,26 +764,160 @@ fn views_measure_neighbors_in_the_trees_frame() {
 
 #[test]
 fn the_encoder_keeps_its_layout_ranges_and_unknowns() {
-    let (_, rounds) = grow_under(200, |_| FULL);
+    let (_, rounds) = grow_grove(500, |_| FULL);
     let mut seen = BTreeSet::new();
-    for record in rounds.iter().flat_map(|r| &r.records) {
+    for record in rounds.iter().flatten().flat_map(|r| &r.records) {
         let x = encode(&record.view);
         assert!(x.iter().all(|v| (-1.0..=1.0).contains(v)), "{x:?}");
         // One kind, and one holder state per candidate.
-        assert_eq!(x[16..23].iter().sum::<f32>(), 1.0);
+        assert_eq!(x[18..26].iter().sum::<f32>(), 1.0);
         for (i, c) in record.view.candidates.iter().enumerate() {
             let f = &x[COMMON + i * PER_CANDIDATE..COMMON + (i + 1) * PER_CANDIDATE];
-            assert_eq!(f[..5].iter().sum::<f32>(), 1.0);
+            assert_eq!(f[..6].iter().sum::<f32>(), 1.0);
             // An unmeasured reading is zero beside a zero flag.
             if c.light.is_none() {
-                assert_eq!((f[10], f[11]), (0.0, 0.0));
+                assert_eq!((f[12], f[13]), (0.0, 0.0));
             }
             if c.soil.is_none() {
-                assert_eq!((f[12], f[13], f[14]), (0.0, 0.0, 0.0));
+                assert_eq!((f[14], f[15], f[16]), (0.0, 0.0, 0.0));
             }
         }
         seen.insert(record.view.point.kind);
     }
-    assert_eq!(seen.len(), 7, "{seen:?}");
-    assert_eq!((ENCODER, COMMON, PER_CANDIDATE, INPUTS), (1, 42, 15, 102));
+    assert_eq!(seen.len(), 8, "{seen:?}");
+    assert_eq!((ENCODER, COMMON, PER_CANDIDATE, INPUTS), (2, 45, 17, 113));
+}
+
+#[test]
+fn a_grown_conifer_hangs_cones_and_drops_seeds_that_its_stores_pay_for() {
+    let traits = Traits::default();
+    let brain = Conifer::default();
+    let (history, rounds) = grow_grove(1000, |_| FULL);
+    let mut released = 0;
+    for (tick, decisions) in rounds.iter().enumerate() {
+        let (before, after) = (&history[tick], &history[tick + 1]);
+        // Dropping a seed moves stores; the bed's ledger balances every tick.
+        let (b, a, l) = (total(before), total(after), &after.ledger);
+        for i in 0..3 {
+            assert_eq!(
+                a[i] + l.maintenance[i] + l.growth[i] + l.loss[i],
+                b[i] + l.intake[i],
+                "tick {tick}"
+            );
+        }
+        let records = || decisions.iter().flat_map(|r| &r.records);
+        // Cones hang below the tips of a grown tree's branches.
+        for r in records().filter(|r| r.bid.action == Action::Grow(Role::Cone)) {
+            assert!(r.view.whole.height >= brain.max_height, "tick {tick}");
+            assert_eq!(r.view.point.kind, Kind::BranchTip);
+            if let Outcome::Won(chosen) = r.outcome {
+                assert_eq!(chosen, Some(DOWN_));
+            }
+        }
+        // No tree carries more cones, or has more offspring, than its traits allow.
+        let mut cones: BTreeMap<OrganismId, u16> = BTreeMap::new();
+        for t in living(after, Role::Cone) {
+            *cones.entry(t.organism).or_default() += 1;
+        }
+        assert!(cones.values().all(|n| *n <= traits.max_cones), "{cones:?}");
+        let mut offspring: BTreeMap<OrganismId, u16> = BTreeMap::new();
+        for parent in after.parents.values() {
+            *offspring.entry(*parent).or_default() += 1;
+        }
+        assert!(offspring.values().all(|n| *n <= traits.max_offspring));
+        // Each drop is a new organism: one root in the top row of dirt,
+        // holding the seed's reserves, within the wind's reach of its cone.
+        let drops: Vec<[i32; 2]> = records()
+            .filter(|r| r.bid.action == Action::Release && r.outcome == Outcome::Won(None))
+            .map(|r| {
+                before
+                    .tissues
+                    .iter()
+                    .find(|t| t.id == r.view.point.tissue)
+                    .unwrap()
+                    .cell
+            })
+            .collect();
+        let seeds: Vec<&Tissue> = after
+            .tissues
+            .iter()
+            .filter(|t| {
+                after.parents.contains_key(&t.organism) && !before.parents.contains_key(&t.organism)
+            })
+            .collect();
+        assert_eq!(seeds.len(), drops.len(), "tick {tick}");
+        for seed in seeds {
+            assert_eq!(
+                (seed.role, seed.cell[1], seed.stores),
+                (Role::Root, -1, traits.starting_reserves)
+            );
+            assert!(
+                drops
+                    .iter()
+                    .any(|cone| (cone[0] - seed.cell[0]).abs() <= i32::from(traits.seed_drift))
+            );
+        }
+        released += drops.len();
+    }
+    assert!(released >= 6, "{released}");
+}
+
+#[test]
+fn seeds_sprout_only_into_light_and_otherwise_die_and_are_cleared() {
+    let traits = Traits::default();
+    let (history, rounds) = grow_grove(1200, |_| FULL);
+    let (mut sprouted, mut cleared) = (0, 0);
+    for (tick, decisions) in rounds.iter().enumerate() {
+        for r in decisions.iter().flat_map(|r| &r.records) {
+            let p = &r.view.point;
+            if p.attached || r.view.whole.wood > 0 || r.bid.action != Action::Grow(Role::Wood) {
+                continue;
+            }
+            // Every seed, planted or dropped, bids to sprout straight up. It
+            // sprouts in light enough, and waits in the shade.
+            let light = r.view.candidates[UP_].light;
+            match r.outcome {
+                Outcome::Won(Some(UP_)) => {
+                    assert!(light.unwrap() >= traits.sprout_light);
+                    sprouted += 1;
+                }
+                Outcome::Refused(Refusal::Shade) => {
+                    assert!(light.is_none_or(|l| l < traits.sprout_light))
+                }
+                other => panic!("tick {tick}: {other:?}"),
+            }
+        }
+        // A seed that never sprouts dies, and the grove clears it away.
+        let gone = history[tick]
+            .parents
+            .keys()
+            .filter(|o| !history[tick + 1].parents.contains_key(o))
+            .count();
+        cleared += gone;
+    }
+    assert!(sprouted >= 3 && cleared >= 3, "{sprouted} {cleared}");
+}
+
+#[test]
+fn a_seed_in_dry_or_dark_dirt_never_sprouts_and_is_cleared() {
+    for (limit, conditions) in [("dry", (1000, [1000, 0])), ("dark", (300, [1000; 2]))] {
+        let (history, rounds) = grow_grove(300, |_| conditions);
+        let refusal = if limit == "dry" {
+            Refusal::Dry
+        } else {
+            Refusal::Shade
+        };
+        for r in rounds.iter().flatten().flat_map(|r| &r.records) {
+            assert_eq!(r.outcome, Outcome::Refused(refusal), "{limit}");
+        }
+        assert!(history.last().unwrap().tissues.is_empty(), "{limit}");
+    }
+}
+
+#[test]
+fn a_grove_from_one_seed_replays_exactly() {
+    let (a, _) = grow_grove(900, |_| FULL);
+    let (b, _) = grow_grove(900, |_| FULL);
+    assert!(a.last().unwrap().parents.len() >= 2);
+    assert_eq!(a, b);
 }

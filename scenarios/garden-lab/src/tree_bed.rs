@@ -1,19 +1,24 @@
 //! A taller bed with deeper dirt, where a conifer grows beside grass. Both
 //! live in one runtime under one light publication, so they compete for the
-//! same light and space. The bed keeps its own clock and settings, and runs
-//! only while it is shown.
+//! same light and space. Grown, the conifer drops seeds that sprout into
+//! trees of their own where they land in the open. The bed keeps its own
+//! clock and settings, and runs only while it is shown.
 use super::*;
 use engine_core::plants::{
     grass,
-    tree::{self, Action as TreeAction, Conifer, Outcome, Round, Tree},
+    tree::{self, Action as TreeAction, Conifer, Grove, Outcome, Round, Tree},
 };
 use engine_rapier::tree::TreeSenses;
-use std::cmp::Reverse;
+use std::{cmp::Reverse, collections::BTreeSet};
 
-/// Long enough to grow the full cone and regrow a cut branch.
-pub const TREE_MAX_TICKS: u64 = 1200;
+/// Long enough to grow the full tree and regrow a cut branch, and for the
+/// tree's seeds to sprout and grow.
+pub const TREE_MAX_TICKS: u64 = 2000;
 pub const TREE_ORIGIN: [i32; 2] = [12, 7];
 pub const TREE_GRASS_ORIGIN: [i32; 2] = [20, 7];
+/// Where "Plant a tree seed in the grass" plants: two cells from the grass's
+/// seed, inside the patch its blades spread over.
+pub const TREE_SEEDLING_ORIGIN: [i32; 2] = [22, 7];
 /// Each sun's name and the direction toward it. The default, fifteen degrees
 /// off vertical from the left, casts the tree's shadow toward the grass. The
 /// sines and cosines are written out so every platform lights the bed alike.
@@ -34,6 +39,8 @@ const WOOD: RenderColor = RenderColor::rgb(0.55, 0.36, 0.2);
 const NEEDLE: RenderColor = RenderColor::rgb(0.1, 0.7, 0.35);
 const BLADE: RenderColor = RenderColor::rgb(0.25, 1.0, 0.3);
 const ROOT: RenderColor = RenderColor::rgb(0.75, 0.85, 1.0);
+const CONE: RenderColor = RenderColor::rgb(0.65, 0.3, 0.12);
+const SEED: RenderColor = RenderColor::rgb(0.9, 0.78, 0.5);
 const WON: RenderColor = RenderColor::rgb(1.0, 0.9, 0.2);
 const REFUSED: RenderColor = RenderColor::rgb(1.0, 0.25, 0.25);
 const OUTBID: RenderColor = RenderColor::rgb(0.6, 0.6, 0.6);
@@ -54,7 +61,7 @@ const UPRIGHT: [[f32; 2]; 5] = [
     [0.766, 0.643],
 ];
 
-pub const TREE_CONTROLS: [(&str, Command); 17] = [
+pub const TREE_CONTROLS: [(&str, Command); 18] = [
     ("Pause / resume", Command::Pause),
     ("Single step", Command::Step),
     ("Faster (max 64x)", Command::Faster),
@@ -73,17 +80,21 @@ pub const TREE_CONTROLS: [(&str, Command); 17] = [
     ("Inspect next tissue", Command::Select),
     ("Bids on/off", Command::Bids),
     ("Cut a branch: selected, else lowest", Command::CutBranch),
+    ("Plant a tree seed in the grass", Command::PlantSeedling),
     ("Plant fresh tree and grass", Command::PlantTree),
     ("Back to grass bed", Command::GrassBed),
 ];
 
 pub struct TreeBed {
     pub plants: Plants,
-    pub tree: Tree,
+    /// The trees planted, then each seed their cones drop, taken in where it
+    /// lands. A tree is cleared away once all its tissue has died.
+    pub grove: Grove,
     pub grass: Grass,
     pub brain: Conifer,
-    /// The last decision: every point's view, bid and outcome.
-    pub round: Round,
+    /// Each tree's last decision, in the grove's order: every point's view,
+    /// bid and outcome.
+    pub rounds: Vec<Round>,
     pub grass_plan: Plan,
     pub paused: bool,
     pub speed: u64,
@@ -98,6 +109,9 @@ pub struct TreeBed {
     pub selected: usize,
     pub control: usize,
     pub cuts: u32,
+    /// Seeds dropped, and trees cleared away, since planting.
+    pub dropped: usize,
+    pub cleared: usize,
     pub exposure: BTreeMap<u64, plants::Exposure>,
     pub work: VisibilityCounters,
     pub probes: usize,
@@ -147,24 +161,31 @@ impl TreeBed {
         .unwrap();
         world.step(1.0 / 60.0);
         let support = assembly.plant_support();
-        let tree = Tree::new(tree::Traits::default(), TREE_ORIGIN, [0, 1], support).unwrap();
+        let grove = Grove {
+            trees: vec![Tree::new(tree::Traits::default(), TREE_ORIGIN, [0, 1], support).unwrap()],
+        };
         let grass = Grass::new(Traits::default(), TREE_GRASS_ORIGIN, [0, 1], support).unwrap();
-        let mut runtime = Plants::new(plants::grass::physiology(), seed).unwrap();
+        // Room in each tick for every tree's bids beside the grass's.
+        let config = plants::Config {
+            max_intents: 32,
+            ..plants::grass::physiology()
+        };
+        let mut runtime = Plants::new(config, seed).unwrap();
         {
             let roots = uptake(&world, &assembly, &terrain, &geometry, [1000; 2]);
             let env = GrassEnvironment {
                 roots: &roots,
                 physiology: &roots,
             };
-            tree.plant(&mut runtime, &env).unwrap();
+            grove.trees[0].plant(&mut runtime, &env).unwrap();
             grass.plant(&mut runtime, &env).unwrap();
         }
         Self {
             plants: runtime,
-            tree,
+            grove,
             grass,
             brain: Conifer::default(),
-            round: Round::default(),
+            rounds: Vec::new(),
             grass_plan: Plan::default(),
             paused: false,
             speed: START_SPEED,
@@ -178,6 +199,8 @@ impl TreeBed {
             selected: 0,
             control: 0,
             cuts: 0,
+            dropped: 0,
+            cleared: 0,
             exposure: BTreeMap::new(),
             work: VisibilityCounters::default(),
             probes: 0,
@@ -201,8 +224,9 @@ impl TreeBed {
     }
 
     /// One boundary: light at every blade and needle and at the cells the
-    /// tree asks about, then the tree's bids and the grass's plan, admitted
-    /// together by the runtime.
+    /// trees ask about, then the trees' bids and the grass's plan, admitted
+    /// together by the runtime. Then the grove takes in the seeds its cones
+    /// dropped and clears away the trees that have died.
     pub fn tick(&mut self) {
         let before = self.plants.observe();
         if before.tick >= TREE_MAX_TICKS {
@@ -222,8 +246,9 @@ impl TreeBed {
             roots: &roots,
             physiology: &roots,
         };
-        let probes = self.tree.probes(&before, &unlit);
+        let probes = self.grove.probes(&before, &unlit);
         self.probes = probes.len();
+        let owners = self.grove.owners(&before);
         let light = PlantLight::publish_with_probes(
             &mut self.publisher,
             before.tick,
@@ -238,7 +263,11 @@ impl TreeBed {
                 footprints: &[],
             },
             &probes,
-            &|t| self.tree.transmits(t),
+            &|t| {
+                owners
+                    .get(&t.organism)
+                    .map_or(0.0, |tree| tree.transmits(t))
+            },
         )
         .expect("bounded tree bed light");
         self.work = light.work;
@@ -255,13 +284,24 @@ impl TreeBed {
             light: &light,
             roots: &roots,
         };
-        self.round = self.tree.plan(&before, &env, &senses, &mut self.brain);
+        // The trees share the intents the grass leaves.
         self.grass_plan = self.grass.plan(&before, &env);
-        let mut intents = self.round.intents.clone();
+        let budget = before.config.max_intents - self.grass_plan.intents.len();
+        self.rounds = self
+            .grove
+            .plan(&before, &env, &senses, &mut self.brain, budget);
+        let mut intents: Vec<_> = self
+            .rounds
+            .iter()
+            .flat_map(|r| r.intents.iter().cloned())
+            .collect();
         intents.extend(self.grass_plan.intents.iter().cloned());
         self.plants
             .tick(before.tick, false, 1, &intents, &env)
             .unwrap();
+        let tending = self.grove.tend(&mut self.plants).unwrap();
+        self.dropped += tending.adopted.len();
+        self.cleared += tending.cleared.len();
     }
 
     pub fn advance(&mut self, dt: Duration) {
@@ -318,6 +358,7 @@ impl TreeBed {
             Command::Select => self.selected = self.selected.wrapping_add(1),
             Command::Bids => self.bids = !self.bids,
             Command::CutBranch => self.cut_branch(),
+            Command::PlantSeedling => self.plant_seedling(),
             Command::PlantTree => {
                 // Fresh seeds of each, under the same settings.
                 let mut fresh = Self::new(self.seed);
@@ -335,6 +376,52 @@ impl TreeBed {
                 *self = fresh;
             }
             _ => {}
+        }
+    }
+
+    /// Plant a tree seed inside the grass patch. A cell holds one tissue, so
+    /// the grass is lifted from the seed's column first, as a plug of turf
+    /// is, and its shares are lost. Where a tree already stands in the
+    /// column's top two cells, nothing happens.
+    fn plant_seedling(&mut self) {
+        let o = self.plants.observe();
+        let [x, top] = TREE_SEEDLING_ORIGIN;
+        if o.tissues
+            .iter()
+            .any(|t| t.policy != grass::POLICY && (t.cell == [x, top] || t.cell == [x, top + 1]))
+        {
+            return;
+        }
+        let plug: Vec<u64> = o
+            .tissues
+            .iter()
+            .filter(|t| t.policy == grass::POLICY && t.cell[0] == x)
+            .map(|t| t.id)
+            .collect();
+        if !plug.is_empty() {
+            self.plants.remove_many(&plug).unwrap();
+        }
+        let support = self.assembly.plant_support();
+        let tree = Tree::new(
+            tree::Traits::default(),
+            TREE_SEEDLING_ORIGIN,
+            [0, 1],
+            support,
+        )
+        .unwrap();
+        let roots = uptake(
+            &self.world,
+            &self.assembly,
+            &self.terrain,
+            &self.geometry,
+            self.availability,
+        );
+        let env = GrassEnvironment {
+            roots: &roots,
+            physiology: &roots,
+        };
+        if tree.plant(&mut self.plants, &env).is_ok() {
+            self.grove.trees.push(tree);
         }
     }
 
@@ -372,19 +459,26 @@ impl TreeBed {
 
     /// The last decision's record for a tissue, if it bid in it.
     pub fn record(&self, id: u64) -> Option<&tree::Record> {
-        self.round
-            .records
+        self.rounds
             .iter()
+            .flat_map(|r| &r.records)
             .find(|r| r.view.point.tissue == id)
     }
 
-    /// Cut the selected branch, or else the lowest one, with everything that
-    /// grew beyond the cut. As in cutting grass, their shares are lost.
+    /// Cut the selected branch, or else the eldest tree's lowest, with
+    /// everything that grew beyond the cut. As in cutting grass, their shares
+    /// are lost.
     fn cut_branch(&mut self) {
         let o = self.plants.observe();
+        let owners = self.grove.owners(&o);
+        // A branch is a tree's wood beside its trunk.
         let branch = |t: &Tissue| {
-            t.policy == tree::POLICY && t.role == Role::Wood && t.cell[0] != TREE_ORIGIN[0]
+            t.role == Role::Wood
+                && owners
+                    .get(&t.organism)
+                    .is_some_and(|tree| t.cell[0] != tree.origin[0])
         };
+        let eldest = self.grove.trees.first().and_then(|tree| tree.organism(&o));
         let parent = |id: u64| {
             o.connections
                 .iter()
@@ -396,7 +490,11 @@ impl TreeBed {
             // side facing the grass.
             o.tissues
                 .iter()
-                .filter(|t| branch(t) && parent(t.id).is_some_and(|p| !branch(p)))
+                .filter(|t| {
+                    Some(t.organism) == eldest
+                        && branch(t)
+                        && parent(t.id).is_some_and(|p| !branch(p))
+                })
                 .min_by_key(|t| (t.cell[1], Reverse(t.cell[0])))
                 .map(|t| t.id)
         });
@@ -419,15 +517,18 @@ impl TreeBed {
         self.cuts += 1;
     }
 
-    /// The tree's living wood, needles and roots, its dead tissue, and how
-    /// high and deep it reaches.
+    /// The eldest tree's living wood, needles, cones and roots, its dead
+    /// tissue, and how high and deep it reaches.
     pub fn tree_summary(&self) -> String {
         let o = self.plants.observe();
-        let own: Vec<&Tissue> = o
-            .tissues
-            .iter()
-            .filter(|t| t.policy == tree::POLICY)
-            .collect();
+        let Some(tree) = self.grove.trees.first() else {
+            return format!(
+                "Conifer {:x} | none standing | cuts {}",
+                tree::POLICY,
+                self.cuts
+            );
+        };
+        let own: Vec<&Tissue> = tree.own(&o).collect();
         let count = |role: Role| {
             own.iter()
                 .filter(|t| t.role == role && t.health > 0)
@@ -437,19 +538,19 @@ impl TreeBed {
         let height = own
             .iter()
             .filter(|t| t.role == Role::Wood && t.health > 0)
-            .map(|t| t.cell[1] - TREE_ORIGIN[1])
+            .map(|t| t.cell[1] - tree.origin[1])
             .max()
             .unwrap_or(0);
         let depth = own
             .iter()
             .filter(|t| t.role == Role::Root)
-            .map(|t| TREE_ORIGIN[1] - t.cell[1])
+            .map(|t| tree.origin[1] - t.cell[1])
             .max()
             .unwrap_or(0);
         let energy = self
-            .round
-            .records
+            .rounds
             .first()
+            .and_then(|r| r.records.first())
             .map(|r| {
                 format!(
                     " | energy in {} upkeep {}",
@@ -458,24 +559,47 @@ impl TreeBed {
             })
             .unwrap_or_default();
         format!(
-            "Conifer {:x} | wood {} needles {} roots {} dead {} | height {height} depth {depth} | cuts {}{energy}",
+            "Conifer {:x} | wood {} needles {} cones {} roots {} dead {} | height {height} depth {depth} | cuts {}{energy}",
             tree::POLICY,
             count(Role::Wood),
             count(Role::Shoot),
+            count(Role::Cone),
             count(Role::Root),
             dead,
             self.cuts,
         )
     }
 
-    /// How the last decision's bids came out.
+    /// The grove: its trees, and the seeds lying where they landed, not yet
+    /// sprouted; the seeds dropped and trees cleared away since planting; and
+    /// how full the bed is. It holds only as many tissues as its light can
+    /// measure.
+    pub fn grove_summary(&self) -> String {
+        let o = self.plants.observe();
+        let sprouted = self
+            .grove
+            .trees
+            .iter()
+            .filter(|tree| tree.own(&o).any(|t| t.role == Role::Wood))
+            .count();
+        format!(
+            "Grove | trees {sprouted} seeds {} | seeds dropped {} | trees cleared {} | bed tissues {}/{}",
+            self.grove.trees.len() - sprouted,
+            self.dropped,
+            self.cleared,
+            o.tissues.len(),
+            o.config.max_tissues
+        )
+    }
+
+    /// How the last decision's bids came out, across the grove.
     pub fn bid_summary(&self) -> String {
-        if let Some(waiting) = &self.round.waiting {
+        if let Some(waiting) = self.rounds.first().and_then(|r| r.waiting.as_ref()) {
             return format!("Bids: waiting for {waiting:?}");
         }
         let (mut waited, mut won, mut outbid) = (0, 0, 0);
         let mut refused: BTreeMap<String, usize> = BTreeMap::new();
-        for r in &self.round.records {
+        for r in self.rounds.iter().flat_map(|r| &r.records) {
             match r.outcome {
                 Outcome::Waited => waited += 1,
                 Outcome::Won(_) => won += 1,
@@ -494,7 +618,7 @@ impl TreeBed {
         };
         format!(
             "Bids from {} points: {waited} wait, {won} won, {outbid} outbid, refused {refused}",
-            self.round.records.len()
+            self.rounds.iter().map(|r| r.records.len()).sum::<usize>()
         )
     }
 
@@ -552,9 +676,17 @@ impl TreeBed {
                 .find(|&&(_, child)| child == id)
                 .and_then(|&(p, _)| o.tissues.iter().find(|t| t.id == p))
         };
+        let owners = self.grove.owners(&o);
+        // A tree with no wood yet is a seed, lying where it landed.
+        let seeds: BTreeSet<u64> = owners
+            .iter()
+            .filter(|(_, tree)| !tree.own(&o).any(|t| t.role == Role::Wood))
+            .map(|(&organism, _)| organism)
+            .collect();
         for t in &o.tissues {
             let tree = t.policy == tree::POLICY;
-            let underground = matches!(t.role, Role::Root | Role::Runner);
+            let seed = tree && seeds.contains(&t.organism);
+            let underground = matches!(t.role, Role::Root | Role::Runner) && !seed;
             if underground && !self.inspect {
                 continue;
             }
@@ -564,14 +696,32 @@ impl TreeBed {
                 STRESSED
             } else {
                 match (tree, t.role) {
+                    _ if seed => SEED,
                     (_, Role::Wood) => WOOD,
                     (true, Role::Shoot) => NEEDLE,
+                    (true, Role::Cone) => CONE,
                     (false, Role::Shoot) => BLADE,
                     _ => ROOT,
                 }
             };
             let center = p(t.cell);
+            // How far a needle or cone has grown toward size three.
+            let grown = || {
+                let target = o.config.development_per_size.iter().sum::<u64>().max(1);
+                let progress = t.development.iter().sum::<u64>() as f32 / target as f32;
+                f32::from(t.size - 1) + progress
+            };
             match (tree, t.role) {
+                // A seed lies on the soil above its cell.
+                _ if seed => f.push_primitive(
+                    3,
+                    oval(
+                        RenderPoint::new(center.x, center.y + 0.64),
+                        0.32,
+                        0.15,
+                        color,
+                    ),
+                ),
                 // Wood runs from the tissue it grew from, as wide as the
                 // disk it shades with, with a round joint at its end.
                 (_, Role::Wood) => {
@@ -590,9 +740,7 @@ impl TreeBed {
                 // which lengthen as it matures. On the trunk's line it
                 // stands upright.
                 (true, Role::Shoot) => {
-                    let target = o.config.development_per_size.iter().sum::<u64>().max(1);
-                    let progress = t.development.iter().sum::<u64>() as f32 / target as f32;
-                    let grown = f32::from(t.size - 1) + progress;
+                    let grown = grown();
                     let wood = parent(t.id);
                     let from = wood.map_or(center, |q| p(q.cell));
                     let (gx, gy) = if from == center {
@@ -600,7 +748,8 @@ impl TreeBed {
                     } else {
                         (center.x - from.x, center.y - from.y)
                     };
-                    let out = (t.cell[0] - TREE_ORIGIN[0]).signum() as f32;
+                    let trunk = owners.get(&t.organism).map_or(t.cell, |tree| tree.origin);
+                    let out = (t.cell[0] - trunk[0]).signum() as f32;
                     // Turned toward the trunk's outside, or up beside it.
                     let (lx, ly, spray) = match (out == 0.0, gy == 0.0) {
                         (true, _) => (1.0, 0.0, &UPRIGHT),
@@ -622,6 +771,23 @@ impl TreeBed {
                         );
                         f.push_primitive(3, garden_segment(base, tip, 0.08, color));
                     }
+                }
+                // A cone hangs from the branch tip above it, and lengthens
+                // as it ripens.
+                (true, Role::Cone) => {
+                    let top = parent(t.id).map_or(center.y + 0.5, |q| {
+                        p(q.cell).y - 0.25 * f32::from(q.size).sqrt()
+                    });
+                    let length = 0.4 + 0.25 * grown();
+                    f.push_primitive(
+                        3,
+                        oval(
+                            RenderPoint::new(center.x, top - 0.5 * length),
+                            0.12 + 0.12 * length,
+                            0.5 * length,
+                            color,
+                        ),
+                    );
                 }
                 // Blades as in the grass bed.
                 (false, Role::Shoot) => {
@@ -658,7 +824,7 @@ impl TreeBed {
             }
         }
         if self.bids {
-            for r in &self.round.records {
+            for r in self.rounds.iter().flat_map(|r| &r.records) {
                 if r.bid.action == TreeAction::Wait {
                     continue;
                 }
@@ -747,9 +913,10 @@ impl TreeBed {
                 "CONTROL: < {} > (up/down selects, Space activates)",
                 TREE_CONTROLS[self.control].0
             ),
-            "Brown wood | green needles and blades | amber stressed | grey dead | white roots | bids: yellow won, red refused, grey outbid | pink selected"
+            "Brown wood | green needles and blades | rust cones | tan seeds | amber stressed | grey dead | white roots | bids: yellow won, red refused, grey outbid | pink selected"
                 .into(),
             self.tree_summary(),
+            self.grove_summary(),
             self.grass_summary(),
             self.bid_summary(),
             format!(
@@ -762,14 +929,14 @@ impl TreeBed {
             ),
         ];
         if let Some(t) = self.selection() {
+            let owner = match o.parents.get(&t.organism) {
+                _ if t.policy != tree::POLICY => "grass".into(),
+                Some(parent) => format!("tree {} from a seed of {parent}", t.organism),
+                None => format!("tree {}", t.organism),
+            };
             lines.push(format!(
-                "Tissue {} | {} {:?} | size {} | health {} | reserves {:?} | shade {} shortage {}",
+                "Tissue {} | {owner} {:?} | size {} | health {} | reserves {:?} | shade {} shortage {}",
                 t.id,
-                if t.policy == tree::POLICY {
-                    "tree"
-                } else {
-                    "grass"
-                },
                 t.role,
                 t.size,
                 t.health,
@@ -800,7 +967,9 @@ impl TreeBed {
                         r.outcome,
                     )
                 }
-                None if t.policy == tree::POLICY => "No bid yet: grown in the last decision".into(),
+                None if t.policy == tree::POLICY => {
+                    "No bid yet: grown or landed in the last decision".into()
+                }
                 None => "Grass plans by its own policy".into(),
             });
         }
@@ -811,6 +980,19 @@ impl TreeBed {
         }
         f
     }
+}
+
+/// A filled oval, upright or lying.
+fn oval(center: RenderPoint, rx: f32, ry: f32, color: RenderColor) -> RenderPrimitive {
+    RenderPrimitive::Polygon(RenderPolygon::filled(
+        (0..12)
+            .map(|i| {
+                let a = i as f32 * std::f32::consts::TAU / 12.0;
+                RenderPoint::new(center.x + rx * a.cos(), center.y + ry * a.sin())
+            })
+            .collect(),
+        color,
+    ))
 }
 
 /// A point's own cell: one below its candidate above, since the bed's up is +y.
@@ -846,6 +1028,7 @@ mod tree_bed_contract {
                         Some(t) => match (t.policy == tree::POLICY, t.role) {
                             (true, Role::Wood) => '#',
                             (true, Role::Shoot) => '*',
+                            (true, Role::Cone) => 'o',
                             (true, _) => 'r',
                             (false, Role::Shoot) => ',',
                             (false, Role::Runner) => '~',
@@ -965,7 +1148,7 @@ mod tree_bed_contract {
         assert_eq!((needles(4, -1), needles(4, 1)), (6, 2), "{picture}");
         // The tree measured light at the cells it asked about, and bid.
         assert!(bed.probes > 0 && bed.probes <= tree::MAX_PROBES);
-        assert!(!bed.round.records.is_empty());
+        assert!(!bed.rounds[0].records.is_empty());
         // The crown's shadow falls to the right, where the grass's nearest
         // blade died in it; the others live.
         let blades = |alive: bool| -> Vec<i32> {
@@ -985,7 +1168,7 @@ mod tree_bed_contract {
         let mut again = TreeBed::new(42);
         run(&mut again, 600);
         assert_eq!(again.plants.observe(), o);
-        assert_eq!(again.round, bed.round);
+        assert_eq!(again.rounds, bed.rounds);
     }
 
     #[test]
@@ -1128,5 +1311,180 @@ mod tree_bed_contract {
             (o.tick, o.tissues.len(), bed.cuts, bed.intensity, bed.sun),
             (0, 2, 0, next_light(1000), 1)
         );
+    }
+
+    /// What became of a seed the grove took in: where and when it landed,
+    /// when it sprouted or was cleared away, and why its first wood was
+    /// refused.
+    #[derive(Debug)]
+    struct Life {
+        parent: u64,
+        cell: [i32; 2],
+        landed: u64,
+        sprouted: Option<u64>,
+        cleared: Option<u64>,
+        refused: BTreeSet<String>,
+    }
+
+    fn lives(bed: &mut TreeBed, until: u64) -> BTreeMap<u64, Life> {
+        let mut lives: BTreeMap<u64, Life> = BTreeMap::new();
+        while bed.plants.observe().tick < until {
+            let before = bed.plants.observe();
+            bed.tick();
+            let o = bed.plants.observe();
+            for r in bed.rounds.iter().flat_map(|r| &r.records) {
+                let Outcome::Refused(why) = r.outcome else {
+                    continue;
+                };
+                let seed = before.tissues.iter().find(|t| t.id == r.view.point.tissue);
+                if let Some(life) = seed.and_then(|t| lives.get_mut(&t.organism)) {
+                    life.refused.insert(format!("{why:?}"));
+                }
+            }
+            let owners = bed.grove.owners(&o);
+            for (&organism, tree) in &owners {
+                let Some(&parent) = o.parents.get(&organism) else {
+                    continue;
+                };
+                let life = lives.entry(organism).or_insert(Life {
+                    parent,
+                    cell: tree.origin,
+                    landed: o.tick,
+                    sprouted: None,
+                    cleared: None,
+                    refused: BTreeSet::new(),
+                });
+                if life.sprouted.is_none() && tree.own(&o).any(|t| t.role == Role::Wood) {
+                    life.sprouted = Some(o.tick);
+                }
+            }
+            for (organism, life) in lives.iter_mut() {
+                if life.cleared.is_none() && !owners.contains_key(organism) {
+                    life.cleared = Some(o.tick);
+                }
+            }
+        }
+        lives
+    }
+
+    #[test]
+    fn tree_bed_drops_seeds_that_sprout_beyond_the_crown_and_die_under_it() {
+        let mut bed = TreeBed::new(42);
+        let lives = lives(&mut bed, 1000);
+        let o = bed.plants.observe();
+        let picture = draw(&bed);
+        // The grown tree's cones dropped seeds onto the dirt about it, never
+        // onto the grass, which fills its patch's top row.
+        assert!(lives.len() >= 4, "{lives:#?}");
+        assert_eq!(bed.dropped, lives.len());
+        for life in lives.values() {
+            assert_eq!((life.parent, life.cell[1]), (1, TOP_DIRT), "{life:?}");
+            assert!(!(17..=24).contains(&life.cell[0]), "{life:?}");
+        }
+        let reach = |l: &Life| (l.cell[0] - TREE_ORIGIN[0]).abs();
+        // Beyond the crown's reach, they sprouted at their first decision and
+        // grew needles of their own.
+        let open: Vec<_> = lives.iter().filter(|(_, l)| reach(l) > 6).collect();
+        assert!(open.len() >= 2, "{lives:#?}");
+        for (organism, life) in &open {
+            assert_eq!(life.sprouted, Some(life.landed + 1), "{life:?}");
+            assert!(
+                o.tissues
+                    .iter()
+                    .any(|t| { t.organism == **organism && t.role == Role::Shoot && t.health > 0 }),
+                "{picture}"
+            );
+        }
+        // Under it, they never sprouted. Once their reserves ran out they
+        // died, and were cleared away.
+        let under: Vec<_> = lives.values().filter(|l| reach(l) <= 6).collect();
+        assert!(under.iter().all(|l| l.sprouted.is_none()), "{lives:#?}");
+        let cleared: Vec<_> = under.iter().filter(|l| l.cleared.is_some()).collect();
+        assert!(cleared.len() >= 2, "{lives:#?}");
+        assert!(cleared.iter().all(|l| l.cleared.unwrap() > l.landed + 150));
+        assert_eq!(bed.cleared, cleared.len());
+        // The first to land, before the bed was full, was refused for shade
+        // alone.
+        let first = under.iter().min_by_key(|l| l.landed).unwrap();
+        assert_eq!(
+            first.refused,
+            BTreeSet::from(["Shade".to_string()]),
+            "{first:?}"
+        );
+        // By tick 1000 the bed holds as many tissues as its light measures.
+        assert_eq!(o.tissues.len(), o.config.max_tissues, "{picture}");
+        let mut again = TreeBed::new(42);
+        run(&mut again, 1000);
+        assert_eq!(again.plants.observe(), o);
+        assert_eq!((again.dropped, again.cleared), (bed.dropped, bed.cleared));
+        // The young tree beyond the grass reaches over the column a seed is
+        // planted in, which the seed's cells keep free.
+        let [x, top] = TREE_SEEDLING_ORIGIN;
+        assert!(
+            o.tissues
+                .iter()
+                .any(|t| t.cell == [x, top + 3] && t.role == Role::Wood)
+        );
+        bed.command(Command::PlantSeedling);
+        assert!(
+            bed.grove
+                .trees
+                .iter()
+                .any(|t| t.origin == TREE_SEEDLING_ORIGIN)
+        );
+    }
+
+    #[test]
+    fn tree_bed_plants_a_seed_in_the_grass_that_climbs_above_it_and_starves_for_water() {
+        let mut bed = TreeBed::new(42);
+        run(&mut bed, 100);
+        let [x, top] = TREE_SEEDLING_ORIGIN;
+        let grass_at = |o: &plants::Observation, cell: [i32; 2]| {
+            o.tissues
+                .iter()
+                .any(|t| t.policy == grass::POLICY && t.cell == cell && t.health > 0)
+        };
+        let o = bed.plants.observe();
+        assert!(grass_at(&o, [x, top]) && grass_at(&o, [x, top + 1]));
+        let lost = o.ledger.loss;
+        // The grass is lifted from the seed's column, with its shares, and
+        // the seed lies between two blades.
+        bed.command(Command::PlantSeedling);
+        let o = bed.plants.observe();
+        assert!(
+            !o.tissues
+                .iter()
+                .any(|t| t.policy == grass::POLICY && t.cell[0] == x)
+        );
+        assert!((0..3).all(|r| o.ledger.loss[r] > lost[r]));
+        assert!(grass_at(&o, [x - 1, top + 1]) && grass_at(&o, [x + 1, top + 1]));
+        assert_eq!(bed.grove.trees.len(), 2);
+        let seedling = bed.grove.trees[1].organism(&o).unwrap();
+        assert!(o.parents.is_empty());
+        let own = |o: &plants::Observation, role: Role| -> Vec<[i32; 2]> {
+            o.tissues
+                .iter()
+                .filter(|t| t.organism == seedling && t.role == role && t.health > 0)
+                .map(|t| t.cell)
+                .collect()
+        };
+        // Hemmed in by them, it climbs a cell before its first needles, which
+        // stand above the blades.
+        run(&mut bed, 105);
+        let o = bed.plants.observe();
+        assert_eq!(own(&o, Role::Wood), [[x, top + 1], [x, top + 2]]);
+        assert_eq!(own(&o, Role::Shoot), [[x + 1, top + 2], [x - 1, top + 2]]);
+        // The grass's roots fill the soil about its seed, so it grows no
+        // roots of its own. Taking in less water than its upkeep, it stays a
+        // sapling, alive in the sun.
+        run(&mut bed, 600);
+        let o = bed.plants.observe();
+        let whole = &bed.rounds[1].records[0].view.whole;
+        assert_eq!(own(&o, Role::Root), [[x, top]]);
+        assert!(whole.intake[1] < whole.upkeep[1], "{whole:?}");
+        assert!(own(&o, Role::Wood).len() <= 4 && !own(&o, Role::Shoot).is_empty());
+        // Planted again, nothing happens: the sapling stands in the column.
+        bed.command(Command::PlantSeedling);
+        assert_eq!((bed.grove.trees.len(), bed.plants.observe()), (2, o));
     }
 }

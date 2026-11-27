@@ -998,6 +998,41 @@ fn garden_lab_tree_bed_grows_cuts_and_returns_in_both_renderers() {
             }
             capture(h, renderer, "tree-cut", &cut);
 
+            // A seed planted in the grass takes the place of the grass in its
+            // column, between two blades, as a tree of its own.
+            choose_tree(
+                h,
+                &mut s,
+                &mut t,
+                control(scenario_garden_lab::Command::PlantSeedling),
+            );
+            let [x, top] = scenario_garden_lab::TREE_SEEDLING_ORIGIN;
+            let sown = snapshot(h, |v| {
+                v["tree_bed"]["trees"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|t| t["origin"] == serde_json::json!([x, top]))
+            });
+            let tree = sown["tree_bed"]["trees"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|t| t["origin"] == serde_json::json!([x, top]))
+                .unwrap();
+            assert_eq!(
+                (&tree["parent"], &tree["sprouted"]),
+                (&Value::Null, &Value::Bool(false))
+            );
+            let blade = |column: i32| {
+                tree_tissues(&sown).iter().any(|t| {
+                    t["policy"] == engine_core::plants::grass::POLICY
+                        && t["cell"] == serde_json::json!([column, top + 1])
+                })
+            };
+            assert!(!blade(x) && blade(x - 1) && blade(x + 1), "{sown}");
+            capture(h, renderer, "tree-seed-in-grass", &sown);
+
             // Back to the grass bed, which runs again from where it waited.
             choose_tree(
                 h,

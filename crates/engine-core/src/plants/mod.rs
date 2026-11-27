@@ -21,6 +21,10 @@ pub enum Role {
     /// Trunk and branch tissue: it gathers nothing and needs no light, stores
     /// reserves, shades like a blade and thickens by paid development.
     Wood,
+    /// A tree's seed-bearing tissue. It gathers nothing and needs no light,
+    /// ripens by paid development to size three, and once ripe drops with its
+    /// seed: see `Intent::Release`.
+    Cone,
 }
 impl Role {
     /// Position in the role-ordered `Config` tables.
@@ -31,6 +35,7 @@ impl Role {
             Self::Shoot => 2,
             Self::Moss => 3,
             Self::Wood => 4,
+            Self::Cone => 5,
         }
     }
 }
@@ -71,13 +76,13 @@ pub struct Config {
     pub max_organisms: usize,
     pub max_intents: usize,
     pub max_size: u16,
-    /// Role-ordered tables: root, runner, shoot, moss, wood.
-    pub capacity_per_size: [Resources; 5],
-    pub maintenance_per_size: [Resources; 5],
-    pub growth_per_size: [Resources; 5],
-    /// A shoot's development target per added size. Wood thickens toward its
-    /// own `growth_per_size` instead, so a thickened segment has cost what
-    /// building it at that size would have.
+    /// Role-ordered tables: root, runner, shoot, moss, wood, cone.
+    pub capacity_per_size: [Resources; 6],
+    pub maintenance_per_size: [Resources; 6],
+    pub growth_per_size: [Resources; 6],
+    /// A shoot's or a cone's development target per added size. Wood
+    /// thickens toward its own `growth_per_size` instead, so a thickened
+    /// segment has cost what building it at that size would have.
     pub development_per_size: Resources,
     pub root_intake_per_size: Resources,
     pub shoot_energy_per_size: u64,
@@ -101,9 +106,16 @@ impl Default for Config {
             max_organisms: 64,
             max_intents: 16,
             max_size: 16,
-            capacity_per_size: [[20; 3], [10; 3], [20; 3], [24; 3], [20; 3]],
-            maintenance_per_size: [[1, 1, 1], [1, 1, 1], [1, 2, 2], [1, 1, 1], [1, 1, 1]],
-            growth_per_size: [[3; 3], [2; 3], [4; 3], [20; 3], [2, 2, 6]],
+            capacity_per_size: [[20; 3], [10; 3], [20; 3], [24; 3], [20; 3], [10; 3]],
+            maintenance_per_size: [
+                [1, 1, 1],
+                [1, 1, 1],
+                [1, 2, 2],
+                [1, 1, 1],
+                [1, 1, 1],
+                [1, 1, 1],
+            ],
+            growth_per_size: [[3; 3], [2; 3], [4; 3], [20; 3], [2, 2, 6], [2, 2, 4]],
             development_per_size: [4; 3],
             root_intake_per_size: [4, 3, 0],
             shoot_energy_per_size: 8,
@@ -120,13 +132,14 @@ impl Default for Config {
 }
 impl Config {
     /// The paid target for a tissue's next size, or `None` when it cannot
-    /// develop: shoots mature to size three and wood thickens to `max_size`.
+    /// develop: shoots mature and cones ripen to size three, and wood thickens
+    /// to `max_size`.
     pub fn development_target(&self, role: Role, size: u16) -> Option<Resources> {
         if size >= self.max_size {
             return None;
         }
         match role {
-            Role::Shoot if size < 3 => Some(self.development_per_size),
+            Role::Shoot | Role::Cone if size < 3 => Some(self.development_per_size),
             Role::Wood => Some(self.growth_per_size[Role::Wood.index()]),
             _ => None,
         }
@@ -204,6 +217,21 @@ pub enum Intent {
     /// shares of the stores are lost, as a removal's are. A tissue joined to
     /// nothing it grew from, such as a seed, cannot be shed.
     Shed { tissue: TissueId },
+    /// A ripe cone with nothing grown from it drops with its seed. The cone
+    /// leaves the tree, and its share of the stores stays with the tissue it
+    /// grew on. The seed starts a new organism of the cone's policy at `cell`:
+    /// one tissue of `role` and `size` holding `stores`, which the cone's
+    /// connected stores pay. The seed's tissue costs nothing more, since the
+    /// cone paid for it as it ripened. The runtime does not trace the seed's
+    /// fall: the policy that releases it chooses the cell.
+    Release {
+        cone: TissueId,
+        role: Role,
+        size: u16,
+        cell: [i32; 2],
+        support: Option<Support>,
+        stores: Resources,
+    },
 }
 
 /// Inputs come from bounded host adapters, never from the plant brain. Light is
@@ -240,6 +268,8 @@ pub struct Observation {
     pub config: Config,
     pub tissues: Vec<Tissue>,
     pub connections: Vec<(TissueId, TissueId)>,
+    /// The organism whose cone released each living organism's seed.
+    pub parents: BTreeMap<OrganismId, OrganismId>,
     pub ledger: Ledger,
 }
 pub trait PlantBrain {
@@ -330,6 +360,8 @@ pub struct Plants {
     next_organism: u64,
     tissues: BTreeMap<TissueId, Tissue>,
     edges: BTreeSet<(TissueId, TissueId)>,
+    /// Each released organism's parent, kept while it has tissue.
+    parents: BTreeMap<OrganismId, OrganismId>,
     ledger: Ledger,
 }
 fn add(a: &mut Resources, b: Resources) {
@@ -395,6 +427,7 @@ impl Plants {
             next_organism: 1,
             tissues: BTreeMap::new(),
             edges: BTreeSet::new(),
+            parents: BTreeMap::new(),
             ledger: Ledger::default(),
         })
     }
@@ -405,6 +438,7 @@ impl Plants {
             config: self.config.clone(),
             tissues: self.tissues.values().cloned().collect(),
             connections: self.edges.iter().copied().collect(),
+            parents: self.parents.clone(),
             ledger: self.ledger.clone(),
         }
     }
@@ -648,6 +682,74 @@ impl Plants {
                 }
                 self.remove_many(&shed)
             }
+            Intent::Release {
+                cone,
+                role,
+                size,
+                cell,
+                support,
+                stores,
+            } => {
+                let c = self.tissues.get(&cone).ok_or(Rejection::Invalid)?.clone();
+                if c.health == 0 {
+                    return Err(Rejection::Dead);
+                }
+                // A tissue's children have higher IDs, so an edge that starts
+                // at the cone leads to something grown from it.
+                if c.role != Role::Cone
+                    || self.config.development_target(c.role, c.size).is_some()
+                    || self.edges.iter().any(|&(a, _)| a == cone)
+                {
+                    return Err(Rejection::Invalid);
+                }
+                self.validate_site(role, size, cell, support, env)?;
+                if self.organism_count() >= self.config.max_organisms {
+                    return Err(Rejection::OrganismLimit);
+                }
+                let cap = scaled(self.config.capacity_per_size[role.index()], size);
+                if (0..3).any(|i| stores[i] > cap[i]) {
+                    return Err(Rejection::Invalid);
+                }
+                let group = self
+                    .components()
+                    .into_iter()
+                    .find(|g| g.contains(&cone))
+                    .unwrap();
+                let total = self.total(&group);
+                if (0..3).any(|i| total[i] < stores[i]) {
+                    return Err(Rejection::Unaffordable);
+                }
+                let id = self.next_tissue;
+                let organism = self.next_organism;
+                self.next_tissue = id.checked_add(1).ok_or(Rejection::Invalid)?;
+                self.next_organism = organism.checked_add(1).ok_or(Rejection::Invalid)?;
+                let rest: Vec<_> = group.into_iter().filter(|t| *t != cone).collect();
+                self.tissues.remove(&cone);
+                self.edges.retain(|&(a, b)| a != cone && b != cone);
+                self.distribute(&rest, std::array::from_fn(|i| total[i] - stores[i]));
+                self.tissues.insert(
+                    id,
+                    Tissue {
+                        id,
+                        organism,
+                        policy: c.policy,
+                        role,
+                        cell,
+                        size,
+                        development: [0; 3],
+                        invested: [0; 3],
+                        support,
+                        health: 100,
+                        shortage_ticks: 0,
+                        shade_ticks: 0,
+                        stores,
+                        allocation: 0,
+                    },
+                );
+                self.parents.insert(organism, c.organism);
+                self.prune();
+                Ok(())
+            }
             Intent::Grow {
                 parent,
                 role,
@@ -761,7 +863,7 @@ impl Plants {
                 let contact = match t.role {
                     Role::Root => Some((e.dirt_contact, self.config.root_intake_per_size)),
                     Role::Moss => Some((e.surface_contact, self.config.moss_intake_per_size)),
-                    Role::Runner | Role::Shoot | Role::Wood => None,
+                    Role::Runner | Role::Shoot | Role::Wood | Role::Cone => None,
                 };
                 let mut intake = [0; 3];
                 if let Some((true, rates)) = contact {
@@ -808,7 +910,7 @@ impl Plants {
                             * u64::from(e.light).min(saturation)
                             / saturation
                     }
-                    Role::Root | Role::Runner | Role::Wood => 0,
+                    Role::Root | Role::Runner | Role::Wood | Role::Cone => 0,
                 };
                 add(&mut pool, intake);
                 add(&mut self.ledger.intake, intake);
@@ -837,7 +939,7 @@ impl Plants {
                 let threshold = match t.role {
                     Role::Shoot => Some(self.config.local_light_threshold),
                     Role::Moss => Some(self.config.moss_light_threshold),
-                    Role::Root | Role::Runner | Role::Wood => None,
+                    Role::Root | Role::Runner | Role::Wood | Role::Cone => None,
                 };
                 let shade = threshold.is_some_and(|limit| samples[&id].light < limit);
                 t.shade_ticks = if shade {
@@ -940,7 +1042,13 @@ impl Plants {
         self.edges
             .retain(|(a, b)| !ids.contains(a) && !ids.contains(b));
         self.normalize();
+        self.prune();
         Ok(())
+    }
+    /// Lineage lasts while an organism has tissue.
+    fn prune(&mut self) {
+        let present: BTreeSet<OrganismId> = self.tissues.values().map(|t| t.organism).collect();
+        self.parents.retain(|child, _| present.contains(child));
     }
     pub fn resize_storage(&mut self, id: u64, size: u16) -> Result<(), Rejection> {
         if size == 0 || size > self.config.max_size {
