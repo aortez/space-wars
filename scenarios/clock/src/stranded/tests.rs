@@ -642,8 +642,8 @@ fn fallings_bars_come_down_in_its_world_as_it_takes_off_from_its_digit() {
 
 #[test]
 fn on_the_floor_it_runs_out_from_under_the_bars_it_can_get_clear_of() {
-    // Seed 4's bars come down on it, a few steps from a stretch they miss.
-    let mut state = falling_on_the_floor(4, -218.4);
+    // Seed 3's bars come down on it, a few steps from a stretch they miss.
+    let mut state = falling_on_the_floor(3, -218.4);
     let start = spaceling(&state).feet;
     // It takes a moment to see them.
     for _ in 1..DODGE_REACTION {

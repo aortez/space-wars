@@ -1172,7 +1172,7 @@ fn a_loser_blows_apart_and_each_piece_turns_to_dirt_where_it_comes_to_rest() {
 
 #[test]
 fn a_fight_with_no_survivors_blows_up_both_tanks_then_withdraws() {
-    let mut state = ready(4.0 / 3.0, 234, ClockTimeFormat::TwentyFourHour);
+    let mut state = ready(4.0 / 3.0, 372, ClockTimeFormat::TwentyFourHour);
     start_fighting(&mut state);
     to_the_result(&mut state);
     assert_eq!(tanks(&state).result, Some(ResultKind::Neither));
@@ -1931,7 +1931,7 @@ fn a_survivor_draws_its_ending_evenly_from_those_that_fit_the_fight() {
     // A fight that leaves no winner gives a spaceling that drew an ending
     // with the winner the rescue beam, and waits no longer than a rescue
     // takes.
-    let mut state = ready(4.0 / 3.0, 234, ClockTimeFormat::TwentyFourHour);
+    let mut state = ready(4.0 / 3.0, 372, ClockTimeFormat::TwentyFourHour);
     start_fighting(&mut state);
     event(&mut state).survivors.rolls = [Some(Ejection::Thrown); 2];
     event(&mut state).survivors.ending_rolls =
@@ -2322,7 +2322,7 @@ fn the_winner_takes_a_parting_shot_and_the_spaceling_dodges_it_and_runs_off_the_
     use survivor::{Ending, Phase};
     let (mut state, loser) = survival(
         4.0 / 3.0,
-        42,
+        1,
         survivor::Ejection::Thrown,
         Ending::PartingShot,
     );
@@ -2457,7 +2457,7 @@ fn a_spaceling_the_parting_shell_knocks_over_gets_up_and_rises_out_of_view_on_it
     use survivor::{Ending, Phase};
     let (mut state, loser) = survival(
         16.0 / 9.0,
-        42,
+        15,
         survivor::Ejection::Thrown,
         Ending::PartingShot,
     );
@@ -2627,7 +2627,7 @@ fn a_spaceling_with_no_way_out_after_a_parting_shot_waves_for_the_rescue_beam() 
     use survivor::{Ending, Fallback, Phase};
     let (mut state, loser) = survival(
         4.0 / 3.0,
-        42,
+        1,
         survivor::Ejection::Thrown,
         Ending::PartingShot,
     );
@@ -2779,7 +2779,7 @@ fn win_for(slot: usize) -> ResultKind {
 #[test]
 fn a_spaceling_rebuilds_its_tank_from_its_dirt_and_the_fight_reopens_for_a_sudden_death() {
     use survivor::{Ending, Phase};
-    let (mut state, loser) = rebuilding(5.0 / 3.0, 43, false);
+    let (mut state, loser) = rebuilding(5.0 / 3.0, 2, false);
     let scale = tanks(&state).duel.placement().scale;
     let winner = 1 - loser;
     assert_eq!(survivor(&state, loser).drawn, Ending::Rebuild);
@@ -3118,7 +3118,7 @@ fn the_winner_shoots_at_the_dirt_crawling_home_and_scatters_it() {
 #[test]
 fn a_spaceling_whose_dirt_is_lost_out_of_view_waves_for_the_rescue_beam() {
     use survivor::{Ending, Fallback, Phase};
-    let (mut state, loser) = rebuilding(5.0 / 3.0, 43, false);
+    let (mut state, loser) = rebuilding(5.0 / 3.0, 1, false);
     // A piece of its tank leaves the view before it turns to dirt.
     let layout = tanks(&state).layout;
     let piece = tanks(&state)
@@ -3304,10 +3304,10 @@ fn a_rebuild_cut_short_at_any_stage_leaves_nothing_behind() {
     }
 }
 
-/// The fight at 4:3 from seed 234, in which each tank's last shell is in
+/// The fight at 4:3 from seed 372, in which each tank's last shell is in
 /// flight at once, ready to fight.
 fn last_shells_together() -> ClockState {
-    let mut state = ready(4.0 / 3.0, 234, ClockTimeFormat::TwentyFourHour);
+    let mut state = ready(4.0 / 3.0, 372, ClockTimeFormat::TwentyFourHour);
     start_fighting(&mut state);
     state
 }

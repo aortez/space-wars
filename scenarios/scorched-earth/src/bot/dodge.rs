@@ -3,7 +3,6 @@
 //! waits for that shell, traces where it will burst, drives away from that spot
 //! while the shell flies, and waits where it stops until the shell lands.
 use super::*;
-use crate::armor::BLAST_REACH;
 use crate::driving::BRAKING_DISTANCE;
 use crate::duel::{flight_end, shell_ray_through};
 
@@ -12,7 +11,7 @@ const REACTION_TICKS: u64 = FIXED_HZ as u64 / 4;
 /// The hull's ends and the wheels lie within this distance of its middle.
 const HALF_LENGTH: f32 = 1.9;
 /// A shell bursting this far from the tank's middle cannot reach it.
-const CLEAR: f32 = BLAST_REACH + HALF_LENGTH;
+const CLEAR: f32 = cannon::BLAST.radius + HALF_LENGTH;
 /// A dodge shorter than this leaves the tank nearly as close to the burst, so
 /// the tank stays where it is unless less than this takes it clear.
 const SHORTEST: f32 = 2.0;

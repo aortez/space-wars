@@ -416,7 +416,7 @@ impl Duel {
         recorded: bool,
     ) -> u64 {
         let tank = self.tanks[player];
-        let motion = self.motion(physics, tank.body).unwrap();
+        let carriage = self.carriage(physics, tank.body).unwrap();
         let barrel = self.barrel(physics, player);
         let position = barrel.exit(|pivot, along| {
             self.cast_ray(
@@ -431,7 +431,8 @@ impl Duel {
             )
             .map(|hit| hit.point)
         });
-        let velocity = tank.direction() * tank.speed + motion.linear_velocity;
+        let velocity =
+            cannon::launch_velocity(tank.direction(), tank.speed, barrel.pivot, carriage);
         let flight = recorded.then(|| {
             self.record_launch(
                 physics,

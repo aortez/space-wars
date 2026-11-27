@@ -91,7 +91,7 @@ fn a_shell_charges_the_tank_it_hits_once_then_bursts_once() {
         let ledger = source.ledger();
         assert!(ledger.kinetic.absorbed > 0.0, "sprung={suspension}");
         assert!(ledger.payload.absorbed > 0.0);
-        assert!(ledger.payload.delivered <= f64::from(PAYLOAD));
+        assert!(ledger.payload.delivered <= f64::from(cannon::PAYLOAD));
         assert_eq!(struck.absorbed[1], 0.0);
         assert_eq!(struck.unmodeled, 0.0);
         let charged = ledger.kinetic.absorbed + ledger.payload.absorbed;
@@ -163,7 +163,7 @@ fn a_burst_between_the_tanks_divides_one_payload() {
     assert!(absorbed[0] > 0.0);
     assert!((absorbed[0] - absorbed[1]).abs() < 0.01 * absorbed[0]);
     let ledger = source.ledger().payload;
-    assert!(ledger.delivered <= f64::from(PAYLOAD));
+    assert!(ledger.delivered <= f64::from(cannon::PAYLOAD));
     assert!((f64::from(absorbed[0] + absorbed[1]) - ledger.absorbed).abs() < 0.01);
     assert!(matches!(
         source.release(&[]),
@@ -221,7 +221,7 @@ fn a_burst_beyond_reach_spares_the_tanks_and_their_bots() {
         let mut state = settled(suspension);
         let above = position(&state, 0) + Vec2::Y;
         // No circle reaches a unit above its tank's origin.
-        state.explode_from(above + Vec2::Y * (BLAST_REACH + 0.1), Some(1));
+        state.explode_from(above + Vec2::Y * (cannon::BLAST.radius + 0.1), Some(1));
         assert_eq!(state.tanks[0].health, 100.0, "sprung={suspension}");
         assert!(last_hit(&state, 0).is_null());
         state.explode_from(above + Vec2::Y * 3.0, Some(1));
@@ -278,13 +278,24 @@ fn a_shell_stopped_by_terrain_reports_its_hit_without_charging_it() {
 }
 
 #[test]
+fn a_tank_is_as_thick_as_the_blast_front_is_deep() {
+    // A tank thinner than the front would let part of every blast past it.
+    assert_eq!(TANK_THICKNESS, cannon::BLAST.height);
+}
+
+#[test]
 fn a_direct_hit_costs_about_a_third_of_a_tank() {
     for suspension in [false, true] {
         let mut state = settled(suspension);
-        // A harder shot hits harder.
-        let slow = drop_on(&mut state.clone(), Vec2::ZERO, 15.0);
-        let fast = drop_on(&mut state.clone(), Vec2::ZERO, 35.0);
-        assert!(slow < fast, "sprung={suspension}: {slow} {fast}");
+        // The round is light and its payload does most of a hit's harm, so a
+        // hit at the cannon's lowest power costs about what one at its highest
+        // does.
+        let slow = drop_on(&mut state.clone(), Vec2::ZERO, cannon::MIN_POWER);
+        let fast = drop_on(&mut state.clone(), Vec2::ZERO, cannon::MAX_POWER);
+        assert!(
+            (fast - slow).abs() < 1.0,
+            "sprung={suspension}: {slow} {fast}"
+        );
         // A tank falls to the third or fourth.
         let mut hits = Vec::new();
         while state.tanks[0].health > 0.0 {

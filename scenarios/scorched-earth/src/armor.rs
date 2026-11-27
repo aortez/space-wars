@@ -1,8 +1,9 @@
 //! Tank armor and the shells that charge it (#331).
 //!
 //! A tank's armor is one material region that the duel keeps, and its health
-//! is that region's integrity. A shell is a weapon source with two parts: a
-//! kinetic part, its mass at its launch speed, and an explosive payload. A
+//! is that region's integrity. A shell is the round of the tanks' shared
+//! cannon, `engine_rapier::cannon`: a weapon source with two parts, a kinetic
+//! part, its mass at its launch speed, and an explosive payload. A
 //! shell that strikes a tank charges that tank's armor once, with the impact
 //! measured from the shell's velocity and the tank's motion. Whatever else it
 //! strikes, such as terrain, is outside the material model, and the hit's
@@ -28,16 +29,17 @@
 use super::*;
 use crate::host::Placement;
 use engine_material::{
-    ARMOR, ContactGeometry, Face, Impact, MAX_LENGTH, MIN_LENGTH, Projectile, SHELL, Section,
-    Share, Source, SourceId, SourceSpec, Target, blast_center, blast_reach, patch_width_from_radii,
+    ARMOR, ContactGeometry, Face, Impact, MAX_LENGTH, MIN_LENGTH, Projectile, Section, Share,
+    Source, SourceId, SourceSpec, Target, blast_center, blast_reach, patch_width_from_radii,
     sweep_crossings,
 };
 use engine_rapier::world::RayHit;
 use engine_rapier::world::weapon::{Reachable, Recipient, Recipients, pay_push, projectile_impact};
 use std::collections::{BTreeMap, BTreeSet};
 
-/// Represented depth of a tank into the screen, and of a burst's front, so a
-/// tank stops the whole front wherever it lies across it.
+/// Represented depth of a tank into the screen, as deep as the cannon's blast
+/// front, `cannon::BLAST.height`, so a tank stops the whole front wherever it
+/// lies across it.
 const TANK_THICKNESS: f32 = 2.0;
 /// Depth of armor plate behind a struck face.
 const PLATE_DEPTH: f32 = 0.2;
@@ -46,18 +48,6 @@ const PLATE_DEPTH: f32 = 0.2;
 /// gears carry the same armor.
 const ARMOR_VOLUME: f32 = 9.36 * PLATE_DEPTH * TANK_THICKNESS;
 const ARMOR_SECTION: Section = Section::new(TANK_THICKNESS, PLATE_DEPTH);
-/// A shell's radius, for its contact patch and where it bursts on a surface.
-const SHELL_RADIUS: f32 = 0.25;
-/// A shell's mass, so a harder shot hits harder.
-const SHELL_MASS: f32 = 7.0;
-/// The shell's casing, the part of its mass that meets what it strikes.
-const CASING_VOLUME: f32 = 0.05;
-const CASING: Section = Section::new(0.5, 0.1);
-/// Explosive energy of one shell.
-const PAYLOAD: f32 = 28_000.0;
-/// How far a burst reaches to a tank's surface.
-pub(crate) const BLAST_REACH: f32 = 5.0;
-
 /// Circles standing in for the rigid hull, in its body's frame. Like the
 /// chassis's, they lie within the collider, so a shell bursting off the hull
 /// is outside them.
@@ -95,16 +85,15 @@ pub(crate) fn armor_left(health: f32) -> Region {
 /// is gone. A speed the law refuses, such as a non-finite one, leaves the
 /// payload alone.
 pub(crate) fn shell(id: SourceId, owner: Option<u64>, speed: f32) -> Source {
-    let casing = Region::new(SHELL, CASING_VOLUME).expect("the casing's volume is in range");
     Source::new(SourceSpec {
         id,
         owner,
         projectile: Some(Projectile {
-            region: casing,
-            mass: SHELL_MASS,
+            region: cannon::casing(),
+            mass: cannon::ROUND_MASS,
             speed,
         }),
-        payload: Some(PAYLOAD),
+        payload: Some(cannon::PAYLOAD),
         beam: None,
     })
     .unwrap_or_else(|_| charge(id, owner))
@@ -116,7 +105,7 @@ pub(crate) fn charge(id: SourceId, owner: Option<u64>) -> Source {
         id,
         owner,
         projectile: None,
-        payload: Some(PAYLOAD),
+        payload: Some(cannon::PAYLOAD),
         beam: None,
     })
     .expect("the payload is finite")
@@ -259,7 +248,7 @@ pub(super) fn pass_tissue(
         recipients,
         &mut shell.keys,
         start.midpoint(end),
-        start.distance_to(end) * 0.5 + SHELL_RADIUS,
+        start.distance_to(end) * 0.5 + cannon::ROUND_RADIUS,
     )
     .into_iter()
     .filter(|(recipient, _)| matches!(recipient, Recipient::Tissue(_)))
@@ -268,7 +257,7 @@ pub(super) fn pass_tissue(
         return;
     }
     let targets: Vec<Target> = tissue.iter().map(|(_, target)| *target).collect();
-    let Ok(crossings) = sweep_crossings(start, end, SHELL_RADIUS, &targets) else {
+    let Ok(crossings) = sweep_crossings(start, end, cannon::ROUND_RADIUS, &targets) else {
         return;
     };
     let speed = shell.velocity.length();
@@ -281,7 +270,7 @@ pub(super) fn pass_tissue(
         let Some((region, section, back)) = proxy(recipients, *key, placement.scale) else {
             continue;
         };
-        let face = Face::new(2.0 * SHELL_RADIUS.min(target.radius), section);
+        let face = Face::new(2.0 * cannon::ROUND_RADIUS.min(target.radius), section);
         if let Ok(outcome) = shell.source.pass(crossing.key, &region, face, speed) {
             recipients.absorb(*key, (f64::from(outcome.consumed[0]) * back) as f32);
         }
@@ -349,10 +338,17 @@ impl Duel {
         pushes: &[Push; 2],
     ) -> Struck {
         let mut released = Struck::default();
-        let guests = guests(&self.placement, recipients, keys, center, BLAST_REACH);
+        let guests = guests(
+            &self.placement,
+            recipients,
+            keys,
+            center,
+            cannon::BLAST.radius,
+        );
         let mut targets = self.armor_targets(physics);
         targets.extend(guests.iter().map(|(_, target)| *target));
-        let Ok(reaches) = blast_reach(center, BLAST_REACH, TANK_THICKNESS, &targets) else {
+        let Ok(reaches) = blast_reach(center, cannon::BLAST.radius, cannon::BLAST.height, &targets)
+        else {
             return released;
         };
         // The host's tissue that can take a share, as the duel sees it, and
@@ -420,7 +416,7 @@ impl Duel {
         let scale = self.placement.scale;
         let load = projectile_impact(
             physics,
-            SHELL_MASS * scale * scale,
+            cannon::ROUND_MASS * scale * scale,
             velocity * scale,
             hit.collider,
             None,
@@ -453,9 +449,9 @@ impl Duel {
         if let Some(load) = self.measure(physics, shell.velocity, hit) {
             match slot {
                 Some(slot) => {
-                    let outcome = patch_width_from_radii(SHELL_RADIUS, None)
+                    let outcome = patch_width_from_radii(cannon::ROUND_RADIUS, None)
                         .ok()
-                        .map(|width| ContactGeometry::new(width, CASING, ARMOR_SECTION))
+                        .map(|width| ContactGeometry::new(width, cannon::CASING, ARMOR_SECTION))
                         .and_then(|contact| {
                             shell
                                 .source
@@ -473,7 +469,7 @@ impl Duel {
         // allows, so a burst off the ground beside a wheel could start inside
         // it, where it would meet the tank in every direction.
         let center = blast_center(
-            point + hit.normal * SHELL_RADIUS,
+            point + hit.normal * cannon::ROUND_RADIUS,
             &self.armor_targets(physics),
         );
         let released = self.burst(

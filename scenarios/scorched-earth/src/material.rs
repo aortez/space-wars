@@ -145,9 +145,10 @@ impl Duel {
         self.notify_hits(owner, before);
     }
 
-    /// A burst's crater and pushes at `point`, and its payload released from
-    /// `center` into the tanks' armor and the host's tissue. Returns what the
-    /// tanks' armor took and what the host's bodies stopped.
+    /// A burst's crater at `point`, which pushes the loose dirt, and its
+    /// payload released from `center` into the tanks' armor and the host's
+    /// tissue, with the cannon's push on the tanks' hulls from there. Returns
+    /// what the tanks' armor took and what the host's bodies stopped.
     pub(super) fn burst(
         &mut self,
         physics: &mut PhysicsWorld,
@@ -181,12 +182,13 @@ impl Duel {
         .apply(physics, bodies);
         // Combat damage is independent of whether the bounded material pool
         // admitted this edit. Capacity cannot make a tank invulnerable.
+        let push = cannon::BLAST.push.expect("the cannon's blast pushes");
         let pushes = self.tank_pushes(
             physics,
             RadialImpulse {
-                center: self.placement.point_to_world(point),
-                radius: 6.0 * self.placement.scale,
-                speed: 4.0 * self.placement.scale,
+                center: self.placement.point_to_world(center),
+                radius: push.radius * self.placement.scale,
+                speed: push.speed * self.placement.scale,
             },
         );
         let released = self.release_payload(physics, recipients, center, source, keys, &pushes);

@@ -54,12 +54,40 @@ struct Trace {
     limit: u32,
 }
 
-/// The tank's pose when its plot began. Every arc launches from it.
+/// The tank's pose when its plot began. Every arc launches from it, carried
+/// by the hull's velocity at its center of mass, `center`, and its spin.
 #[derive(Debug, Clone, Copy, Serialize)]
 struct Pose {
     position: Vec2,
     angle: f32,
     velocity: Vec2,
+    spin: f32,
+    center: Vec2,
+}
+
+impl Pose {
+    /// `player`'s tank as it stands now.
+    fn of(state: &Duel, physics: &PhysicsWorld, player: usize) -> Option<Self> {
+        let body = state.tanks[player].body;
+        let motion = state.motion(physics, body)?;
+        let carriage = state.carriage(physics, body)?;
+        Some(Self {
+            position: motion.position,
+            angle: motion.angle,
+            velocity: carriage.velocity,
+            spin: carriage.spin,
+            center: carriage.center,
+        })
+    }
+
+    /// How the hull carries the barrel.
+    fn carriage(self) -> Carriage {
+        Carriage {
+            center: self.center,
+            velocity: self.velocity,
+            spin: self.spin,
+        }
+    }
 }
 
 #[derive(Clone, Serialize)]
@@ -98,15 +126,11 @@ impl Plot {
     /// A plot from `player`'s tank as it stands at `target`, in the duel's
     /// units.
     pub(crate) fn at(state: &Duel, physics: &PhysicsWorld, player: usize, target: Vec2) -> Self {
-        let motion = state.motion(physics, state.tanks[player].body).unwrap();
+        let shooter = Pose::of(state, physics, player).unwrap();
         Self {
-            shooter: Pose {
-                position: motion.position,
-                angle: motion.angle,
-                velocity: motion.linear_velocity,
-            },
+            shooter,
             target,
-            facing: (target.x - motion.position.x).signum(),
+            facing: (target.x - shooter.position.x).signum(),
             started: state.tick,
             finished: None,
             casts: 0,
@@ -203,7 +227,8 @@ impl Plot {
         casts: &mut u32,
     ) -> Result<Trace, &'static str> {
         let (Barrel { pivot, muzzle }, direction) = barrel(self.shooter, self.facing, elevation);
-        let power = firing_power(muzzle, direction, self.shooter.velocity, self.target)
+        let carried = self.shooter.carriage().velocity_at(pivot);
+        let power = firing_power(muzzle, direction, carried, self.target)
             .ok_or("unreachable")?
             .clamp(cannon::MIN_POWER, state.placement.max_power());
         *casts += 1;
@@ -223,7 +248,7 @@ impl Plot {
         {
             return Err("blocked barrel");
         }
-        let velocity = direction * power + self.shooter.velocity;
+        let velocity = cannon::launch_velocity(direction, power, pivot, self.shooter.carriage());
         // Horizontal speed is constant, so the arc reaches the target's X then.
         let ticks = ((self.target.x - muzzle.x) / velocity.x / DT).ceil();
         let limit = if ticks.is_finite() && ticks > 0.0 {
@@ -263,8 +288,10 @@ impl Plot {
     /// Its speed across is constant, so it reaches where it bursts then.
     pub(crate) fn flight_ticks(&self) -> Option<u32> {
         let arc = self.reaching()?;
-        let (Barrel { muzzle, .. }, direction) = barrel(self.shooter, self.facing, arc.elevation);
-        let across = direction.x * arc.power + self.shooter.velocity.x;
+        let (Barrel { pivot, muzzle }, direction) =
+            barrel(self.shooter, self.facing, arc.elevation);
+        let across =
+            cannon::launch_velocity(direction, arc.power, pivot, self.shooter.carriage()).x;
         let ticks = ((arc.end.x - muzzle.x) / across / DT).ceil();
         Some(if ticks.is_finite() {
             ticks.max(0.0) as u32
@@ -292,9 +319,11 @@ fn barrel(pose: Pose, facing: f32, elevation: f32) -> (Barrel, Vec2) {
 }
 
 /// The launch speed along `direction` whose arc from `muzzle` passes through
-/// `target` under gravity alone. The tank's own `velocity` carries the shell
-/// too, as it does in `fire`. There is none when the barrel points below the
-/// target, or away from it.
+/// `target` under gravity alone. The `velocity` the hull carries the barrel's
+/// pivot at carries the shell too, as it does in `fire`. From a still hull
+/// there is none when the barrel points below the target, or away from it. A
+/// hull that lifts the shell can let two speeds reach a target above the
+/// barrel; this answers the faster, which may be more than the cannon fires.
 fn firing_power(muzzle: Vec2, direction: Vec2, velocity: Vec2, target: Vec2) -> Option<f32> {
     let cross = |a: Vec2, b: Vec2| a.x * b.y - a.y * b.x;
     let offset = target - muzzle;
@@ -404,30 +433,31 @@ impl Duel {
     }
 
     /// Points the barrel along the plotted arc. Its power reaches where the
-    /// target is now, which is the plotted power unless the target has moved.
+    /// target is now, from the barrel as the hull carries it now, which is the
+    /// plotted power unless either tank has moved.
     pub(super) fn aim_plotted(&mut self, physics: &PhysicsWorld, player: usize) {
         let arc = self.bots[player]
             .plotted_arc()
             .expect("a plotted tank fires only a plotted arc");
         let facing = self.bots[player].plot.as_ref().unwrap().facing;
-        let motion = self.motion(physics, self.tanks[player].body).unwrap();
         let target = self
             .motion(physics, self.tanks[1 - player].body)
             .unwrap()
             .position;
-        let pose = Pose {
-            position: motion.position,
-            angle: motion.angle,
-            velocity: motion.linear_velocity,
-        };
-        let (Barrel { muzzle, .. }, direction) = barrel(pose, facing, arc.elevation);
+        let pose = Pose::of(self, physics, player).unwrap();
+        let (Barrel { pivot, muzzle }, direction) = barrel(pose, facing, arc.elevation);
         let tank = &mut self.tanks[player];
         tank.facing = facing;
         tank.elevation = arc.elevation;
-        tank.speed = firing_power(muzzle, direction, pose.velocity, target)
-            .map_or(arc.power, |power| {
-                power.clamp(cannon::MIN_POWER, self.placement.max_power())
-            });
+        tank.speed = firing_power(
+            muzzle,
+            direction,
+            pose.carriage().velocity_at(pivot),
+            target,
+        )
+        .map_or(arc.power, |power| {
+            power.clamp(cannon::MIN_POWER, self.placement.max_power())
+        });
     }
 }
 
@@ -450,14 +480,10 @@ impl Duel {
         {
             return None;
         }
-        let motion = self.motion(physics, self.tanks[player].body)?;
-        let pose = Pose {
-            position: motion.position,
-            angle: motion.angle,
-            velocity: motion.linear_velocity,
-        };
-        let (Barrel { muzzle, .. }, direction) = barrel(pose, plot.facing, arc.elevation);
-        let speed = firing_power(muzzle, direction, pose.velocity, plot.target)
+        let pose = Pose::of(self, physics, player)?;
+        let (Barrel { pivot, muzzle }, direction) = barrel(pose, plot.facing, arc.elevation);
+        let carried = pose.carriage().velocity_at(pivot);
+        let speed = firing_power(muzzle, direction, carried, plot.target)
             .map_or(arc.power, |power| {
                 power.clamp(cannon::MIN_POWER, self.placement.max_power())
             });

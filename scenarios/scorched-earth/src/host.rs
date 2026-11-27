@@ -856,6 +856,19 @@ impl Duel {
         Some(motion)
     }
 
+    /// How `body` carries a cannon, in the duel's units: its center of mass,
+    /// the velocity there and its spin. A retired tank's body has left the
+    /// world, so it carries its cannon as it last moved, about its origin.
+    pub(crate) fn carriage(&self, world: &PhysicsWorld, body: BodyId) -> Option<Carriage> {
+        let motion = self.motion(world, body)?;
+        let center = world
+            .center_of_mass(body)
+            .map_or(motion.position, |center| {
+                self.placement.point_from_world(center)
+            });
+        Some(Carriage::new(motion, center))
+    }
+
     pub(crate) fn cast_ray(
         &self,
         world: &PhysicsWorld,

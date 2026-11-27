@@ -502,6 +502,17 @@ fn a_host_plots_a_shot_at_a_point_fires_it_once_the_duel_is_over_and_traces_its_
             .unwrap()
             .point;
         let target = ground + Vec2::Y * (0.5 * scale);
+        // The retired tank can still be aimed, and its arcs plotted from where
+        // it last stood, though it fires nothing.
+        let mut retired = duel.aim_at(&world, 0, target);
+        for _ in 0..40 {
+            duel.plot(&world, &mut retired);
+        }
+        assert!(
+            retired.direction().is_some(),
+            "an arc from the retired tank"
+        );
+        assert!(duel.fire_aim(&mut world, &retired).is_none());
         let mut aim = duel.aim_at(&world, 1, target);
         let mut ticks = 0;
         while !aim.plotted() {
@@ -1005,7 +1016,7 @@ fn a_burst_shares_its_payload_with_the_hosts_moss_and_stops_at_its_bodies() {
     assert!(work > 0.0);
     assert!(field.moss[&1].integrity() > 0.0);
     let payload = event.ledger.payload;
-    assert!(payload.delivered <= 28_000.0);
+    assert!(payload.delivered <= f64::from(cannon::PAYLOAD));
     // The payload went to the tank's armor and the moss, and nowhere twice.
     let armor = f64::from(event.absorbed[1]) - event.ledger.kinetic.absorbed;
     assert!((armor + f64::from(work) - payload.absorbed).abs() < 0.1);

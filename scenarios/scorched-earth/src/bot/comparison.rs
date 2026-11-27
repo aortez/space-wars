@@ -239,7 +239,7 @@ mod tests {
     #[test]
     fn post_hit_forks_preserve_physics_inflight_shots_and_learned_history() {
         let state = capture(GrainShape::Round, 7, 1035);
-        assert_eq!(state.observation_hash(), 0x11e505d21b4f8bf7);
+        assert_eq!(state.observation_hash(), 0x5516a9f8e9713def);
         assert!(state.bots[0].pending.is_some());
         assert_eq!(state.bots[0].aim.observations, 3);
         for choice in [Choice::ContinueAiming, Choice::Reference, Choice::Current] {
@@ -283,7 +283,7 @@ mod tests {
 
     #[test]
     fn selected_native_firing_patch_is_reached_and_shooting_resumes() {
-        let state = capture(GrainShape::Hexagon, 42, 754);
+        let state = capture(GrainShape::Hexagon, 4, 768);
         let report = continuation(&state, 1, Choice::Current, 7);
         assert_eq!(report["relocation"]["reason"], "arrived");
         assert!(report["max_displacement_x"].as_f64().unwrap() > 1.5);
@@ -294,7 +294,7 @@ mod tests {
 
     #[test]
     fn a_retained_correction_gets_one_real_shot_and_preserves_the_firing_schedule() {
-        let state = capture(GrainShape::Hexagon, 77, 1032);
+        let state = capture(GrainShape::Hexagon, 72, 1044);
         let mut candidate = fork(&state, 0, Choice::Current);
         assert_eq!(json!(candidate.tanks), json!(state.tanks));
         assert_eq!(json!(candidate.bots[0].aim), json!(state.bots[0].aim));
@@ -330,7 +330,7 @@ mod tests {
 
     #[test]
     fn repeated_hits_cannot_extend_an_unfired_correction_or_rearm_it() {
-        let state = capture(GrainShape::Hexagon, 77, 1032);
+        let state = capture(GrainShape::Hexagon, 72, 1044);
         let mut candidate = fork(&state, 0, Choice::Current);
         let deadline = candidate.bots[0]
             .shot_priority
@@ -372,7 +372,7 @@ mod tests {
 
     #[test]
     fn changed_target_or_new_barrel_obstruction_cancels_the_preference() {
-        let state = capture(GrainShape::Hexagon, 77, 1032);
+        let state = capture(GrainShape::Hexagon, 72, 1044);
         let mut moved = fork(&state, 0, Choice::Current);
         let body = moved.tanks[1].body;
         let motion = moved.physics.motion(body).unwrap();
@@ -424,7 +424,7 @@ mod tests {
 
     #[test]
     fn driving_toggle_and_expired_observation_do_not_extend_the_preference() {
-        let state = capture(GrainShape::Hexagon, 77, 1032);
+        let state = capture(GrainShape::Hexagon, 72, 1044);
         let mut candidate = fork(&state, 0, Choice::Current);
         let deadline = candidate.bots[0].shot_priority.as_ref().unwrap().deadline;
         candidate.command(Command::CpuDrive);

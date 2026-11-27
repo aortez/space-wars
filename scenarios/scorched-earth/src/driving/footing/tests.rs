@@ -13,12 +13,12 @@ fn captured_crater() -> ScorchedState {
             demo: true,
             ..Default::default()
         },
-        314,
+        218,
     );
-    for _ in 0..645 {
+    for _ in 0..904 {
         step(&mut state);
     }
-    assert_eq!(state.observation_hash(), 0xb70e78833520c3fd);
+    assert_eq!(state.observation_hash(), 0x5bfcc4c50b73557f);
     assert!(state.firing_footing_target(1).is_some());
     state
 }
@@ -58,7 +58,7 @@ fn captured_cpu_reaches_better_actual_footing_then_stops_and_fires_with_replay()
             assert!(before.linear_velocity.length() < 0.6 && before.angular_velocity.abs() < 0.35);
             shot_from_hold |= was_holding;
         }
-        if state.tick == 780 {
+        if state.tick == 981 {
             let old = reference.physics.motion(reference.tanks[1].body).unwrap();
             let current = state.physics.motion(state.tanks[1].body).unwrap();
             assert!(current.angle.to_degrees().abs() < 18.0);

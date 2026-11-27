@@ -180,10 +180,10 @@ const SHOT_RANGE: f32 = 14.0;
 /// How far the winner's hull may lean and still take its shot: a tank off
 /// its wheels has none.
 const UPRIGHT: f32 = 0.5;
-/// How far a shell's burst reaches, in the duel's units, as in Scorched
-/// Earth, and how far from a burst a spaceling's middle must be for the
-/// burst to miss it.
-pub const BLAST_REACH: f32 = 5.0;
+/// How far a shell's burst reaches, in the duel's units, as the tanks'
+/// shared cannon's blast does, and how far from a burst a spaceling's middle
+/// must be for the burst to miss it.
+pub const BLAST_REACH: f32 = engine_rapier::cannon::BLAST.radius;
 const CLEAR: f32 = BLAST_REACH + 1.0;
 /// How long after the winner fires a spaceling sees the shell coming, as a
 /// dodging tank does, and how long it watches the shell burst before it
