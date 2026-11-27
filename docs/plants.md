@@ -591,11 +591,14 @@ removes them as `remove_many` does, and their shares of the stores are lost, in
 that tick's `loss`. A tissue with no parent, such as a seed or the base of a
 severed fragment, cannot be shed, so a brain can never drop its whole plant.
 
-Wood stays lightweight tissue on cells, with no bodies, colliders or loads.
-Bending and breaking are #224's, anchorage #225's. `engine-material`'s
-`TissueTable` gains a wood entry in the same role order. The grass and moss
-policies act only on their own tissue, so wood in a shared runtime counts only
-toward the runtime's ceilings.
+In the plant runtime, wood stays lightweight tissue on cells, with no bodies,
+colliders or loads. Garden Lab's tree bed can hang a grown tree's wood on
+hinges as bodies while its growth waits
+([Physical wood](garden-lab.md#physical-wood-224)); keeping wood physical
+while it grows is the rest of #224, and anchorage is #225's.
+`engine-material`'s `TissueTable` gains a wood entry in the same role order.
+The grass and moss policies act only on their own tissue, so wood in a shared
+runtime counts only toward the runtime's ceilings.
 
 Non-ignored `plants::` fixtures cover wood's zero intake and its lack of a
 shade deficit in darkness, its upkeep by size and how long full reserves last,
