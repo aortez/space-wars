@@ -244,6 +244,20 @@ effective generation. The view uses the runner's edit and lifecycle commands.
 Check both 1024×768 and 800×480 and record the running view.
 [#756](https://github.com/aortez/space-wars/issues/756)
 
+Open **Training** from the launcher, choose **Clock duck · Platforms**, and
+start the run. **Steer** changes settings for the next generation. To watch
+a scored headless run, pass its directory to the client. For example, the
+following command plays generation 56 and shows the history through that
+generation. Omit the generation to watch the latest winner. Replay opens
+read-only and can also run while another process owns the job.
+
+```sh
+target/ci/engine-client --training-replay "$run_dir" --training-generation 56
+```
+
+[Desktop view at 1024×768](../images/training/clock-duck-1024x768.png) ·
+[Best tab at 800×480](../images/training/clock-duck-800x480.png)
+
 ## Background jobs
 
 First host the job in-process for the Training view. Then run that same owner

@@ -115,6 +115,7 @@ pub(crate) fn install(window: &MainWindow, control: JobControl) -> std::io::Resu
             }
         }
         if !w.get_training_visible()
+            || w.get_duck_job()
             || w.get_training_setup()
             || w.get_training_history()
             || !w.get_launcher_visible()
@@ -198,7 +199,7 @@ pub(crate) fn install(window: &MainWindow, control: JobControl) -> std::io::Resu
     })
 }
 
-fn speed(index: i32) -> f64 {
+pub(crate) fn speed(index: i32) -> f64 {
     [1.0, 2.0, 4.0, 0.0][index.rem_euclid(4) as usize]
 }
 pub(crate) fn command(w: &MainWindow, id: &str) {

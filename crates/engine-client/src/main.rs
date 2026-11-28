@@ -22,6 +22,7 @@ mod controller_profile;
 #[cfg(test)]
 mod crow_visual_tests;
 mod device_info;
+mod duck_training;
 mod frame_trace;
 mod gamepad;
 mod genome_controls;
@@ -208,6 +209,14 @@ struct Args {
     /// Settings directory override. Useful for Pi/systemd services.
     #[arg(long)]
     config_dir: Option<PathBuf>,
+
+    /// Watch a scored Clock training run from this directory in the native Training view.
+    #[arg(long, conflicts_with = "scenario")]
+    training_replay: Option<PathBuf>,
+
+    /// Play a specific completed generation. Omit to play the latest winner.
+    #[arg(long, requires = "training_replay")]
+    training_generation: Option<u32>,
 
     /// Presentation renderer to use for game frames.
     #[arg(long, value_enum)]
@@ -550,7 +559,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         settings_writer.clone(),
         Rc::clone(&input),
     );
-    let _training = training_controls::install(&window, config_directory.join("training"))?;
+    let archive = args
+        .training_replay
+        .as_ref()
+        .map(|dir| engine_agent::trainer::Trainer::read_replay(dir, args.training_generation))
+        .transpose()
+        .map_err(std::io::Error::other)?;
+    let _training = training_controls::install_with_replay(
+        &window,
+        config_directory.join("training"),
+        archive,
+    )?;
     let _genomes = genome_controls::install(&window, config_directory.join("training"))?;
     device_info::install(
         &window,
@@ -565,7 +584,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::clone(&settings),
         settings_writer.clone(),
         Rc::clone(&rom_catalog),
-        !launch_directly && !args.uses_debug_render() && !args.uses_benchmark() && !args.touch_test,
+        !launch_directly
+            && args.training_replay.is_none()
+            && !args.uses_debug_render()
+            && !args.uses_benchmark()
+            && !args.touch_test,
     );
     apply_video_settings(&window, &args, &settings.read().unwrap());
     let controllers = controller_controls::install(
@@ -3139,6 +3162,8 @@ mod tests {
             pizza_benchmark_gravity: PizzaBenchmarkGravityArg::Fast,
             pizza_benchmark_workload: PizzaBenchmarkWorkloadArg::Dense,
             config_dir: None,
+            training_replay: None,
+            training_generation: None,
             renderer: None,
             raster_scale: None,
             fullscreen: false,
