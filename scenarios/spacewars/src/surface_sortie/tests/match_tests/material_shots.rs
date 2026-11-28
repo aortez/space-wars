@@ -244,8 +244,13 @@ fn a_tank_round_counts_once_for_its_players_seat_and_a_governments_for_none() {
             let case = format!("{target:?}, {allegiance:?}");
             let mut state = fixture(target);
             let motion = state.impact_motion(1).unwrap();
+            let round = crate::tanks::TankRound {
+                tank,
+                allegiance,
+                shot: crate::tanks::TankShotId::NONE,
+            };
             state.world.debris.push(DebrisState::new_tank_round(
-                crate::tanks::TankRound { tank, allegiance },
+                round,
                 state.world.tick,
                 motion.center_of_mass - Vec2::X * 8.0,
                 motion.velocity + Vec2::X * 300.0,

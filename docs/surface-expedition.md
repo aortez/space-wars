@@ -155,6 +155,53 @@ gives the barrel's pivot.
   shot at the least power comes down beside the tank that fired it: about 6
   units off at 75°, within its blast's reach, and on the tank itself at 85°.
 
+#### Shot records
+
+Each round a tank fires has a record, for the tanks' controller (#240) to aim
+by. `SpacewarsState::tank_shots` lists a tank's records, oldest first, and
+`tank_shots_ended` lists each record that ended in the last step that advanced
+the world. A paused step, or one after the game is decided, leaves that list as
+it was, so a reader that polls tells the records apart by their ids. A record
+holds only what happened, and predicts nothing.
+
+- **Launch.** The tick; the elevation, facing and power fired with; the up
+  they were measured from; the hull's motion; the barrel's pivot and
+  direction; where the round started and its velocity; and whether something
+  stood in the barrel. The barrel is cast against the world as the last step
+  left it, so a body that left the game in that step can still stand in it.
+- **Flight.** After each step: how many steps the round has flown, where it is,
+  and how it moves. The step that stops a round leaves it turned back from what
+  it met, so an ended shot's flight tells of the rebound.
+- **End.** The tick, where the shot ended, and how. It burst on a tank, a ship
+  or pod, a pilot on foot, a rover, a piece of debris, the ground or something
+  else, or in flight where its shell died another way. Or it expired after its
+  600 ticks, or its shell was removed. The end also tells what the shot's hit
+  and blast together charged each body it harmed, in that body's health, the
+  worst harmed first, for up to 8 bodies, and where the shot's energy went. A
+  body is charged no more than it had left. In a match, a pod or a pilot on
+  foot can lose less than a record tells: the match's rules pass over a round's
+  hit on a body that the round touched in the six ticks before, and take only
+  its blast (#784).
+
+A command can name a target: a ship or pod, a pilot on foot, a tank, a rover or
+a piece of debris, by the id that `DebrisState::id` tells. The target only
+labels the records of the shots fired under that command. Such a record adds
+where the target was and how it moved as the tank fired and after each step of
+the round's flight, and the closest the round came to where the target really
+was. It sees the target as the step that fires the shot begins, once the world
+holds a body for just what the game then holds. Each step samples the target
+before the shot's blast can push it and before a target that the step destroyed
+leaves the world, so the record of a shot that destroyed its target still tells
+where the target was. A target that the world holds no body for adds nothing.
+Naming a target changes nothing about the round or what it can hit, and it
+blocks no claim.
+
+A tank keeps the records of its rounds in flight and of the last 4 of its
+shots to end. When a tank leaves the world its ended records go with it, and
+its rounds in flight keep theirs until they end. Clearing the tanks drops
+every record, and a rebuilt world starts with none. No two shots in a world
+share an id, and a record that has ended never changes.
+
 ### Two-player expedition
 
 Each pilot has its own assigned ship, input state, landing gate, transfer
@@ -414,6 +461,25 @@ under. The terrain fixture's own planet keeps the arcade game's pull, about
 from its tank. The surface games' pull is named once, as
 `engine_rapier::SURFACE_GRAVITY`, which Scorched Earth, the labs and this
 game's planets read.
+
+Shot record regressions fire real tanks on the material planet, where the
+ground pulls about 18, and in the rounds' weightless fixture above it. They
+cover a record's launch against the round and the hull as it fired; a blocked
+barrel; a new id for each shot, and no record for a refused trigger; a target's
+motion as the tank fired and after each step, and the round's closest approach
+to where a flying ship really was; a target that the shot destroys, one that
+left the game in the step before, one that a host moved, and targets that the
+world holds no body for; a burst on the ground and direct hits on a tank, a
+ship, a pod and a pilot on foot, against what each lost, and ejection
+protection; a burst among eleven rocks, which lists the eight it cost most; two
+rounds that end in one step; expiry, and the steps that advance nothing; a
+round that a laser destroys in flight, one whose shell leaves the game, one
+whose shell comes back, and one that a host kills on its last tick; a round
+that outlives the tank that fired it; the last four ended shots, kept by when
+they ended; removal, clearing and a rebuilt world; a named target that changes
+nothing but its shots' records and blocks no claim; and the same records from
+a second run and from a clone taken with rounds in flight. A round that stops
+on a rover is covered in the arcade world, beside the shots' own tests.
 
 Positive AI flight/capture fixtures now let their otherwise idle opponent
 depart through real controls only when its landing feet support it on the

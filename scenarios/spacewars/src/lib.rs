@@ -419,6 +419,12 @@ pub struct SpacewarsState {
     pub contact_hits: Vec<ContactHit>,
     /// Each tank destroyed in this step.
     pub tank_losses: Vec<tanks::TankLoss>,
+    /// The record of each tank's shot that ended in the last step that
+    /// advanced the world, whether its tank still lives or not. A call that
+    /// advances nothing, as one with no time to step or one after the game is
+    /// decided, leaves the list as it was, so a reader that polls tells the
+    /// records apart by their ids.
+    pub tank_shots_ended: Vec<tanks::TankShot>,
     pub spaceport_contacts: Vec<SpaceportContact>,
     pub player_view_heights: [f32; 2],
     pub last_step_metrics: SpacewarsStepMetrics,
@@ -430,6 +436,9 @@ pub struct SpacewarsState {
     shot_hits: BTreeMap<u64, shots::ShotHit>,
     /// What each payload's blast charged the bodies it reached in this step.
     blast_hits: Vec<shots::BlastHit>,
+    /// How the shot of each tank's round that ended in this step ended, by
+    /// the round's physics id.
+    round_ends: BTreeMap<u64, shots::RoundEnd>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -1362,6 +1371,7 @@ impl Scenario for SpacewarsScenario {
             body_impacts: Vec::new(),
             contact_hits: Vec::new(),
             tank_losses: Vec::new(),
+            tank_shots_ended: Vec::new(),
             spaceport_contacts: Vec::new(),
             player_view_heights,
             last_step_metrics: SpacewarsStepMetrics::default(),
@@ -1371,6 +1381,7 @@ impl Scenario for SpacewarsScenario {
             gravity_participants: Vec::new(),
             shot_hits: BTreeMap::new(),
             blast_hits: Vec::new(),
+            round_ends: BTreeMap::new(),
         }
     }
 
@@ -1516,8 +1527,9 @@ impl SpacewarsScenario {
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
 
         let lifecycle_started = Instant::now();
-        state.fire_tanks();
+        let fired = state.fire_tanks();
         let lifecycle = reconcile_physics(state, dt);
+        state.record_tank_shots(fired);
         shots::launch(state);
         state.clear_rounds();
         let lifecycle_time = lifecycle_started.elapsed() + terrain_time;
@@ -1554,6 +1566,7 @@ impl SpacewarsScenario {
         state
             .physics
             .synchronize_motion(&mut state.ships, &mut state.debris);
+        state.track_tank_shots();
         for pilot in surface_pilots.iter() {
             let index = pilot.vehicle_index();
             if pilot.is_aboard() {
@@ -1600,6 +1613,7 @@ impl SpacewarsScenario {
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
         handle_rover_deaths(state);
         handle_tank_deaths(state);
+        state.finish_tank_shots();
         surface_sortie::combat::record_hits(state, surface_pilots);
         surface_sortie::impact::record_contacts(state, surface_pilots);
 
@@ -5465,7 +5479,7 @@ impl DebrisState {
     /// `spawn_tick` from `position`: a shell of the shared cannon's round's
     /// size and mass that carries its payload. No seat owns it, and its hits
     /// name its tank's side.
-    pub fn new_tank_round(
+    pub(crate) fn new_tank_round(
         round: tanks::TankRound,
         spawn_tick: u64,
         position: Vec2,
@@ -5488,6 +5502,12 @@ impl DebrisState {
         shell.blast = Some(cannon::BLAST);
         shell.tank_round = Some(round);
         shell
+    }
+
+    /// This piece's identity, which no other piece in its world takes. None
+    /// until the world has given the piece a body.
+    pub fn id(&self) -> Option<DebrisId> {
+        DebrisId::from_value(self.physics_id)
     }
 
     /// The side a shell's hits name: the side of the tank whose round it is,

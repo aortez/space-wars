@@ -25,7 +25,7 @@
 //! rules that charge a laser's hit, and the push it buys reaches the state of
 //! a ship or a piece of debris, which the next step writes back.
 use super::*;
-use engine_material::{Part, Region, Section};
+use engine_material::{Part, Region, Section, SourceLedger};
 use engine_rapier::world::weapon::{
     Exclusion, Prepared, Reachable, Recipient, Recipients, ShotSpec, WeaponEvent, body_circles,
 };
@@ -53,6 +53,22 @@ pub(super) struct BlastHit {
     /// Where the blast started.
     pub center: Vec2,
     pub health: f32,
+}
+
+/// How the shot of a tank's round ended in a step, for the round's shot
+/// record.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub(super) struct RoundEnd {
+    /// The entity the shot stopped on.
+    pub stopped: Option<PhysicsId>,
+    /// Where its blast started.
+    pub burst: Option<Vec2>,
+    /// Whether the weapons ended the shot of themselves, as they end one that
+    /// stopped or ran out of time, and not because the game had ended its
+    /// shell.
+    pub unprompted: bool,
+    /// Where the shot's energy went.
+    pub ledger: Option<SourceLedger>,
 }
 
 /// Launches each shell that has a body in the world and no shot yet. A shell
@@ -107,7 +123,8 @@ pub(super) fn prepare(state: &SpacewarsState, dt: f32) -> Option<Prepared> {
 /// another way, such as to a laser or terrain, lands no hit, but its payload
 /// bursts where the shell died. One whose shell left the game retires. The
 /// bodies a blast reaches are charged here, except a match's pods and pilots
-/// on foot, which the match rules charge.
+/// on foot, which the match rules charge. How each tank's round ended is kept
+/// for its shot's record.
 pub(super) fn settle(
     state: &mut SpacewarsState,
     pilots: &[SurfacePilot],
@@ -116,6 +133,7 @@ pub(super) fn settle(
 ) {
     state.shot_hits.clear();
     state.blast_hits.clear();
+    state.round_ends.clear();
     let Some(prepared) = prepared else {
         return;
     };
@@ -128,6 +146,7 @@ pub(super) fn settle(
         physics,
         shot_hits,
         blast_hits,
+        round_ends,
         ..
     } = state;
     let mut bodies = Bodies::new(ships, debris, rovers, tanks, exposed);
@@ -151,8 +170,17 @@ pub(super) fn settle(
     let mut retired = Vec::new();
     let mut centers = BTreeMap::new();
     let mut pushed = BTreeSet::new();
+    // Whether an event's source is a tank's round, whose shot has a record
+    // to fill.
+    let round = |source: u64| {
+        let shell = bodies.debris(source);
+        shell.is_some_and(|shell| shell.tank_round.is_some())
+    };
     for event in events {
         match event {
+            WeaponEvent::Stopped { source, body, .. } if round(source) => {
+                round_ends.entry(source).or_default().stopped = Some(body.entity);
+            }
             WeaponEvent::Delivered {
                 source,
                 part: Part::Kinetic,
@@ -207,6 +235,9 @@ pub(super) fn settle(
             }
             WeaponEvent::Burst { source, center } => {
                 centers.insert(source, center);
+                if round(source) {
+                    round_ends.entry(source).or_default().burst = Some(center);
+                }
             }
             WeaponEvent::Delivered {
                 source,
@@ -238,7 +269,15 @@ pub(super) fn settle(
             } => {
                 pushed.insert(entity);
             }
-            WeaponEvent::Retired { source, .. } => retired.push(source),
+            WeaponEvent::Retired { source, ledger, .. } => {
+                retired.push(source);
+                if round(source) {
+                    let end = round_ends.entry(source).or_default();
+                    end.ledger = Some(ledger);
+                    // The game asked for the end of each shot in `ended`.
+                    end.unprompted = !ended.iter().any(|&(id, _)| id == source);
+                }
+            }
             _ => {}
         }
     }
@@ -966,6 +1005,78 @@ mod tests {
             (rover.life - left.life - hit.health).abs() < 1.0e-4,
             "{hit:?}"
         );
+    }
+
+    /// A tank's round that stops on a rover names the rover in its shot's
+    /// record, with what the round cost it.
+    #[test]
+    fn a_tank_shots_record_names_the_rover_its_round_stopped_on() {
+        use engine_rapier::rover::RoverSpawnPose;
+        use tanks::{ShotBody, ShotOutcome, ShotStop, TankCommand};
+
+        let (mut state, planet, rover) = rover_under_fire(60.0);
+        state.debris.retain(|item| item.kind != DebrisKind::Shell);
+        // A tank far from the rover fires, and its round is put where the
+        // fixture's shell was: 7 units above the chassis, closing at 60.
+        let radius = state.config.universe_radius as f32;
+        let pose = RoverSpawnPose {
+            wheel_center: Vec2::splat(radius * 1.6),
+            up_angle: core::f32::consts::FRAC_PI_2,
+        };
+        let tanks = &mut state.physics.tanks;
+        let tank = tanks
+            .insert(
+                &mut state.physics.world,
+                pose,
+                physics::tank_spec(),
+                Allegiance::INITIAL_GOVERNMENT,
+            )
+            .expect("room for the tank");
+        state.physics.material_queries_dirty = true;
+        step(&mut state);
+        let fire = TankCommand {
+            fire: true,
+            ..TankCommand::default()
+        };
+        assert!(state.command_tank(tank, fire));
+        step(&mut state);
+        assert!(state.command_tank(tank, TankCommand::default()));
+        let chassis = state.physics.rover_snapshot(&rover).unwrap().chassis;
+        let riding = state.physics.rover_body_motions(&rover).unwrap()[0].linear_velocity;
+        let radial = (chassis.position - state.planets[planet].position).normalized();
+        let mut rounds = state.debris.iter_mut();
+        let round = rounds
+            .find(|item| item.tank_round.is_some())
+            .expect("the tank's round");
+        round.position = chassis.position + radial * 7.0;
+        round.velocity = riding - radial * 60.0;
+        let life = |state: &SpacewarsState| {
+            let mut rovers = state.rovers.iter();
+            rovers.find(|r| r.id == rover.id).map_or(0.0, |r| r.life)
+        };
+        let before = life(&state);
+        for _ in 0..30 {
+            if !state.tank_shots_ended.is_empty() {
+                break;
+            }
+            step(&mut state);
+        }
+        let [shot] = &state.tank_shots_ended[..] else {
+            panic!("{:?}", state.tank_shots_ended);
+        };
+        let end = shot.end.as_ref().unwrap();
+        let on = ShotBody::Rover(rover.id);
+        let struck = ShotOutcome::Burst {
+            on: Some(ShotStop::Body(on)),
+        };
+        assert_eq!(end.outcome, struck);
+        let [harm] = end.harm[..] else {
+            panic!("{:?}", end.harm);
+        };
+        assert_eq!(harm.body, on);
+        let lost = before - life(&state);
+        assert!(lost > 0.0, "{lost}");
+        assert!((harm.health - lost).abs() < 1.0e-3, "{harm:?} {lost}");
     }
 
     #[test]

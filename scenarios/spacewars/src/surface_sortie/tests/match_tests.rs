@@ -7,6 +7,7 @@ mod material_lasers;
 mod material_shots;
 mod material_tanks;
 mod pod_hull;
+mod tank_shots;
 
 #[test]
 fn time_limit_uses_current_ownership_and_freezes_living_pilots() {
