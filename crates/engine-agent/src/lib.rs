@@ -15,6 +15,7 @@ pub mod ship_curriculum;
 pub mod ship_perception;
 pub mod ship_qualification;
 pub mod ship_training;
+pub mod trainer;
 pub mod training_history;
 pub mod training_job;
 pub mod training_validation;

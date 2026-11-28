@@ -1,4 +1,6 @@
-//! Headless Spacewars episode runner and future training entry point.
+//! Headless scenario evaluation and population training.
+
+mod trainer_cli;
 
 use std::{io, process::ExitCode};
 
@@ -13,9 +15,13 @@ use scenario_spacewars::PlayerId;
 #[derive(Parser, Debug)]
 #[command(
     name = "engine-agent",
+    args_conflicts_with_subcommands = true,
     about = "Run deterministic Spacewars controller episodes without rendering"
 )]
 struct Args {
+    #[command(subcommand)]
+    command: Option<trainer_cli::Command>,
+
     /// Run a fixed, named evaluation suite instead of a custom batch.
     #[arg(
         long,
@@ -220,6 +226,9 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
+    if let Some(command) = args.command {
+        return trainer_cli::run(command);
+    }
     if let Some(comparison) = args.compare {
         let baseline = args.baseline.unwrap_or(ControllerArg::RuleV5).into();
         let candidate = args
