@@ -1,6 +1,7 @@
 //! A connection that bends turns its branch by the law's elastic rotation for
 //! the moment it carries, settles back when a load is lifted, bends less when
-//! thicker, holds a stone dropped low but breaks when it falls from high, and
+//! thicker, keeps its rest and the work it absorbed when it thickens where it
+//! hangs, holds a stone dropped low but breaks when it falls from high, and
 //! severs under an overload as a weld does, on the same step after a save.
 use super::connection::{BRANCH, DT, SCALES, Scale, TRUNK, TWIN, beam, body, weld_id, world};
 use super::*;
@@ -272,6 +273,104 @@ fn a_thicker_branch_bends_less_by_the_cube_of_its_height() {
             give < 1.0e-3 * deflection(&slender, BRANCH).abs(),
             "g {}: {give}",
             scale.g
+        );
+    }
+}
+
+#[test]
+fn a_hinge_thickened_where_it_hangs_keeps_its_rest_and_the_work_it_absorbed() {
+    for scale in SCALES {
+        let mut hung = overloaded(scale, 90.0);
+        for _ in 0..30 {
+            hung.step(DT);
+        }
+        let id = weld_id(BRANCH);
+        let before = hung.connection(id).unwrap();
+        let capacity = |state: &ConnectionState| f64::from(state.connection.region().capacity());
+        let used = capacity(&before) - before.connection.region().remaining_precise();
+        assert!(before.failure.is_none() && used > 0.0, "{before:?}");
+        let thin = before.connection.beam();
+        let thick = Beam::new(thin.thickness, 2.0 * thin.height, thin.length);
+
+        // Refused, with nothing changed: no such connection, a beam too slight
+        // for the work already absorbed, and a beam that is not one.
+        let stranger = weld_id(PhysicsId::new(99));
+        assert_eq!(
+            hung.reshape_connection(stranger, thick),
+            Err(ConnectionRejection::Missing)
+        );
+        let slight = Beam::new(0.1 * thin.thickness, 0.1 * thin.height, thin.length);
+        assert_eq!(
+            hung.reshape_connection(id, slight),
+            Err(ConnectionRejection::Exhausted)
+        );
+        let flat = Beam::new(0.0, thin.height, thin.length);
+        assert_eq!(
+            hung.reshape_connection(id, flat),
+            Err(ConnectionRejection::Geometry)
+        );
+        assert_eq!(hung.connection(id), Some(before));
+
+        // Twice as deep, it keeps its frames, so it has turned as far from
+        // its rest as it had, and the work it absorbed stays absorbed.
+        hung.reshape_connection(id, thick).unwrap();
+        let after = hung.connection(id).unwrap();
+        assert_eq!(after.deflection, before.deflection);
+        assert_eq!(after.connection.beam(), thick);
+        let still_used = capacity(&after) - after.connection.region().remaining_precise();
+        assert!(
+            (still_used - used).abs() < 1.0e-6 * used,
+            "g {}: used {still_used} of {}, after {used}",
+            scale.g,
+            capacity(&after)
+        );
+        let bytes = hung.snapshot_bytes().unwrap();
+        let restored = PhysicsWorld::from_snapshot_bytes(&bytes).unwrap();
+        assert_eq!(restored.snapshot_bytes().unwrap(), bytes);
+
+        // At a quarter of the stress it carried, the thick beam is safe. It
+        // springs up and settles where a hinge of the thick beam joined level
+        // settles, not that far below where it hung.
+        let remaining = after.connection.region().remaining_precise();
+        run(&mut hung, 20.0, 60.0);
+        let settled = hung.connection(id).unwrap();
+        assert!(settled.failure.is_none());
+        assert!(settled.load.utilization < 1.0, "g {}: {settled:?}", scale.g);
+        assert_eq!(settled.connection.region().remaining_precise(), remaining);
+        let mut level = world(scale, 4);
+        grow(&mut level, scale, BRANCH, 1.0);
+        let material = before.connection.region().material();
+        hinge(
+            &mut level,
+            scale,
+            BRANCH,
+            1.0,
+            Connection::new(material, thick).unwrap(),
+        );
+        run(&mut level, 20.0, 60.0);
+        let (turn, joined) = (settled.deflection.unwrap(), deflection(&level, BRANCH));
+        assert!(
+            (turn - joined).abs() < 1.0e-3 * joined.abs(),
+            "g {}: {turn} where one joined level turns {joined}, from {:?}",
+            scale.g,
+            before.deflection
+        );
+        let (weight, _) = weight_and_moment(&hung, scale, BRANCH);
+        let expected = balance(hinge_stiffness(&settled.connection), weight, 2.0 * scale.k);
+        assert!(
+            (turn + expected).abs() < 2.0 * sag_tolerance(4) * expected,
+            "g {}: {turn} for {expected}",
+            scale.g
+        );
+
+        // A severed connection cannot be reshaped.
+        let mut broken = overloaded(scale, 90.0);
+        while broken.severed_connections().is_empty() {
+            broken.step(DT);
+        }
+        assert_eq!(
+            broken.reshape_connection(id, thick),
+            Err(ConnectionRejection::Exhausted)
         );
     }
 }
