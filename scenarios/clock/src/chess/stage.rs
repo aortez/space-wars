@@ -393,10 +393,16 @@ impl Scene<'_> {
     /// Whether `area` is clear of every world's bodies and the plants, and
     /// dry, just above whatever supports it.
     pub fn clear(&self, area: Area) -> bool {
+        self.clear_but(area, &[])
+    }
+
+    /// Whether `area` is clear of every world's bodies but those of `own`,
+    /// and of the plants, and dry, just above whatever supports it.
+    pub fn clear_but(&self, area: Area, own: &[PhysicsId]) -> bool {
         area.width() > 0.0
             && area.height() > LIFT
             && !self.plants.iter().any(|plant| plant.overlaps(area))
-            && self.worlds.iter().all(|world| area.is_clear_in(world, &[]))
+            && self.worlds.iter().all(|world| area.is_clear_in(world, own))
             && self.water.is_none_or(|water| dry(water, area))
     }
 }
