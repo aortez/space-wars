@@ -290,6 +290,8 @@ ticks, catch-up limit and fractional carry. A run stops aging at 2000 ticks.
 | Physical wood on/off | Hangs the trees' wood on hinges under gravity while they grow; off, the living wood leaves the world and the trees grow on as their cells stand. See [Physical wood](#physical-wood-224). |
 | Light snow, heavy snow | Lays snow on the selected wood, else the tip of the planted tree's lowest branch, on the grass's side first, making the wood physical; the same control again clears it. |
 | Wind | Cycles calm, a breeze and a gale that blow toward the grass, making the wood physical. See [Roots that hold](#roots-that-hold-225). |
+| Dig a trench | Digs a column of the dirt from the soil surface to the bottom: the selected root's column, else the first column beside the roots of the selected tissue's tree, or of the eldest tree, that still has dirt, on the windward side first. It makes the wood physical. See [Trenches and loose dirt](#trenches-and-loose-dirt-225). |
+| Fill the trenches | Puts back the dirt the trenches took wherever no tissue above ground stands and no wood, snow or loose dirt lies, making the wood physical. |
 | Plant a tree seed in the grass | Lifts the grass from column 22, two cells right of the grass's seed, with its shares, and plants a tree seed in its top cell of dirt. Nothing happens if a tree holds that cell or the one above it. |
 | Plant fresh tree and grass | Replaces every plant with fresh seeds of the tree and grass, under the same settings. |
 | Back to grass bed | Shows the grass bed. |
@@ -706,9 +708,10 @@ A root plate is rigid, and the dirt's grip is the same in every direction and
 at every depth. A root's intake does not depend on its anchor: a root that
 pulled out still feeds its tree. The plates and the trunks' feet pass through
 the dirt, so a fallen tree's roots are drawn through it. A tree lives or dies
-whole when its roots let go: its cells cannot lie down. Dirt cannot yet be dug
-away from roots, and the trees' brain does not yet sense what its anchors
-carry; both are #225's next steps.
+whole when its roots let go: its cells cannot lie down. A trench can dig the
+dirt away from roots ([Trenches and loose dirt](#trenches-and-loose-dirt-225)).
+The trees' brain does not yet sense what its anchors carry, which is #225's
+next step.
 
 | | Held in the gale | Uprooted |
 | --- | --- | --- |
@@ -756,3 +759,128 @@ draws the two pictures and counts the fallen tree's grey. The full-only
 functional case above, once its snow has built up and while the bed runs, turns
 the wind to a breeze, checks that a tree leans on roots that hold, and brings
 the calm back.
+
+### Trenches and loose dirt (#225)
+
+**Dig a trench** takes one column of the bed's dirt, from the soil surface to
+its bottom row. It digs through the selected root, or else beside the roots of
+the selected tissue's tree, or of the eldest tree: to windward first, then to
+lee, wherever that column still has dirt. Nothing happens where the column has
+none left. Like the wind, it makes the wood physical first. Before the next
+step, every root in the trench lets go of the dirt for good, as a root the load
+pulled out does, and so does any other anchor held there. A trench that cuts
+the bed's dirt in two leaves the larger side in the bed, fixed. The rest comes
+loose where it lay, a block of its own, on a floor laid under the bed with the
+first trench. The anchors held in that dirt are handed to the block where they
+hold ([anchors](design/material-connection-loads.md#anchors)). The block takes
+whatever its roots put on it, so a tree rooted there stands no more firmly than
+the block lies. A trunk's foot passes through the dirt its seed grips, the
+bed's or a block's.
+
+**Fill the trenches** puts back the dirt the trenches took, each cell as it
+was, wherever no tissue above ground stands in it and no wood, snow or loose
+dirt lies across it. It too makes the wood physical first. A root grips the
+dirt put back only if it never let go: a root laid bare stays bare, and a loose
+block stays loose. Roots that grow into the dirt grip it, as anywhere in the
+bed. Resting the wood takes the living roots' anchors and leaves the loose
+dirt where it lies. Made physical again, the roots grip the dirt they lie in,
+the bed's or a block's. A block that falls out of the bed is cleared away, and
+the roots that gripped it grip nothing again. Planting fresh brings the whole
+bed back.
+
+With seed 42 at tick 600, held there, the conifer's 32 roots fill columns 10
+to 13 from just under the surface down to the row above the bottom one, and
+reach into columns 14 and 15 in the two rows above the bottom one. Its trunk
+stands in column 12. A trench through the root at
+[13, 4] lays bare the seven roots in column 13, and they let go. The dirt to
+windward of it comes loose: 104 cells in 13 columns, with the 21 anchors of
+the roots in columns 10 to 12. The four roots that reach past the trench to lee
+still grip the bed. The block lies where it was, and the tree stands as it
+stood. Dug from windward a column at a time instead, trenches through columns
+10, 11 and 12 leave 25, 18 and 11 anchors, and the tree leans 0.07, 0.22 and
+0.64 degrees toward them. The next, through column 13, leaves only the four
+roots past it. The tree's weight pulls them out within 2 s, at 1.3 times their
+safe load, and the tree is uprooted.
+
+Beside the roots, the first trench goes to windward, through column 9. It cuts
+loose the 72 cells beyond it, which hold no root. The second goes to lee,
+through column 16, and cuts loose the conifer's root ball: the six columns its
+roots fill, 48 cells, with all 32 anchors. In the calm the tree stands on it as
+it stood on fixed ground. On fixed ground the gale leans the conifer 0.76
+degrees. Here it tips the root ball into the trench to lee, until the ball's
+top corner meets the trench's far wall, one cell across and eight deep. The
+ball turns 7.2 degrees and the tree leans 7.9. No root pulls out: the most
+loaded anchor carries 0.99 of its safe load as the ball tips and settles at
+0.54. The wall stops the ball short and the crown whips on. About four seconds
+after the wind begins to rise, the trunk snaps at [12, 17], ten cells above the
+dirt, and the crown above it falls dead toward the grass, nine segments of
+wood. That jolt comes close to what the wood and the roots can bear. With the
+clock running, four recordings on the same seed, paused at ticks 598 to 600,
+each tipped the ball to 7.2 degrees. Three kept every root and broke the wood
+in three places. One pulled a root out of the ball and broke the wood in one.
+Filling then closes the trench to windward. The one to lee stays open
+where the root ball lies in it. Once the gale drops, the ball rights itself on
+its own weight and the tree's, within 3 s, back where it came loose, and the
+tree stands up with it. Filling again closes the trench to lee around it.
+
+Only the bed's dirt feeds roots. A root in a loose block holds the block but
+takes nothing from it, and a root laid bare takes nothing at all: #225 keeps
+what holds a root apart from what feeds it. So a tree whose roots all lie in
+loose dirt starves. With its root ball cut loose and the clock running, the
+conifer's tissues go short 15 ticks after the trenches, and it dies 175 ticks
+after them. The four roots the trench through column 13 leaves in the bed
+cannot feed it either. It dies back to seven tissues by tick 800, and is dead
+at tick 937. A trench cuts only the bed's dirt, never a
+loose block, and the larger side of the bed always stays. A block is rigid: it
+neither crumbles nor settles, and stops harder than soil would. The floor
+comes with the first trench, so a bed that has none is as it was, in its
+bodies and its pictures.
+
+| | Root ball cut loose | Tipped in the gale |
+| --- | --- | --- |
+| 1280×720 | ![The conifer standing on a block of dirt between two open trenches, its roots inside the block](screenshots/garden-lab/tree-dirt-loose-1280x720-raster.png) | ![The root ball tipped into the trench toward the grass, the conifer leaning with it and its broken crown lying grey by the grass](screenshots/garden-lab/tree-dirt-tipped-1280x720-raster.png) |
+| 800×480 | ![The conifer standing on a block of dirt between two open trenches, its roots inside the block](screenshots/garden-lab/tree-dirt-loose-800x480-raster.png) | ![The root ball tipped into the trench toward the grass, the conifer leaning with it and its broken crown lying grey by the grass](screenshots/garden-lab/tree-dirt-tipped-800x480-raster.png) |
+
+The pictures are from the window-free renderer without the text, with the
+trees' clock held at tick 600: 4 s after the two trenches beside the conifer's
+roots, and 12 s into the gale that followed. Once a trench has cut the dirt, the
+dirt has a line of its own after the grove's. It gives the trenches, the cells
+they hold open and those filled back in, and the anchors they laid bare. Then
+come the loose blocks, with their cells, the anchors that grip them and the
+most any has turned. The text's twelve lines then sit a little closer, so that
+the lowest stays above the sun. A selected root laid bare by a trench says so,
+and one that grips a loose block says its anchor is in loose dirt. In the
+status, each anchor adds the entity of the `dirt` it grips, the bed's (1) or a
+block's. `tree_bed` adds `dirt`: the `trenches`, the cells `open` and
+`filled`, the anchors `bared`, the `blocks`, each with its `entity`, `cells`,
+`position`, `angle` in radians and `anchors`, and the `summary`.
+
+`dirt_tests` checks, with the trees' clock held, that a trench through a root
+takes its whole column and lays bare the seven roots in it, which let go before
+the next step. It checks that the trench cuts the trunk's side loose with the
+21 anchors in it, the same anchors, now held by the block, and that the block
+rests where it lay while the tree stands as it stood, its foot touching
+nothing. It checks the text: why each root holds what it holds, no line longer
+than the window, and the lowest above the sun. It checks that trenches to
+windward and then to lee cut the root ball loose with all 32 anchors, and that
+the gale tips the ball into the trench until it wedges against the far wall,
+every root holding and the top snapped. Filling then closes only the trench
+to windward, and once the gale drops the ball rights itself and filling
+closes the other. It checks that filling puts back every cell but those the
+trunk's foot lies across, and that a root that lost its dirt grips none as the
+tree grows on. It checks that trenches a column at a time leave fewer anchors
+and a greater lean, until the tree's weight pulls the last four out, and that
+filling then grips none of them. It checks
+that digging at rest, resting, a block lost out of the bed and planting fresh
+leave no anchor or joint behind. Throughout, the dirt keeps all 256 of its
+cells, and each anchor holds the dirt its root grips. `world::tests::anchor`
+adds moving and loose supports, turned gravity and an anchor handed to another
+support ([qualification](design/material-connection-loads.md#qualification)).
+The window-free
+`garden_render_contract_tree_bed_a_root_ball_cut_loose_tips_into_its_trench_in_a_gale`
+draws the two pictures. It checks that the trenches take about a sixteenth of
+the dirt's brown, and counts the broken crown's grey. The full-only functional
+case, after resting the wood, digs a trench beside the eldest tree's roots,
+which makes the wood physical, and then a second. It checks that each loose
+block counts the anchors that grip it and that some anchor grips loose dirt,
+and then fills the trenches back in.

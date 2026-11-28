@@ -11,10 +11,12 @@ use engine_core::plants::{
 use engine_rapier::tree::TreeSenses;
 use std::{cmp::Reverse, collections::BTreeSet};
 
+mod dirt;
 mod roots;
 mod wood;
+pub use dirt::{Block, Dirt};
 pub use roots::{
-    Anchor, CONE_SAIL, DeadPlate, FALLEN, GRIP, NEEDLE_SAIL, Plate, ROOT_MASS, WIND_RISE,
+    Anchor, CONE_SAIL, DeadPlate, FALLEN, GRIP, Hold, NEEDLE_SAIL, Plate, ROOT_MASS, WIND_RISE,
     WIND_SECONDS, WINDS, Wind,
 };
 pub use wood::{
@@ -22,6 +24,8 @@ pub use wood::{
     SNOW_SECONDS, Segment, Snow, WOOD_DT, Wood, Work,
 };
 use wood::{Moved, beyond};
+#[cfg(test)]
+mod dirt_tests;
 #[cfg(test)]
 mod roots_tests;
 #[cfg(test)]
@@ -77,7 +81,7 @@ const UPRIGHT: [[f32; 2]; 5] = [
     [0.766, 0.643],
 ];
 
-pub const TREE_CONTROLS: [(&str, Command); 22] = [
+pub const TREE_CONTROLS: [(&str, Command); 24] = [
     ("Pause / resume", Command::Pause),
     ("Single step", Command::Step),
     ("Faster (max 64x)", Command::Faster),
@@ -109,6 +113,11 @@ pub const TREE_CONTROLS: [(&str, Command); 22] = [
     ),
     ("Heavy snow on/off: the same", Command::HeavySnow),
     ("Wind toward the grass: calm / breeze / gale", Command::Wind),
+    (
+        "Dig a trench: at the selected root, else beside the roots",
+        Command::Dig,
+    ),
+    ("Fill the trenches where nothing lies", Command::Fill),
     ("Plant a tree seed in the grass", Command::PlantSeedling),
     ("Plant fresh tree and grass", Command::PlantTree),
     ("Back to grass bed", Command::GrassBed),
@@ -147,6 +156,8 @@ pub struct TreeBed {
     pub dropped_ms: u64,
     /// The wood as bodies, and its dead wood.
     pub wood: Wood,
+    /// The trenches dug in the dirt, and the dirt they cut loose.
+    pub dirt: Dirt,
     pending_ns: u64,
     seed: u64,
     world: PhysicsWorld,
@@ -240,6 +251,7 @@ impl TreeBed {
             probes: 0,
             dropped_ms: 0,
             wood: Wood::default(),
+            dirt: Dirt::default(),
             pending_ns: 0,
             seed,
             world,
@@ -356,7 +368,7 @@ impl TreeBed {
         if self.paused || dt.is_zero() {
             return;
         }
-        if self.wood.physical || !self.wood.dead.is_empty() {
+        if self.wood.physical || !self.wood.dead.is_empty() || !self.dirt.loose.is_empty() {
             self.step_wood(dt.as_secs_f32().min(WOOD_DT));
         }
         let incoming = dt.as_nanos().min(u128::from(u64::MAX / MAX_SPEED)) as u64 * self.speed;
@@ -415,6 +427,8 @@ impl TreeBed {
             Command::LightSnow => self.snow(LIGHT_SNOW),
             Command::HeavySnow => self.snow(HEAVY_SNOW),
             Command::Wind => self.turn_wind(),
+            Command::Dig => self.dig_trench(),
+            Command::Fill => self.fill(),
             Command::PlantSeedling => self.plant_seedling(),
             Command::PlantTree => {
                 // Fresh seeds of each, under the same settings.
@@ -885,18 +899,7 @@ impl TreeBed {
         let mut f = RenderFrame::new(Camera2::new(RenderPoint::new(0.0, 4.5), 36.0));
         let bed = self.frame();
         let p = |cell: [i32; 2]| bed.point(cell, Vec2::ZERO);
-        // The dirt as one block, from its bottom row to the soil surface.
-        let corners = [[0, 0], [WIDTH - 1, 0], [WIDTH - 1, TOP_DIRT], [0, TOP_DIRT]];
-        let offsets = [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]];
-        f.push_primitive(
-            0,
-            RenderPrimitive::Polygon(RenderPolygon::filled(
-                (0..4)
-                    .map(|i| bed.point(corners[i], Vec2::new(offsets[i][0], offsets[i][1])))
-                    .collect(),
-                RenderColor::rgb(0.28, 0.19, 0.10),
-            )),
-        );
+        self.draw_dirt(&mut f);
         let o = self.plants.observe();
         let scene = self.scene(&o);
         // Physical wood moves its drawing with its body, and its needles' and
@@ -1051,6 +1054,11 @@ impl TreeBed {
                 )
             },
         ];
+        // Once a trench has cut the dirt, it has a line of its own after the
+        // grove's.
+        if self.dirt.trenches > 0 {
+            lines.insert(6, self.dirt_summary());
+        }
         if let Some(t) = self.selection() {
             let owner = match o.parents.get(&t.organism) {
                 _ if t.policy != tree::POLICY => "grass".into(),
@@ -1068,14 +1076,21 @@ impl TreeBed {
                             h.turn.to_degrees()
                         )
                     });
-            let anchor = if self.wood.pulled.contains(&t.id) {
+            let anchor = if self.dirt.bare_roots.contains(&t.id) {
+                " | laid bare by a trench".into()
+            } else if self.wood.pulled.contains(&t.id) {
                 " | pulled out of the dirt".into()
             } else {
                 self.anchors()
                     .into_iter()
                     .find(|a| a.tissue == t.id)
                     .map_or(String::new(), |a| {
-                        format!(" | anchor {:.2} of safe", a.utilization)
+                        let loose = if a.dirt == self.assembly.body().entity {
+                            ""
+                        } else {
+                            " in loose dirt"
+                        };
+                        format!(" | anchor {:.2} of safe{loose}", a.utilization)
                     })
             };
             lines.push(format!(
@@ -1117,8 +1132,16 @@ impl TreeBed {
                 None => "Grass plans by its own policy".into(),
             });
         }
+        // Eleven lines fit above the sun. With the dirt's line there are
+        // twelve, set a little closer so that the lowest stays where the
+        // eleventh was.
+        let spacing = match lines.len() {
+            n if n > 11 => 9.8 / (n - 1) as f32,
+            _ => 0.98,
+        };
         for (i, line) in lines.into_iter().enumerate() {
-            let mut text = RenderText::new(RenderPoint::new(-28.0, 21.6 - i as f32 * 0.98), line);
+            let mut text =
+                RenderText::new(RenderPoint::new(-28.0, 21.6 - i as f32 * spacing), line);
             text.size = 13.0;
             f.push_primitive(10, RenderPrimitive::Text(text));
         }

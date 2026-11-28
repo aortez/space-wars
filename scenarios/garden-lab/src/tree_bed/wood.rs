@@ -365,16 +365,16 @@ impl Moved {
 
 /// A box as its body lies: its center, its angle and its half extents.
 #[derive(Clone, Copy, Debug)]
-struct Lying {
-    center: Vec2,
-    angle: f32,
-    half: Vec2,
+pub(super) struct Lying {
+    pub(super) center: Vec2,
+    pub(super) angle: f32,
+    pub(super) half: Vec2,
 }
 
 impl Lying {
     /// Whether the boxes overlap by more than `CLEAR`: no side of either
     /// separates them.
-    fn overlaps(&self, other: &Lying) -> bool {
+    pub(super) fn overlaps(&self, other: &Lying) -> bool {
         let between = other.center - self.center;
         [self.angle, other.angle].into_iter().all(|angle| {
             [Vec2::X, Vec2::Y].into_iter().all(|side| {
@@ -520,11 +520,15 @@ impl TreeBed {
     fn grow_segment(&mut self, t: &Tissue, parent: &Tissue, on: &[&Tissue]) {
         let shape = self.shape(t, parent, on);
         let carrier = self.wood.living.get(&parent.id).copied();
-        let (holder, moved) = match carrier {
-            Some(s) => (s.body(), self.segment_moved(&s)),
+        let (holder, moved, ground) = match carrier {
+            Some(s) => (s.body(), self.segment_moved(&s), None),
             None => {
                 let plate = &self.wood.plates[&t.organism];
-                (plate.body(), self.plate_moved(plate))
+                (
+                    plate.body(),
+                    self.plate_moved(plate),
+                    Some(self.ground(plate)),
+                )
             }
         };
         let place = |v: Vec2| moved.map_or(v, |m| m.apply(v));
@@ -564,10 +568,9 @@ impl TreeBed {
             },
             &[segment.shape(LIVING)],
         ));
-        if carrier.is_none() {
-            // A trunk's foot stands in the dirt its roots hold it in.
-            self.world
-                .pass_through(segment.entity, self.assembly.body().entity);
+        if let Some(ground) = ground {
+            // A trunk's foot stands in the dirt its seed grips.
+            self.world.pass_through(segment.entity, ground);
         }
         let (from, to) = (self.at(parent.cell), self.at(t.cell));
         self.world
@@ -693,7 +696,7 @@ impl TreeBed {
     }
 
     /// How a segment's box lies now.
-    fn lying(&self, segment: &Segment) -> Option<Lying> {
+    pub(super) fn lying(&self, segment: &Segment) -> Option<Lying> {
         let motion = self.world.motion(segment.body())?;
         Some(Lying {
             center: motion.position,
@@ -703,7 +706,7 @@ impl TreeBed {
     }
 
     /// How the snow's box lies now.
-    fn snow_lying(&self, snow: &Snow) -> Option<Lying> {
+    pub(super) fn snow_lying(&self, snow: &Snow) -> Option<Lying> {
         let motion = self.world.motion(snow.body())?;
         Some(Lying {
             center: motion.position,

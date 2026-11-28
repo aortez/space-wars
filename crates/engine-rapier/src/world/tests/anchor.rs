@@ -1,13 +1,18 @@
 //! An anchor gives by the law's elastic extension for the force it carries
 //! and charges that whole force, whichever way it points. Anchors that hold
 //! one body share its load by where each holds. An overloaded anchor lets go,
-//! and the rest carry on or follow it, on the same step after a save.
+//! and the rest carry on or follow it, on the same step after a save. An
+//! anchor holds in its support's own frame wherever the support goes, toward
+//! gravity however it points, and from another support it is handed to; a
+//! loose support goes with what it holds.
 use super::connection::{DT, SCALES, Scale, TRUNK, body, world};
 use super::*;
 use crate::world::connection::{anchor_stiffness, hinge_stiffness};
 use engine_material::{Beam, Connection, FailureMode, Material};
+use std::f32::consts::FRAC_PI_2;
 
 const BAR: PhysicsId = PhysicsId::new(2);
+const CLOD: PhysicsId = PhysicsId::new(3);
 
 /// A bar eight units long and half a unit high, level, four units below the
 /// support's center and so clear of it. Its center of mass lies `center`
@@ -576,4 +581,339 @@ fn an_anchor_is_refused_as_a_connection_is() {
     assert_eq!(world.joint_count(), 0);
     assert_eq!(world.connection(anchor_id(1)), None);
     assert_eq!(world.identity_fault(), None);
+}
+
+/// A clod of ground one unit square, of the bar's own mass, that never
+/// sleeps.
+fn clod(world: &mut PhysicsWorld, scale: Scale, kind: BodyKind, position: Vec2) {
+    let half = 0.5 * scale.k;
+    let mass = 4.0 * scale.k * scale.k;
+    let mut collider =
+        ColliderSpec::cuboid(ColliderId::new(CLOD, ColliderRole::PRIMARY, 0), half, half);
+    collider.mass_properties = Some(ColliderMassProperties {
+        center: Vec2::ZERO,
+        mass,
+        inertia: mass * 2.0 * half * half / 3.0,
+    });
+    assert!(world.insert_body(
+        body(CLOD),
+        BodySpec {
+            kind,
+            position,
+            can_sleep: false,
+            ..BodySpec::default()
+        },
+        &[collider],
+    ));
+}
+
+/// A world whose bar hangs, level, from one anchor at its middle in a clod
+/// at `clod_at`, in place of the trunk. The anchor gives `stretch` under the
+/// bar's weight and is safe to four times it. A clod where the anchor holds
+/// overlaps the bar, which it does not touch while the anchor holds.
+fn clodded(scale: Scale, kind: BodyKind, clod_at: Vec2) -> (PhysicsWorld, f32) {
+    let mut world = world(scale, 4);
+    assert!(world.remove_entity(TRUNK));
+    clod(&mut world, scale, kind, clod_at * scale.k);
+    bar(&mut world, scale, 0.0);
+    let weight = weight(&world, scale);
+    let (beam, stretch) = (beam(scale), 0.08 * scale.k);
+    let connection = Connection::new(
+        material(
+            stiffness_for(&world, scale, beam, stretch),
+            4.0 * weight / beam.area(),
+            1.0,
+        ),
+        beam,
+    )
+    .unwrap();
+    world
+        .insert_anchor(
+            anchor_id(0),
+            AnchorSpec {
+                support: body(CLOD),
+                body: body(BAR),
+                at: Vec2::new(0.0, -4.0 * scale.k),
+                axis: Vec2::new(0.0, -1.0),
+                connection,
+            },
+        )
+        .unwrap();
+    (world, stretch)
+}
+
+/// Drive the clod, over four seconds, from where it lies by `shift` and
+/// through `turn`, setting off and coming to rest gently.
+fn carry(world: &mut PhysicsWorld, shift: Vec2, turn: f32) {
+    let start = world.motion(body(CLOD)).unwrap();
+    for step in 1..=240 {
+        let t = step as f32 / 240.0;
+        let share = t * t * (3.0 - 2.0 * t);
+        assert!(world.set_next_kinematic_pose(
+            body(CLOD),
+            start.position + shift * share,
+            start.angle + turn * share
+        ));
+        world.step(DT);
+    }
+}
+
+#[test]
+fn an_anchor_holds_in_its_supports_own_frame_as_the_support_moves_and_turns() {
+    for scale in SCALES {
+        // The clod holds the bar four units below its center.
+        let (mut world, stretch) = clodded(scale, BodyKind::KinematicPosition, Vec2::ZERO);
+        let weight = weight(&world, scale);
+        run(&mut world, 10.0, 60.0);
+        // Carried three units right and two up, and turned a quarter turn
+        // counterclockwise.
+        let shift = Vec2::new(3.0, 2.0) * scale.k;
+        carry(&mut world, shift, FRAC_PI_2);
+        // The long bar swings slowly on its anchor's turn, and takes long
+        // to come to rest.
+        run(&mut world, 200.0, 60.0);
+        // The bar hangs from where the clod now holds it, turned with the
+        // clod, by the law's extension for its weight straight down.
+        let held = shift + Vec2::new(0.0, -4.0 * scale.k).rotate_radians(FRAC_PI_2);
+        let motion = world.motion(body(BAR)).unwrap();
+        let case = format!("g {}: {motion:?}", scale.g);
+        assert!(
+            (held - motion.position - Vec2::new(0.0, stretch)).length() < 2.0e-3 * stretch,
+            "{case}"
+        );
+        assert!((motion.angle - FRAC_PI_2).abs() < 1.0e-4, "{case}");
+        // The anchor's beam turned with the clod, so the weight now pulls
+        // across it, toward its clockwise side, and charges as before.
+        let state = world.connection(anchor_id(0)).unwrap();
+        assert!(state.load.axial.abs() < 1.0e-3 * weight, "{state:?}");
+        assert!(
+            (state.load.shear + weight).abs() < 1.0e-3 * weight,
+            "{state:?}"
+        );
+        assert!((state.load.utilization - 0.25).abs() < 1.0e-3, "{state:?}");
+        assert_eq!(state.connection.integrity(), 1.0);
+    }
+}
+
+#[test]
+fn a_loose_support_falls_with_what_its_anchors_hold_and_takes_their_pull() {
+    for scale in SCALES {
+        // Free in the air, the clod and the bar fall together, and the
+        // anchor between them carries nothing: no weight hangs from a
+        // support that falls. The clod holds the bar at its own center.
+        let middle = Vec2::new(0.0, -4.0);
+        let (mut world, stretch) = clodded(scale, BodyKind::Dynamic, middle);
+        run(&mut world, 1.0, 60.0);
+        let (clod, bar) = (
+            world.motion(body(CLOD)).unwrap(),
+            world.motion(body(BAR)).unwrap(),
+        );
+        let case = format!("g {}: {clod:?} {bar:?}", scale.g);
+        assert!(
+            (clod.linear_velocity.y + scale.g).abs() < 1.0e-3 * scale.g,
+            "{case}"
+        );
+        assert!(
+            (bar.linear_velocity - clod.linear_velocity).length() < 1.0e-3 * scale.g,
+            "{case}"
+        );
+        assert!(
+            (bar.position - clod.position).length() < 1.0e-2 * stretch,
+            "{case}"
+        );
+        assert!(load(&world, 0).utilization < 1.0e-3, "{case}");
+        // Pushed sideways where nothing weighs, the bar pulls the clod after
+        // it, and the anchor carries the share of the push that moves the
+        // clod: half of it, for a clod of the bar's mass.
+        let (mut world, _) = clodded(scale, BodyKind::Dynamic, middle);
+        let weight = weight(&world, scale);
+        assert!(world.set_gravity(Vec2::ZERO));
+        for step in 0..300 {
+            let share = ((step + 1) as f32 / 120.0).min(1.0);
+            world.clear_forces();
+            assert!(world.apply_force(body(BAR), Vec2::new(share * weight, 0.0), true));
+            world.step(DT);
+        }
+        let state = world.connection(anchor_id(0)).unwrap();
+        assert!(
+            (state.load.shear - 0.5 * weight).abs() < 1.0e-2 * weight,
+            "g {}: {state:?}",
+            scale.g
+        );
+        assert!(state.load.axial.abs() < 1.0e-2 * weight, "{state:?}");
+        let (clod, bar) = (
+            world.motion(body(CLOD)).unwrap(),
+            world.motion(body(BAR)).unwrap(),
+        );
+        assert!(
+            (clod.linear_velocity.x - bar.linear_velocity.x).abs() < 1.0e-2 * bar.linear_velocity.x,
+            "g {}: {clod:?} {bar:?}",
+            scale.g
+        );
+    }
+}
+
+#[test]
+fn anchors_hold_toward_gravity_however_it_points() {
+    for scale in SCALES {
+        let (mut world, connection) = hung(scale, 0.0, &[-2.0, 2.0], 4.0);
+        let weight = weight(&world, scale);
+        // Gravity half a radian off straight down, toward the right.
+        let tilt = 0.5_f32;
+        let down = Vec2::new(tilt.sin(), -tilt.cos());
+        assert!(world.set_gravity(down * scale.g));
+        run(&mut world, 30.0, 60.0);
+        // The two share the weight evenly, whichever way it pulls: along
+        // their beams by its cosine, and across them, toward their
+        // counterclockwise side, by its sine.
+        for i in 0..2 {
+            let load = load(&world, i);
+            let case = format!("g {}, anchor {i}: {load:?}", scale.g);
+            assert!(
+                (load.axial - 0.5 * weight * tilt.cos()).abs() < 2.0e-3 * weight,
+                "{case}"
+            );
+            assert!(
+                (load.shear - 0.5 * weight * tilt.sin()).abs() < 2.0e-3 * weight,
+                "{case}"
+            );
+            assert!((load.utilization - 0.125).abs() < 1.0e-3, "{case}");
+        }
+        // The bar gave the law's extension for its weight along gravity,
+        // not straight down, and did not turn.
+        let motion = world.motion(body(BAR)).unwrap();
+        let stretch = 0.5 * weight / anchor_stiffness(&connection);
+        let moved = motion.position - Vec2::new(0.0, -4.0 * scale.k);
+        assert!(
+            (moved - down * stretch).length() < 1.0e-2 * stretch,
+            "g {}: {motion:?}",
+            scale.g
+        );
+        assert!(motion.angle.abs() < 1.0e-4, "g {}: {motion:?}", scale.g);
+    }
+}
+
+#[test]
+fn an_anchor_handed_to_another_support_holds_from_it_as_it_held() {
+    for scale in SCALES {
+        let (mut world, connection) = hung(scale, 0.0, &[0.0], 4.0);
+        let weight = weight(&world, scale);
+        let stretch = weight / anchor_stiffness(&connection);
+        run(&mut world, 30.0, 60.0);
+        let lying = world.motion(body(BAR)).unwrap();
+        let state = world.connection(anchor_id(0)).unwrap();
+        // A clod well clear of the trunk and the bar takes the anchor where
+        // it lies.
+        clod(
+            &mut world,
+            scale,
+            BodyKind::KinematicPosition,
+            Vec2::new(-6.0, 3.0) * scale.k,
+        );
+        world.rebind_connection(anchor_id(0), body(CLOD)).unwrap();
+        let handed = world.connection(anchor_id(0)).unwrap();
+        assert_eq!(handed.root_body, body(CLOD));
+        assert_eq!(
+            (handed.body, handed.connection, handed.load, handed.failure),
+            (state.body, state.connection, state.load, state.failure)
+        );
+        // It carries on from the give it had, so the bar does not stir.
+        run(&mut world, 1.0, 60.0);
+        let still = world.motion(body(BAR)).unwrap();
+        let case = format!("g {}: {lying:?} {still:?}", scale.g);
+        assert!(
+            (still.position - lying.position).length() < 1.0e-3 * stretch,
+            "{case}"
+        );
+        assert!(
+            (load(&world, 0).axial - weight).abs() < 1.0e-3 * weight,
+            "{case}"
+        );
+        // The trunk no longer holds it: taken away, it takes no anchor with
+        // it, and the clod carries the bar wherever it goes.
+        assert!(world.remove_entity(TRUNK));
+        assert!(world.contains_joint(anchor_id(0)));
+        let shift = Vec2::new(2.0, 1.0) * scale.k;
+        carry(&mut world, shift, 0.0);
+        run(&mut world, 30.0, 60.0);
+        let carried = world.motion(body(BAR)).unwrap();
+        assert!(
+            (carried.position - lying.position - shift).length() < 2.0e-3 * stretch,
+            "g {}: {carried:?}",
+            scale.g
+        );
+        assert_eq!(world.identity_fault(), None);
+        // A restored world holds the bar from the clod too.
+        let bytes = world.snapshot_bytes().unwrap();
+        let mut restored = PhysicsWorld::from_snapshot_bytes(&bytes).unwrap();
+        assert_eq!(restored.snapshot_bytes().unwrap(), bytes);
+        assert_eq!(observed_one(&restored), observed_one(&world));
+        for _ in 0..60 {
+            world.step(DT);
+            restored.step(DT);
+        }
+        assert_eq!(observed_one(&restored), observed_one(&world));
+    }
+}
+
+/// What a host sees of the bar and its one anchor. A snapshot keeps no
+/// material's name.
+fn observed_one(world: &PhysicsWorld) -> impl PartialEq + std::fmt::Debug {
+    (
+        world.motion(body(BAR)),
+        world.connection(anchor_id(0)).map(|s| {
+            (
+                s.root_body,
+                s.load,
+                s.failure,
+                s.deflection,
+                s.connection.region().remaining_precise(),
+            )
+        }),
+    )
+}
+
+#[test]
+fn handing_on_an_anchor_is_refused_where_it_has_nothing_to_hand_on() {
+    let scale = SCALES[0];
+    let (mut world, _) = hung(scale, 0.0, &[0.0], 4.0);
+    clod(
+        &mut world,
+        scale,
+        BodyKind::Fixed,
+        Vec2::new(-6.0, 3.0) * scale.k,
+    );
+    use ConnectionRejection as R;
+    assert_eq!(
+        world.rebind_connection(anchor_id(1), body(CLOD)),
+        Err(R::Missing)
+    );
+    assert_eq!(
+        world.rebind_connection(anchor_id(0), body(PhysicsId::new(9))),
+        Err(R::Bodies)
+    );
+    assert_eq!(
+        world.rebind_connection(anchor_id(0), body(BAR)),
+        Err(R::Bodies)
+    );
+    assert_eq!(
+        world.connection(anchor_id(0)).unwrap().root_body,
+        body(TRUNK)
+    );
+    // One that let go has no joint to hand on.
+    let (mut weak, _) = hung(scale, 0.0, &[0.0], 0.5);
+    clod(
+        &mut weak,
+        scale,
+        BodyKind::Fixed,
+        Vec2::new(-6.0, 3.0) * scale.k,
+    );
+    run(&mut weak, 2.0, 60.0);
+    assert!(weak.connection(anchor_id(0)).unwrap().failure.is_some());
+    assert_eq!(
+        weak.rebind_connection(anchor_id(0), body(CLOD)),
+        Err(R::Exhausted)
+    );
+    assert_eq!(world.identity_fault(), None);
+    assert_eq!(weak.identity_fault(), None);
 }

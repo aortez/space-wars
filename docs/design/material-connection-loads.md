@@ -14,7 +14,8 @@ what a severing means. A connection that [bends](#connections-that-bend)
 stiffness holds the held body's turn, so a branch sags under its load and
 springs back when the load is lifted. An [anchor](#anchors) (#225) holds a
 body in its support by springs in every direction, as the ground holds a root,
-so that several anchors share a load by where they hold.
+so that several anchors share a load by where they hold, and passes to another
+support where the ground it holds in breaks away.
 
 ## Welds and identity
 
@@ -143,6 +144,16 @@ Contacts between the two bodies stay off while any anchor joins them. Each
 spring is damped at insertion for the held body alone, the linear ones for its
 mass and the turning one for its inertia about the anchor, at the ratio a
 hinge's is.
+
+`rebind_connection` hands a live connection's root end to another body where
+it lies, as when the dirt that holds a root breaks away from the ground with
+it. Its frame on the new body is where its frame on the old one lay, so the
+connection keeps the give it has, its springs, its beam, the work it has
+absorbed and its last load, and nothing stirs. From the next step the new body
+takes what the old one took, and contacts between the new pair stay off while
+it holds. It is refused, with nothing changed, for a connection that is
+missing or has severed, and for a body that is missing or is the one the
+connection holds. A save keeps the new root body as any other.
 
 ## Charging and severing
 
@@ -327,6 +338,29 @@ a unit square and a unit long.
   half as far and is charged for half the stress.
 - **Refusals:** an anchor is refused as a connection is, its identity is taken
   by an anchor or a weld alike, and removing the held body removes its anchors.
+- **Moving supports:** with the bar hung by its middle from a kinematic clod a
+  unit square, four units above it, the clod is carried three units right and
+  two up and turned a quarter turn over four seconds, setting off and coming to
+  rest gently. The bar comes to hang by the anchor's give below where the clod
+  now holds it, turned the quarter turn with it, and its weight now pulls
+  across the anchor's beam, at the same quarter of its safe stress.
+- **Loose supports:** a dynamic clod as heavy as the bar, holding it at its
+  middle, falls with it: after a second both fall at the same speed, gravity's
+  times the second, and the anchor carries nothing. Pushed sideways where
+  nothing weighs, the bar pulls the clod after it at the same speed, and the
+  anchor carries half the push, the share that moves the clod.
+- **Turned gravity:** with gravity half a radian off straight down, two anchors
+  share the weight evenly along it, by its cosine along their beams and its
+  sine across them, at an eighth of their safe stress. The bar sinks by the
+  give along gravity and does not turn.
+- **Handing on:** a bar hung from one anchor in the trunk is handed to a
+  kinematic clod six units to the side and three up, clear of both. The anchor
+  keeps its connection and its load,
+  the bar does not stir, and it still carries the weight along its root. With
+  the trunk removed the anchor stays, and carrying the clod two units right and
+  one up carries the bar the same. A restored copy writes the same save and
+  steps exactly as the original. Handing on is refused for a missing anchor, a
+  missing body, the bar itself and an anchor that has let go.
 
 ## Limits
 

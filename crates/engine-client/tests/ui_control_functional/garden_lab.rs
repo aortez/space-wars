@@ -1174,6 +1174,41 @@ fn garden_lab_tree_bed_grows_cuts_and_returns_in_both_renderers() {
             assert_eq!(hinges(&later), 0);
             assert!(dead(&resting) >= dead(&cut));
             assert_eq!(dead(&later), dead(&resting));
+            // A trench beside the eldest tree's roots makes the wood physical
+            // again, and a second cuts away dirt the anchors of roots grip:
+            // each anchor grips the bed or a loose block, which counts it.
+            // Filling closes what nothing lies in.
+            choose_tree(
+                h,
+                &mut s,
+                &mut t,
+                control(scenario_garden_lab::Command::Dig),
+            );
+            let dug = snapshot(h, |v| v["tree_bed"]["dirt"]["trenches"] == 1);
+            assert_eq!(dug["tree_bed"]["wood"]["physical"], true);
+            press(h, &mut s, InputButton::South);
+            let loose = snapshot(h, |v| v["tree_bed"]["dirt"]["trenches"] == 2);
+            let dirt = &loose["tree_bed"]["dirt"];
+            let blocks = dirt["blocks"].as_array().unwrap();
+            let anchors = loose["tree_bed"]["wood"]["roots"]["anchors"]
+                .as_array()
+                .unwrap();
+            for b in blocks {
+                let gripping = anchors.iter().filter(|a| a["dirt"] == b["entity"]);
+                assert_eq!(b["anchors"].as_u64(), Some(gripping.count() as u64), "{b}");
+            }
+            assert!(
+                anchors.iter().any(|a| a["dirt"] != 1),
+                "no anchor grips loose dirt: {dirt}"
+            );
+            choose_tree(
+                h,
+                &mut s,
+                &mut t,
+                control(scenario_garden_lab::Command::Fill),
+            );
+            let open = |v: &Value| v["tree_bed"]["dirt"]["open"].as_u64().unwrap();
+            snapshot(h, |v| open(v) < open(&loose));
 
             // Back to the grass bed, which runs again from where it waited.
             choose_tree(
