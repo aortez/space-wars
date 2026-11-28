@@ -3,7 +3,7 @@ use crate::chess_board_visual_tests::captures;
 use crate::gpu_scene::{mesh::MeshBuilder, plan};
 use crate::thruster_visual_tests::{svg, write_png};
 use engine_chess::{Color, Square};
-use engine_chess_board::{DARK_SQUARE, LIGHT_SQUARE, MAX_PRIMITIVES};
+use engine_chess_board::{DARK_SQUARE, LIGHT_SQUARE, MAX_PRIMITIVES, Squares};
 use engine_common::{
     ClockEventProfile, ClockLampMode, ClockTimeFormat, RenderColor, RenderPoint, RenderRect,
 };
@@ -235,11 +235,22 @@ fn move_on_its_way(visit: &Visit, exhibition: &Exhibition) -> Option<f32> {
     }
 }
 
+/// The squares the board marks for the piece the bird to move has picked up
+/// to go to, which are none until it has picked one up.
+fn marked_for(visit: &Visit, exhibition: &Exhibition) -> Squares {
+    match visit.show(exhibition) {
+        Show::Board(_, presentation) => presentation
+            .selection
+            .map_or(Squares::EMPTY, |selection| selection.destinations),
+        _ => Squares::EMPTY,
+    }
+}
+
 /// A moment of a visit, by what the visit and its match have come to.
 type Moment = (&'static str, Phase, fn(&Visit, &Exhibition) -> bool);
 
 /// The moments a visit is drawn at, in the order they come.
-const MOMENTS: [Moment; 16] = [
+const MOMENTS: [Moment; 17] = [
     ("01-over-the-frame", Phase::Arriving, |visit, _| {
         visit.crow().task() == crow::Task::Coming && along_the_crows_way(visit) >= 0.0
     }),
@@ -255,30 +266,33 @@ const MOMENTS: [Moment; 16] = [
     ("05-opening", Phase::Opening, |visit, _| visit.ticks() >= 22),
     ("06-placing", Phase::Placing, |visit, _| visit.ticks() >= 60),
     ("07-set", Phase::Playing, |_, _| true),
-    ("08-first-move", Phase::Playing, |visit, exhibition| {
+    ("08-reaching", Phase::Playing, |visit, exhibition| {
+        !marked_for(visit, exhibition).is_empty()
+    }),
+    ("09-first-move", Phase::Playing, |visit, exhibition| {
         move_on_its_way(visit, exhibition).is_some_and(|progress| progress >= 0.5)
     }),
-    ("09-second-move", Phase::Playing, |visit, exhibition| {
+    ("10-second-move", Phase::Playing, |visit, exhibition| {
         let moves = exhibition.current().unwrap().game().moves().len();
         moves == 2 && move_on_its_way(visit, exhibition).is_some_and(|progress| progress >= 0.5)
     }),
-    ("10-clearing", Phase::Clearing, |visit, _| {
+    ("11-clearing", Phase::Clearing, |visit, _| {
         visit.ticks() >= 45
     }),
-    ("11-closing", Phase::Closing, |visit, _| visit.ticks() >= 22),
-    ("12-picking-up", Phase::Leaving, |visit, _| {
+    ("12-closing", Phase::Closing, |visit, _| visit.ticks() >= 22),
+    ("13-picking-up", Phase::Leaving, |visit, _| {
         visit.duck().task() == Task::Lifting && visit.duck().ticks() >= LOWER_TICKS / 2
     }),
-    ("13-turning", Phase::Leaving, |visit, _| {
+    ("14-turning", Phase::Leaving, |visit, _| {
         visit.duck().task() == Task::Turning && visit.duck().ticks() >= TURN_TICKS / 3
     }),
-    ("14-flying-out", Phase::Leaving, |visit, _| {
+    ("15-flying-out", Phase::Leaving, |visit, _| {
         visit.crow().task() == crow::Task::Going && along_the_crows_way(visit) <= 0.5
     }),
-    ("15-going", Phase::Leaving, |visit, _| {
+    ("16-going", Phase::Leaving, |visit, _| {
         visit.duck().task() == Task::Taking && along_its_way(visit) <= 0.5
     }),
-    ("16-through-the-door", Phase::Leaving, |visit, _| {
+    ("17-through-the-door", Phase::Leaving, |visit, _| {
         visit.duck().task() == Task::Taking && along_its_way(visit) <= -0.02
     }),
 ];
@@ -294,8 +308,9 @@ const DOOR_SHAPES: usize = 14;
 /// A visit is drawn by the CPU raster and the vector paths where its stage
 /// stands, at every size the board is qualified at: the crow flying in over
 /// the frame to its seat, the duck bringing the case and setting it down,
-/// the board opening, being set up and in play with each bird's move on its
-/// way, and all of it packed and taken away again as the crow flies out.
+/// the board opening, being set up and in play, with the first bird to move
+/// reaching for its piece and each bird's move on its way, and all of it
+/// packed and taken away again as the crow flies out.
 /// The GPU scene prepares each of those frames. Nothing else in the view
 /// changes for the visit: not the digits, which go on telling the time, the
 /// AM/PM letters, the date or the frame the crow passes behind. With
@@ -509,12 +524,16 @@ fn a_chess_visit_draws_its_board_and_its_birds_below_the_digits_on_both_render_p
                         assert!(within(case, place, EDGE), "{what}: {place:?}");
                     }
                 }
-                if moment != "07-set" {
+                if !["07-set", "08-reaching"].contains(&moment) {
                     continue;
                 }
                 // Set up, every empty square shows its own colour all over,
                 // and a piece covers much of each square of the four ranks
                 // the players start on. A compact rook covers all of its.
+                // Once the first bird to move has picked its piece up, the
+                // board marks the one square it goes to.
+                let marked = marked_for(visit, exhibition);
+                assert_eq!(marked.len(), usize::from(moment == "08-reaching"), "{what}");
                 let width = viewport.width as usize;
                 for index in 0..64 {
                     let square = Square::new(index % 8, index / 8).unwrap();
@@ -532,7 +551,9 @@ fn a_chess_visit_draws_its_board_and_its_birds_below_the_digits_on_both_render_p
                         .map(|(x, y)| pixels.as_slice()[y * width + x])
                         .collect();
                     let bare = inside.iter().filter(|pixel| is(**pixel, base)).count();
-                    if (2..6).contains(&square.rank()) {
+                    if marked.contains(square) {
+                        assert!(bare < inside.len(), "{what}: {square:?} is not marked");
+                    } else if (2..6).contains(&square.rank()) {
                         assert_eq!(bare, inside.len(), "{what}: {square:?} is empty");
                     } else {
                         assert!(
@@ -551,11 +572,17 @@ fn a_chess_visit_draws_its_board_and_its_birds_below_the_digits_on_both_render_p
             shapes[index.unwrap()]
         };
         assert!(of("06-placing") < of("07-set"), "{name}");
-        assert!(of("10-clearing") < of("09-second-move"), "{name}");
-        // Each bird leans over the board for its own move, and not for the
-        // other's.
-        assert_eq!(leaned.len(), 2, "{name}: {leaned:?}");
-        assert_ne!(leaned[0].1, leaned[1].1, "{name}: {leaned:?}");
+        assert!(of("11-clearing") < of("10-second-move"), "{name}");
+        // Each bird leans over the board for its own move, from when it
+        // reaches for its piece, and not for the other's.
+        let moments: Vec<_> = leaned.iter().map(|(moment, ..)| *moment).collect();
+        assert_eq!(
+            moments,
+            ["08-reaching", "09-first-move", "10-second-move"],
+            "{name}"
+        );
+        assert_eq!(leaned[0].1, leaned[1].1, "{name}: {leaned:?}");
+        assert_ne!(leaned[1].1, leaned[2].1, "{name}: {leaned:?}");
         for (_, _, own, others) in &leaned {
             assert!(*own > 0.9 && *others < 0.1, "{name}: {leaned:?}");
         }

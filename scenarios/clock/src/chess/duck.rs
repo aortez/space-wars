@@ -569,6 +569,12 @@ impl Duck {
         self.lean
     }
 
+    /// Whether the duck sits at the board leaning all the way over it, its
+    /// bill at the board's frame.
+    pub fn reached(&self) -> bool {
+        self.task == Task::Seated && self.lean >= 1.0
+    }
+
     /// How far off the ground the duck is drawn, in the pixels of its art:
     /// the winner's few hops. Its body stays where it is.
     pub fn hop(&self) -> f32 {

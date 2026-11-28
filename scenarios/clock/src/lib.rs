@@ -1514,7 +1514,12 @@ impl ClockState {
 
     /// The water the active event holds, if it holds any.
     fn scene_water(&self) -> Option<&engine_water::WaterWorld> {
-        match &self.active_event {
+        Self::event_water(self.active_event.as_ref())
+    }
+
+    /// The water `event` holds, if it holds any.
+    fn event_water(event: Option<&ActiveEvent>) -> Option<&engine_water::WaterWorld> {
+        match event {
             Some(ActiveEvent::Aquarium(event)) => Some(&event.water),
             Some(ActiveEvent::Rain(rain)) => Some(&rain.water),
             Some(ActiveEvent::Meltdown(melt)) => Some(&melt.water),
@@ -2507,8 +2512,33 @@ impl ClockState {
                 .expect("the stranded spaceling's claim keeps a world");
             spaceling.drive(world);
         }
-        // The chess board takes the shape it has now, its case or its square,
-        // and the birds at it steer for the step.
+        // The visit to the board checks its stage against the scene as it is
+        // now. Then the board takes the shape it has now, its case or its
+        // square, and the birds at it steer for the step.
+        if let Some(looks) = self.chess_visit.as_ref().map(chess::Visit::looks_now) {
+            // The stage stands on the floor's own slabs, and a floor that an
+            // event or a duck's visit has taken has none.
+            let support: Vec<_> = self.floor.geometry(layout).slabs().collect();
+            let plants = if looks {
+                self.plant_areas()
+            } else {
+                Vec::new()
+            };
+            let worlds: Vec<_> = Self::scene_worlds(&self.arena, self.active_event.as_ref())
+                .into_iter()
+                .flatten()
+                .collect();
+            let scene = chess::stage::Scene {
+                layout,
+                support: &support,
+                worlds: &worlds,
+                plants: &plants,
+                water: Self::event_water(self.active_event.as_ref()).filter(|_| looks),
+            };
+            if let Some(visit) = &mut self.chess_visit {
+                visit.recheck(&scene);
+            }
+        }
         if let Some(visit) = &mut self.chess_visit {
             let world = self
                 .arena

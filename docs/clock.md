@@ -3008,22 +3008,23 @@ the [qualification's](#spider-visit-qualification-2026-11-01) second visit:
 ### Chess board (#405)
 
 A crow and a duck are to play a slow game of chess below the digits (#374).
-So far the Clock can stage their board and bring both birds. It finds the
-board a place. The duck walks in with the board packed in its case and sets
-it down, while the crow flies in to its seat on the other side. The board is
-set up from the match in hand and shows the moves the birds play, each bird
-leaning over it for its own. Then the board is packed up again, the crow
-flies out, and the duck carries the case out. The rest of #405 ties each move
-to its bird's reach and checks the scene again during the visit, and #406
-brings the schedule. Until then nothing in ordinary Clock starts a visit to
-the board, so it has no event ID or switch. The
+The Clock can stage their board and bring both birds. It finds the board a
+place. The duck walks in with the board packed in its case and sets it down,
+while the crow flies in to its seat on the other side. The board is set up
+from the match in hand and shows the moves the birds play. Each bird leans
+over the board for its own moves, and its piece moves only once it leans all
+the way from its seat. Then the board is packed up again, the crow flies out,
+and the duck carries the case out. All the while the visit checks its stage,
+and ends or packs up when the floor goes from under it or something comes to
+stand on it. #406 brings the schedule. Until then nothing in ordinary Clock
+starts a visit to the board, so it has no event ID or switch. The
 [development fixture](#seeing-the-board-in-the-real-client) starts visits.
 
 ![The duck with the board's case at 800×480: coming with it, setting it down, picking it up, turning with it, going, and passing through its door](screenshots/clock/chess-duck-carrying-800x480.png)
 
 ![The crow at 800×480: passing behind the frame, flying in, coming down at its seat, and flying out](screenshots/clock/chess-crow-flying-800x480.png)
 
-![The board at 800×480, with the birds at their seats: the case set down, the board opening, half set and set, the duck's move and the crow's, and the board half cleared and folding](screenshots/clock/chess-board-visit-800x480.png)
+![The board at 800×480, with the birds at their seats: the case set down, the board opening and half set, the duck leaning all the way over the set board with the pawn it picked up and the pawn's square marked, the duck's move and the crow's, and the board half cleared and folding](screenshots/clock/chess-board-visit-800x480.png)
 
 #### Where the board stands
 
@@ -3072,7 +3073,7 @@ third of the floor limits the board, not the room below the face. In the
 1280×720 view the crow's way on the right would pass within the gap kept
 round the AM/PM letters, so there the duck takes the right side.
 
-![The duck leaning over the board for its move, and then the crow for its own, in the four views](screenshots/clock/chess-board-views.png)
+![The duck leaning over the board for its move, first with the pawn it picked up and the pawn's square marked, and then the crow for its own, in the four views](screenshots/clock/chess-board-views.png)
 
 #### The visit
 
@@ -3089,7 +3090,7 @@ case the duck holds is no body.
 | Arriving | 5.2 to 6.0 s | The door on the duck's side opens, and the duck walks in with the case held before it. Meanwhile the crow flies in over the frame on the other side and comes down at its seat. The duck sets the case down where the board is to stand, and steps back toward its seat. |
 | Opening | 0.75 s | The case opens out into the board, as soon as the duck is clear of the board's place. |
 | Placing | 2 s | The pieces of the match in hand come out one at a time: each player's from its own back rank outward, the king first, the two players in turn. The birds nod over them by turns. |
-| Playing | Until the visit is asked to pack up | The board shows the birds' moves. A bird moves every five seconds, and its piece travels for half a second. Each bird leans over the board from a second before its own move until its piece has arrived. |
+| Playing | Until the visit is asked to pack up | The board shows the birds' moves. A bird moves every five seconds, and its piece travels for half a second. Each bird leans over the board from a second before its own move until its piece has arrived. Once it leans all the way, the board marks the piece it reaches for and the square it goes to. |
 | Clearing | 1.5 s | The pieces go back, the last out first. The birds nod over them by turns. |
 | Closing | 0.75 s | The board folds back into its case. |
 | Leaving | 5.4 to 5.6 s | The crow takes off and flies out the way it came. The duck steps up to the case, picks it up, turns with it and walks out through its door, which closes behind it. Then the visit lets go of the arena. |
@@ -3115,6 +3116,52 @@ were qualified in. The duck is drawn in front of the board and of the case it
 holds, on the layer a visiting duck is drawn on. The crow is drawn on the
 visiting crows' layer: in front of the board, and behind the frame it flies
 in over.
+
+#### A move and its bird
+
+The bird to move knows its move a second before the end of its turn, and
+leans over the board for it. Ten ticks later it leans all the way, its bill at
+the board's frame. The board then marks the piece it reaches for and the
+square it goes to, with the board's tints for a piece picked up
+([Chess board drawing](chess-board.md#what-a-host-does)). At the end of the
+turn the piece sets off, the marks of the last move take their place, and the
+bird leans until the piece has arrived.
+
+Play goes on only while both birds are at their seats. A crow knocked off its
+seat, or a bird not yet at its seat when play begins, holds the turn and its
+search where they are, and the board marks nothing. Once the bird is back and
+leans all the way again, it plays the move it reached for. So no piece moves
+without its bird, and a turn is longer by the time its bird was away. A crow
+that cannot come down at its seat again is late after six seconds, and the
+visit packs up.
+
+#### Checks during the visit
+
+The visit checks its stage against the scene each tick, before its birds
+steer.
+
+- **The floor under the duck.** The floor's slabs must still hold up the
+  duck's way and its room, and the board's place until the duck carries the
+  case out. Where they do not, the duck could neither stay nor take the board
+  away. The visit is then over where it stands: its board and both birds
+  leave the arena before the next step. That happens when the drain opens
+  under the board, and when an event or a duck's visit takes the floor,
+  because the stage stood on the floor's own slabs. A player who joins takes
+  the floor for their duck's course, so the visit ends then too.
+- **The floor under the crow.** Where only the crow's room has lost its floor,
+  the crow flies out at once, and the duck packs the board up and takes it
+  away.
+- **What stands on the stage.** Every half second the visit looks at the
+  board's place and both rooms. It looks for any body but its own board and
+  birds, in the arena or in a world that an event keeps apart, for the plants'
+  tissue above the soil, and for water. Something found there at two looks in
+  a row has the visit pack up, so a body that only passes through does not.
+  Falling's bars, coming down on a bank where a board stands, are found so.
+- **A resize** ends the visit at once.
+
+In every case the match keeps every move it was given, and only the visit's
+own board and birds leave the arena. `chess::Visit::trouble` names what the
+visit found: `Floor`, `CrowFloor` or `Taken`.
 
 #### The duck at the board
 
@@ -3213,7 +3260,7 @@ A bird at the board has one of nine poses, which `clock state` names:
 | `arriving` | The visit is arriving | Walks in with the case, sets it down and steps back. It leans as it sets the case down. | Flies in and comes down at its seat. |
 | `setting` | The board opens and the pieces come out | Nods over the board, once every half second. | Nods over the board between the duck's nods. |
 | `waiting` | Between its moves | Sits upright. | Stands upright. |
-| `moving` | From a second before its move until its piece has arrived | Leans over the board. | Leans over the board. |
+| `moving` | From when it reaches for its piece, a second before its move, until the piece has arrived | Leans over the board. | Leans over the board. |
 | `won` | The game has ended, and it won | Hops three times where it sits. | Hops three times where it stands, raising its wing at the top of each hop. |
 | `lost` | The game has ended, and it lost | Leans over the board. | Hangs its head to the ground. |
 | `drawn` | The game has ended in a draw | Nods once. | Nods once. |
@@ -3226,23 +3273,14 @@ leans and how high it hops, and `render::crow::silhouette` takes those and
 the crow's wing. Both draw a visiting bird as before, with no lean and no
 hop.
 
-Known limits, until the rest of #405 and #406 land:
+Known limits:
 
-- Once the board is open, nothing checks its stage again. An event or a
-  duck's visit that starts during a visit meets the board where it stands and
-  the birds where they are. A duck that loses its footing there ends the
-  visit where it stands.
-- A player's duck that joins during a visit lays its course in place of the
-  floor, and the course's gaps and raised surfaces lie about the middle of
-  the floor, where the board stands. A chess duck left over a gap falls out
-  of the scene, and the visit is over where it stands, within half a second
-  of the player joining. Where only the crow is left over a gap, it takes to
-  the air, cannot come down at its seat and is late six seconds later. It
-  flies out, the visit packs up, and the duck carries the board out, about
-  14 seconds after the player joined. A course that is level under both
-  birds leaves them playing beside the player's duck. Of 24 courses tried in
-  the 800×480 view, 15 dropped the duck, 3 only the crow, and 6 neither. The
-  visit left nothing behind in any of them.
+- Until #406 lands, nothing keeps events, a duck's visit or a player apart
+  from a visit to the board. One that takes the floor, or opens the drain
+  under the stage, ends the visit where it stands. One whose bodies come to
+  stand on the stage has it pack up
+  ([above](#checks-during-the-visit)). #406 turns them away while a visit is
+  at the board.
 - The chess crow meets a visit's first crow and the magpie as bodies, where
   their ways cross. A visit's later crows pass through it, as they pass
   through each other.
@@ -3286,16 +3324,18 @@ its body.
 `client_scenarios::clock::chess_tests` draws a visit at each of the four
 views above, in the 12-hour format with the date shown, through the CPU
 raster and the vector backends, and has the GPU scene prepare each frame. At
-sixteen moments of the visit it checks that nothing differs from the same
+seventeen moments of the visit it checks that nothing differs from the same
 Clock without a visit but the visit's own board or case, its birds and its
 door, and that the frame's rail at the crow's edge of the view is as it was,
 the crow behind it or not. With the board set, it checks that each empty
 square shows its own colour and that a piece covers each square the players
-start on. Set `SPACEWARS_CLOCK_ARTIFACTS=DIR` to keep each backend's PNG and
+start on. Once the first bird to move has picked its piece up, it checks the
+same, but that the square the piece goes to is marked. Set
+`SPACEWARS_CLOCK_ARTIFACTS=DIR` to keep each backend's PNG and
 the vector backend's SVG. A visit adds at most 323 shapes for its board, 74
 for its crow, 57 for its duck and 14 for an open door.
 
-#### On the cabinets (2026-11-27)
+#### On the cabinets (2026-11-28)
 
 The trial build ran from `/tmp` with the fixture on `spacewars.local`
 (HyperPixel, 800×480) and `sw-picade-2` (Picade, 1024×768), with the events
@@ -3303,19 +3343,20 @@ off and the 12-hour format with the date shown. Both cabinets run the raster
 renderer, and a round in the vector renderer followed. The run's records stay
 on the workstation.
 
-| HyperPixel, the crow's move in the first visit | Picade, the crow's move in the first visit |
+| HyperPixel, the crow's piece picked up in the first visit | Picade, the crow's piece picked up in the first visit |
 | --- | --- |
-| ![The crow leaning over the board below the colon on the HyperPixel while its piece travels, the duck at the board's other side, with the date line and the PM letters](screenshots/clock/chess-board-hyperpixel-device.png) | ![The crow leaning over the board below the colon on the Picade while its piece travels, the duck at the board's other side, with the date line and the PM letters](screenshots/clock/chess-board-picade-device.png) |
+| ![The crow leaning all the way over the board below the colon on the HyperPixel, the pawn it picked up and the square it goes to marked, the duck at the board's other side, with the date line and the AM letters](screenshots/clock/chess-board-hyperpixel-device.png) | ![The crow leaning all the way over the board below the colon on the Picade, the pawn it picked up and the square it goes to marked, the duck at the board's other side, with the date line and the AM letters](screenshots/clock/chess-board-picade-device.png) |
 
 On the HyperPixel the crow plays Black in that run, and on the Picade White:
 the two cabinets' Clocks have different seeds. The Picade's frame-rate overlay
 is the cabinet's own setting. It reads low there because the trial took a
-screenshot about every 140 ms. The traces below were taken with no
-screenshots.
+screenshot about every 140 ms. A screenshot is read back from the frame before
+it is shown, which holds up that loop by about 10 ms on the HyperPixel and
+43 ms on the Picade, so the traces below were taken with none.
 
 In the raster renderer no refresh was skipped on either cabinet. From the
 visit's claim to its release, each visit lasted 26.6 to 26.7 s on the
-HyperPixel and 26.8 to 26.9 s on the Picade. On the HyperPixel its birds
+HyperPixel and 26.9 to 27.0 s on the Picade. On the HyperPixel its birds
 began to play 8.0 s after it came and began to leave 21.3 s after it came. On
 the Picade they did so at 8.2 s and 21.5 s. Each row is two traces of 240
 loops: the idle Clock without the fixture, the crow flying in and the duck
@@ -3326,34 +3367,52 @@ with it.
 
 | Cabinet | Renderer | Clock | Loop CPU: mean, 95th percentile, longest | Refreshes skipped |
 | --- | --- | --- | --- | --- |
-| HyperPixel | Raster | Idle | 1.43, 1.65, 1.77 ms | 0 |
-| HyperPixel | Raster | Birds arriving | 1.64, 1.87, 2.06 ms | 0 |
-| HyperPixel | Raster | Board set | 2.11, 2.38, 2.61 ms | 0 |
-| HyperPixel | Raster | From a move | 2.11, 2.37, 2.56 ms | 0 |
-| HyperPixel | Raster | Birds leaving | 1.62, 1.87, 2.11 ms | 0 |
-| Picade | Raster | Idle | 5.43, 6.89, 7.99 ms | 0 |
-| Picade | Raster | Birds arriving | 6.05, 7.70, 8.73 ms | 0 |
-| Picade | Raster | Board set | 7.30, 9.48, 10.61 ms | 0 |
-| Picade | Raster | From a move | 7.23, 9.57, 10.71 ms | 0 |
-| Picade | Raster | Birds leaving | 6.06, 7.79, 9.00 ms | 0 |
-| HyperPixel | Vector | Idle | 10.75, 11.62, 13.51 ms | 0 |
-| HyperPixel | Vector | Birds arriving | 12.37, 13.33, 15.68 ms | 0 |
-| HyperPixel | Vector | Board set | 13.38, 14.21, 16.30 ms | 0 |
-| HyperPixel | Vector | From a move | 13.04, 13.95, 14.93 ms | 0 |
-| HyperPixel | Vector | Birds leaving | 11.54, 13.17, 14.66 ms | 0 |
+| HyperPixel | Raster | Idle | 1.51, 1.74, 1.96 ms | 0 |
+| HyperPixel | Raster | Birds arriving | 1.71, 1.93, 2.20 ms | 0 |
+| HyperPixel | Raster | Board set | 2.22, 2.48, 2.73 ms | 0 |
+| HyperPixel | Raster | From a move | 2.21, 2.49, 2.68 ms | 0 |
+| HyperPixel | Raster | Birds leaving | 1.72, 1.98, 2.15 ms | 0 |
+| Picade | Raster | Idle | 5.67, 7.32, 8.28 ms | 0 |
+| Picade | Raster | Birds arriving | 6.37, 8.17, 9.74 ms | 0 |
+| Picade | Raster | Board set | 7.73, 9.92, 11.15 ms | 0 |
+| Picade | Raster | From a move | 7.61, 9.89, 11.32 ms | 0 |
+| Picade | Raster | Birds leaving | 6.35, 8.49, 9.67 ms | 0 |
+| HyperPixel | Vector | Idle | 11.44, 12.17, 13.11 ms | 0 |
+| HyperPixel | Vector | Birds arriving | 12.43, 13.76, 14.90 ms | 0 |
+| HyperPixel | Vector | Board set | 13.39, 14.07, 15.69 ms | 0 |
+| HyperPixel | Vector | From a move | 13.40, 14.08, 14.90 ms | 0 |
+| HyperPixel | Vector | Birds leaving | 12.08, 13.17, 14.99 ms | 0 |
 
 In the raster renderer the birds arriving cost about 0.2 ms of the loop on
-the HyperPixel and 0.6 ms on the Picade, and about as much while they leave.
-The visit with its board set costs about 0.7 ms on the HyperPixel and 1.9 ms
-on the Picade. In the vector renderer the HyperPixel still shows every
-refresh, though its longest loop, 16.3 ms, comes close to the 16.7 ms between
-two.
+the HyperPixel and 0.7 ms on the Picade, and about as much while they leave.
+The visit with its board set costs about 0.7 ms on the HyperPixel and 2.1 ms
+on the Picade. The visit's [checks](#checks-during-the-visit) are a small
+part of that. On the workstation they take about 0.2 µs of a tick on
+average, and 1.5 µs at a look, out of the 19 µs a tick that a visit costs in
+all. In the vector renderer the HyperPixel still shows every refresh, though
+its longest loop, 15.7 ms, comes close to the 16.7 ms between two.
 
 The Picade's vector renderer does not keep up with the Clock even when it is
-idle: it shows a frame every 33.3 ms on average. With the board set it shows
-one every 38.4 ms. The two visits it traced lasted 26.9 s, as in the raster
-renderer, but the two it took screenshots of lasted 29.0 and 29.1 s. Neither
+idle: it shows a frame every 33.5 ms on average. With the board set it shows
+one every 39.8 ms. The two visits it traced lasted 26.9 s, as in the raster
+renderer, but the two it took screenshots of lasted 28.8 and 28.9 s. Neither
 cabinet runs that renderer.
+
+In the raster renderer, four more visits on each cabinet met an event as the
+first bird to move leaned all the way over its marked piece: two met Falling,
+which opens the drain, and two met Rain, which takes the floor. When the trial
+first looked, 0.2 s after asking for the event, each visit was over: its board
+and both birds had gone, and the arena held no claim. The match kept every
+move, and the next visit came once the event was over. Traced across the
+event's start with no screenshot, no refresh was skipped on either cabinet,
+and a visit's ordinary end, traced the same way, skipped none either.
+
+| Cabinet | Event | Longest loop with the visit | Longest loop with none |
+| --- | --- | --- | --- |
+| HyperPixel | Falling | 2.63 ms | 2.27 ms |
+| HyperPixel | Rain | 3.31 ms | 3.16 ms |
+| Picade | Falling | 10.17 ms | 9.38 ms |
+| Picade | Rain | 11.34 ms | 12.12 ms |
 
 ### Managed floor and drain
 

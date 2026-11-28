@@ -12,6 +12,14 @@
 //! into its case, the crow flies out, and the duck picks the case up and
 //! walks out with it. The match keeps every action its game accepted.
 //!
+//! Play goes on only while both birds are at their seats. A crow knocked off
+//! its seat, or a bird not at its seat yet, holds the turn where it is. The
+//! bird to move leans over the board as it reaches for its piece, and takes
+//! its action only once it leans all the way, its bill at the board's frame.
+//! From then until the piece sets off, the board marks the piece and the
+//! square it goes to, and the bird leans until the piece has arrived. So no
+//! piece moves without its bird.
+//!
 //! What the board shows always comes from the match's game as it stands, so
 //! the pieces set out, those in play and a move in motion are of one
 //! revision. Packed, it shows none.
@@ -38,9 +46,22 @@
 //! So it does when the crow's body has left the scene some other way than
 //! the crow flies out. A crow that is late on its way out leaves the arena
 //! where it is. The duck takes the board away in each case.
+//!
+//! The visit checks its stage against the scene as it is now, each tick
+//! before its birds steer. The floor must still hold up all of what the duck
+//! stands on and walks along: its way and its room, and the board's place
+//! until the duck carries the case out. Where it does not, as when the drain
+//! opens under them or an event or a duck's visit takes the floor, the duck
+//! could neither stay nor take the board away. The visit is then over where
+//! it stands, before the arena's next step. Where only the crow's room has lost its floor, the crow flies
+//! out at once and the visit packs up. Every half second the visit also
+//! looks at what stands in the board's place and in the birds' rooms. Found
+//! there at two looks in a row, anything but its own board and birds, a
+//! plant or water has the visit pack up, so what only passes through does
+//! not.
 
 use engine_chess::{Action, Color, Outcome, PieceKind, Position, Square};
-use engine_chess_board::{Board, Presentation, Squares, Transition};
+use engine_chess_board::{Board, Presentation, Selection, Squares, Transition};
 use engine_common::{ClockChessActor, ClockChessBird, ClockChessState};
 use engine_rapier::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
@@ -49,7 +70,7 @@ use engine_rapier::world::{
 
 use super::crow::{self, Crow};
 use super::duck::{self, Duck, Task};
-use super::stage::{Area, Side, Stage};
+use super::stage::{Area, Scene, Side, Stage};
 use super::{Bird, Event, Exhibition, Pace, Play, Pose};
 use crate::arena::ids::canonical;
 use crate::layout::Layout;
@@ -100,6 +121,19 @@ impl Timed for Phase {
 /// How long a move takes to travel to its square, in ticks.
 pub const MOVE_TICKS: u64 = 30;
 
+/// How many ticks apart the visit looks at what stands on its stage, and at
+/// how many looks in a row it must find something there to pack up.
+pub const LOOK_TICKS: u64 = 30;
+const TAKEN_LOOKS: u32 = 2;
+
+/// The visit's own bodies in the arena: its board's, its duck's and its
+/// crow's.
+const OWN: [PhysicsId; 3] = [
+    PhysicsId::new(canonical::CHESS_BOARD.start),
+    duck::ENTITY,
+    PhysicsId::new(canonical::CHESS_CROW.start),
+];
+
 /// What a visit's board shows.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Show {
@@ -149,6 +183,27 @@ pub struct Visit {
     duck: Duck,
     /// The visit ended where it stood, with no duck to take the board away.
     abandoned: bool,
+    /// Ticks since the visit was admitted.
+    age: u64,
+    /// What the visit found wrong with its stage.
+    trouble: Option<Trouble>,
+    /// How many looks in a row have found something on the stage.
+    taken: u32,
+}
+
+/// What a visit found wrong with its stage, as the
+/// [module documentation](self) says.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Trouble {
+    /// The floor no longer held up what the duck stands on and walks along,
+    /// and the visit was over where it stood.
+    Floor,
+    /// The floor no longer held up the crow's room. The crow flew out, and
+    /// the visit packed up.
+    CrowFloor,
+    /// Something stood in the board's place or a bird's room, and the visit
+    /// packed up.
+    Taken,
 }
 
 impl Visit {
@@ -183,6 +238,9 @@ impl Visit {
             crow: Crow::new(&stage, layout, world),
             duck: Duck::new(&stage, layout, world),
             abandoned: false,
+            age: 0,
+            trouble: None,
+            taken: 0,
         }
     }
 
@@ -322,10 +380,67 @@ impl Visit {
         self.stage.board.is_clear_in(world, &own)
     }
 
+    /// Whether the visit looks at what stands on its stage at this tick's
+    /// check: one in every [`LOOK_TICKS`], from its first.
+    pub fn looks_now(&self) -> bool {
+        self.age.is_multiple_of(LOOK_TICKS)
+    }
+
+    /// What the visit found wrong with its stage, which ended it or had it
+    /// pack up, if anything has.
+    pub fn trouble(&self) -> Option<Trouble> {
+        self.trouble
+    }
+
+    /// Checks the visit's stage against `scene` as it is now, and has the
+    /// visit do what that calls for, as the [module documentation](self)
+    /// says. `scene` is the stage's own: the floor's slabs, none where an
+    /// event or a duck's visit has taken the floor, and the arena's world.
+    /// When the visit [`looks_now`](Self::looks_now), `scene` holds the
+    /// plants, the worlds' bodies and the water as they are, and the visit
+    /// looks at what stands on its stage. The host calls this each tick that
+    /// moves time, before [`drive`](Self::drive).
+    pub(crate) fn recheck(&mut self, scene: &Scene<'_>) {
+        if self.abandoned || self.trouble == Some(Trouble::Floor) {
+            return;
+        }
+        let stage = self.stage;
+        let (duck, crow) = (stage.duck, stage.duck.other());
+        let floored = |area: Area| area.width() <= 0.0 || scene.supports(area);
+        // A duck carrying the case out is done with the board's place.
+        let place = !matches!(self.duck.task(), Task::Taking | Task::Gone);
+        let under_duck = floored(stage.room(duck))
+            && floored(stage.way(duck))
+            && (!place || floored(stage.board));
+        if self.duck.present() && !under_duck {
+            // The visit is over where it stands as its birds next steer.
+            self.trouble = Some(Trouble::Floor);
+            return;
+        }
+        let crow_down = matches!(self.crow.task(), crow::Task::Coming | crow::Task::Seated);
+        if crow_down && !floored(stage.room(crow)) {
+            self.crow.leave();
+            if self.pack() {
+                self.trouble.get_or_insert(Trouble::CrowFloor);
+            }
+        }
+        if self.looks_now() {
+            let stands = [stage.board, stage.room(duck), stage.room(crow)];
+            let clear = stands.into_iter().all(|area| scene.clear_but(area, &OWN));
+            self.taken = if clear { 0 } else { self.taken + 1 };
+            if self.taken >= TAKEN_LOOKS && self.pack() {
+                self.trouble.get_or_insert(Trouble::Taken);
+            }
+        }
+    }
+
     /// Has the duck go on with the case as far as it has got, gives the
     /// board in `world` the shape it has now, and steers the birds for the
     /// step to come. The host calls this before the arena's step.
     pub fn drive(&mut self, world: &mut PhysicsWorld) {
+        if self.trouble == Some(Trouble::Floor) && !self.abandoned {
+            self.abandon(world);
+        }
         if !self.abandoned {
             self.direct_crow(world);
             self.direct(world);
@@ -465,6 +580,7 @@ impl Visit {
     /// there, and returns what they did in it. The host calls this for each
     /// tick that moves time.
     pub fn tick(&mut self, exhibition: &mut Exhibition, world: &PhysicsWorld) -> Option<Event> {
+        self.age += 1;
         self.crow.observe(world);
         self.duck.observe(world);
         let event = self.advance(exhibition);
@@ -485,7 +601,14 @@ impl Visit {
         }
         self.ticks += 1;
         if self.phase == Phase::Playing {
-            if let Some(play) = &mut self.play {
+            // Play goes on while both birds are at the board, and the bird to
+            // move takes its action once it has reached for its piece.
+            let at_board = self.at_board();
+            let reached = self.reaching.is_some_and(|bird| self.reached(bird));
+            if let Some(play) = &mut self.play
+                && at_board
+                && (reached || !play.acts_next())
+            {
                 event = play.tick(exhibition);
                 match event {
                     Some(Event::Reach { bird, .. }) => self.reaching = Some(bird),
@@ -541,6 +664,36 @@ impl Visit {
     fn enter(&mut self, phase: Phase) {
         self.phase = phase;
         self.ticks = 0;
+    }
+
+    /// Whether both birds are at their seats, where they play.
+    fn at_board(&self) -> bool {
+        self.crow.task() == crow::Task::Seated && self.duck.task() == Task::Seated
+    }
+
+    /// Whether `bird` is at its seat leaning all the way over the board.
+    fn reached(&self, bird: Bird) -> bool {
+        match bird {
+            Bird::Crow => self.crow.reached(),
+            Bird::Duck => self.duck.reached(),
+        }
+    }
+
+    /// The piece the bird to move has reached for and the square it goes
+    /// to, from when the bird leans all the way over the board until the
+    /// piece sets off.
+    fn picked(&self) -> Option<Selection> {
+        let bird = self.reaching?;
+        if self.moving.is_some() || !self.reached(bird) {
+            return None;
+        }
+        match self.play.as_ref()?.reaching()? {
+            Action::Move(mv) => Some(Selection {
+                square: mv.from,
+                destinations: [mv.to].into_iter().collect(),
+            }),
+            _ => None,
+        }
     }
 
     /// What `bird` is doing at the board now, of `exhibition`'s match in
@@ -615,6 +768,7 @@ impl Visit {
                 transition: self.moving.and_then(|ticks| {
                     Transition::of_last_move(game, ticks as f32 / MOVE_TICKS as f32)
                 }),
+                selection: self.picked(),
                 ..Presentation::of(game)
             }
         } else {

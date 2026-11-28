@@ -440,6 +440,12 @@ impl Crow {
         self.lean
     }
 
+    /// Whether the crow stands at its seat leaning all the way over the
+    /// board, its bill at the board's frame.
+    pub fn reached(&self) -> bool {
+        self.task == Task::Seated && self.lean >= 1.0
+    }
+
     /// Whether the crow hangs its head to the ground: it has lost.
     pub fn bowed(&self) -> bool {
         self.task == Task::Seated && self.pose == Pose::Lost

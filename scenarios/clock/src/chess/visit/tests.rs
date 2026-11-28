@@ -164,6 +164,28 @@ impl Bench {
         }
         panic!("the visit never left");
     }
+
+    /// One tick as the host takes it, with the visit checking its stage
+    /// first against the floor's `support`, `plants` and its world.
+    fn tick_with(&mut self, support: &[(Vec2, Vec2)], plants: &[Area]) -> Option<Event> {
+        let worlds = [&self.world];
+        let scene = Scene {
+            layout: Layout::new(800.0 / 480.0),
+            support,
+            worlds: &worlds,
+            plants,
+            water: None,
+        };
+        self.visit.recheck(&scene);
+        self.tick()
+    }
+}
+
+/// The closed floor's support in the 800×480 view.
+fn closed_floor() -> Vec<(Vec2, Vec2)> {
+    FloorGeometry::closed(Layout::new(800.0 / 480.0))
+        .support()
+        .collect()
 }
 
 /// Lays the floor's `support` in `world`, as the arena keeps it under
@@ -667,6 +689,106 @@ fn a_move_travels_to_its_square_and_the_board_shows_one_revision_throughout() {
     assert_eq!(bench.visit.phase(), Phase::Clearing);
     bench.leave();
     assert_eq!(game(&bench.exhibition).revision().actions, actions);
+}
+
+/// The square whose piece the board marks as picked up, and the squares it
+/// marks for that piece to go to.
+fn picked_of(show: &Show) -> Option<(Square, Squares)> {
+    match show {
+        Show::Board(_, presentation) => presentation
+            .selection
+            .map(|selection| (selection.square, selection.destinations)),
+        _ => None,
+    }
+}
+
+#[test]
+fn the_bird_to_move_takes_its_piece_up_once_it_leans_all_the_way_and_only_from_its_seat() {
+    let mut bench = Bench::new(7);
+    bench.until_play();
+    let reached = |bench: &Bench, bird: Bird| match bird {
+        Bird::Crow => bench.visit.crow().reached(),
+        Bird::Duck => bench.visit.duck().reached(),
+    };
+
+    // The board marks nothing until the bird to move leans all the way over
+    // it, ten ticks into its reach. Then it marks the piece the bird reaches
+    // for and the square it goes to, until the piece sets off.
+    let (bird, mv, reach) = loop {
+        if let Some(Event::Reach {
+            bird,
+            action: Action::Move(mv),
+        }) = bench.tick()
+        {
+            break (bird, mv, bench.ticked);
+        }
+        assert!(bench.ticked < LONGEST, "no bird reached");
+    };
+    let mut marked = 0;
+    let acted = loop {
+        let picked = picked_of(&bench.show());
+        if reached(&bench, bird) {
+            assert_eq!(picked, Some((mv.from, [mv.to].into_iter().collect())));
+            marked += 1;
+        } else {
+            assert_eq!(picked, None, "tick {}", bench.ticked);
+        }
+        if let Some(Event::Act { .. }) = bench.tick() {
+            break bench.ticked;
+        }
+    };
+    assert_eq!(acted - reach, Pace::CLOCK.reach);
+    assert_eq!(marked, Pace::CLOCK.reach - 10);
+    // The piece on its way, the board marks its move instead.
+    assert_eq!(picked_of(&bench.show()), None);
+
+    // A crow knocked off its seat as it reaches holds the turn where it is,
+    // and nothing is marked or moved, until it is back at its seat and leans
+    // all the way again. Then it plays the move it reached for.
+    let (mv, reach) = loop {
+        if let Some(Event::Reach {
+            bird: Bird::Crow,
+            action: Action::Move(mv),
+        }) = bench.tick()
+        {
+            break (mv, bench.ticked);
+        }
+        assert!(bench.ticked < LONGEST, "the crow never reached");
+    };
+    let crow = bench.visit.crow();
+    let away = (crow.position().x - bench.visit.stage().board.center().x).signum();
+    let knock = Vec2::new(away, 1.0) * crow.pitch() * 9.0;
+    bench.visit.drive(&mut bench.world);
+    crate::crow::body::CHESS_CROW.drive(&mut bench.world, knock);
+    bench.world.step(crate::events::duck::DT);
+    assert_eq!(bench.visit.tick(&mut bench.exhibition, &bench.world), None);
+    bench.ticked += 1;
+    let mut flew = 0;
+    let acted = loop {
+        if let Some(Event::Act { bird, action, .. }) = bench.tick() {
+            assert_eq!((bird, action), (Bird::Crow, Action::Move(mv)));
+            assert!(bench.visit.crow().reached());
+            break bench.ticked;
+        }
+        flew += u64::from(bench.visit.crow().task() != crow::Task::Seated);
+        let marked = picked_of(&bench.show()).is_some();
+        assert_eq!(
+            marked,
+            bench.visit.crow().reached(),
+            "tick {}",
+            bench.ticked
+        );
+        assert!(bench.ticked < reach + LONGEST, "the crow never moved");
+    };
+    assert!(flew > 0, "the crow was knocked off its seat");
+    // The turn waited for every tick the crow was away from its seat, and
+    // for the ten it took to lean all the way again.
+    assert!(
+        acted - reach >= Pace::CLOCK.reach + flew,
+        "{} ticks",
+        acted - reach
+    );
+    assert_eq!(bench.visit.trouble(), None);
 }
 
 #[test]
@@ -1603,19 +1725,51 @@ fn over_an_open_drain_the_board_stands_on_a_bank_and_the_duck_keeps_to_it() {
     ] {
         assert!(area.max.x <= -drain || area.min.x >= drain, "{area:?}");
     }
-    // The duck walks in along that bank and sets the case down on it.
+    // The bank holds the stage up. But as the duck walks in along it, the
+    // digits' bars come down on the bank, where the board is to stand, and
+    // the visit packs up before the case is set down. The duck takes the
+    // case away along the bank.
     let bank = stage.board.center().x.signum();
-    let mut ticked = 0;
-    while state.chess_visit().unwrap().phase() == Phase::Arriving {
+    let (mut ticked, mut trouble) = (0, None);
+    while let Some(visit) = state.chess_visit() {
+        assert!(
+            matches!(visit.phase(), Phase::Arriving | Phase::Leaving),
+            "tick {ticked}"
+        );
+        if visit.duck().present() {
+            let at = visit.duck().position();
+            assert!(at.x * bank > drain, "tick {ticked}: {at:?}");
+            assert!(at.y > stage.ground(), "tick {ticked}: {at:?}");
+        }
+        trouble = visit.trouble();
         ticks(&mut state, 1);
         ticked += 1;
-        let visit = state.chess_visit().expect("the visit goes on");
-        let at = visit.duck().position();
-        assert!(at.x * bank > drain, "tick {ticked}: {at:?}");
-        assert!(at.y > stage.ground(), "tick {ticked}: {at:?}");
-        assert!(ticked < LONGEST, "the duck never came");
+        assert!(ticked < LONGEST, "the visit never left");
     }
-    assert_eq!(state.chess_visit().unwrap().phase(), Phase::Opening);
+    assert_eq!(trouble, Some(Trouble::Taken));
+    assert_eq!(own(&state), []);
+}
+
+/// What of a visit's board and birds is in the arena.
+fn own(state: &ClockState) -> Vec<PhysicsId> {
+    entities(state)
+        .into_iter()
+        .filter(|id| [BOARD, DUCK, CROW].contains(id))
+        .collect()
+}
+
+/// Whether every owner of the arena holds no more of it than its claim.
+fn within_claims(state: &ClockState) -> bool {
+    state
+        .arena_state()
+        .claims
+        .iter()
+        .all(|claim| claim.population.within(claim.budget))
+}
+
+/// The number of actions the match in hand has taken.
+fn actions_of(state: &ClockState) -> u32 {
+    game(state.chess()).revision().actions
 }
 
 #[test]
@@ -1648,8 +1802,10 @@ fn nobody_takes_the_chess_birds_over_and_they_are_in_no_other_birds_state() {
     let joined = state.chess_state().expect("the visit goes on");
     assert_eq!(joined.actors, chess.actors);
     assert!(state.crow_state().is_none() && state.crow_states().is_empty());
-    // The player's input moves the player's duck and never the chess duck,
-    // which keeps its seat on their course until the visit packs up.
+    // Their course takes the floor the stage stood on, so the visit is over
+    // before its birds steer again, the chess duck where it sat. The
+    // player's input moves only the player's duck, and no crow visits the
+    // Clock.
     let input = ClockAction::player_duck_input(crate::ClockDuckInput {
         session_id: session,
         player,
@@ -1658,104 +1814,256 @@ fn nobody_takes_the_chess_birds_over_and_they_are_in_no_other_birds_state() {
         run: true,
         dive: false,
     });
-    let mut ticked = 0;
-    while ticked < 600 {
+    ClockScenario::step(&mut state, std::slice::from_ref(&input), Duration::ZERO);
+    let chess = state.chess_state().expect("the visit goes on");
+    assert_eq!(chess.actors[1].position_milli, seated);
+    for ticked in 1..=600 {
         ClockScenario::step(&mut state, std::slice::from_ref(&input), TICK);
-        ticked += 1;
-        let Some(chess) = state.chess_state() else {
-            break;
-        };
-        let duck = chess
-            .actors
-            .iter()
-            .find(|actor| actor.bird == ClockChessBird::Duck);
-        if let Some(actor) = duck.filter(|_| chess.phase != Phase::Leaving) {
-            let moved = (actor.position_milli[0] - seated[0]).abs();
-            assert!(moved < 2_000, "tick {ticked}: the chess duck went {moved}");
-        }
-        // No crow visits the Clock, whatever becomes of the chess crow.
+        assert!(state.chess_state().is_none(), "tick {ticked}");
         assert!(state.crow_state().is_none(), "tick {ticked}");
     }
-    // Whatever became of the visit, the arena holds what its owners claim.
     assert!(state.player_duck_session().is_some());
-    let claims = state.arena_state().claims;
-    assert!(
-        claims
-            .iter()
-            .all(|claim| claim.population.within(claim.budget))
-    );
+    assert!(within_claims(&state));
 }
 
 #[test]
-fn a_visit_a_player_joins_ends_or_plays_on_and_leaves_nothing_of_its_own_behind() {
-    // A player's duck lays its course in place of the floor, with gaps and
-    // raised surfaces about the middle of it, where the board stands. A
-    // visit does not check its stage again, so what becomes of it depends
-    // on what the course leaves under its birds.
-    let own = |state: &ClockState| -> Vec<PhysicsId> {
-        entities(state)
-            .into_iter()
-            .filter(|id| [BOARD, DUCK, CROW].contains(id))
-            .collect()
-    };
-    let (mut ended, mut played_on) = (0, 0);
+fn a_player_who_joins_takes_the_floor_and_the_visit_is_over_where_it_stands() {
+    // A player's duck lays its course in place of the floor the stage stood
+    // on. Whatever the course leaves under the birds, the visit is over
+    // before they steer again, and leaves nothing of its own behind. The
+    // match keeps its moves.
     for seed in 50..58 {
         let mut state = clock(seed);
         state.admit_chess_visit().expect("a visit");
         while state.chess_visit().unwrap().phase() != Phase::Playing {
             ticks(&mut state, 1);
         }
+        ticks(&mut state, 2 * Pace::CLOCK.turn);
+        let actions = actions_of(&state);
+        assert!(actions > 0, "{seed}");
         ClockScenario::step(
             &mut state,
             &[ClockAction::toggle_player_duck(1)],
             Duration::ZERO,
         );
         assert!(state.player_duck_session().is_some(), "{seed}");
-        // A duck left over a gap falls out of the scene, and the visit is
-        // over where it stands. A crow left over one is late six seconds
-        // later, and the duck then carries the board out. Twenty seconds
-        // see the end of either.
-        for _ in 0..20 * 60 {
-            if state.chess_visit().is_none() {
-                break;
-            }
-            ticks(&mut state, 1);
-        }
-        if let Some(visit) = state.chess_visit() {
-            // The course is level under both birds, and they play on
-            // beside the player's duck until the visit is asked to pack up.
-            assert_eq!(visit.phase(), Phase::Playing, "{seed}");
-            assert_eq!(visit.duck().task(), Task::Seated, "{seed}");
-            assert_eq!(visit.crow().task(), crow::Task::Seated, "{seed}");
-            assert_eq!(own(&state), [BOARD, DUCK, CROW], "{seed}");
-            assert!(state.pack_chess_visit());
-            let mut packing = 0;
-            while state.chess_visit().is_some() {
-                ticks(&mut state, 1);
-                packing += 1;
-                assert!(packing < LONGEST, "{seed}");
-            }
-            played_on += 1;
-        } else {
-            ended += 1;
-        }
-        // Either way nothing of the visit is left in the arena or in the
-        // Clock's state, and what holds the arena is within its claims.
+        assert_eq!(state.floor.mode(), ClockFloorMode::EventOwned, "{seed}");
+        assert!(state.chess_visit().is_some(), "{seed}");
+        ticks(&mut state, 1);
+        assert!(state.chess_visit().is_none(), "{seed}");
         assert_eq!(own(&state), [], "{seed}");
         assert!(state.chess_state().is_none(), "{seed}");
-        let claims = state.arena_state().claims;
-        assert!(
-            claims
-                .iter()
-                .all(|claim| claim.population.within(claim.budget)),
-            "{seed}"
+        assert!(within_claims(&state), "{seed}");
+        assert_eq!(actions_of(&state), actions, "{seed}");
+    }
+}
+
+#[test]
+fn a_visit_over_where_it_stands_takes_only_its_own_out_of_the_arena() {
+    // Beside the residents, a visit is played at until a player joins and
+    // its floor is taken, and the run goes on as one that had no visit.
+    let mut reference = furnished(31);
+    let mut state = furnished(31);
+    state.admit_chess_visit().expect("a visit");
+    while state.chess_visit().unwrap().phase() != Phase::Playing {
+        ticks(&mut state, 1);
+        ticks(&mut reference, 1);
+    }
+    let join = [ClockAction::toggle_player_duck(1)];
+    ClockScenario::step(&mut state, &join, Duration::ZERO);
+    ClockScenario::step(&mut reference, &join, Duration::ZERO);
+    for tick in 1..=600 {
+        ticks(&mut state, 1);
+        ticks(&mut reference, 1);
+        assert!(state.chess_visit().is_none(), "tick {tick}");
+        assert_eq!(entities(&state), entities(&reference), "tick {tick}");
+        let (now, without) = (state.arena_accounting(), reference.arena_accounting());
+        assert_eq!(now.steps, without.steps, "tick {tick}");
+        assert_eq!(now.bodies, without.bodies, "tick {tick}");
+        assert_eq!(
+            state.arena.owners(),
+            reference.arena.owners(),
+            "tick {tick}"
         );
     }
-    // These seeds' courses do both.
-    assert!(
-        ended > 0 && played_on > 0,
-        "{ended} ended, {played_on} played on"
+    assert_eq!(
+        state.soil().unwrap().quads(),
+        reference.soil().unwrap().quads()
     );
+    assert_eq!(state.plant_areas(), reference.plant_areas());
+    assert_eq!(state.arena_fixtures(), reference.arena_fixtures());
+    assert!(within_claims(&state));
+    // The match is as the visit left it, for the next to set out.
+    assert_eq!(state.chess().current().unwrap().number(), 1);
+}
+
+#[test]
+fn a_floor_that_goes_from_under_the_duck_ends_the_visit_where_it_stands() {
+    // The board stands in the middle of the floor, over the drain, with the
+    // birds' rooms and ways on the banks. Whenever the floor goes from under
+    // what the duck stands on or walks along, the duck could neither stay
+    // nor take the board away, and the visit is over before its birds steer
+    // again. It leaves nothing of its own behind, and the match keeps its
+    // moves. Falling opens the drain, and Rain takes the floor.
+    let moments = [
+        "walking in",
+        "playing",
+        "putting the pieces away",
+        "carrying the case out",
+    ];
+    for (index, moment) in moments.into_iter().enumerate() {
+        for kind in [ClockEventKind::Falling, ClockEventKind::Rain] {
+            let mut state = clock(70 + index as u64);
+            state.admit_chess_visit().expect("a visit");
+            let stage = *state.chess_visit().unwrap().stage();
+            let drain = Layout::new(state.aspect_ratio()).drain_half_width();
+            assert!(stage.board.min.x < -drain && drain < stage.board.max.x);
+            let mut ticked = 0;
+            loop {
+                let visit = state.chess_visit().expect("the visit goes on");
+                let played =
+                    visit.phase() == Phase::Playing && visit.ticks() >= 2 * Pace::CLOCK.turn;
+                let there = match index {
+                    0 => visit.duck().task() == Task::Bringing && ticked >= 60,
+                    1 => played,
+                    2 => visit.phase() == Phase::Clearing,
+                    _ => visit.duck().task() == Task::Taking,
+                };
+                if there {
+                    break;
+                }
+                if played {
+                    state.pack_chess_visit();
+                }
+                ticks(&mut state, 1);
+                ticked += 1;
+                assert!(ticked < LONGEST, "{moment}: never came");
+            }
+            let actions = actions_of(&state);
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::trigger_event(kind)],
+                Duration::ZERO,
+            );
+            assert_ne!(state.floor.mode(), ClockFloorMode::Closed, "{kind:?}");
+            ticks(&mut state, 1);
+            let what = format!("{moment}, {kind:?}");
+            if kind == ClockEventKind::Falling && index == 3 {
+                // Carrying the case out, the duck is done with the board's
+                // place, and its own way is on a bank. It walks on out.
+                let visit = state.chess_visit().expect("the visit goes on");
+                assert_eq!(visit.trouble(), None, "{what}");
+                while state.chess_visit().is_some() {
+                    ticks(&mut state, 1);
+                    ticked += 1;
+                    assert!(ticked < LONGEST, "{what}: never left");
+                }
+            } else {
+                assert!(state.chess_visit().is_none(), "{what}");
+            }
+            assert_eq!(own(&state), [], "{what}");
+            assert!(state.chess_state().is_none(), "{what}");
+            assert!(within_claims(&state), "{what}");
+            assert_eq!(actions_of(&state), actions, "{what}");
+        }
+    }
+}
+
+#[test]
+fn a_floor_that_goes_from_under_the_crow_alone_sends_it_out_and_the_board_is_packed_up() {
+    let mut bench = Bench::new(13);
+    bench.until_play();
+    let stage = *bench.visit.stage();
+    // While the floor holds the stage up, the birds play on.
+    let whole = closed_floor();
+    for _ in 0..3 * LOOK_TICKS {
+        bench.tick_with(&whole, &[]);
+    }
+    assert_eq!(bench.visit.trouble(), None);
+    assert_eq!(bench.visit.phase(), Phase::Playing);
+
+    // The floor goes from under the crow's room, and stays under the board
+    // and the duck's room and way. The crow flies out at once, and the duck
+    // packs the board up and takes it away. Nothing more is played.
+    let (min, max) = whole[0];
+    let left = match stage.duck {
+        Side::Left => [(min, Vec2::new(stage.board.max.x, max.y))],
+        Side::Right => [(Vec2::new(stage.board.min.x, min.y), max)],
+    };
+    let actions = game(&bench.exhibition).revision().actions;
+    bench.tick_with(&left, &[]);
+    assert_eq!(bench.visit.trouble(), Some(Trouble::CrowFloor));
+    assert_eq!(bench.visit.crow().task(), crow::Task::Going);
+    while !bench.visit.done() {
+        let event = bench.tick_with(&left, &[]);
+        assert!(!matches!(event, Some(Event::Reach { .. })), "{event:?}");
+        assert!(bench.ticked < LONGEST, "the visit never left");
+    }
+    assert!(!bench.visit.abandoned());
+    assert_eq!(bench.visit.trouble(), Some(Trouble::CrowFloor));
+    assert_eq!(bench.owned(), []);
+    assert_eq!(game(&bench.exhibition).revision().actions, actions);
+}
+
+#[test]
+fn what_stays_on_the_stage_has_the_visit_pack_up_and_what_passes_does_not() {
+    let floor = closed_floor();
+    let mut bench = Bench::new(14);
+    bench.until_play();
+    let stage = *bench.visit.stage();
+    // High in the crow's room, over its head.
+    let room = stage.room(stage.duck.other());
+    let at = Vec2::new(room.center().x, room.max.y - 2.0);
+
+    // A body in the room at one look, and gone by the next, leaves the
+    // birds playing.
+    while !bench.visit.looks_now() {
+        bench.tick_with(&floor, &[]);
+    }
+    stand_a_box(&mut bench.world, at, 3.0);
+    bench.tick_with(&floor, &[]);
+    take_the_box(&mut bench.world);
+    for _ in 0..3 * LOOK_TICKS {
+        bench.tick_with(&floor, &[]);
+    }
+    assert_eq!(bench.visit.trouble(), None);
+    assert_eq!(bench.visit.phase(), Phase::Playing);
+
+    // One that stays there for two looks in a row has the visit pack up:
+    // the duck puts the board away and takes it out, and the crow flies out.
+    stand_a_box(&mut bench.world, at, 3.0);
+    let mut waited = 0;
+    while bench.visit.trouble().is_none() {
+        bench.tick_with(&floor, &[]);
+        waited += 1;
+        assert!(waited <= 2 * LOOK_TICKS, "{waited} ticks");
+    }
+    assert_eq!(bench.visit.trouble(), Some(Trouble::Taken));
+    assert!(waited > LOOK_TICKS, "{waited} ticks");
+    take_the_box(&mut bench.world);
+    let actions = game(&bench.exhibition).revision().actions;
+    let mut cleared = false;
+    while !bench.visit.done() {
+        let event = bench.tick_with(&floor, &[]);
+        assert!(!matches!(event, Some(Event::Reach { .. })), "{event:?}");
+        cleared |= bench.visit.phase() == Phase::Clearing;
+        assert!(bench.ticked < LONGEST, "the visit never left");
+    }
+    assert!(cleared && !bench.visit.abandoned());
+    assert_eq!(game(&bench.exhibition).revision().actions, actions);
+
+    // So does a plant that has grown into the duck's room.
+    let mut bench = Bench::new(15);
+    bench.until_play();
+    let room = bench.visit.stage().room(bench.visit.stage().duck);
+    let plant = Area::new(room.min, room.min + Vec2::new(2.0, 6.0));
+    let mut waited = 0;
+    while bench.visit.trouble().is_none() {
+        bench.tick_with(&floor, &[plant]);
+        waited += 1;
+        assert!(waited <= 2 * LOOK_TICKS, "{waited} ticks");
+    }
+    assert_eq!(bench.visit.trouble(), Some(Trouble::Taken));
 }
 
 #[test]

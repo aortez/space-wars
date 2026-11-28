@@ -41,7 +41,7 @@ mod visit;
 /// What a bird of a visit to the board is doing, for whatever draws it or
 /// reports it.
 pub use engine_common::ClockChessPose as Pose;
-pub use visit::{MOVE_TICKS, Phase, Show, Visit};
+pub use visit::{LOOK_TICKS, MOVE_TICKS, Phase, Show, Trouble, Visit};
 
 /// The players.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -358,6 +358,12 @@ impl Play {
             Turn::Reaching(decision) => Some(decision.action),
             _ => None,
         }
+    }
+
+    /// Whether the next tick ends the turn with the action the bird to move
+    /// is reaching to take.
+    pub fn acts_next(&self) -> bool {
+        matches!(self.turn, Turn::Reaching(_)) && self.into + 1 >= self.pace.turn
     }
 
     /// Whether play has stopped: the game has ended, or the match is no
