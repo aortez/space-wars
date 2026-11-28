@@ -339,6 +339,7 @@ impl Rock {
                 tick: before.tick,
                 geometry_generation: before.tick,
                 footprints: bed,
+                transparent: &[],
             },
         )
         .expect("bounded rock light");
@@ -480,6 +481,7 @@ impl GardenLabState {
                 tick: before.tick,
                 geometry_generation: before.tick,
                 footprints: &rock_disks,
+                transparent: &[],
             },
         )
         .expect("bounded garden light");

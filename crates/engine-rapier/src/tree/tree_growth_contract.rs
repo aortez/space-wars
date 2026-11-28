@@ -103,6 +103,7 @@ fn grow(ticks: u64, sun: Vec2) -> (Vec<Observation>, Vec<Vec<Round>>) {
                 tick: o.tick,
                 geometry_generation: o.tick,
                 footprints: &[],
+                transparent: &[],
             },
             &probes,
             &|t| {

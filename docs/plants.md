@@ -217,7 +217,8 @@ from #209; this adapter does not change those inputs or ledger accounting.
 Pass the complete tissue set for one support, across all its organisms, to one
 publication and one publisher per simulation boundary. Use
 `publish_with_occluders` to also supply `WorldOccluders`: world-space disks from
-all other relevant supports, tagged with this exact tick and geometry revision.
+all other relevant supports, tagged with this exact tick and geometry revision,
+and any colliders of this support's world that light passes.
 `publish` is the convenience form for scenes with no external lightweight
 occluders. At most 256 local tissues plus external disks combined (including
 local roots and dead elements) are admitted atomically, before allocation or
@@ -242,10 +243,11 @@ own local boundary contact is exempt under the shared 0.001-world-unit endpoint
 policy. Neighboring tissue, even in the same organism, blocks. Coincident disks
 with distinct identities block one another. A receiver embedded in an ordinary
 solid remains blocked; no organism-wide exclusion exists. Sensors are ignored;
-all other canonical solids (including terrain) block. This initial adapter has
-no transparent physical override. Physical water represented as a collider is
-therefore opaque here; hosts needing transparent water require a scoped policy
-extension rather than silently excluding an entity.
+all other canonical solids (including terrain) block, except the colliders a
+host names in `WorldOccluders::transparent`, at most 256 of this support's
+world. Garden Lab's tree bed names its living wood's bodies, whose tissues
+already shade at their cells. Nothing is excluded unnamed: physical water
+represented as a collider is opaque here until its host names it.
 
 Complete terrain edits, assembly synchronization and the normal canonical step
 before publishing. The adapter copies the canonical query snapshot and derives

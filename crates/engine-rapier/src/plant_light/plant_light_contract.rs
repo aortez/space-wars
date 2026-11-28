@@ -433,6 +433,7 @@ fn plant_light_contract_two_support_tissue_shade_motion_removal_and_replay() {
                     tick,
                     geometry_generation: tick,
                     footprints: disks,
+                    transparent: &[],
                 },
             )
             .unwrap();
@@ -481,6 +482,7 @@ fn plant_light_contract_external_aggregate_caps_identity_and_freshness() {
                 tick,
                 geometry_generation: revision,
                 footprints: disks,
+                transparent: &[],
             },
         )
     };
@@ -682,6 +684,7 @@ fn plant_light_contract_translucent_tissue_passes_the_product_of_its_shares() {
                     tick,
                     geometry_generation: tick,
                     footprints: &[],
+                    transparent: &[],
                 },
                 &[],
                 transmits,
@@ -739,6 +742,7 @@ fn plant_light_contract_probes_measure_empty_cells_and_shade_nothing() {
                 tick,
                 geometry_generation: tick,
                 footprints: &[],
+                transparent: &[],
             },
             probes,
             &|_| 0.0,
@@ -766,5 +770,55 @@ fn plant_light_contract_probes_measure_empty_cells_and_shade_nothing() {
     assert_eq!(
         light.probe([6, 6], 0).err(),
         Some(LightingError::InvalidInput)
+    );
+}
+
+#[test]
+fn plant_light_contract_a_solid_named_transparent_passes_light() {
+    let (mut w, t, g, a) = fixture();
+    // A solid hangs above a blade and the empty cell over it.
+    let blade = shoot(&a, 1, [5, 2]);
+    let above = [5, 3];
+    solid(
+        &mut w,
+        t.cell_center(engine_terrain::CellCoord::new(5, 3)) + Vec2::Y * 2.0,
+        false,
+    );
+    let r = roots(&w, &t, &g, &a);
+    let publish = |publisher: &mut LightingPublisher, tick: u64, transparent: &[ColliderId]| {
+        PlantLight::publish_with_probes(
+            publisher,
+            tick,
+            tick,
+            full_sun(Vec2::Y),
+            &r,
+            std::slice::from_ref(&blade),
+            u64::MAX,
+            WorldOccluders {
+                tick,
+                geometry_generation: tick,
+                footprints: &[],
+                transparent,
+            },
+            &[above],
+            &|_| 0.0,
+        )
+    };
+    let mut publisher = LightingPublisher::default();
+    let shaded = publish(&mut publisher, 0, &[]).unwrap();
+    assert_eq!(shaded.diagnostic(&blade, 0).unwrap().intensity, 0.0);
+    assert_eq!(shaded.probe(above, 0).unwrap().intensity, 0.0);
+    // Named transparent, it passes the light to the tissue and the probe.
+    let id = ColliderId::new(PhysicsId::new(2), ColliderRole::PRIMARY, 0);
+    let lit = publish(&mut publisher, 1, &[id]).unwrap();
+    assert_eq!(lit.diagnostic(&blade, 1).unwrap().intensity, 1000.0);
+    assert_eq!(lit.probe(above, 1).unwrap().intensity, 1000.0);
+    // At most MAX_OPTICAL_EXCLUSIONS colliders pass light.
+    let many: Vec<ColliderId> = (0..=crate::world::MAX_OPTICAL_EXCLUSIONS as u16)
+        .map(|i| ColliderId::new(PhysicsId::new(2), ColliderRole::PRIMARY, i))
+        .collect();
+    assert_eq!(
+        publish(&mut publisher, 2, &many).err(),
+        Some(LightingError::Capacity)
     );
 }

@@ -13,9 +13,14 @@
 //! step, new wood is hinged where its parent now hangs and moves as it moves.
 //! Wood that thickened, or whose needles and cones changed, is reshaped where
 //! it hangs, and its hinge keeps the rest it was joined at. Wood a tree shed,
-//! and a tree that died, stay as dead wood. Living wood's bodies are sensors,
-//! which light passes, since its tissues shade at their cells; dead wood
-//! shades where it lies.
+//! and a tree that died, stay as dead wood.
+//!
+//! Living wood is solid: dead wood and loose snow land on it, and it lands
+//! on the dirt. Living wood passes living wood, since its segments overlap
+//! where they join. Wood that dies lies in the living wood it came away
+//! from, so it passes living wood until it is clear of it, as dead wood does
+//! that living wood grows into. Light passes living wood's bodies, since its
+//! tissues shade at their cells; dead wood shades where it lies.
 use super::*;
 use engine_material::{Beam, Connection, FailureMode, Material};
 use std::f32::consts::FRAC_PI_2;
@@ -52,15 +57,32 @@ const SNOW: RenderColor = RenderColor::rgb(0.88, 0.94, 1.0);
 /// dirt's and the shade's, and are never reused.
 const FIRST_ENTITY: u64 = 16;
 const WOOD_GROUP: u32 = 1 << 8;
-/// Living wood touches nothing. Its hinges hold it, and its segments overlap
-/// where they join and where the trunk meets the dirt.
-const LIVING: CollisionGroups = CollisionGroups::NONE;
-/// Dead wood, and snow that slid off it, lands on the dirt and passes through
-/// wood.
+const LIVING_GROUP: u32 = 1 << 9;
+const PARTING_GROUP: u32 = 1 << 10;
+/// Living wood stops all but living wood, whose segments overlap where they
+/// join, and wood that is parting from it. A hinge's two bodies never touch,
+/// so a trunk's foot stands in the dirt it is hinged to.
+const LIVING: CollisionGroups = CollisionGroups {
+    memberships: LIVING_GROUP,
+    filter: !(LIVING_GROUP | PARTING_GROUP),
+};
+/// Dead wood, and snow that slid off it, lands on the dirt and on living
+/// wood, and passes through dead wood.
 const DEAD_WOOD: CollisionGroups = CollisionGroups {
     memberships: WOOD_GROUP,
-    filter: !WOOD_GROUP,
+    filter: !(WOOD_GROUP | PARTING_GROUP),
 };
+/// Dead wood or loose snow that lies in living wood passes through all wood
+/// until it is clear, and lands on the dirt.
+const PARTING: CollisionGroups = CollisionGroups {
+    memberships: PARTING_GROUP,
+    filter: !(WOOD_GROUP | LIVING_GROUP | PARTING_GROUP),
+};
+/// Snow fastened to wood touches nothing: its fastening holds it.
+const FASTENED: CollisionGroups = CollisionGroups::NONE;
+/// Two boxes that overlap by less than this, in cells, count as clear of
+/// each other.
+const CLEAR: f32 = 0.01;
 /// What fastens snow to wood: far stronger than any load it carries, so it
 /// never charges.
 const FASTENING: Material = Material {
@@ -172,15 +194,17 @@ impl Segment {
         ColliderId::new(self.entity, ColliderRole::PRIMARY, 0)
     }
 
-    /// Its box. Living, it is a sensor that touches nothing, which light
-    /// passes. Dead, it lands on the dirt and shades.
-    fn shape(&self, living: bool) -> ColliderSpec {
+    /// Its box, which touches what `groups` lets it.
+    fn shape(&self, groups: CollisionGroups) -> ColliderSpec {
         let mut collider =
             ColliderSpec::cuboid(self.collider(), 0.5 * self.width, 0.5 * self.length);
         collider.mass_properties = Some(self.mass);
-        collider.sensor = living;
-        collider.collision_groups = if living { LIVING } else { DEAD_WOOD };
+        collider.collision_groups = groups;
         collider
+    }
+
+    fn half(&self) -> Vec2 {
+        Vec2::new(0.5 * self.width, 0.5 * self.length)
     }
 
     /// The beam of its hinge: wood with a square section as wide as the
@@ -201,6 +225,8 @@ impl Segment {
 #[derive(Clone, Debug)]
 pub struct Dead {
     pub segment: Segment,
+    /// Whether it lies in living wood, and so passes through all wood.
+    pub parting: bool,
     drawing: Vec<(i32, RenderPrimitive)>,
     /// Wood that died together shares a death, and is cleared together.
     death: u32,
@@ -216,6 +242,9 @@ pub struct Snow {
     pub on: u64,
     /// Whether it still lies on that wood, or slid off as the wood died.
     pub fastened: bool,
+    /// Whether, slid off, it lies in living wood, and so passes through all
+    /// wood.
+    pub parting: bool,
     /// The share of its weight it started from, and how long it has built up.
     from: f32,
     age: f32,
@@ -296,6 +325,34 @@ impl Moved {
             }
             RenderPrimitive::Text(t) => RenderPrimitive::Text(t),
         }
+    }
+}
+
+/// A box as its body lies: its center, its angle and its half extents.
+#[derive(Clone, Copy, Debug)]
+struct Lying {
+    center: Vec2,
+    angle: f32,
+    half: Vec2,
+}
+
+impl Lying {
+    /// Whether the boxes overlap by more than `CLEAR`: no side of either
+    /// separates them.
+    fn overlaps(&self, other: &Lying) -> bool {
+        let between = other.center - self.center;
+        [self.angle, other.angle].into_iter().all(|angle| {
+            [Vec2::X, Vec2::Y].into_iter().all(|side| {
+                let axis = side.rotate_radians(angle);
+                between.dot(axis).abs() + CLEAR < self.reach(axis) + other.reach(axis)
+            })
+        })
+    }
+
+    /// How far the box reaches from its center along the unit `axis`.
+    fn reach(&self, axis: Vec2) -> f32 {
+        Vec2::X.rotate_radians(self.angle).dot(axis).abs() * self.half.x
+            + Vec2::Y.rotate_radians(self.angle).dot(axis).abs() * self.half.y
     }
 }
 
@@ -452,7 +509,7 @@ impl TreeBed {
                 angular_damping: DRAG,
                 ..Default::default()
             },
-            &[segment.shape(true)],
+            &[segment.shape(LIVING)],
         ));
         let (from, to) = (self.at(parent.cell), self.at(t.cell));
         self.world
@@ -470,6 +527,7 @@ impl TreeBed {
             )
             .expect("a fresh hinge between two bodies");
         self.wood.living.insert(t.id, segment);
+        self.part(&segment);
     }
 
     /// Bring the bodies in step with what growth did at a boundary, before
@@ -521,7 +579,7 @@ impl TreeBed {
         assert!(self.world.replace_colliders(
             segment.body(),
             ColliderRole::PRIMARY,
-            &[segment.shape(true)]
+            &[segment.shape(LIVING)]
         ));
         // Mass first, so that the hinge is damped for the body as it is now.
         self.world.refresh_mass_properties(segment.body());
@@ -564,6 +622,93 @@ impl TreeBed {
                 self.world.remove_connection(joint);
             }
         }
+        self.settle();
+    }
+
+    /// How a segment's box lies now.
+    fn lying(&self, segment: &Segment) -> Option<Lying> {
+        let motion = self.world.motion(segment.body())?;
+        Some(Lying {
+            center: motion.position,
+            angle: motion.angle,
+            half: segment.half(),
+        })
+    }
+
+    /// How the snow's box lies now.
+    fn snow_lying(&self, snow: &Snow) -> Option<Lying> {
+        let motion = self.world.motion(snow.body())?;
+        Some(Lying {
+            center: motion.position,
+            angle: motion.angle,
+            half: SNOW_HALF,
+        })
+    }
+
+    /// Dead wood and loose snow that the living `segment` lies in pass
+    /// through wood until they are clear of it: living wood has grown into
+    /// them, or was built where they lie.
+    fn part(&mut self, segment: &Segment) {
+        let Some(grown) = self.lying(segment) else {
+            return;
+        };
+        for i in 0..self.wood.dead.len() {
+            let dead = self.wood.dead[i].segment;
+            if !self.wood.dead[i].parting && self.lying(&dead).is_some_and(|l| l.overlaps(&grown)) {
+                self.world.set_collision_groups(dead.collider(), PARTING);
+                self.wood.dead[i].parting = true;
+            }
+        }
+        if let Some(snow) = self.wood.snow
+            && !snow.fastened
+            && !snow.parting
+            && self.snow_lying(&snow).is_some_and(|l| l.overlaps(&grown))
+        {
+            self.world.set_collision_groups(snow.collider(), PARTING);
+            self.wood.snow = Some(Snow {
+                parting: true,
+                ..snow
+            });
+        }
+    }
+
+    /// Dead wood and loose snow that have come clear of the living wood no
+    /// longer pass through wood.
+    fn settle(&mut self) {
+        let snow = self.wood.snow.filter(|s| s.parting);
+        if snow.is_none() && !self.wood.dead.iter().any(|d| d.parting) {
+            return;
+        }
+        let living: Vec<Lying> = self
+            .wood
+            .living
+            .values()
+            .filter_map(|s| self.lying(s))
+            .collect();
+        let clear =
+            |own: Option<Lying>| own.is_some_and(|o| !living.iter().any(|l| l.overlaps(&o)));
+        for i in 0..self.wood.dead.len() {
+            let dead = self.wood.dead[i].segment;
+            if self.wood.dead[i].parting && clear(self.lying(&dead)) {
+                self.world.set_collision_groups(dead.collider(), DEAD_WOOD);
+                self.wood.dead[i].parting = false;
+            }
+        }
+        if let Some(snow) = snow
+            && clear(self.snow_lying(&snow))
+        {
+            self.world.set_collision_groups(snow.collider(), DEAD_WOOD);
+            self.wood.snow = Some(Snow {
+                parting: false,
+                ..snow
+            });
+        }
+    }
+
+    /// The living wood's colliders, which light passes: its tissues shade at
+    /// their cells.
+    pub(super) fn living_colliders(&self) -> Vec<ColliderId> {
+        self.wood.living.values().map(Segment::collider).collect()
     }
 
     /// The wood beyond a broken or cut hinge leaves its tree, as in a cut, and
@@ -608,13 +753,16 @@ impl TreeBed {
             if parted || broken {
                 self.world.remove_connection(segment.hinge());
             }
+            // It lies in the wood it came away from until a step finds it
+            // clear.
             assert!(self.world.replace_colliders(
                 segment.body(),
                 ColliderRole::PRIMARY,
-                &[segment.shape(false)]
+                &[segment.shape(PARTING)]
             ));
             self.wood.dead.push(Dead {
                 segment,
+                parting: true,
                 drawing: drawings.remove(id).unwrap_or_default(),
                 death,
             });
@@ -626,10 +774,11 @@ impl TreeBed {
         {
             // It slides off, and falls with its full weight.
             self.world.remove_connection(snow.fastening());
-            self.world.set_collision_groups(snow.collider(), DEAD_WOOD);
+            self.world.set_collision_groups(snow.collider(), PARTING);
             self.world.set_gravity_scale(snow.body(), 1.0, true);
             snow.from = 1.0;
             snow.fastened = false;
+            snow.parting = true;
         }
         while self.wood.dead.len() > self.wood.max_dead {
             let first = self.wood.dead[0].death;
@@ -681,6 +830,7 @@ impl TreeBed {
             mass,
             on,
             fastened: true,
+            parting: false,
             from: previous
                 .filter(|s| s.on == on)
                 .map_or(0.0, |s| (s.share() * s.mass / mass).min(1.0)),
@@ -694,7 +844,7 @@ impl TreeBed {
             mass,
             inertia: mass * SNOW_HALF.length_squared() / 3.0,
         });
-        collider.collision_groups = LIVING;
+        collider.collision_groups = FASTENED;
         assert!(self.world.insert_body(
             snow.body(),
             BodySpec {
