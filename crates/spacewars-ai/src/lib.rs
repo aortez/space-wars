@@ -8,7 +8,9 @@
 
 #![forbid(unsafe_code)]
 
+pub mod c3;
 pub mod combat_pilot;
+pub mod evolution_draws;
 pub mod flight_pilot;
 mod flight_prediction;
 pub mod flight_stack;

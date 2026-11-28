@@ -5961,6 +5961,7 @@ dependencies = [
  "engine-common",
  "engine-core",
  "engine-rapier",
+ "scenario-clock",
  "scenario-spacewars",
  "serde",
  "serde_json",

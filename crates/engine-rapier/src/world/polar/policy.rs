@@ -2,7 +2,10 @@
 use super::*;
 
 mod creature;
-pub use creature::{CREATURE_SELF_FEATURES, CreatureBody, CreatureContext, CreatureObservation};
+pub use creature::{
+    CREATURE_OBJECT_WIDTH, CREATURE_SELF_FEATURES, CreatureBody, CreatureContext,
+    CreatureObservation,
+};
 
 pub const BAND_EDGES_BODY_LENGTHS: [f32; 24] = [
     0., 0.25, 0.5, 0.75, 1., 1.375, 1.75, 2.25, 2.875, 3.625, 4.5, 5.5, 6.75, 8.25, 10., 12.,

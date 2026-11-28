@@ -112,14 +112,25 @@ durable. Bound weights per genome and bytes per checkpoint. A missing genome
 makes resume fail with its ID. Keep the existing dense checkpoint reader for
 the arrival recipes. [Evolution storage](../../crates/engine-agent/src/evolution.rs)
 
-Take one observation and decision every six simulation ticks, holding the
-result between decisions. Schedule visits and detect contacts and falls every
-physics tick. Compare the same jump inputs on the same courses at one- and
-six-tick cadence, including narrow landings and both entrances. If six ticks
-lose jumps the per-tick control can make, measure a shorter interval before
-freezing the creature contract. Record decision cadence in the genome and
-replay contract. Report observation and inference cost separately and measure
-episodes per second. [C3 inference](../../crates/spacewars-ai/src/learned_flight.rs) · [#753](https://github.com/aortez/space-wars/issues/753)
+The creature v1 takes one observation and decision every three simulation
+ticks and holds the controls between decisions. Physics, contacts and falls
+advance every tick. The initial six-tick interval missed a landing on
+Platforms from both doors when running and holding jump for six ticks out of
+each fifteen. Per-tick control exited at tick 1451 with four clears. With
+six-tick decisions the duck fell at tick 1375 after one clear. At three
+ticks the outcomes and landings matched per-tick control on all four course
+patterns from both doors, for both one- and six-tick jump pulses. The genome
+and replay record the cadence. [C3 inference](../../crates/spacewars-ai/src/c3.rs)
+· [#753](https://github.com/aortez/space-wars/issues/753)
+
+The creature C3 has 39,028 parameters. The closed-loop benchmark drives
+one random genome through two Platforms cases from both doors. Those four
+short visits took 567 physics ticks and 142 decisions on each host. Across
+three single-worker runs with the optimized CI profile, median inference
+took 72–73 µs on a Ryzen 7 9800X3D and 622–630 µs on sw-picade-2 (Pi 4).
+Throughput including sensing and physics was 14.7–23.8 episodes/s on the
+desktop and 6.92–7.13 episodes/s on the Pi. Episode throughput varies with
+the time each candidate stays alive. [Clock C3 benchmark](../../crates/spacewars-ai/examples/duck_c3_benchmark.rs)
 
 ## Duck arrival recipe
 
