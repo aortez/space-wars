@@ -5,7 +5,7 @@ use crate::events::{
 };
 
 fn moving_panels(event: &TestDuck) -> [bool; 2] {
-    let mut active = door_panels(Some(&event.duck)).map(|panel| panel.is_some());
+    let mut active = door_panels(Some(&event.duck), None).map(|panel| panel.is_some());
     if event.direction < 0.0 {
         active.reverse();
     }
@@ -24,7 +24,7 @@ fn entrance_panel_returns_flush_after_closing_and_stays_closed() {
             while event.phase == EventPhase::Opening {
                 assert!(!event.step(), "opening must finish within the event");
             }
-            let panel = door_panels(Some(&event.duck))
+            let panel = door_panels(Some(&event.duck), None)
                 .into_iter()
                 .flatten()
                 .next()

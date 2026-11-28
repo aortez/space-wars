@@ -431,12 +431,17 @@ fn clock_moves(state: &ClockState) -> &[Move] {
     state.chess().current().expect("a match").game().moves()
 }
 
-/// Ticks from a visit's admission to its first tick of play.
-fn setup_ticks() -> u64 {
-    [Phase::Arriving, Phase::Opening, Phase::Placing]
-        .iter()
-        .map(|phase| phase.ticks().expect("a timed phase"))
-        .sum()
+/// Ticks `state` until the birds of its visit play, and returns how many
+/// ticks that took: the visit's setup.
+fn set_up(state: &mut ClockState) -> u64 {
+    for ticks in 0..2_000 {
+        let visit = state.chess_visit().expect("a visit");
+        if visit.phase() == Phase::Playing {
+            return ticks;
+        }
+        ClockScenario::step(state, &[], TICK);
+    }
+    panic!("the visit never set its board up");
 }
 
 #[test]
@@ -460,8 +465,14 @@ fn the_board_takes_only_ticks_that_move_and_pays_no_heed_to_the_time_of_day() {
     }
     let visit = busy.chess_visit().expect("a visit");
     assert_eq!((visit.phase(), visit.ticks()), (Phase::Arriving, 0));
+    assert_eq!(visit.duck().ticks(), 0, "nor does the duck take a step");
 
-    let setup = setup_ticks();
+    // The same visit in another Clock tells how long its setup takes.
+    let setup = {
+        let mut reference = clock(21);
+        reference.admit_chess_visit().expect("a visit");
+        set_up(&mut reference)
+    };
     for tick in 1..=setup + 600 {
         let actions = match tick.checked_sub(setup) {
             Some(100) => vec![ClockAction::set_reading(at(10, 0, 0))],
@@ -489,11 +500,11 @@ fn a_resize_ends_the_visit_and_the_match_goes_on_at_the_next_but_not_into_a_new_
             ClockScenario::step(state, &[], TICK);
         }
     };
-    let setup = setup_ticks();
     let turn = Pace::CLOCK.turn;
     let mut reference = clock(22);
     reference.admit_chess_visit().expect("a visit");
-    ticks(&mut reference, setup + 3 * turn);
+    let setup = set_up(&mut reference);
+    ticks(&mut reference, 3 * turn);
     let moves = clock_moves(&reference).to_vec();
     assert_eq!(moves.len(), 3);
 
@@ -503,17 +514,21 @@ fn a_resize_ends_the_visit_and_the_match_goes_on_at_the_next_but_not_into_a_new_
     let aspect_ratio = state.aspect_ratio();
     state.set_aspect_ratio(aspect_ratio * 0.8);
     assert_ne!(state.aspect_ratio(), aspect_ratio);
-    // A resize takes the board away at once, with its claim on the arena.
+    // A resize takes the board and the duck away at once, with their claim
+    // on the arena.
     assert!(state.chess_visit().is_none(), "a resize ends the visit");
+    assert!(state.chess_state().is_none());
     assert!(!state.arena.holds(crate::arena::Owner::Chess));
     let board =
         engine_rapier::world::PhysicsId::new(crate::arena::ids::canonical::CHESS_BOARD.start);
-    assert!(
-        state
-            .arena
-            .world()
-            .is_none_or(|world| !world.contains_entity(board))
-    );
+    for entity in [board, duck::ENTITY] {
+        assert!(
+            state
+                .arena
+                .world()
+                .is_none_or(|world| !world.contains_entity(entity))
+        );
+    }
 
     // Away from the board, nothing is played.
     ticks(&mut state, 1_000);
@@ -522,7 +537,8 @@ fn a_resize_ends_the_visit_and_the_match_goes_on_at_the_next_but_not_into_a_new_
     // The next visit sets the board up in the new view, and plays on from
     // where the last left off.
     assert_eq!(state.admit_chess_visit(), Ok(()));
-    ticks(&mut state, setup + turn);
+    set_up(&mut state);
+    ticks(&mut state, turn);
     assert_eq!(state.chess().current().expect("a match").number(), 1);
     assert_eq!(clock_moves(&state), moves);
 

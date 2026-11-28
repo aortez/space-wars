@@ -1,14 +1,24 @@
 //! The chess board below the digits: packed in its case, opening out of it
-//! into a board, set up with the match's pieces, and folding away again.
+//! into a board, set up with the match's pieces, and folding away again. And
+//! the duck that brings it, plays at it and takes it away.
 //!
 //! The board stands on the floor in front of the plants, so it is drawn on
 //! the floor's layer after them. The spotlights do not warm that layer, and
-//! the board keeps the colours its pieces were qualified in.
+//! the board keeps the colours its pieces were qualified in. The duck is
+//! drawn as a visiting duck is, by the same silhouette on the same layer, in
+//! front of the board and of the case it holds.
 
 use engine_chess_board::{DARK_SQUARE, FRAME_COLOR, FRAME_SHARE, LIGHT_SQUARE};
 
 use super::*;
-use crate::chess::{Exhibition, Show, Visit, stage::Area};
+use crate::chess::{Exhibition, Show, Visit, duck::Duck, stage::Area};
+
+#[cfg(test)]
+mod tests;
+
+// The duck is drawn in front of its board and of the case it holds, and
+// behind the door it comes through.
+const _: () = assert!(ARENA_LAYER < ACTIVE_CELL_LAYER && ACTIVE_CELL_LAYER < frame::DOOR_LAYER);
 
 /// The case's lid line, as a share of its height from its foot, and its
 /// width as a share of the case's height.
@@ -22,6 +32,7 @@ const CLASP_COLOR: RenderColor = RenderColor::rgb(0.78, 0.62, 0.30);
 /// The fold down the middle of an opening board, as a share of its width.
 const FOLD: f32 = 0.012;
 
+/// The visit's board, as it stands or as the duck has it.
 pub(super) fn render(frame: &mut RenderFrame, visit: &Visit, exhibition: &Exhibition) {
     match visit.show(exhibition) {
         Show::Case(case) => self::case(frame, case),
@@ -32,6 +43,27 @@ pub(super) fn render(frame: &mut RenderFrame, visit: &Visit, exhibition: &Exhibi
         Show::Board(board, presentation) => {
             engine_chess_board::draw(frame, ARENA_LAYER, &board, &presentation);
         }
+    }
+}
+
+/// The visit's birds, drawn with the Clock's other visitors.
+pub(super) fn render_birds(frame: &mut RenderFrame, visit: &Visit) {
+    let duck = visit.duck();
+    if duck.present() {
+        super::duck::silhouette(frame, &pose(duck), &|point| point);
+    }
+}
+
+/// The chess duck as its silhouette is drawn, in the world's own frame.
+fn pose(duck: &Duck) -> super::duck::Pose {
+    super::duck::Pose {
+        position: duck.position(),
+        radius: duck.radius(),
+        facing: duck.facing(),
+        stride: duck.stride(),
+        hanging: false,
+        lean: duck.lean(),
+        hop: duck.hop(),
     }
 }
 

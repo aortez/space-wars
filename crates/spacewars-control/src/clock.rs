@@ -87,6 +87,11 @@ pub struct ClockState {
     pub stranded: Option<engine_common::ClockStrandedState>,
     #[serde(default)]
     pub spider: Option<engine_common::ClockSpiderState>,
+    /// The visit to the chess board, with its board and its birds, while
+    /// there is one. Its duck and its crow are the visit's own: they are not
+    /// in `duck`, `crow` or `crows`, and nobody takes them over.
+    #[serde(default)]
+    pub chess: Option<engine_common::ClockChessState>,
     #[serde(default)]
     pub explosion: Option<engine_common::ClockExplosionState>,
     #[serde(default)]
@@ -510,6 +515,7 @@ mod tests {
             crows: Vec::new(),
             stranded: None,
             spider: None,
+            chess: None,
             explosion: None,
             coins: None,
             lamps: None,
@@ -630,6 +636,83 @@ mod tests {
             assert!(json.contains(named), "{named} in {json}");
         }
         assert_eq!(ClockState::from_json(&json).unwrap(), state);
+    }
+
+    #[test]
+    fn a_chess_visit_round_trips_with_its_birds_and_an_older_payload_has_none() {
+        use engine_common::{
+            ClockChessActor, ClockChessBird, ClockChessPhase, ClockChessPose, ClockChessState,
+        };
+        let mut state = clock_state();
+        state.chess = Some(ClockChessState {
+            visit_id: 3,
+            match_number: 2,
+            phase: ClockChessPhase::Playing,
+            phase_tick: 245,
+            actions: 17,
+            board_milli: [-45_067, -201_600, 45_067, -111_467],
+            actors: vec![ClockChessActor {
+                bird: ClockChessBird::Duck,
+                white: true,
+                pose: ClockChessPose::Moving,
+                position_milli: [-63_100, -194_660],
+                facing_right: true,
+                carrying: false,
+            }],
+        });
+        let json = state.to_json().unwrap();
+        for named in [
+            r#""phase":"playing""#,
+            r#""bird":"duck""#,
+            r#""pose":"moving""#,
+            r#""visit_id":3"#,
+            r#""match_number":2"#,
+        ] {
+            assert!(json.contains(named), "{named} in {json}");
+        }
+        assert_eq!(ClockState::from_json(&json).unwrap(), state);
+        // The visit's birds are its own: the duck's and the crows' states
+        // say nothing of them.
+        assert!(state.duck.is_none() && state.player_duck.is_none());
+        assert_eq!(state.visiting_crows().count(), 0);
+
+        // Each phase, bird and pose goes by its own name.
+        for phase in [
+            ClockChessPhase::Arriving,
+            ClockChessPhase::Opening,
+            ClockChessPhase::Placing,
+            ClockChessPhase::Playing,
+            ClockChessPhase::Clearing,
+            ClockChessPhase::Closing,
+            ClockChessPhase::Leaving,
+        ] {
+            let name = serde_json::to_value(phase).unwrap();
+            assert_eq!(name.as_str(), Some(phase.as_str()));
+        }
+        for pose in [
+            ClockChessPose::Arriving,
+            ClockChessPose::Setting,
+            ClockChessPose::Waiting,
+            ClockChessPose::Moving,
+            ClockChessPose::Won,
+            ClockChessPose::Lost,
+            ClockChessPose::Drawn,
+            ClockChessPose::Packing,
+            ClockChessPose::Leaving,
+        ] {
+            let name = serde_json::to_value(pose).unwrap();
+            assert_eq!(name.as_str(), Some(pose.as_str()));
+        }
+        for bird in [ClockChessBird::Crow, ClockChessBird::Duck] {
+            let name = serde_json::to_value(bird).unwrap();
+            assert_eq!(name.as_str(), Some(bird.as_str()));
+        }
+
+        // A payload from before the visit was published has none.
+        let mut older: serde_json::Value = serde_json::from_str(&json).unwrap();
+        older.as_object_mut().unwrap().remove("chess");
+        let older = ClockState::from_json(&older.to_string()).unwrap();
+        assert_eq!(older.chess, None);
     }
 
     #[test]

@@ -24,7 +24,11 @@ impl DoorPanel {
 
 pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
     let width = layout.frame_width;
-    let doors = door_panels(state.duck_scene().as_deref());
+    let chess = state
+        .chess_visit
+        .as_ref()
+        .and_then(|visit| visit.duck().door());
+    let doors = door_panels(state.duck_scene().as_deref(), chess);
     inner_shadow(frame, layout, width, doors);
     for door in doors.into_iter().flatten() {
         door_shadow(frame, door, width);
@@ -211,11 +215,17 @@ fn door_shadow(frame: &mut RenderFrame, door: DoorPanel, width: f32) {
 
 // The door is the rail itself, mounted at its outer top corner. Rotate the
 // original bevel and grain with it so a closed flap rejoins the wall exactly.
-fn door_panels(event: Option<&DuckEvent>) -> [Option<DoorPanel>; 2] {
+// A visiting duck's doors are bodies in its arena. The chess duck's door is
+// only drawn, on its side, unless a visiting duck has a door there.
+fn door_panels(event: Option<&DuckEvent>, chess: Option<DoorPanel>) -> [Option<DoorPanel>; 2] {
     let mut panels = [None; 2];
+    let side = |panel: &DoorPanel| usize::from(panel.hinge.x > 0.0);
+    if let Some(panel) = chess {
+        panels[side(&panel)] = Some(panel);
+    }
     if let Some(event) = event {
         for panel in event.door_panels().into_iter().flatten() {
-            panels[usize::from(panel.hinge.x > 0.0)] = Some(panel);
+            panels[side(&panel)] = Some(panel);
         }
     }
     panels

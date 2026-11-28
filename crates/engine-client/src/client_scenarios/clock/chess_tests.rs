@@ -4,8 +4,12 @@ use crate::gpu_scene::{mesh::MeshBuilder, plan};
 use crate::thruster_visual_tests::{svg, write_png};
 use engine_chess::{Color, Square};
 use engine_chess_board::{DARK_SQUARE, LIGHT_SQUARE, MAX_PRIMITIVES};
-use engine_common::{ClockEventProfile, ClockLampMode, ClockTimeFormat, RenderColor, RenderRect};
-use scenario_clock::chess::{Pace, Phase};
+use engine_common::{
+    ClockEventProfile, ClockLampMode, ClockTimeFormat, RenderColor, RenderPoint, RenderRect,
+};
+use scenario_clock::chess::duck::{Duck, LOWER_TICKS, TURN_TICKS, Task};
+use scenario_clock::chess::stage::Side;
+use scenario_clock::chess::{Bird, Exhibition, Phase, Pose, Show, Visit};
 use slint::{Rgb8Pixel, SharedPixelBuffer};
 
 /// The sizes the board is qualified at, and the desktop's window, where the
@@ -73,27 +77,6 @@ fn pixels_of(rect: RenderRect, viewport: Viewport) -> Pixels {
     ]
 }
 
-/// The least rectangle holding every pixel that differs between `a` and `b`,
-/// by the pixels' edges.
-fn changed(a: &SharedPixelBuffer<Rgb8Pixel>, b: &SharedPixelBuffer<Rgb8Pixel>) -> Option<Pixels> {
-    let width = a.width() as usize;
-    let mut bounds: Option<Pixels> = None;
-    for (index, (now, before)) in a.as_slice().iter().zip(b.as_slice()).enumerate() {
-        if !differs(*now, *before) {
-            continue;
-        }
-        let (x, y) = ((index % width) as f32, (index / width) as f32);
-        let within = bounds.get_or_insert([x, y, x + 1.0, y + 1.0]);
-        *within = [
-            within[0].min(x),
-            within[1].min(y),
-            within[2].max(x + 1.0),
-            within[3].max(y + 1.0),
-        ];
-    }
-    bounds
-}
-
 /// Whether two pixels differ by more than a backend's rounding.
 fn differs(a: Rgb8Pixel, b: Rgb8Pixel) -> bool {
     a.r.abs_diff(b.r)
@@ -131,40 +114,144 @@ fn is(pixel: Rgb8Pixel, color: RenderColor) -> bool {
     )
 }
 
-/// A visit's board is drawn by the CPU raster and the vector paths where its
-/// stage stands, at every size the board is qualified at: packed, opening,
-/// being set up, in play with a move on its way, and packed away again. The
-/// GPU scene prepares each of those frames. Nothing else in the view changes
-/// for the board: not the digits, which go on telling the time, the AM/PM
-/// letters or the date. With `SPACEWARS_CLOCK_ARTIFACTS` set, each path's
-/// pixels and the vector path's shapes are written there.
+/// The least rectangle holding every pixel within `clip` that differs
+/// between `a` and `b`.
+fn changed_in(
+    a: &SharedPixelBuffer<Rgb8Pixel>,
+    b: &SharedPixelBuffer<Rgb8Pixel>,
+    clip: Pixels,
+) -> Option<Pixels> {
+    let width = a.width() as usize;
+    let mut bounds: Option<Pixels> = None;
+    for (index, (now, before)) in a.as_slice().iter().zip(b.as_slice()).enumerate() {
+        let (x, y) = ((index % width) as f32, (index / width) as f32);
+        if !differs(*now, *before) || !within([x, y, x + 1.0, y + 1.0], clip, 0.0) {
+            continue;
+        }
+        let within = bounds.get_or_insert([x, y, x + 1.0, y + 1.0]);
+        *within = [
+            within[0].min(x),
+            within[1].min(y),
+            within[2].max(x + 1.0),
+            within[3].max(y + 1.0),
+        ];
+    }
+    bounds
+}
+
+/// A pixel that differs between `a` and `b` and lies in none of `allowed`,
+/// give or take `slack` pixels, if there is one.
+fn stray(
+    a: &SharedPixelBuffer<Rgb8Pixel>,
+    b: &SharedPixelBuffer<Rgb8Pixel>,
+    allowed: &[Pixels],
+    slack: f32,
+) -> Option<(usize, usize)> {
+    let width = a.width() as usize;
+    a.as_slice()
+        .iter()
+        .zip(b.as_slice())
+        .enumerate()
+        .filter(|(_, (now, before))| differs(**now, **before))
+        .map(|(index, _)| (index % width, index / width))
+        .find(|&(x, y)| {
+            let pixel = [x as f32, y as f32, x as f32 + 1.0, y as f32 + 1.0];
+            !allowed.iter().any(|area| within(pixel, *area, slack))
+        })
+}
+
+/// The pixels a duck may be drawn in, however it leans or hops: its
+/// silhouette is under five radii long and three high.
+fn duck_pixels(duck: &Duck, viewport: Viewport) -> Pixels {
+    let (at, radius) = (duck.position(), duck.radius());
+    pixels_of(
+        RenderRect {
+            min: RenderPoint::new(at.x - radius * 3.2, at.y - radius * 1.2),
+            max: RenderPoint::new(at.x + radius * 3.2, at.y + radius * 2.7),
+        },
+        viewport,
+    )
+}
+
+/// How far along its way between the edge of the view and its room the duck
+/// is, from 0 at the edge to 1 at its room.
+fn along_its_way(visit: &Visit) -> f32 {
+    let stage = visit.stage();
+    let way = stage.way(stage.duck);
+    let from_left = (visit.duck().position().x - way.min.x) / way.width();
+    match stage.duck {
+        Side::Left => from_left,
+        Side::Right => 1.0 - from_left,
+    }
+}
+
+/// How far a move is on its way across the board, if one is.
+fn move_on_its_way(visit: &Visit, exhibition: &Exhibition) -> Option<f32> {
+    match visit.show(exhibition) {
+        Show::Board(_, presentation) => presentation.transition.map(|moving| moving.progress),
+        _ => None,
+    }
+}
+
+/// A moment of a visit, by what the visit and its match have come to.
+type Moment = (&'static str, Phase, fn(&Visit, &Exhibition) -> bool);
+
+/// The moments a visit is drawn at, in the order they come.
+const MOMENTS: [Moment; 13] = [
+    ("01-coming", Phase::Arriving, |visit, _| {
+        visit.duck().task() == Task::Bringing && along_its_way(visit) >= 0.5
+    }),
+    ("02-setting-down", Phase::Arriving, |visit, _| {
+        visit.duck().task() == Task::Lowering && visit.duck().ticks() >= LOWER_TICKS / 2
+    }),
+    ("03-opening", Phase::Opening, |visit, _| visit.ticks() >= 22),
+    ("04-placing", Phase::Placing, |visit, _| visit.ticks() >= 60),
+    ("05-set", Phase::Playing, |_, _| true),
+    ("06-first-move", Phase::Playing, |visit, exhibition| {
+        move_on_its_way(visit, exhibition).is_some_and(|progress| progress >= 0.5)
+    }),
+    ("07-second-move", Phase::Playing, |visit, exhibition| {
+        let moves = exhibition.current().unwrap().game().moves().len();
+        moves == 2 && move_on_its_way(visit, exhibition).is_some_and(|progress| progress >= 0.5)
+    }),
+    ("08-clearing", Phase::Clearing, |visit, _| {
+        visit.ticks() >= 45
+    }),
+    ("09-closing", Phase::Closing, |visit, _| visit.ticks() >= 22),
+    ("10-picking-up", Phase::Leaving, |visit, _| {
+        visit.duck().task() == Task::Lifting && visit.duck().ticks() >= LOWER_TICKS / 2
+    }),
+    ("11-turning", Phase::Leaving, |visit, _| {
+        visit.duck().task() == Task::Turning && visit.duck().ticks() >= TURN_TICKS / 3
+    }),
+    ("12-going", Phase::Leaving, |visit, _| {
+        visit.duck().task() == Task::Taking && along_its_way(visit) <= 0.5
+    }),
+    ("13-through-the-door", Phase::Leaving, |visit, _| {
+        visit.duck().task() == Task::Taking && along_its_way(visit) <= -0.02
+    }),
+];
+
+/// The shapes a visit adds to the Clock's frame beyond its board: the
+/// duck's silhouette, and what the frame draws of a door that is at all
+/// open, over what it draws of its closed wall.
+const DUCK_SHAPES: usize = 57;
+const DOOR_SHAPES: usize = 14;
+
+/// A visit is drawn by the CPU raster and the vector paths where its stage
+/// stands, at every size the board is qualified at: the duck bringing the
+/// case and setting it down, the board opening, being set up and in play
+/// with each bird's move on its way, and all of it packed and taken away
+/// again. The GPU scene prepares each of those frames. Nothing else in the
+/// view changes for the visit: not the digits, which go on telling the time,
+/// the AM/PM letters or the date. With `SPACEWARS_CLOCK_ARTIFACTS` set, each
+/// path's pixels and the vector path's shapes are written there.
 #[test]
-fn a_chess_visit_draws_its_board_below_the_digits_on_both_render_paths() {
+fn a_chess_visit_draws_its_board_and_its_duck_below_the_digits_on_both_render_paths() {
     let output = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS").map(std::path::PathBuf::from);
     if let Some(output) = &output {
         std::fs::create_dir_all(output).unwrap();
     }
-    let setup: u64 = [Phase::Arriving, Phase::Opening, Phase::Placing]
-        .iter()
-        .map(|phase| phase.ticks().unwrap())
-        .sum();
-    let turn = Pace::CLOCK.turn;
-    // The visit is asked to pack up while its second move is on its way.
-    let packing = setup + 2 * turn + 10;
-    let cleared = packing + 20 + Phase::Clearing.ticks().unwrap();
-    let closed = cleared + Phase::Closing.ticks().unwrap();
-    let gone = closed + Phase::Leaving.ticks().unwrap();
-    let moments = [
-        ("1-packed", 15, Phase::Arriving),
-        ("2-opening", 30 + 22, Phase::Opening),
-        ("3-placing", 75 + 60, Phase::Placing),
-        ("4-set", setup, Phase::Playing),
-        ("5-moving", setup + turn + 15, Phase::Playing),
-        ("6-moved", setup + 2 * turn - 1, Phase::Playing),
-        ("7-clearing", cleared - 45, Phase::Clearing),
-        ("8-closing", closed - 22, Phase::Closing),
-        ("9-packed", gone - 15, Phase::Leaving),
-    ];
     for (name, viewport) in VIEWPORTS {
         let mut plain = clock(viewport);
         let mut visited = clock(viewport);
@@ -173,37 +260,48 @@ fn a_chess_visit_draws_its_board_below_the_digits_on_both_render_paths() {
         let stage = *visit.stage();
         let laid = stage.board_for(visit.side(Color::White));
         let board = pixels_of(stage.board.rect(), viewport);
-        let case = pixels_of(stage.case().rect(), viewport);
         // The board stands below the face, in the lower half of the view.
         assert!(board[1] > viewport.height * 0.5, "{name}: {board:?}");
 
-        let mut tick = 0;
-        // Steps both Clocks to `until` ticks after the visit's admission.
-        let mut step_to =
-            |plain: &mut ClockClientScenario, visited: &mut ClockClientScenario, until: u64| {
-                while tick < until {
-                    // The time goes on, and the digits with it.
-                    let actions = if tick == setup + 30 {
-                        vec![ClockAction::set_reading(reading(9))]
-                    } else {
-                        Vec::new()
-                    };
-                    if tick == packing {
-                        assert!(visited.state.pack_chess_visit(), "{name}");
-                    }
-                    plain.step(&actions, TICK);
-                    visited.step(&actions, TICK);
-                    tick += 1;
-                }
-            };
+        let mut ticks = 0;
+        let mut packed = false;
         let mut shapes = Vec::new();
+        let mut leaned = Vec::new();
         // The plain Clock's frame, and each path's pixels of it, drawn again
         // only when the frame changes.
         let mut plain_drawn: Option<(RenderFrame, Drawn)> = None;
-        for (moment, at, phase) in moments {
-            step_to(&mut plain, &mut visited, at);
+        for (moment, phase, reached) in MOMENTS {
+            // Both Clocks step to the moment. The time goes on meanwhile,
+            // and the digits with it.
+            loop {
+                let visit = visited.state.chess_visit().expect("a visit");
+                let exhibition = visited.state.chess();
+                // The visit is asked to pack up while its second move is on
+                // its way.
+                let moves = exhibition.current().unwrap().game().moves().len();
+                let asked = !packed
+                    && moves == 2
+                    && move_on_its_way(visit, exhibition).is_some_and(|progress| progress >= 0.3);
+                if visit.phase() == phase && reached(visit, exhibition) {
+                    break;
+                }
+                assert!(ticks < 6_000, "{name}: the visit never came to {moment}");
+                let actions = if visit.phase() == Phase::Playing && visit.ticks() == 30 {
+                    vec![ClockAction::set_reading(reading(9))]
+                } else {
+                    Vec::new()
+                };
+                if asked {
+                    assert!(visited.state.pack_chess_visit(), "{name}");
+                    packed = true;
+                }
+                plain.step(&actions, TICK);
+                visited.step(&actions, TICK);
+                ticks += 1;
+            }
             let visit = visited.state.chess_visit().expect("a visit");
-            assert_eq!(visit.phase(), phase, "{name} {moment}");
+            let exhibition = visited.state.chess();
+            let duck = visit.duck();
             let frames = visited.render_frames(RenderBackend::Raster, viewport);
             assert_eq!(
                 frames,
@@ -212,8 +310,18 @@ fn a_chess_visit_draws_its_board_below_the_digits_on_both_render_paths() {
             );
             let background = plain.render_frames(RenderBackend::Raster, viewport);
             let added = primitives(&frames[0]) - primitives(&background[0]);
-            assert!(added <= MAX_PRIMITIVES, "{name} {moment}: {added}");
+            let door = duck.door_area();
+            let most = MAX_PRIMITIVES + DUCK_SHAPES + door.map_or(0, |_| DOOR_SHAPES);
+            assert!(added <= most, "{name} {moment}: {added} shapes");
+            // Packed, the visit is its case, its duck and its door.
+            if let Show::Case(_) = visit.show(exhibition) {
+                let shapes = 3 + DUCK_SHAPES + door.map_or(0, |_| DOOR_SHAPES);
+                assert_eq!(added, shapes, "{name} {moment}");
+            }
             shapes.push(added);
+            if visit.pose(Bird::Duck, exhibition) == Pose::Moving {
+                leaned.push((moment, duck.lean()));
+            }
             // The GPU scene, which the cabinets draw through, prepares the
             // same frame.
             let scene = plan::build(&frames, viewport, visited.frame_layout(), 1.0).unwrap();
@@ -233,6 +341,26 @@ fn a_chess_visit_draws_its_board_below_the_digits_on_both_render_paths() {
                 plain_drawn = Some((background[0].clone(), pixels));
             }
             let (_, before) = plain_drawn.as_ref().unwrap();
+            // Where the visit draws: its board or its case, its duck, and
+            // its door while that is open, with the shadow the frame gives
+            // an open door.
+            let shown = match visit.show(exhibition) {
+                Show::Case(case) => pixels_of(case.rect(), viewport),
+                Show::Unfolding { .. } | Show::Board(..) => board,
+            };
+            let ducks = duck_pixels(duck, viewport);
+            let frame_width = viewport.width.min(viewport.height) * 0.022;
+            let doors = door.map(|door| {
+                let [left, top, right, bottom] = pixels_of(door.rect(), viewport);
+                [
+                    left - frame_width,
+                    top - frame_width,
+                    right + frame_width,
+                    bottom + frame_width,
+                ]
+            });
+            let mut allowed = vec![shown, ducks];
+            allowed.extend(doors);
             for ((backend, pixels), (_, before)) in drawn.iter().zip(before) {
                 let what = format!("{name} {moment} {backend}");
                 if let Some(output) = &output {
@@ -241,25 +369,50 @@ fn a_chess_visit_draws_its_board_below_the_digits_on_both_render_paths() {
                         pixels,
                     );
                 }
-                // Only the board's own place changes, and all of it: the
-                // case while it is packed, and the board's square once it
-                // is open.
-                let drawn =
-                    changed(pixels, before).unwrap_or_else(|| panic!("{what}: nothing is drawn"));
-                match phase {
-                    Phase::Arriving | Phase::Leaving => {
-                        assert!(same(drawn, case, EDGE), "{what}: {drawn:?}");
-                        assert_eq!(added, 3, "{what}");
+                // Only the visit's own places change.
+                assert_eq!(
+                    stray(pixels, before, &allowed, EDGE),
+                    None,
+                    "{what}: a pixel changed outside {allowed:?}"
+                );
+                // The duck is drawn where its body is, while any of it is
+                // in the view.
+                let in_view = ducks[2] > EDGE && ducks[0] < viewport.width - EDGE;
+                let seen = changed_in(pixels, before, ducks);
+                assert_eq!(seen.is_some(), in_view, "{what}: the duck at {ducks:?}");
+                // All of the board's place changes: the case wherever it is
+                // while it is packed, and the board's square once it is
+                // open.
+                let place = changed_in(
+                    pixels,
+                    before,
+                    [
+                        shown[0] - EDGE,
+                        shown[1] - EDGE,
+                        shown[2] + EDGE,
+                        shown[3] + EDGE,
+                    ],
+                );
+                let in_view = [
+                    shown[0].max(0.0),
+                    shown[1],
+                    shown[2].min(viewport.width),
+                    shown[3],
+                ];
+                match visit.show(exhibition) {
+                    Show::Case(_) | Show::Board(..) => {
+                        if in_view[0] < in_view[2] {
+                            let place = place.unwrap_or_else(|| panic!("{what}: nothing drawn"));
+                            assert!(same(place, in_view, EDGE), "{what}: {place:?}");
+                        }
                     }
-                    Phase::Opening | Phase::Closing => {
-                        assert!(within(drawn, board, EDGE), "{what}: {drawn:?}");
-                        assert!(within(case, drawn, EDGE), "{what}: {drawn:?}");
-                    }
-                    Phase::Placing | Phase::Playing | Phase::Clearing => {
-                        assert!(same(drawn, board, EDGE), "{what}: {drawn:?}");
+                    Show::Unfolding { .. } => {
+                        let case = pixels_of(stage.case().rect(), viewport);
+                        let place = place.unwrap_or_else(|| panic!("{what}: nothing drawn"));
+                        assert!(within(case, place, EDGE), "{what}: {place:?}");
                     }
                 }
-                if moment != "4-set" {
+                if moment != "05-set" {
                     continue;
                 }
                 // Set up, every empty square shows its own colour all over,
@@ -297,18 +450,115 @@ fn a_chess_visit_draws_its_board_below_the_digits_on_both_render_paths() {
         // The board with half its pieces out takes fewer shapes than with
         // them all, and a piece on its way is still one piece.
         let of = |moment: &str| {
-            let index = moments.iter().position(|(name, ..)| *name == moment);
+            let index = MOMENTS.iter().position(|(name, ..)| *name == moment);
             shapes[index.unwrap()]
         };
-        assert!(of("3-placing") < of("4-set"), "{name}");
-        assert!(of("7-clearing") < of("6-moved"), "{name}");
+        assert!(of("04-placing") < of("05-set"), "{name}");
+        assert!(of("08-clearing") < of("07-second-move"), "{name}");
+        // The duck leans over the board for its own move, and not for the
+        // crow's.
+        assert_eq!(leaned.len(), 1, "{name}: {leaned:?}");
+        assert!(leaned[0].1 > 0.9, "{name}: {leaned:?}");
 
-        // Once the board has gone, the view is as it would have been.
-        step_to(&mut plain, &mut visited, gone);
-        assert!(visited.state.chess_visit().is_none(), "{name}");
+        // Once the duck has gone with the board, the view is as it would
+        // have been.
+        while visited.state.chess_visit().is_some() {
+            assert!(ticks < 6_000, "{name}: the visit never left");
+            plain.step(&[], TICK);
+            visited.step(&[], TICK);
+            ticks += 1;
+        }
         let frames = visited.render_frames(RenderBackend::Raster, viewport);
         assert_eq!(frames, plain.render_frames(RenderBackend::Raster, viewport));
         let played = visited.state.chess().current().unwrap().game();
         assert_eq!(played.moves().len(), 2, "{name}");
     }
+}
+
+/// The Clock's state publishes a visit to the board for as long as it
+/// lasts, with its duck under it as the visit's own bird: in the visit's
+/// claim on the arena, in no duck's or crow's state, and gone from the state
+/// once it has walked out.
+#[test]
+fn clock_state_publishes_a_chess_visit_with_its_duck_as_the_visits_own() {
+    use engine_common::{ClockArenaOwner, ClockChessBird, ClockChessPose};
+    let mut visited = clock(Viewport::new(800.0, 480.0));
+    assert_eq!(visited.clock_state().unwrap().chess, None);
+    visited.state.admit_chess_visit().expect("a visit");
+    let duck_plays_white = {
+        let current = visited.state.chess().current().unwrap();
+        current.bird(Color::White) == Bird::Duck
+    };
+    let mut poses = Vec::new();
+    let mut carried = Vec::new();
+    let mut packed = false;
+    let mut ticks = 0;
+    loop {
+        let state = visited.clock_state().unwrap();
+        let claim = state
+            .arena
+            .as_ref()
+            .unwrap()
+            .claims
+            .iter()
+            .find(|claim| claim.owner == ClockArenaOwner::Chess);
+        let Some(chess) = &state.chess else {
+            assert!(claim.is_none(), "the visit's claim goes with it");
+            break;
+        };
+        let claim = claim.expect("the visit holds the arena");
+        assert_eq!((chess.visit_id, chess.match_number), (1, 1));
+        // The visit's birds are in its own state and in no other's.
+        assert!(state.duck.is_none() && state.player_duck.is_none());
+        assert!(state.crow.is_none() && state.crows.is_empty());
+        assert!(chess.actors.len() <= 1);
+        assert!(claim.population.bodies >= chess.actors.len());
+        assert!(claim.population.within(claim.budget));
+        for actor in &chess.actors {
+            assert_eq!(actor.bird, ClockChessBird::Duck);
+            assert_eq!(actor.white, duck_plays_white);
+            if poses.last() != Some(&actor.pose) {
+                poses.push(actor.pose);
+            }
+            if carried.last() != Some(&actor.carrying) {
+                carried.push(actor.carrying);
+            }
+        }
+        // The state goes over the wire and comes back as it was.
+        if ticks % 60 == 0 {
+            let json = state.to_json().unwrap();
+            assert_eq!(
+                spacewars_control::ClockState::from_json(&json).unwrap(),
+                state
+            );
+        }
+        let moves = visited
+            .state
+            .chess()
+            .current()
+            .unwrap()
+            .game()
+            .moves()
+            .len();
+        if !packed && moves == 2 {
+            packed = visited.state.pack_chess_visit();
+        }
+        visited.step(&[], TICK);
+        ticks += 1;
+        assert!(ticks < 6_000, "the visit never left");
+    }
+    // It came with the case, sat without it, and left with it again.
+    assert_eq!(carried, [true, false, true]);
+    assert_eq!(
+        poses,
+        [
+            ClockChessPose::Arriving,
+            ClockChessPose::Setting,
+            ClockChessPose::Waiting,
+            ClockChessPose::Moving,
+            ClockChessPose::Waiting,
+            ClockChessPose::Packing,
+            ClockChessPose::Leaving,
+        ]
+    );
 }

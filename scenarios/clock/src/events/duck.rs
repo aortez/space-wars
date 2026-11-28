@@ -45,7 +45,9 @@ pub(crate) use view::DuckView;
 #[cfg(test)]
 mod water_tests;
 
-use controller::{Command, Controller, CourseContext, Gait, Movement, Observation};
+use controller::{Controller, CourseContext};
+// The actuator the chess duck walks with as well.
+pub(crate) use controller::{Command, Gait, Movement, Observation};
 use engine_common::{ClockDuckNavigationState, ClockDuckOutcome, ClockDuckState};
 use engine_core::Vec2;
 use engine_rapier::buoyancy::{BuoyancyConfig, BuoyancyReport, BuoyantBody, BuoyantMaterial};

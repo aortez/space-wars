@@ -1385,13 +1385,23 @@ impl ClockState {
         self.chess_visit.as_ref().and_then(chess::Visit::play)
     }
 
+    /// The visit to the board as Clock's state publishes it, while there is
+    /// one: its board, and its birds that are in the scene. They are the
+    /// visit's own, and appear in no other bird's state.
+    pub fn chess_state(&self) -> Option<engine_common::ClockChessState> {
+        self.chess_visit
+            .as_ref()
+            .map(|visit| visit.state(&self.chess))
+    }
+
     /// Admits a visit to the board where a stage stands clear below the
-    /// digits, and puts the board there packed, to be set up. The visit
-    /// plays the run's unfinished match, or a new one, with the duck at the
-    /// left where it can be. Refused, changing nothing, while a visit is at
-    /// the board, while an event or a duck's visit has the floor to itself,
-    /// where no stage stands clear, supported and dry, as over an open drain,
-    /// and when the arena cannot take the board.
+    /// digits. Its duck comes from the edge of the view on its side with the
+    /// board packed, to set it up there. The visit plays the run's
+    /// unfinished match, or a new one, with the duck at the left where it
+    /// can be. Refused, changing nothing, while a visit is at the board,
+    /// while an event or a duck's visit has the floor to itself, where no
+    /// stage stands clear, supported and dry, as over an open drain, and
+    /// when the arena cannot take the visit.
     pub fn admit_chess_visit(&mut self) -> Result<(), chess::Refusal> {
         use chess::stage::{Scene, Side, Stage};
         if self.chess_visit.is_some() {
@@ -1422,9 +1432,9 @@ impl ClockState {
         let mut owners = self.arena_owners();
         owners.push(arena::Owner::Chess);
         self.arena.admit(&owners).map_err(chess::Refusal::Arena)?;
-        let current = self.chess.admit();
+        self.chess.admit();
         let world = self.arena.claim_resident(arena::Owner::Chess, layout);
-        self.chess_visit = Some(chess::Visit::new(stage, current, world));
+        self.chess_visit = Some(chess::Visit::new(stage, layout, &self.chess, world));
         Ok(())
     }
 
@@ -1462,8 +1472,9 @@ impl ClockState {
         }
     }
 
-    /// Takes the board and its visit away at once, with whatever of it is in
-    /// the arena, as when it has gone or a resize ends it.
+    /// Takes the visit to the board away at once, with whatever of it is in
+    /// the arena, its board and its duck, as when it is over or a resize
+    /// ends it.
     fn finish_chess_visit(&mut self) {
         if self.chess_visit.take().is_some() {
             self.arena.release(arena::Owner::Chess);
@@ -2490,12 +2501,13 @@ impl ClockState {
                 .expect("the stranded spaceling's claim keeps a world");
             spaceling.drive(world);
         }
-        // The chess board takes the shape it has now: its case or its square.
+        // The chess board takes the shape it has now, its case or its square,
+        // and the duck that carries it steers for the step.
         if let Some(visit) = &mut self.chess_visit {
             let world = self
                 .arena
                 .held_mut(arena::Owner::Chess)
-                .expect("the chess board's claim keeps a world");
+                .expect("the chess visit's claim keeps a world");
             visit.drive(world);
         }
         // The arena's one rigid step this tick, whoever holds it.
@@ -2533,10 +2545,15 @@ impl ClockState {
         }
         self.update_crow(true);
         self.update_stranded(true);
-        // The visit to the board takes its tick, and play there with it. A
-        // board that has gone leaves the arena.
+        // The visit to the board takes its tick, and play there with it. Its
+        // duck reads its body back from the step. A visit that is over leaves
+        // the arena.
         if let Some(visit) = &mut self.chess_visit {
-            visit.tick(&mut self.chess);
+            let world = self
+                .arena
+                .held(arena::Owner::Chess)
+                .expect("the chess visit's claim keeps a world");
+            visit.tick(&mut self.chess, world);
             if visit.done() {
                 self.finish_chess_visit();
             }

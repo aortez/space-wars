@@ -13,6 +13,7 @@ use serde::{
 mod activity_settings;
 pub mod background;
 mod clock_arena;
+mod clock_chess;
 mod clock_digit_surfaces;
 mod clock_font;
 mod clock_message;
@@ -22,6 +23,9 @@ pub use activity_settings::{AutostartSettings, MatchSettings};
 pub use clock_arena::{
     ClockArenaAccounting, ClockArenaClaim, ClockArenaLimits, ClockArenaOwner, ClockArenaPopulation,
     ClockArenaRemap, ClockArenaState, ClockArenaStep, ClockArenaUnavailable,
+};
+pub use clock_chess::{
+    ClockChessActor, ClockChessBird, ClockChessPhase, ClockChessPose, ClockChessState,
 };
 pub use clock_digit_surfaces::{
     ClockDigitSurface, ClockDigitSurfaceState, ClockSurfaceAccounting, ClockSurfaceChange,

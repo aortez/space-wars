@@ -680,6 +680,9 @@ fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout:
     if let Some(fixture) = &state.spider {
         spider::render(frame, &fixture.state(&state.arena, &state.published));
     }
+    if let Some(visit) = &state.chess_visit {
+        chess::render_birds(frame, visit);
+    }
     // Kept outside the marquee's face fade and early return. The duck/course
     // retain their own opacity and geometry while clock content transforms.
     if let Some(event) = state.duck_scene() {

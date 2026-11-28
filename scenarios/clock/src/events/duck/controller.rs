@@ -16,7 +16,7 @@ mod recovery;
 mod water;
 
 #[derive(Clone, Copy)]
-pub(super) struct Observation {
+pub(crate) struct Observation {
     pub position: Vec2,
     pub velocity: Vec2,
     pub support_velocity: Vec2,
@@ -28,7 +28,7 @@ pub(super) struct Observation {
 }
 
 #[derive(Clone, Copy)]
-pub(super) enum Gait {
+pub(crate) enum Gait {
     Still,
     Walk,
     Run,
@@ -36,7 +36,7 @@ pub(super) enum Gait {
     Sprint(f32),
 }
 
-pub(super) struct Command {
+pub(crate) struct Command {
     pub gait: Gait,
     pub direction: f32,
     pub jump: bool,
@@ -52,7 +52,7 @@ pub(super) struct CourseContext<'a> {
 }
 
 /// Actuator tuning lives separately from the controller's learned capabilities.
-pub(super) struct Movement {
+pub(crate) struct Movement {
     pub walk_speed: f32,
     pub run_speed: f32,
     pub gravity: f32,

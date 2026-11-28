@@ -3007,14 +3007,18 @@ the [qualification's](#spider-visit-qualification-2026-11-01) second visit:
 ### Chess board (#405)
 
 A crow and a duck are to play a slow game of chess below the digits (#374).
-So far the Clock can stage their board: it finds the board a place, sets it
-up from the match in hand, shows the moves the birds play, and packs it away.
-The birds themselves come later in #405, and the schedule that brings them in
-#406. Until then nothing in ordinary Clock starts a visit to the board, so it
-has no event ID or switch. The
-[development fixture](#seeing-the-board-in-the-real-client) starts visits.
+So far the Clock can stage their board and bring the duck: it finds the board
+a place, the duck walks in with the board packed in its case and sets it
+down, the board is set up from the match in hand and shows the moves the
+birds play, and the duck packs it up and carries it out. The crow comes later
+in #405, and the schedule that brings the birds in #406. Until then nothing in
+ordinary Clock starts a visit to the board, so it has no event ID or switch.
+The [development fixture](#seeing-the-board-in-the-real-client) starts
+visits.
 
-![A visit to the board at 800×480: the packed case, the board opening, half set, set, a move on its way, the move made, half cleared, folding, and the case again](screenshots/clock/chess-board-visit-800x480.png)
+![The duck with the board's case at 800×480: coming with it, setting it down, picking it up, turning with it, going, and passing through its door](screenshots/clock/chess-duck-carrying-800x480.png)
+
+![The board at 800×480, with the duck at its seat: the case set down, the board opening, half set and set, the duck's move and the crow's, and the board half cleared and folding](screenshots/clock/chess-board-visit-800x480.png)
 
 #### Where the board stands
 
@@ -3047,7 +3051,7 @@ is turned away, and leaves nothing behind.
   The banks of the 480×800 view are too short, so a visit there is turned
   away while the drain is open.
 - An event or a duck's visit that has the floor to itself turns a visit away.
-  So does the arena when it cannot take the board, as during Tanks.
+  So does the arena when it cannot take the visit, as during Tanks.
 
 | View | Board's side | A square on screen | Gap below the face |
 | --- | --- | --- | --- |
@@ -3061,28 +3065,33 @@ third of the floor limits the board, not the room below the face. In the
 1280×720 view the crow's way on the right would pass within the gap kept
 round the AM/PM letters, so there the duck takes the right side.
 
-![The board with a move made in the four views](screenshots/clock/chess-board-views.png)
+![The duck leaning over the board for its move in the four views](screenshots/clock/chess-board-views.png)
 
 #### The visit
 
-The board is one fixed body in the arena. Its owner, `chess`, has room for
-that one body and collider, which the arena's capacity gained
+A visit has two bodies in the arena, the duck's and the board's. Its owner,
+`chess`, has room for those two bodies and their colliders, which the arena
+keeps for it
 ([Sharing the run's physics arena](#sharing-the-runs-physics-arena)). The
-body has the shape that is drawn: the case while the board is packed, and
-the board's square while it is open.
+board's body is fixed, and has the shape that is drawn: the case while it
+stands packed on the ground, and the board's square while it is open. The
+case the duck holds is no body.
 
-| Phase | Lasts | The board |
+| Phase | Lasts | What happens |
 | --- | --- | --- |
-| Arriving | 0.5 s | Stands packed in its case, half its side wide. |
-| Opening | 0.75 s | Opens out of the case. It opens only if the board's place is still clear of every other body. Otherwise the case goes as it came. |
-| Placing | 2 s | The pieces of the match in hand come out one at a time: each player's from its own back rank outward, the king first, the two players in turn. |
-| Playing | Until the visit is asked to pack up | Shows the birds' moves. A bird moves every five seconds, and its piece travels for half a second. |
+| Arriving | 5.2 to 6.0 s | The door on the duck's side opens, and the duck walks in with the case held before it. It sets the case down where the board is to stand, and steps back toward its seat. |
+| Opening | 0.75 s | The case opens out into the board, as soon as the duck is clear of the board's place. |
+| Placing | 2 s | The pieces of the match in hand come out one at a time: each player's from its own back rank outward, the king first, the two players in turn. The duck nods over them. |
+| Playing | Until the visit is asked to pack up | The board shows the birds' moves. A bird moves every five seconds, and its piece travels for half a second. The duck leans over the board from a second before its own move until its piece has arrived. |
 | Clearing | 1.5 s | The pieces go back, the last out first. |
-| Closing | 0.75 s | Folds back into its case. |
-| Leaving | 0.5 s | Stands packed, then goes with its claim on the arena. |
+| Closing | 0.75 s | The board folds back into its case. |
+| Leaving | 5.4 to 5.6 s | The duck steps up to the case, picks it up, turns with it and walks out through its door, which closes behind it. Then the visit lets go of the arena. |
 
+- The board is set up 8.0 to 8.7 s after the visit is admitted, in each of the
+  four views above. #406 allows ten seconds for it.
 - A visit asked to pack up while its board is being set up puts the board
-  away from where it got to. A move on its way arrives first.
+  away from where it got to, and a duck still bringing the case turns and
+  takes it away again. A move on its way arrives first.
 - A resize ends the visit at once.
 - Either way the match keeps every move it was given, and the next visit sets
   the board out as the match stands.
@@ -3093,14 +3102,78 @@ the board's square while it is open.
 
 The board is drawn on the floor's layer, in front of the plants. The
 spotlights do not warm that layer, so the board keeps the colours its pieces
-were qualified in.
+were qualified in. The duck is drawn in front of the board and of the case it
+holds, on the layer a visiting duck is drawn on.
+
+#### The duck at the board
+
+`chess::duck` is the Clock's duck in another role. It has the visiting duck's
+round body and silhouette, and walks with the visiting duck's actuator at its
+walking pace, a seventh of the view's width a second. Nothing else of a duck's
+visit comes with it: no course, no doors in the arena and no player.
+
+- **Its size comes from the board.** Its body's radius is 0.077 of the
+  board's side, the most that lets it sit within its room and lean as far as
+  the board's frame. From its seat its bill reaches the inner edge of the
+  frame when it leans all the way, so it never covers a square.
+- **Its body is a disc in the arena**, in the visit's claim. Like a crow's it
+  feels none of the world's gravity, so a visit that sets the world's does
+  not change how it walks. Over the floor its controller brings its own pull,
+  and the floor holds it up. Beyond the edge of the view there is no floor,
+  and there it walks level. Whatever it meets stops it, pushes it or is
+  pushed by it. It is one of the arena's birds (`arena::BIRD`), so the walls
+  at the edges of the view let it through.
+- **Its door is drawn, and is no body.** It is the frame's wall on the
+  duck's side, as tall as a visiting duck's door. It opens before the duck
+  reaches it and closes behind it, and the duck keeps out of its way until it
+  is open.
+- **It sets the case down, and the case opens, only while the board's place
+  is clear** of every other body. Where something has come to stand there
+  since the stage was found, the duck takes the case away as it brought it.
+- **Every walk has a time to be done in**: half as long again as it takes
+  with nothing in the way, and two seconds more. A duck that is late on its
+  way in turns back with the case. One that is late to its seat takes the
+  board away again. One that is late to the case or on its way out, or whose
+  body has fallen out of the scene, cannot take the board away: the visit is
+  then over where it stands, and its duck and its board leave the arena at
+  once. The match keeps its moves in every case.
+- **Nobody takes it over.** It is not the Clock's visiting duck, and a player
+  who joins gets a duck of their own.
+
+| View | The duck's radius | A pixel of its art on screen |
+| --- | --- | --- |
+| 800×480 | 6.9 units | 2.3 pixels |
+| 1024×768 | 8.7 units | 4.6 pixels |
+| 480×800 | 7.1 units | 3.9 pixels |
+| 1280×720 | 6.6 units | 3.2 pixels |
+
+A bird at the board has one of nine poses, which `clock state` names:
+
+| Pose | When | What the duck does |
+| --- | --- | --- |
+| `arriving` | The visit is arriving | Walks in with the case, sets it down and steps back. It leans as it sets the case down. |
+| `setting` | The board opens and the pieces come out | Nods over the board, once every half second. |
+| `waiting` | Between its moves | Sits upright. |
+| `moving` | From a second before its move until its piece has arrived | Leans over the board. |
+| `won` | The game has ended, and it won | Hops three times where it sits. |
+| `lost` | The game has ended, and it lost | Leans over the board. |
+| `drawn` | The game has ended in a draw | Nods once. |
+| `packing` | The pieces go back and the board folds | Nods over the board. |
+| `leaving` | The visit is leaving | Steps up to the case, picks it up, turns with it and walks out. |
+
+The leans, nods and hops are drawn, and move no body. The visiting duck's
+silhouette draws them: `render::duck::silhouette` takes how far the duck
+leans and how high it hops, and draws a visiting duck with neither, as
+before.
 
 Known limits, until the rest of #405 and #406 land:
 
 - Once the board is open, nothing checks its stage again. An event or a
-  duck's visit that starts during a visit meets the board where it stands.
-- The case and the pieces come and go by themselves. The duck that carries
-  the case, and the birds that move the pieces, are not there yet.
+  duck's visit that starts during a visit meets the board where it stands and
+  the duck where it sits. A duck that loses its footing there ends the visit
+  where it stands.
+- There is no crow yet. Its moves are played with nobody at its side of the
+  board.
 
 #### Seeing the board in the real client
 
@@ -3114,28 +3187,37 @@ spacewars-cli clock state
 
 Three seconds after the Clock has heard the time, the fixture admits a visit.
 Each visit sets the board up, plays two moves, and is asked to pack up a
-second after the second move: about 17 seconds in all. Three seconds after
-the board has gone, the next visit goes on with the same match, so every
-visit after the first sets out a position that has been played into. A visit
-that is turned away is tried again three seconds later. Any other value of
-the switch, as in ordinary Clock, starts none.
+second after the second move: about 27 seconds in all. Three seconds after
+the visit has gone, the next goes on with the same match, so every visit
+after the first sets out a position that has been played into. A visit that
+is turned away is tried again three seconds later. Any other value of the
+switch, as in ordinary Clock, starts none.
 
-While the board is there, `clock state` shows its claim, beside the floor
-the arena keeps under it:
+While a visit is there, `clock state` shows its claim, beside the floor the
+arena keeps under it, and the visit with its duck:
 
 ```text
-Arena: 1 claims, 0 residents (at most 9 and 4); 2 bodies, 2 colliders, 0 joints (at most 287, 319, 1); floor 1 bodies
-Arena claims: chess 1/1 bodies, 1/1 colliders
+Arena: 1 claims, 0 residents (at most 9 and 4); 3 bodies, 3 colliders, 0 joints (at most 288, 320, 1); floor 1 bodies
+Arena claims: chess 2/2 bodies, 2/2 colliders
+Chess visit #3: match 1, playing, phase tick=571, actions=5, board=[-45067, -201600, 45067, -111467]
+Chess visit #3 duck: plays White, waiting, position=[-63578, -194692], facing right=true, carrying=false
 ```
+
+The duck is the visit's own bird, so it is listed under the visit and is in
+neither the visiting duck's state nor a player's. The same holds for
+`chess` in the state's JSON, where each of the visit's birds in the scene is
+one of `actors`.
 
 `client_scenarios::clock::chess_tests` draws a visit at each of the four
 views above, in the 12-hour format with the date shown, through the CPU
 raster and the vector backends, and has the GPU scene prepare each frame. At
-nine moments of the visit it checks that only the board's own place differs
-from the same Clock without a visit. With the board set, it checks that each
-empty square shows its own colour and that a piece covers each square the
-players start on. Set `SPACEWARS_CLOCK_ARTIFACTS=DIR` to keep each backend's
-PNG and the vector backend's SVG.
+thirteen moments of the visit it checks that nothing differs from the same
+Clock without a visit but the visit's own board or case, its duck and its
+door. With the board set, it checks that each empty square shows its own
+colour and that a piece covers each square the players start on. Set
+`SPACEWARS_CLOCK_ARTIFACTS=DIR` to keep each backend's PNG and the vector
+backend's SVG. A visit adds at most 323 shapes for its board, 57 for its duck
+and 14 for an open door.
 
 #### On the cabinets (2026-11-27)
 
@@ -3145,39 +3227,49 @@ off and the 12-hour format with the date shown. Both cabinets run the raster
 renderer, and a round in the vector renderer followed. The run's records stay
 on the workstation.
 
-| HyperPixel, a move made in the first visit | Picade, three moves into the match in the second visit |
+| HyperPixel, the duck's move in the first visit | Picade, the duck's move in the first visit |
 | --- | --- |
-| ![The board below the colon on the HyperPixel, with the date line and the PM letters](screenshots/clock/chess-board-hyperpixel-device.png) | ![The board below the colon on the Picade, with the date line and the PM letters](screenshots/clock/chess-board-picade-device.png) |
+| ![The duck leaning over the board below the colon on the HyperPixel, with the date line and the PM letters](screenshots/clock/chess-board-hyperpixel-device.png) | ![The duck leaning over the board below the colon on the Picade, with the date line and the PM letters](screenshots/clock/chess-board-picade-device.png) |
 
-The Picade's frame-rate overlay is the cabinet's own setting. It reads low
-there because the trial took a screenshot every 150 ms. The traces below were
-taken with no screenshots.
+On the HyperPixel the duck plays White in that run, and on the Picade Black:
+the two cabinets' Clocks have different seeds. The Picade's frame-rate overlay
+is the cabinet's own setting. It reads low there because the trial took a
+screenshot about every 150 ms. The traces below were taken with no
+screenshots.
 
-In the raster renderer no refresh was skipped on either cabinet, and every
-visit lasted 17.0 s from the board's claim to its release. Each row is two
-traces of 240 loops: the idle Clock without the fixture, the board set and at
-rest, and four seconds from the first move.
+In the raster renderer no refresh was skipped on either cabinet. From the
+visit's claim to its release, each visit lasted 26.6 to 26.7 s on the
+HyperPixel and 26.9 to 27.0 s on the Picade. Its birds began to play 8.0 s
+after it came on the HyperPixel, and 8.2 s on the Picade. Each row is two
+traces of 240 loops: the idle Clock without the fixture, the duck walking in
+through its open door, the board set and at rest, and four seconds from the
+first move.
 
 | Cabinet | Renderer | Clock | Loop CPU: mean, 95th percentile, longest | Refreshes skipped |
 | --- | --- | --- | --- | --- |
-| HyperPixel | Raster | Idle | 1.40, 1.64, 1.85 ms | 0 |
-| HyperPixel | Raster | Board set | 1.98, 2.24, 2.48 ms | 0 |
-| HyperPixel | Raster | From a move | 2.03, 2.27, 2.48 ms | 0 |
-| Picade | Raster | Idle | 5.56, 7.08, 7.93 ms | 0 |
-| Picade | Raster | Board set | 7.09, 9.37, 10.39 ms | 0 |
-| Picade | Raster | From a move | 7.07, 9.27, 10.30 ms | 0 |
-| HyperPixel | Vector | Idle | 11.40, 12.20, 14.23 ms | 0 |
-| HyperPixel | Vector | Board set | 13.14, 13.88, 16.18 ms | 0 |
-| HyperPixel | Vector | From a move | 12.94, 13.76, 14.89 ms | 0 |
+| HyperPixel | Raster | Idle | 1.47, 1.71, 1.86 ms | 0 |
+| HyperPixel | Raster | Duck walking in | 1.64, 1.89, 2.09 ms | 0 |
+| HyperPixel | Raster | Board set | 2.14, 2.40, 2.58 ms | 0 |
+| HyperPixel | Raster | From a move | 2.15, 2.41, 2.69 ms | 0 |
+| Picade | Raster | Idle | 5.68, 7.23, 8.09 ms | 0 |
+| Picade | Raster | Duck walking in | 6.00, 7.71, 8.57 ms | 0 |
+| Picade | Raster | Board set | 7.23, 9.49, 11.54 ms | 0 |
+| Picade | Raster | From a move | 7.29, 9.49, 10.68 ms | 0 |
+| HyperPixel | Vector | Idle | 11.73, 12.62, 14.59 ms | 0 |
+| HyperPixel | Vector | Duck walking in | 12.28, 13.10, 13.89 ms | 0 |
+| HyperPixel | Vector | Board set | 13.15, 14.18, 16.76 ms | 0 |
+| HyperPixel | Vector | From a move | 13.29, 14.15, 15.72 ms | 0 |
 
-In the raster renderer the board costs about 0.6 ms of the loop on the
-HyperPixel and 1.5 ms on the Picade. In the vector renderer the HyperPixel
-still shows every refresh, though its longest loop, 16.2 ms, nearly fills the
-16.7 ms between two.
+In the raster renderer the duck walking in with its case, through its open
+door, costs about 0.2 ms of the loop on the HyperPixel and 0.3 ms on the
+Picade. The visit with its board set costs about 0.7 ms on the HyperPixel and
+1.6 ms on the Picade. In the vector renderer the HyperPixel still shows every
+refresh, though its longest loop, 16.8 ms, is as long as the 16.7 ms between
+two.
 
 The Picade's vector renderer does not keep up with the Clock even when it is
-idle: it shows a frame every 33.6 ms on average. With the board set a frame
-takes 38.8 ms, and a visit of 17.0 s of the Clock's ticks lasted 19.2 s.
+idle: it shows a frame every 33.7 ms on average. With the board set a frame
+takes 41.4 ms, and a visit of 26.9 s of the Clock's ticks lasted 29.0 s.
 Neither cabinet runs that renderer.
 
 ### Managed floor and drain
@@ -5059,8 +5151,8 @@ Its module comment states the rules, and `arena_contract.rs` holds them:
   crows share ([above](#crow-visitor)). A spaceling a Tanks fight left stranded claims
   it for its stay, with its body and one perch
   ([above](#stranded-spaceling)). A visit to the chess board claims it for
-  the board, one fixed body that stands on the floor
-  ([above](#chess-board-405)). Residents keep it for the rest of the
+  the board, one fixed body that stands on the floor, and for the duck that
+  carries it ([above](#chess-board-405)). Residents keep it for the rest of the
   run: retained soil, and the development arena fixtures. The first claim
   builds the world and the last to let go takes it away. Each owner's bodies
   take identities from its own ranges in `arena::ids::canonical`, and an owner
@@ -5068,9 +5160,9 @@ Its module comment states the rules, and `arena_contract.rs` holds them:
   scale while it holds the arena, and the residents' own return once it has
   gone.
 - **Claims are bounded.** Each owner declares a budget of bodies, colliders
-  and joints. The arena holds at most **287 bodies / 319 colliders** and one
+  and joints. The arena holds at most **288 bodies / 320 colliders** and one
   joint, the spider's line: a visit, the largest event, a crow visit, a
-  stranded spaceling, the chess board, soil and one fixture together, so
+  stranded spaceling, a visit to the chess board, soil and one fixture together, so
   everything Clock ships fits. A crow visit's room is four crows' bodies and their 24 perches
   (#370).
   The spider takes no more room than the largest event, so beside a visit and
@@ -5080,8 +5172,8 @@ Its module comment states the rules, and `arena_contract.rs` holds them:
   room another claim counts on and only the duel refuses it. A stranded
   spaceling's two bodies are reserved the same way, and in the duel too,
   whose hills leave it behind and rise again while its beam lifts it out.
-  The chess board's one body has room of its own, which it takes only while
-  it is there, and the duel refuses it too.
+  The two bodies of a visit to the chess board are reserved as the crow's
+  are, and the duel refuses that visit too.
   At most **9** owners hold it at once, and at most **4** of them are
   residents, soil included. A claim beyond those is refused before anything
   changes, as `residents` or `capacity`. So is a visit, an event, the spider
@@ -5155,7 +5247,7 @@ At rest, the two owners hold the arena with all five balls asleep on the closed
 floor (timings vary by machine):
 
 ```text
-Arena: 2 claims, 2 residents (at most 9 and 4); 6 bodies, 6 colliders, 0 joints (at most 287, 319, 1); floor 1 bodies
+Arena: 2 claims, 2 residents (at most 9 and 4); 6 bodies, 6 colliders, 0 joints (at most 288, 320, 1); floor 1 bodies
 Arena claims: fixture 0 3/4 bodies, 3/4 colliders; fixture 1 2/4 bodies, 2/4 colliders
 Arena run: 1 worlds, 183 steps; granted=2 released=0 refused=0; layout incompatible=false, last remap=None
 Arena step: 3 us (collision detection 2 us, solver 0 us); bodies active=0 sleeping=5; pairs candidate=5 contact=5, contacts=5, CCD substeps=1
@@ -5168,7 +5260,7 @@ has no room for this`, and `clock events` shows `blocked by arena=capacity` for
 Meltdown, Explosion, Coins and Aquarium:
 
 ```text
-Arena: 3 claims, 2 residents (at most 9 and 4); 10 bodies, 10 colliders, 0 joints (at most 287, 319, 1); floor 0 bodies
+Arena: 3 claims, 2 residents (at most 9 and 4); 10 bodies, 10 colliders, 0 joints (at most 288, 320, 1); floor 0 bodies
 Arena claims: fixture 0 3/4 bodies, 3/4 colliders; fixture 1 2/4 bodies, 2/4 colliders; visit 5/11 bodies, 5/11 colliders
 ```
 
