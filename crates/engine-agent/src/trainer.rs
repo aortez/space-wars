@@ -2,7 +2,7 @@
 use crate::{
     duck_recipe::{self, DuckCase, DuckControls, Score, Visit},
     evolution::runtime_id,
-    training_workers::{EpisodePool, WorkerConfig},
+    training_workers::{EpisodePool, WorkerConfig, WorkerControl},
 };
 use engine_common::ClockDuckCoursePattern;
 use serde::{Deserialize, Serialize};
@@ -10,6 +10,7 @@ use spacewars_ai::c3::{C3Genome, EvolutionDraws};
 use std::{
     fs::File,
     path::{Path, PathBuf},
+    sync::{Arc, Mutex},
     time::Instant,
 };
 
@@ -94,6 +95,8 @@ impl TrainerConfig {
 pub struct Replay {
     pub generation: u32,
     pub genome_id: String,
+    #[serde(skip)]
+    live_genome: Option<Arc<C3Genome>>,
     #[serde(flatten)]
     visit: Visit,
 }
@@ -105,11 +108,32 @@ impl std::ops::Deref for Replay {
     }
 }
 impl Replay {
+    /// Live scoring can publish a new offspring before its checkpoint is saved.
+    pub fn live_genome(&self) -> Option<Arc<C3Genome>> {
+        self.live_genome.clone()
+    }
     pub fn controls_at(&self, tick: u64) -> DuckControls {
         self.visit.control_at(tick)
     }
     pub fn ticks(&self) -> u64 {
         self.visit.progress.tick
+    }
+}
+
+/// One generation's most recently finished visit. A slow viewer skips visits
+/// which have already been replaced. Taking a visit never interrupts scoring.
+#[derive(Clone, Default)]
+pub struct LatestVisit(Arc<Mutex<Completion>>);
+
+#[derive(Default)]
+struct Completion {
+    index: usize,
+    pending: Option<Arc<Replay>>,
+}
+
+impl LatestVisit {
+    pub fn take(&self) -> Option<Arc<Replay>> {
+        self.0.lock().unwrap().pending.take()
     }
 }
 
@@ -122,6 +146,9 @@ pub struct GenerationSummary {
     pub best_case: DuckCase,
     /// In priority order: exits, alternating tags, clears, non-falls, ticks alive.
     pub best_terms: [f64; 5],
+    /// Champion training visits in entrance order (left, right), each [exits, visits].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub door_exits: Option<[[u32; 2]; 2]>,
     pub mean_terms: [f64; 5],
     pub spread_terms: [f64; 5],
     pub elapsed_seconds: f64,
@@ -134,6 +161,9 @@ pub struct Generation {
     report: GenerationSummary,
     pub current: Replay,
     pub best: Replay,
+    /// Actual worker completion order. Older records saved only the deterministic sample.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_finished: Option<Replay>,
 }
 impl std::ops::Deref for Generation {
     type Target = GenerationSummary;
@@ -147,6 +177,16 @@ impl Generation {
     }
 }
 
+fn exits_by_entrance<'a>(visits: impl IntoIterator<Item = &'a Visit>) -> [[u32; 2]; 2] {
+    let mut doors = [[0; 2]; 2];
+    for visit in visits {
+        let [exits, total] = &mut doors[usize::from(visit.case.entrance_right)];
+        *exits += visit.score.exits as u32;
+        *total += 1;
+    }
+    doors
+}
+
 fn reason(err: impl std::fmt::Display) -> String {
     err.to_string()
 }
@@ -156,7 +196,7 @@ pub struct Trainer {
     state: store::Checkpoint,
     pending: Option<store::Edit>,
     pool: EpisodePool,
-    population: Vec<C3Genome>,
+    population: Vec<Arc<C3Genome>>,
     latest: Option<Generation>,
     _owner: File,
 }
@@ -184,15 +224,16 @@ impl Trainer {
         seeds.extend(
             (seeds.len()..config.population).map(|slot| C3Genome::random(config.seed, slot)),
         );
-        let state = store::Checkpoint::new(config, &seeds)?;
-        store::save_population(&dir, &seeds)?;
+        let population: Vec<_> = seeds.into_iter().map(Arc::new).collect();
+        let state = store::Checkpoint::new(config, &population)?;
+        store::save_population(&dir, &population)?;
         state.save(&dir)?;
         Ok(Self {
             dir,
             state,
             pending: None,
             pool,
-            population: seeds,
+            population,
             latest: None,
             _owner: owner,
         })
@@ -207,7 +248,7 @@ impl Trainer {
         let population = state
             .population
             .iter()
-            .map(|id| store::load_genome(&dir, id))
+            .map(|id| store::load_genome(&dir, id).map(Arc::new))
             .collect::<Result<Vec<_>, _>>()?;
         let pending = state.edit(&dir)?;
         let latest = state.latest(&dir)?;
@@ -226,6 +267,9 @@ impl Trainer {
 
     pub fn completed(&self) -> u32 {
         self.state.completed
+    }
+    pub fn worker_control(&self) -> WorkerControl {
+        self.pool.control()
     }
     pub fn config(&self) -> &TrainerConfig {
         &self.state.config
@@ -268,7 +312,7 @@ impl Trainer {
         if self.latest.is_none() {
             return Err("No generation has finished".into());
         }
-        Ok(self.population[0].clone())
+        Ok(self.population[0].as_ref().clone())
     }
 
     /// Watch a scored run without acquiring ownership or advancing a checkpoint.
@@ -287,16 +331,52 @@ impl Trainer {
         Ok((record, history))
     }
 
+    /// Re-evaluate a historical champion on its scored cases. A different engine
+    /// build can inspect the archive when every saved fitness term reproduces.
+    pub fn reconstruct_door_exits(
+        dir: &Path,
+        summary: &GenerationSummary,
+    ) -> Result<[[u32; 2]; 2], String> {
+        let state = store::Checkpoint::load(dir)?;
+        if summary.run_id != state.run_id || !(1..=state.completed).contains(&summary.generation) {
+            return Err("Generation does not belong to this run's scored history".into());
+        }
+        let config = &summary.config;
+        config.validate()?;
+        let model = Self::read_genome(dir, &summary.best_genome)?;
+        let cases = duck_recipe::training_cases(
+            config.seed,
+            u64::from(summary.generation),
+            &config.case_mix,
+            config.cases_per_generation,
+        )
+        .map_err(reason)?;
+        let visits = cases
+            .into_iter()
+            .map(|case| duck_recipe::run_model(case, &model, false))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(reason)?;
+        let total: Score = visits.iter().map(|v| v.score).sum();
+        if total.terms().map(|term| term as f64) != summary.best_terms {
+            return Err("Replayed champion scores differ from the recorded fitness terms".into());
+        }
+        Ok(exits_by_entrance(&visits))
+    }
+
+    pub fn read_genome(dir: &Path, id: &str) -> Result<C3Genome, String> {
+        store::load_genome(dir, id)
+    }
+
     pub fn read_champion(dir: &Path) -> Result<C3Genome, String> {
         let state = store::Checkpoint::load(dir)?;
         if state.completed == 0 {
             return Err("No generation has finished".into());
         }
-        store::load_genome(dir, &state.population[0])
+        Self::read_genome(dir, &state.population[0])
     }
 
     pub fn run_generation(&mut self) -> Result<Generation, String> {
-        self.run_generation_with(|_| {})
+        self.score_generation(false, |_, _, _| {}, None)
     }
 
     pub fn run_generation_with(
@@ -312,6 +392,23 @@ impl Trainer {
         on_start: impl FnOnce(u32, &TrainerConfig),
         on_sample: impl Fn(&Replay) + Sync,
     ) -> Result<Generation, String> {
+        self.score_generation(false, |n, config, _| on_start(n, config), Some(&on_sample))
+    }
+
+    /// Opens a fresh, bounded live feed before dispatching this generation's visits.
+    pub fn run_generation_live(
+        &mut self,
+        on_start: impl FnOnce(u32, &TrainerConfig, LatestVisit),
+    ) -> Result<Generation, String> {
+        self.score_generation(true, on_start, None)
+    }
+
+    fn score_generation(
+        &mut self,
+        live: bool,
+        on_start: impl FnOnce(u32, &TrainerConfig, LatestVisit),
+        on_sample: Option<&(dyn Fn(&Replay) + Sync)>,
+    ) -> Result<Generation, String> {
         let generation = self.completed() + 1;
         if generation > self.config().generations {
             return Err("Run has reached its generation limit".into());
@@ -322,7 +419,6 @@ impl Trainer {
             .as_ref()
             .map_or(&self.state.config, |e| &e.config)
             .clone();
-        on_start(generation, &config);
         self.pool
             .control()
             .configure(config.worker_config())
@@ -338,28 +434,42 @@ impl Trainer {
         let tasks: Vec<_> = (0..population.len())
             .flat_map(|slot| (0..cases.len()).map(move |case| (slot, case)))
             .collect();
-        // Slot zero is the elite after the first generation. Show another candidate
-        // in Current so the two independent replays display different policies.
+        // Keep the archived sample independent of worker scheduling.
         let sample_slot = if generation == 1 {
             0
         } else {
             1 + ((generation as usize - 2) % (population.len() - 1))
         };
+        let latest = LatestVisit::default();
         let results = self
             .pool
-            .map(&tasks, |&(slot, case)| {
-                let visit =
-                    duck_recipe::run_model(cases[case], &population[slot], true).map_err(reason)?;
-                let replay = Replay {
-                    generation,
-                    genome_id: population[slot].id().into(),
-                    visit,
-                };
-                if slot == sample_slot && case == 0 {
-                    on_sample(&replay);
-                }
-                Ok::<_, String>(replay)
-            })
+            .map_with_start(
+                &tasks,
+                || on_start(generation, &config, latest.clone()),
+                |&(slot, case)| {
+                    let visit = duck_recipe::run_model(cases[case], &population[slot], true)
+                        .map_err(reason)?;
+                    let replay = Arc::new(Replay {
+                        generation,
+                        genome_id: population[slot].id().into(),
+                        live_genome: live.then(|| population[slot].clone()),
+                        visit,
+                    });
+                    // Publish and select the archival replay at the same completion point.
+                    *latest.0.lock().unwrap() = Completion {
+                        index: slot * cases.len() + case,
+                        pending: live.then(|| replay.clone()),
+                    };
+                    if slot == sample_slot
+                        && case == 0
+                        && let Some(on_sample) = on_sample
+                    {
+                        store::save_genome(&self.dir, &population[slot])?;
+                        on_sample(&replay);
+                    }
+                    Ok::<_, String>(replay)
+                },
+            )
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
         let scores: Vec<Score> = results
@@ -369,12 +479,16 @@ impl Trainer {
         let mut order: Vec<usize> = (0..scores.len()).collect();
         order.sort_by_key(|&i| std::cmp::Reverse(scores[i]));
         let winner = order[0];
-        let best = results[winner * cases.len()..(winner + 1) * cases.len()]
+        let winner_visits = &results[winner * cases.len()..(winner + 1) * cases.len()];
+        let door_exits = exits_by_entrance(winner_visits.iter().map(|r| &r.visit));
+        let best = winner_visits
             .iter()
             .max_by_key(|r| r.score)
             .unwrap()
+            .as_ref()
             .clone();
-        let current = results[sample_slot * cases.len()].clone();
+        let current = results[sample_slot * cases.len()].as_ref().clone();
+        let last_finished = results[latest.0.lock().unwrap().index].as_ref().clone();
         let mean_terms = std::array::from_fn(|i| {
             scores.iter().map(|s| s.terms()[i] as f64).sum::<f64>() / scores.len() as f64
         });
@@ -397,6 +511,7 @@ impl Trainer {
                 best_genome: best.genome_id.clone(),
                 best_case: best.case,
                 best_terms: scores[winner].terms().map(|v| v as f64),
+                door_exits: Some(door_exits),
                 mean_terms,
                 spread_terms,
                 elapsed_seconds,
@@ -404,6 +519,7 @@ impl Trainer {
             },
             current,
             best,
+            last_finished: Some(last_finished),
         };
         let next = self
             .state
@@ -419,7 +535,7 @@ impl Trainer {
         &self,
         config: &TrainerConfig,
         generation: u32,
-    ) -> Result<Vec<C3Genome>, String> {
+    ) -> Result<Vec<Arc<C3Genome>>, String> {
         if self.completed() == 0 {
             let mut result = self
                 .population
@@ -428,7 +544,8 @@ impl Trainer {
                 .cloned()
                 .collect::<Vec<_>>();
             result.extend(
-                (result.len()..config.population).map(|i| C3Genome::random(config.seed, i)),
+                (result.len()..config.population)
+                    .map(|i| Arc::new(C3Genome::random(config.seed, i))),
             );
             return Ok(result);
         }
@@ -441,7 +558,7 @@ impl Trainer {
                 .map(|_| draws.index(self.population.len()))
                 .min()
                 .unwrap();
-            result.push(
+            result.push(Arc::new(
                 self.population[rank]
                     .mutated(
                         &mut draws,
@@ -449,7 +566,7 @@ impl Trainer {
                         config.mutation_scale,
                     )
                     .map_err(reason)?,
-            );
+            ));
         }
         Ok(result)
     }

@@ -47,18 +47,7 @@ fn stored_shape_schema_cadence_and_range_are_checked() {
 #[test]
 fn masked_objects_do_not_affect_actions_and_inputs_are_checked() {
     let model = C3Genome::random(0, 2);
-    let mut obs = CreatureObservation {
-        self_goal: [0.; 30],
-        geometry: PolicyGeometry {
-            cells: vec![[0., 0.]; 1472],
-            rays: vec![[0.; 4]; 128],
-            nearest: [0.; 6],
-            ray_sources: vec![],
-            nearest_source: None,
-        },
-        objects: [[0.; 18]; OBJECT_CAPACITY],
-        object_sources: [None; OBJECT_CAPACITY],
-    };
+    let mut obs = observation();
     let before = model.infer(&obs).unwrap();
     obs.objects[0][3] = 1.;
     assert_eq!(before, model.infer(&obs).unwrap());
@@ -69,4 +58,42 @@ fn masked_objects_do_not_affect_actions_and_inputs_are_checked() {
     obs.objects[0][0] = 0.;
     obs.geometry.rays.pop();
     assert!(model.infer(&obs).is_err());
+}
+
+fn observation() -> CreatureObservation {
+    CreatureObservation {
+        self_goal: [0.; 30],
+        geometry: PolicyGeometry {
+            cells: vec![[0., 0.]; 1472],
+            rays: vec![[0.; 4]; 128],
+            nearest: [0.; 6],
+            ray_sources: vec![],
+            nearest_source: None,
+        },
+        objects: [[0.; 18]; OBJECT_CAPACITY],
+        object_sources: [None; OBJECT_CAPACITY],
+    }
+}
+
+#[test]
+fn contributions_and_bias_reconstruct_every_inferred_action() {
+    let initial = C3Genome::random(7, 2);
+    let model = initial
+        .mutated(&mut EvolutionDraws::new(7, 1, 3, b"offspring"), 1., 0.5)
+        .unwrap();
+    let mut obs = observation();
+    obs.self_goal[0] = -0.75;
+    obs.geometry.cells[23] = [0.25, 0.5];
+    obs.objects[0][0] = 1.;
+    let trace = model.inspect(&obs).unwrap();
+    assert_eq!(trace.outputs, model.infer(&obs).unwrap());
+    for (action, contributions) in trace.contributions.iter().enumerate() {
+        assert!(contributions.iter().any(|v| *v < 0.));
+        assert!(contributions.iter().any(|v| *v > 0.));
+        assert_ne!(trace.biases[action], 0.);
+        let latent = contributions
+            .iter()
+            .fold(trace.biases[action], |sum, term| sum + term);
+        assert_eq!(latent.tanh(), trace.outputs[action]);
+    }
 }

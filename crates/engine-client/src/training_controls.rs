@@ -29,6 +29,7 @@ pub(crate) fn install_with_replay(
     window: &MainWindow,
     root: PathBuf,
     archive: Option<(
+        PathBuf,
         engine_agent::trainer::Generation,
         Vec<engine_agent::trainer::GenerationSummary>,
     )>,
@@ -75,7 +76,11 @@ pub(crate) fn install_with_replay(
             && (id.starts_with("training.duck.")
                 || matches!(
                     id.as_str(),
-                    "training.pause" | "training.resume" | "training.stop"
+                    "training.preview.current"
+                        | "training.preview.best"
+                        | "training.pause"
+                        | "training.resume"
+                        | "training.stop"
                 ))
         {
             if let Err(error) = duck_commands.command(&window, id.as_str()) {
@@ -180,9 +185,9 @@ pub(crate) fn install_with_replay(
             publish(&window, &control.snapshot());
         }
     });
-    if let Some((record, history)) = archive {
+    if let Some((directory, record, history)) = archive {
         window.invoke_training_open();
-        duck.client.watch(window, record, history);
+        duck.client.watch(window, directory, record, history);
     }
     Ok(Training {
         _timer: timer,
@@ -353,11 +358,28 @@ fn adjust(window: &MainWindow, id: &str) {
             direction,
         ));
     } else if id.starts_with("training.generations.") {
-        window.set_training_generations(cycle(
-            window.get_training_generations(),
-            &[1, 4, 8, 16, 32, 48, 64],
-            direction,
-        ));
+        const PRESETS: &[i32] = &[
+            1, 4, 8, 16, 32, 48, 64, 100, 250, 500, 1_000, 2_500, 5_000, 7_500, 9_999,
+        ];
+        let presets = if window.get_training_recipe() == crate::duck_training::RECIPE {
+            PRESETS
+        } else {
+            &PRESETS[..PRESETS.partition_point(|&count| count <= 64)]
+        };
+        let current = window.get_training_generations();
+        let next = if direction > 0 {
+            presets
+                .iter()
+                .find(|&&n| n > current)
+                .unwrap_or(&presets[0])
+        } else {
+            presets
+                .iter()
+                .rev()
+                .find(|&&n| n < current)
+                .unwrap_or(&presets[presets.len() - 1])
+        };
+        window.set_training_generations(*next);
     } else if id.starts_with("training.seed.") {
         window.set_training_seed((window.get_training_seed() - 1 + direction).rem_euclid(99) + 1);
     }

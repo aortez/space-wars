@@ -141,6 +141,7 @@ fn training_setup_progress_and_errors_render_with_working_back_controls() {
         evaluation_millis: 75_000,
         can_resume: true,
         workers: Some(engine_agent::training_workers::WorkerSnapshot {
+            batch_completed: 0,
             config: engine_agent::training_workers::WorkerConfig::default(),
             capacity: 16,
             allowed: 4,

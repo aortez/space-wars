@@ -562,7 +562,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let archive = args
         .training_replay
         .as_ref()
-        .map(|dir| engine_agent::trainer::Trainer::read_replay(dir, args.training_generation))
+        .map(|dir| {
+            engine_agent::trainer::Trainer::read_replay(dir, args.training_generation)
+                .map(|(record, history)| (dir.clone(), record, history))
+        })
         .transpose()
         .map_err(std::io::Error::other)?;
     let _training = training_controls::install_with_replay(

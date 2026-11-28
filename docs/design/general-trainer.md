@@ -230,24 +230,43 @@ ordered score terms in both generations.
 
 ## Watching and steering
 
-Put the duck alongside ship arrivals in Training. **Current** follows a
-sampled candidate and case. **Best** replays the saved champion on its scored
-case, with its original settings. Label both with candidate, generation,
-case and playback tick. Render the real Clock in both views. Use independent
-replay state so slowing, pinning or dropping preview frames cannot affect
-fitness or worker scheduling.
+The Clock workers score independent candidate–case visits in parallel, stepping
+physics as fast as the available CPU allows. Choose a replay in the left column.
+**Latest** starts with the most recently finished visit. When that replay ends,
+the viewer takes the newest available visit and skips any that finished in
+between. **Best** shows the winning genome's best visit from the latest scored
+generation. Each replay uses the original settings and controls. At **1×**
+the display targets 60 physics ticks per second. Changing replay speed
+leaves worker scheduling and fitness unchanged.
 
-Show both views side by side when space permits and provide Current/Best tabs
-at 800×480. Keep progress, the fitness history, best score by term, and
-steering controls reachable in either layout. Show pending settings with their
-effective generation. The view uses the runner's edit and lifecycle commands.
-Check both 1024×768 and 800×480 and record the running view.
+**Pin replay** keeps the selected visit while new scores arrive. The duck and
+training workers keep moving. **Follow new** turns automatic selection back on.
+Opening **Brain** pins the visit for inspection and closing it restores the
+previous setting.
+
+DirtSim's Current pane streams frames from an evaluation while it is being
+scored. Its Best pane runs a separate champion simulation paced by wall time.
+The Clock viewer uses a finished visit so the operator can pause and step the
+exact controls that earned the score.
+[DirtSim evaluation worker](https://github.com/aortez/dirtsim/blob/0db5f847e7c059b807eb982702ba26fe9f004bf9/apps/src/server/evolution/EvaluationExecutor.cpp#L318-L361) ·
+[DirtSim best playback](https://github.com/aortez/dirtsim/blob/0db5f847e7c059b807eb982702ba26fe9f004bf9/apps/src/server/states/Evolution.cpp#L2172-L2190)
+
+When training completes or is saved and stopped, the selected replay holds
+still. **Play replay** plays it once and holds its terminal frame. Opening a
+saved generation directly starts with **Best** playing. Old archives that
+predate completion-order recording offer their **Saved sample** alongside Best.
+[Completed run](../images/training/clock-duck-completed-1024x768.png)
+
+The main view shows one replay with the generation progress, fitness history,
+and scores. **Both doors** in the Brain inspector opens a paired comparison.
+The desktop view shows the entrances side by side. At 800×480 the left column
+switches between the synchronized visits.
 [#756](https://github.com/aortez/space-wars/issues/756)
 
-Open **Training** from the launcher, choose **Clock duck · Platforms**, and
-start the run. **Steer** changes settings for the next generation. To watch
-a scored headless run, pass its directory to the client. For example, the
-following command plays generation 56 and shows the history through that
+Open **Training** from the launcher, choose **Clock duck · Platforms**, set a
+generation budget up to **9,999**, and start the run. **Steer** changes settings
+for the next generation. To watch a scored headless run, pass its directory
+to the client. This command plays generation 56 and shows the history through that
 generation. Omit the generation to watch the latest winner. Replay opens
 read-only and can also run while another process owns the job.
 
@@ -255,8 +274,48 @@ read-only and can also run while another process owns the job.
 target/ci/engine-client --training-replay "$run_dir" --training-generation 56
 ```
 
-[Desktop view at 1024×768](../images/training/clock-duck-1024x768.png) ·
-[Best tab at 800×480](../images/training/clock-duck-800x480.png)
+[Latest during training at 1024×768](../images/training/clock-duck-1024x768.png) ·
+[Best at 800×480](../images/training/clock-duck-800x480.png)
+
+### Inspecting a decision
+
+The run header counts completed visits in the current generation and workers
+currently evaluating a visit. The score panel reports the winning genome's
+exits and visits from each entrance on the cases used for that generation.
+
+Each replay shows Move, Jump, Run and Dive. The bars show the network's
+signed outputs, with zero at the center. The labels show the movement or
+held buttons passed to the body. Choose **Brain** on a pane to pin the replay
+and inspect its latest decision. **Pause replay** holds the scene while
+training continues. **Step decision** advances to the next applied decision
+(three physics ticks during active play).
+
+The polar map centers the duck, draws nearby geometry in cyan and points a
+gold arrow toward the current goal. Select an output to see its last 32
+decisions and the signed contribution of each final hidden unit. Each of the
+64 bars is the unit's activation multiplied by its weight into that output.
+Adding the head bias gives the displayed pre-activation. Applying tanh gives
+the output passed to the creature decoder.
+
+**Both doors** takes the genome and course from **Best** and runs it
+from each entrance with the same seed and clock reading. The two visits advance
+together. The scored side uses the recorded controls, and the opposite side
+computes its own controls from its observations. Switch panes to inspect either
+side at the same tick.
+A visit that finishes first holds its terminal frame until its partner ends.
+
+For example, on case `3628204403383288016` at 15:08, the generation 56
+champion cleared four obstacles and exited at tick 1,401 from the right. From
+the left it cleared none and timed out at tick 2,070.
+
+The inspector recomputes only the replays being viewed. A replay worker checks
+each reconstructed decision against the scored controls before displaying
+network activity. For older archives the viewer can recover the door counts
+by replaying the scored cases and comparing all five aggregate fitness terms
+with the saved generation.
+
+[Inspect a decision at 1024×768](../images/training/clock-brain-1024x768.png) ·
+[Compare entrances at 800×480](../images/training/clock-brain-800x480.png)
 
 ## Background jobs
 
@@ -280,5 +339,5 @@ command runs on a Pi, add the bundled NES game. Its adapter steps an emulated
 frame and applies ordinary pad input. Give it a game-specific observation,
 pad decoder and scoring recipe. RAM exposes state, position, lives and score.
 Choose RAM, pixels or both and the corresponding network with the Falling
-recipe. Reuse the runner, history, checkpoint and Current/Best view through
+recipe. Reuse the runner, history, checkpoint and Latest/Best view through
 the same trainee interface. [#758](https://github.com/aortez/space-wars/issues/758)

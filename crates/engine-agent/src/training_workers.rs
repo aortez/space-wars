@@ -74,6 +74,8 @@ pub struct WorkerSnapshot {
     /// None means unavailable or not yet sampled, never an assumed idle CPU.
     pub machine_cpu_percent: Option<f64>,
     pub completed_episodes: u64,
+    /// Returned tasks in this batch; remains at the final count until the next batch starts.
+    pub batch_completed: usize,
     /// Completed episodes / time spent in pool batches; excludes pauses/setup.
     pub episodes_per_second: f64,
 }
@@ -86,6 +88,7 @@ struct State {
     next: usize,
     total: usize,
     completed: u64,
+    batch_completed: usize,
     elapsed: Duration,
     started: Option<Instant>,
     last_end: Instant,
@@ -169,6 +172,7 @@ impl WorkerControl {
             queued: s.total - s.next,
             machine_cpu_percent: s.cpu_percent,
             completed_episodes: s.completed,
+            batch_completed: s.batch_completed,
             episodes_per_second: if elapsed.is_zero() {
                 0.0
             } else {
@@ -210,6 +214,7 @@ impl EpisodePool {
                 next: 0,
                 total: 0,
                 completed: 0,
+                batch_completed: 0,
                 elapsed: Duration::ZERO,
                 started: None,
                 last_end: Instant::now(),
@@ -234,6 +239,7 @@ impl EpisodePool {
         let _batch = self.batch.lock().unwrap_or_else(|e| e.into_inner());
         let mut s = self.control.0.state.lock().unwrap();
         s.completed = 0;
+        s.batch_completed = 0;
         s.elapsed = Duration::ZERO;
     }
 
@@ -241,9 +247,16 @@ impl EpisodePool {
     /// errors can be collected in input order by the caller. No result is ever
     /// replaced by a score when an evaluator fails.
     pub fn map<T: Sync, R: Send>(&self, items: &[T], evaluate: impl Fn(&T) -> R + Sync) -> Vec<R> {
-        if items.is_empty() {
-            return Vec::new();
-        }
+        self.map_with_start(items, || {}, evaluate)
+    }
+
+    /// Publish the initialized queue to observers before dispatching the first task.
+    pub(crate) fn map_with_start<T: Sync, R: Send>(
+        &self,
+        items: &[T],
+        on_start: impl FnOnce(),
+        evaluate: impl Fn(&T) -> R + Sync,
+    ) -> Vec<R> {
         let _batch = self.batch.lock().unwrap_or_else(|e| e.into_inner());
         {
             let mut s = self.control.0.state.lock().unwrap();
@@ -258,8 +271,10 @@ impl EpisodePool {
             s.started = Some(Instant::now());
             s.next = 0;
             s.total = items.len();
+            s.batch_completed = 0;
         }
         let _finish = Batch(&self.control.0);
+        on_start();
         let results: Vec<_> = items.iter().map(|_| Mutex::new(None)).collect();
         self.workers.scope(|scope| {
             for _ in 0..self.workers.current_num_threads().min(items.len()) {
@@ -317,6 +332,7 @@ impl Drop for Permit<'_> {
         let mut s = self.shared.state.lock().unwrap();
         s.active -= 1;
         s.completed += u64::from(self.completed);
+        s.batch_completed += usize::from(self.completed);
         s.sample();
         self.shared.wake.notify_all();
     }

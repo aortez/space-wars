@@ -82,6 +82,7 @@ fn changing_limits_drains_running_episodes_and_keeps_input_order() {
             .unwrap();
         let s = pool.control.snapshot();
         assert_eq!((s.active, s.allowed), (2, 1));
+        assert_eq!((s.batch_completed, s.queued), (0, 18));
         release.wait();
         assert_eq!(
             job.join().unwrap(),
@@ -89,8 +90,35 @@ fn changing_limits_drains_running_episodes_and_keeps_input_order() {
         );
     });
     assert_eq!(peak.load(Ordering::SeqCst), 2);
-    assert_eq!(pool.control.snapshot().completed_episodes, 20);
-    assert_eq!(pool.control.snapshot().active, 0);
+    let completed = pool.control.snapshot();
+    assert_eq!(
+        (
+            completed.active,
+            completed.queued,
+            completed.batch_completed
+        ),
+        (0, 0, 20)
+    );
+    assert_eq!(completed.completed_episodes, 20);
+    pool.map_with_start(
+        &[0, 1],
+        || {
+            let next = pool.control.snapshot();
+            assert_eq!((next.active, next.queued, next.batch_completed), (0, 2, 0));
+        },
+        |&i| {
+            let active = pool.control.snapshot();
+            assert_eq!(
+                (active.active, active.queued, active.batch_completed),
+                (1, 1 - i, i)
+            );
+        },
+    );
+    assert_eq!(pool.control.snapshot().batch_completed, 2);
+    let empty: [usize; 0] = [];
+    pool.map(&empty, |v| *v);
+    assert_eq!(pool.control.snapshot().batch_completed, 0);
+    assert_eq!(pool.control.snapshot().completed_episodes, 22);
 }
 
 #[test]

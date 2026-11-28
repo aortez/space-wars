@@ -211,6 +211,55 @@ fn training_replays_keep_results_identical_and_support_pinning_speed_and_navigat
 }
 
 #[test]
+fn clock_generation_selector_wraps_and_starts_a_long_run() {
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window
+        .window()
+        .set_size(slint::LogicalSize::new(800., 480.));
+    let directory = tempfile::tempdir().unwrap();
+    let _job = training_controls::install(&window, directory.path().to_owned()).unwrap();
+    install_ui_navigation(&window);
+    window.set_launcher_visible(true);
+    window.show().unwrap();
+    pump_worker_until(&window, || window.get_training_can_start());
+    let activate = |id| assert!(ui_activation::activate(&window, id), "{id}");
+    activate("launcher.training");
+
+    // Ship runs still wrap at their supported limit of 64.
+    activate("training.generations.next");
+    assert_eq!(window.get_training_generations(), 64);
+    activate("training.generations.next");
+    assert_eq!(window.get_training_generations(), 1);
+    activate("training.recipe.previous");
+    assert_eq!(window.get_training_generations(), 8);
+
+    window.set_training_focus(2);
+    training_controls::handle_action(&window, UiAction::Left);
+    activate("training.generations.previous");
+    assert_eq!(window.get_training_generations(), 1);
+    window.window().take_snapshot().unwrap();
+    click(&window, 280., 222.);
+    assert_eq!(window.get_training_generations(), 9_999);
+    training_controls::handle_action(&window, UiAction::Right);
+    assert_eq!(window.get_training_generations(), 1);
+    activate("training.generations.previous");
+    activate("training.start");
+    pump_worker_until(&window, || window.get_training_can_stop());
+    activate("training.stop");
+    pump_worker_until(&window, || window.get_training_status_code() == "stopped");
+    let snapshot: serde_json::Value =
+        serde_json::from_str(&window.get_training_snapshot()).unwrap();
+    let dir = std::path::Path::new(snapshot["run_dir"].as_str().unwrap());
+    assert_eq!(
+        engine_agent::trainer::Trainer::read_config(dir)
+            .unwrap()
+            .generations,
+        9_999
+    );
+}
+
+#[test]
 fn training_keyboard_touch_and_control_ids_manage_a_job_independently_of_navigation() {
     slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
     let window = MainWindow::new().unwrap();
