@@ -12,7 +12,7 @@ use crate::{
     tanks::{TankCommand, TankId},
 };
 
-pub const FIXTURE_VERSION: &str = "planetary-tank-237-v2";
+pub const FIXTURE_VERSION: &str = "planetary-tank-237-v3";
 pub const WARMUP_STEPS: usize = 120;
 pub const MEASURED_STEPS: usize = 600;
 
@@ -95,7 +95,7 @@ impl TankFixture {
     }
 
     fn build(seed: u64, shape: DirtMode, case: FixtureCase, count: usize) -> Self {
-        let mut state = SpacewarsScenario::init_terrain_fixture(seed);
+        let mut state = SpacewarsScenario::init_tank_proving_ground(seed);
         // Keep ordinary ships visible but out of the isolated driving route.
         state.ships[0].position = Vec2::new(700.0, 700.0);
         state.ships[1].position = Vec2::new(800.0, 500.0);
@@ -500,9 +500,59 @@ impl TankFixture {
     }
 }
 
+impl SpacewarsScenario {
+    /// The tanks' proving ground: the terrain fixture's world, with its planet
+    /// weighing what the surface games' controlled planet does, so that tanks
+    /// are tried under the pull they fight under. The terrain fixture's own
+    /// planet has the arcade game's pull.
+    pub(crate) fn init_tank_proving_ground(seed: u64) -> SpacewarsState {
+        let mut state = Self::init_terrain_fixture(seed);
+        let planet = &mut state.planets[0];
+        planet.mass = crate::surface_mass(planet.radius);
+        state
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The proving ground's planet pulls the surface gravity at the height
+    /// its weight is set for, and a tank on it, which rides higher, feels a
+    /// little less. The terrain fixture's own planet pulls about 39 times as
+    /// hard.
+    #[test]
+    fn the_proving_grounds_planet_pulls_the_surface_gravity() {
+        let mut state = SpacewarsScenario::init_tank_proving_ground(42);
+        let planet = state.planets[0];
+        let pull = |mass: f32, distance: f32| {
+            60.0 * engine_core::constants::GRAVITY * mass / distance.powi(2)
+        };
+        let distance = planet.radius * crate::BODY_BOUNDS_RADIUS_SCALE + crate::SURFACE_PULL_HEIGHT;
+        let gravity = engine_rapier::SURFACE_GRAVITY;
+        assert!((pull(planet.mass, distance) - gravity).abs() < 1.0e-3);
+        let arcade = SpacewarsScenario::init_terrain_fixture(42).planets[0];
+        let ratio = pull(arcade.mass, distance) / gravity;
+        assert!((38.0..40.0).contains(&ratio), "{ratio}");
+
+        use engine_common::Scenario;
+        let dt = Duration::from_secs_f32(1.0 / 60.0);
+        state.ships[0].position = Vec2::new(700.0, 700.0);
+        SpacewarsScenario::step(&mut state, &[], dt);
+        let tank = state
+            .place_tank(
+                Vec2::new(496.0, 565.0),
+                -Vec2::Y,
+                Allegiance::INITIAL_GOVERNMENT,
+            )
+            .expect("top admission");
+        for _ in 0..60 {
+            SpacewarsScenario::step(&mut state, &[], dt);
+        }
+        let felt = state.tank_snapshot(tank).unwrap().local_gravity.length();
+        assert!((17.0..gravity).contains(&felt), "{felt}");
+    }
+
     #[test]
     fn shared_script_measures_drive_brake_gap_cut_and_replay() {
         for shape in [DirtMode::Round, DirtMode::Angular] {

@@ -2675,6 +2675,23 @@ fn body_mass(radius: f32) -> f32 {
     core::f32::consts::PI * radius * radius * PLANET_MASS_DENSITY
 }
 
+/// How far above a planet's bounds [`surface_mass`] sets its pull: half the
+/// height of a pilot at the engine's full size.
+const SURFACE_PULL_HEIGHT: f32 = 0.9;
+
+/// The mass of a planet of `radius` that pulls
+/// [`engine_rapier::SURFACE_GRAVITY`] [`SURFACE_PULL_HEIGHT`] above its bounds,
+/// on the world's gravity scale, which is a pull per tick of 60 a second.
+/// The surface games' controlled planets weigh this, and so does the planet
+/// of the tanks' proving ground. The Surface V1 profile weighs each planet
+/// for the same pull at half a pilot's own height, a little lower.
+/// [`body_mass`] is the arcade game's, whose planets pull about 39 times as
+/// hard.
+fn surface_mass(radius: f32) -> f32 {
+    engine_rapier::SURFACE_GRAVITY / 60.0 / GRAVITY
+        * (radius * BODY_BOUNDS_RADIUS_SCALE + SURFACE_PULL_HEIGHT).powi(2)
+}
+
 fn apply_world_gravity(state: &mut SpacewarsState) -> GravityStepMetrics {
     apply_world_gravity_with_pilots(state, &mut [], state.config.delta_time(), false)
 }

@@ -790,9 +790,7 @@ impl Scenario for SurfaceSortieScenario {
         let mut planet = PlanetState {
             position: Vec2::splat(500.0),
             radius: SURFACE_RADIUS,
-            // Match 18 units/s² at the feet using the existing fixed-tick
-            // Spacewars gravity scale, without changing the normal game.
-            mass: 18.0 / 60.0 / GRAVITY * (SURFACE_RADIUS * BODY_BOUNDS_RADIUS_SCALE + 0.9).powi(2),
+            mass: surface_mass(SURFACE_RADIUS),
             color: Color::scale_255(30.0, 55.0, 65.0),
             owner_id: None,
             capturing_player_id: None,

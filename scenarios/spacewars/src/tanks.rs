@@ -657,7 +657,7 @@ mod tests {
             Some(engine_common::DirtMode::Round),
             Some(engine_common::DirtMode::Angular),
         ] {
-            let mut state = super::super::SpacewarsScenario::init_terrain_fixture(42);
+            let mut state = super::super::SpacewarsScenario::init_tank_proving_ground(42);
             state.ships[0].position = Vec2::new(700.0, 700.0);
             state.ships[1].position = Vec2::new(800.0, 500.0);
             if let Some(mode) = mode {
@@ -764,7 +764,7 @@ mod tests {
     #[test]
     fn material_gap_refusal_keeps_real_support_and_inertia() {
         use engine_terrain::{Brush, EditMode, TerrainEdit};
-        let mut state = super::super::SpacewarsScenario::init_terrain_fixture(42);
+        let mut state = super::super::SpacewarsScenario::init_tank_proving_ground(42);
         state.ships[0].position = Vec2::new(700.0, 700.0);
         host_step(&mut state);
         let id = state
@@ -836,7 +836,7 @@ mod tests {
     #[test]
     fn host_material_placement_two_bearings_pause_clone_replay_and_cleanup() {
         use engine_common::Scenario;
-        let mut state = super::super::SpacewarsScenario::init_terrain_fixture(42);
+        let mut state = super::super::SpacewarsScenario::init_tank_proving_ground(42);
         // No stale spatial index may authorize placement.
         assert!(
             state
@@ -935,7 +935,7 @@ mod tests {
     #[test]
     fn queued_material_cut_removes_support_and_tank_falls_without_frame_glue() {
         use engine_terrain::{Brush, EditMode, TerrainEdit};
-        let mut state = super::super::SpacewarsScenario::init_terrain_fixture(42);
+        let mut state = super::super::SpacewarsScenario::init_tank_proving_ground(42);
         host_step(&mut state);
         let id = state
             .place_tank(
@@ -976,8 +976,13 @@ mod tests {
             host_step(&mut state);
             lost_support |= state.tank_snapshot(id).unwrap().support.is_none();
         }
-        let after = state.tank_snapshot(id).unwrap();
         assert!(lost_support);
+        // Half a second after the cut, the ground's pull has dropped it about
+        // 2 units.
+        for _ in 0..21 {
+            host_step(&mut state);
+        }
+        let after = state.tank_snapshot(id).unwrap();
         let radial = (before.assembly.chassis.position - planet.position).normalized();
         assert!(
             (after.assembly.chassis.position - before.assembly.chassis.position).dot(radial) < -1.0
@@ -986,7 +991,7 @@ mod tests {
 
     #[test]
     fn unsupported_host_tank_retains_inertia_and_receives_gravity_once() {
-        let mut state = super::super::SpacewarsScenario::init_terrain_fixture(42);
+        let mut state = super::super::SpacewarsScenario::init_tank_proving_ground(42);
         host_step(&mut state);
         let id = state
             .place_tank(

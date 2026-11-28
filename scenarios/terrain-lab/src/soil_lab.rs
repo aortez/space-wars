@@ -13,7 +13,7 @@ use grains::Grains;
 pub const DT: f64 = 1.0 / 60.0;
 pub const SPACING: f32 = 0.125;
 const RADIUS: f32 = 8.0;
-const GRAVITY: f32 = 18.0;
+const GRAVITY: f32 = engine_rapier::SURFACE_GRAVITY;
 pub const SUPPORT_TICK: u64 = 120;
 pub const BLAST_TICKS: [u64; 2] = [120, 300];
 

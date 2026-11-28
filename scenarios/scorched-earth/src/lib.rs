@@ -50,7 +50,7 @@ pub use suspension::WheelTuning;
 
 pub const FIXED_HZ: u32 = 60;
 const DT: f32 = 1.0 / FIXED_HZ as f32;
-const GRAVITY: f32 = 18.0;
+const GRAVITY: f32 = engine_rapier::SURFACE_GRAVITY;
 const GROUND: PhysicsId = PhysicsId::new(1);
 const DIRT: MaterialId = MaterialId(1);
 const CELL_SIZE: f32 = 0.5;
