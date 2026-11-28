@@ -291,6 +291,49 @@ fn a_shots_record_marks_a_blocked_barrel() {
     }
 }
 
+/// A rock in the barrel blocks it while the game holds the rock. Once the
+/// rock has left the game, it blocks nothing in the next step, though the
+/// physics held its body until that step reconciled.
+#[test]
+fn a_body_that_left_the_game_stands_in_no_barrel() {
+    for left in [false, true] {
+        let mut state = field();
+        let tank = place(&mut state, 0.0, GOVERNMENT);
+        idle(&mut state, 60);
+        let settings = (30.0, 1.0, 30.0);
+        aim(&mut state, tank, settings, false, None);
+        let s = state.world.tank_snapshot(tank).unwrap();
+        let put = s.mount_position + s.muzzle_direction * 1.6;
+        state.world.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            put,
+            s.mount_velocity,
+            0.5,
+            0.0,
+            Color::WHITE,
+        ));
+        idle(&mut state, 1);
+        let debris = &mut state.world.debris;
+        let near = |piece: &&DebrisState| piece.position.distance_to(put) < 0.5;
+        let rock = debris.iter().find(near).and_then(DebrisState::id).unwrap();
+        if left {
+            debris.retain(|piece| piece.id() != Some(rock));
+            // The physics holds the rock's body until the next step
+            // reconciles it with the game.
+            let body = MechanicalEntity::Debris(rock.value());
+            assert!(state.world.physics.carried_motion(body).is_some());
+        }
+        let s = state.world.tank_snapshot(tank).unwrap();
+        let id = fire(&mut state, tank, settings, None);
+        let records = shots(&state, tank);
+        let launch = records.iter().find(|shot| shot.id == id).unwrap().launch;
+        assert_eq!(launch.blocked, !left, "{left}");
+        if left {
+            assert_eq!(launch.position, s.muzzle_position);
+        }
+    }
+}
+
 /// Each shot fired takes a new id, greater than every earlier one, and a
 /// trigger that the cannon refuses, while it reloads or while four of its
 /// rounds fly, starts no record. A tank's records are its rounds in flight

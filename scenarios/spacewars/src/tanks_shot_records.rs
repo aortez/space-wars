@@ -120,8 +120,8 @@ pub struct ShotLaunch {
     pub velocity: Vec2,
     /// Whether something stood in the barrel, so that the round started
     /// there, short of the muzzle. The barrel is cast against the world as
-    /// the last step left it, so a body that left the game in that step can
-    /// still stand in it.
+    /// the last step left it, less the bodies of what has left the game
+    /// since.
     pub blocked: bool,
     /// The target's motion as the step that fired the shot began, if the
     /// command named a target whose body the world then held.

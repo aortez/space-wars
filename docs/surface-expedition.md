@@ -170,7 +170,7 @@ holds only what happened, and predicts nothing.
   they were measured from; the hull's motion; the barrel's pivot and
   direction; where the round started and its velocity; and whether something
   stood in the barrel. The barrel is cast against the world as the last step
-  left it, so a body that left the game in that step can still stand in it.
+  left it, less the bodies of what has left the game since.
 - **Flight.** After each step: how many steps the round has flown, where it is,
   and how it moves. The step that stops a round leaves it turned back from what
   it met, so an ended shot's flight tells of the rebound.
@@ -467,7 +467,8 @@ game's planets read.
 Shot record regressions fire real tanks on the material planet, where the
 ground pulls about 18, and in the rounds' weightless fixture above it. They
 cover a record's launch against the round and the hull as it fired; a blocked
-barrel, and its round's burst on what blocks it; a new id for each shot, and no
+barrel, and its round's burst on what blocks it; a body that left the game in
+the step before, which stands in no barrel; a new id for each shot, and no
 record for a refused trigger; a target's motion as the tank fired and after
 each step, and the round's closest approach to where a flying ship really was;
 a target that the shot destroys, one that left the game in the step before, one
