@@ -77,12 +77,13 @@ law's elastic rotation for the moment it carries. Nothing else holds or resets
 the angle: a heavier load bends the branch further, a lifted one lets it
 spring back, and the rest angle never moves.
 
-The spring's damping is set when the connection is inserted, from the held
-body's moment of inertia about the root, `J`. It is `2 z sqrt(k J)`, where `k`
-is the stiffness and `z = -ln(1 - damping) / 4 pi` is the damping ratio at which
-a free swing of that body alone loses the material's `damping`, its fraction of
-stored elastic energy, each cycle. That ratio is at most critical. Wood's
-damping of 0.2 gives a ratio of 0.018, so a branch rings for a while.
+The spring's damping is set when the connection is inserted, or reshaped, from
+the held body's moment of inertia about the root, `J`. It is `2 z sqrt(k J)`,
+where `k` is the stiffness and `z = -ln(1 - damping) / 4 pi` is the damping
+ratio at which a free swing of that body alone loses the material's `damping`,
+its fraction of stored elastic energy, each cycle. That ratio is at most
+critical. Wood's damping of 0.2 gives a ratio of 0.018, so a branch rings for a
+while.
 
 The spring's impulse is a solver row of its own, so it is the moment at the
 root. Neither locked linear row adds to that moment, since both act at the
@@ -96,6 +97,18 @@ connection reports none.
 A hinge is charged as a weld is, from the moment and axial force it carried.
 Its turn is all elastic, so it measures no plastic rotation either, and the
 law's fallback progression stands in for it.
+
+`reshape_connection` gives a live connection a new beam where it is joined, as
+wood does when it thickens. The joint's frames stay, so a hinge keeps the rest
+it was joined at rather than taking the turn it has. Its spring takes the new
+beam's stiffness, damped as at insertion for the held body as it then is, so a
+host that changes the held body's mass first, as a growing tree does, has it
+damped for its new mass. The work the connection has absorbed stays absorbed:
+it keeps the new beam's capacity less what the old one used. A connection the
+world does not have is refused with `Missing`; one that has severed, or a beam
+whose capacity is no more than the work already absorbed, with `Exhausted`;
+and a beam that is not valid for the material with `Geometry`. A refusal
+changes nothing.
 
 ## Charging and severing
 
@@ -214,6 +227,14 @@ settles all the way.
 - **Thickness:** a beam twice as high turns the same branch 7.94 times less at
   Clock's scale and 7.95 in metres, where the balances give 7.97. The stiffer
   hinge settles 0.4% past its balance.
+- **Thickening:** 30 steps into an overload at twice its safe stress that would
+  use its capacity in 90, a hinge has used 40% of it and turned 0.012. Given a
+  beam twice as deep there, it reports the same turn and keeps that work
+  absorbed. It springs up and settles at half its safe stress within 4e-6 of
+  where a hinge of the deep beam joined level settles, 0.9% past its balance,
+  rather than 0.006 below where it hung, as a hinge joined there afresh would.
+  Refused requests change nothing, and the world saves and restores byte for
+  byte.
 - **Direction:** a branch on the trunk's left turns counterclockwise by the
   same amount as the right one turns clockwise. A load that lifts the right
   branch turns it counterclockwise by as much.

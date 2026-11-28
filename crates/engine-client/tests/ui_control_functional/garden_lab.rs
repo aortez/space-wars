@@ -1041,11 +1041,14 @@ fn garden_lab_tree_bed_grows_cuts_and_returns_in_both_renderers() {
             assert!(!blade(x) && blade(x - 1) && blade(x + 1), "{sown}");
             capture(h, renderer, "tree-seed-in-grass", &sown);
 
-            // Physical wood hangs the trees' wood on hinges, and growth waits
-            // while the bodies move. Light snow lands on the tip of the
-            // lowest branch the cut left, on the side away from the grass, and
-            // bends it down. A cut there drops the branch to the dirt, and the
-            // snow slides off.
+            // Physical wood hangs the trees' wood on hinges. Light snow, laid
+            // while the bed waits, lands on the tip of the lowest branch the cut
+            // left, on the side away from the grass. Resumed, the trees grow on
+            // while the snow's weight builds up and bends that branch down.
+            // Growth may have put wood back where the cut was, so the bed waits
+            // again for a cut that drops the lowest branch, whichever it is then,
+            // as dead wood, counted exactly while nothing grows. Run on, the dead
+            // wood falls to the dirt, and resting the wood leaves it there.
             choose_tree(
                 h,
                 &mut s,
@@ -1064,40 +1067,63 @@ fn garden_lab_tree_bed_grows_cuts_and_returns_in_both_renderers() {
                 h,
                 &mut s,
                 &mut t,
-                control(scenario_garden_lab::Command::Pause),
+                control(scenario_garden_lab::Command::LightSnow),
             );
+            let laid = snapshot(h, |v| v["tree_bed"]["wood"]["snow"].is_object());
+            let on = laid["tree_bed"]["wood"]["snow"]["on"].clone();
+            let hinge = |v: &Value| {
+                v["tree_bed"]["wood"]["hinges"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|h| h["tissue"] == on)
+                    .cloned()
+            };
+            let cell = hinge(&laid).unwrap()["cell"].clone();
+            assert!(cell[1] == 10 && cell[0].as_i64().unwrap() < 12, "{cell}");
             choose_tree(
                 h,
                 &mut s,
                 &mut t,
-                control(scenario_garden_lab::Command::LightSnow),
+                control(scenario_garden_lab::Command::Pause),
             );
             let snowy = snapshot(h, |v| {
                 v["tree_bed"]["wood"]["snow"]["share"]
                     .as_f64()
                     .is_some_and(|share| share > 0.999)
             });
-            let wood = &snowy["tree_bed"]["wood"];
-            let tip = wood["hinges"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .find(|h| h["tissue"] == wood["snow"]["on"])
-                .unwrap();
-            assert!(
-                tip["cell"][1] == 10 && tip["cell"][0].as_i64().unwrap() < 12,
-                "{wood}"
-            );
+            let tip = hinge(&snowy).unwrap();
             assert!(tip["droop"].as_f64().unwrap() > 0.2, "{tip}");
-            assert_eq!(tree_tick(&snowy), tree_tick(&physical), "growth went on");
+            assert!(tree_tick(&snowy) > tree_tick(&physical), "growth waited");
+            choose_tree(
+                h,
+                &mut s,
+                &mut t,
+                control(scenario_garden_lab::Command::Pause),
+            );
+            let held = snapshot(h, |v| v["tree_bed"]["paused"] == true);
             choose_tree(
                 h,
                 &mut s,
                 &mut t,
                 control(scenario_garden_lab::Command::CutBranch),
             );
-            let fallen = snapshot(h, |v| v["tree_bed"]["wood"]["fallen"] == 6);
-            assert_eq!(fallen["tree_bed"]["wood"]["snow"]["fastened"], false);
+            let cut = snapshot(h, |v| v["tree_bed"]["cuts"] == 2);
+            let hinges = |v: &Value| v["tree_bed"]["wood"]["hinges"].as_array().unwrap().len();
+            let dead = |v: &Value| v["tree_bed"]["wood"]["dead"].as_u64().unwrap() as usize;
+            assert!(dead(&cut) > dead(&held), "{cut}");
+            assert_eq!(hinges(&held) - hinges(&cut), dead(&cut) - dead(&held));
+            assert_eq!(
+                cut["tree_bed"]["wood"]["snow"]["fastened"] == true,
+                hinge(&cut).is_some()
+            );
+            choose_tree(
+                h,
+                &mut s,
+                &mut t,
+                control(scenario_garden_lab::Command::Pause),
+            );
+            let fallen = snapshot(h, |v| tree_tick(v) > tree_tick(&cut) + 128);
             capture(h, renderer, "tree-wood-fallen", &fallen);
             choose_tree(
                 h,
@@ -1105,9 +1131,11 @@ fn garden_lab_tree_bed_grows_cuts_and_returns_in_both_renderers() {
                 &mut t,
                 control(scenario_garden_lab::Command::PhysicalWood),
             );
-            let resting = snapshot(h, |v| tree_tick(v) > tree_tick(&fallen));
-            assert_eq!(resting["tree_bed"]["wood"]["physical"], false);
-            assert_eq!(resting["tree_bed"]["wood"]["fallen"], 6);
+            let resting = snapshot(h, |v| v["tree_bed"]["wood"]["physical"] == false);
+            let later = snapshot(h, |v| tree_tick(v) > tree_tick(&resting));
+            assert_eq!(hinges(&later), 0);
+            assert!(dead(&resting) >= dead(&cut));
+            assert_eq!(dead(&later), dead(&resting));
 
             // Back to the grass bed, which runs again from where it waited.
             choose_tree(

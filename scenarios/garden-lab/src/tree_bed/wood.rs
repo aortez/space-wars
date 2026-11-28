@@ -1,12 +1,21 @@
 //! The tree bed's wood as bodies under gravity. Each wood tissue becomes a
-//! segment from the tissue it grew from to its own cell, as it is drawn,
+//! segment from the tissue it grew from to its own cell, a box as it is drawn,
 //! joined there by a hinge with the bending stiffness and strength of a square
 //! wood beam as wide as the segment. The trunk's foot is hinged to the dirt.
 //! Needles and cones weigh on the wood they grow on. Snow on a branch bends it
 //! further. A load that exhausts a hinge breaks the wood beyond it away: the
 //! tree loses those tissues, as in a cut, and they fall to the dirt as dead
-//! wood, while the snow on them slides off. While the wood is physical, growth
-//! waits.
+//! wood, while the snow on them slides off.
+//!
+//! The trees grow on while their wood is physical. Their cells stay the shape
+//! the wood rests in, where growth and light work as they do at rest, and the
+//! bodies and the drawing carry the sag. At each boundary, before the next
+//! step, new wood is hinged where its parent now hangs and moves as it moves.
+//! Wood that thickened, or whose needles and cones changed, is reshaped where
+//! it hangs, and its hinge keeps the rest it was joined at. Wood a tree shed,
+//! and a tree that died, stay as dead wood. Living wood's bodies are sensors,
+//! which light passes, since its tissues shade at their cells; dead wood
+//! shades where it lies.
 use super::*;
 use engine_material::{Beam, Connection, FailureMode, Material};
 use std::f32::consts::FRAC_PI_2;
@@ -33,6 +42,10 @@ pub const SNOW_SECONDS: f32 = 1.0;
 /// The bodies move in real time, a step for each of the lab's updates, sixty a
 /// second, of at most this long.
 pub const WOOD_DT: f32 = 1.0 / 60.0;
+/// The most segments of dead wood the bed keeps, as many as it has tissues.
+/// Were every tissue living wood as well, the world would hold about a
+/// quarter of the colliders its light can measure.
+pub const MAX_DEAD: usize = 256;
 const SNOW_HALF: Vec2 = Vec2::new(0.45, 0.2);
 const SNOW: RenderColor = RenderColor::rgb(0.88, 0.94, 1.0);
 /// The wood's and snow's physics identities count up from here, past the
@@ -42,9 +55,9 @@ const WOOD_GROUP: u32 = 1 << 8;
 /// Living wood touches nothing. Its hinges hold it, and its segments overlap
 /// where they join and where the trunk meets the dirt.
 const LIVING: CollisionGroups = CollisionGroups::NONE;
-/// Fallen wood, and snow that slid off it, lands on the dirt and passes
-/// through wood.
-const FALLEN: CollisionGroups = CollisionGroups {
+/// Dead wood, and snow that slid off it, lands on the dirt and passes through
+/// wood.
+const DEAD_WOOD: CollisionGroups = CollisionGroups {
     memberships: WOOD_GROUP,
     filter: !WOOD_GROUP,
 };
@@ -61,18 +74,42 @@ const FASTENING: Material = Material {
 };
 
 /// The bed's wood as bodies.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Wood {
-    /// While the wood is physical, growth waits.
+    /// While the wood is physical, its bodies move and the trees grow on.
     pub physical: bool,
     /// Each living wood tissue's segment.
     pub living: BTreeMap<u64, Segment>,
-    /// Wood that broke or was cut away while physical, where it fell.
-    pub fallen: Vec<Fallen>,
+    /// Dead wood in the order it died: wood that broke, was cut or was shed
+    /// away, and trees that died standing.
+    pub dead: Vec<Dead>,
+    /// At most this many segments of dead wood stay. Past it, the wood that
+    /// died first is cleared away, with all that died with it.
+    pub max_dead: usize,
     pub snow: Option<Snow>,
     /// Hinges that the load broke.
     pub breaks: u32,
+    /// What keeping the bodies in step with growth has done since the wood
+    /// became physical.
+    pub work: Work,
     entities: u64,
+    deaths: u32,
+}
+
+impl Default for Wood {
+    fn default() -> Self {
+        Self {
+            physical: false,
+            living: BTreeMap::new(),
+            dead: Vec::new(),
+            max_dead: MAX_DEAD,
+            snow: None,
+            breaks: 0,
+            work: Work::default(),
+            entities: 0,
+            deaths: 0,
+        }
+    }
 }
 
 impl Wood {
@@ -82,15 +119,42 @@ impl Wood {
     }
 }
 
-/// A wood tissue's body: a capsule along its segment, as wide as the wood is
-/// drawn.
+/// What keeping the bodies in step with growth has done, in segments.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Work {
+    /// Built for new wood, hinged where the wood it grew on hung.
+    pub grown: u32,
+    /// Reshaped where they hung, as their wood thickened or their needles
+    /// and cones grew, dropped or were shed.
+    pub reshaped: u32,
+    /// Living wood that became dead wood: shed, broken or cut away, or dead
+    /// with its tree.
+    pub died: u32,
+    /// Dead wood cleared away to stay within the cap.
+    pub cleared: u32,
+    /// Hinges the engine would not reshape, which keep the beam they had,
+    /// and the last of them: its wood tissue and why.
+    pub refused: u32,
+    pub refusal: Option<(u64, ConnectionRejection)>,
+}
+
+/// A wood tissue's body: a box from the cell it grew from to its own, as wide
+/// as the wood is drawn. A capsule's rounded ends would reach past those cells,
+/// and a thick trunk's below the soil.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Segment {
     pub entity: PhysicsId,
     pub length: f32,
     pub width: f32,
-    /// Where the body lay when it was built, where the tissue's drawing lies:
-    /// its center and its angle, with its y axis along the segment.
+    /// The living wood it was hinged to when it was built, or none for the
+    /// dirt.
+    pub parent: Option<u64>,
+    /// Its wood's size, and the mass of it and what grows on it in its
+    /// body's frame, when it was last shaped.
+    size: u16,
+    mass: ColliderMassProperties,
+    /// Where the body lies at rest, where the tissue's drawing lies: its
+    /// center and its angle, with its y axis along the segment.
     rest: (Vec2, f32),
 }
 
@@ -108,19 +172,38 @@ impl Segment {
         ColliderId::new(self.entity, ColliderRole::PRIMARY, 0)
     }
 
-    /// Its far end, at the tissue's cell when it was built, for a body at
-    /// `center` turned to `angle`.
+    /// Its box. Living, it is a sensor that touches nothing, which light
+    /// passes. Dead, it lands on the dirt and shades.
+    fn shape(&self, living: bool) -> ColliderSpec {
+        let mut collider =
+            ColliderSpec::cuboid(self.collider(), 0.5 * self.width, 0.5 * self.length);
+        collider.mass_properties = Some(self.mass);
+        collider.sensor = living;
+        collider.collision_groups = if living { LIVING } else { DEAD_WOOD };
+        collider
+    }
+
+    /// The beam of its hinge: wood with a square section as wide as the
+    /// segment, as long as it.
+    fn beam(&self) -> Beam {
+        Beam::new(self.width, self.width, self.length)
+    }
+
+    /// Its far end, at the tissue's cell at rest, for a body at `center`
+    /// turned to `angle`.
     fn end(&self, center: Vec2, angle: f32) -> Vec2 {
         center + Vec2::new(0.0, 0.5 * self.length).rotate_radians(angle)
     }
 }
 
-/// A segment that broke or was cut away, with the drawing it and what grew
-/// on it had, in grey.
+/// A segment of dead wood, with the drawing it and what grew on it had, in
+/// grey.
 #[derive(Clone, Debug)]
-pub struct Fallen {
+pub struct Dead {
     pub segment: Segment,
     drawing: Vec<(i32, RenderPrimitive)>,
+    /// Wood that died together shares a death, and is cleared together.
+    death: u32,
 }
 
 /// Snow fastened on top of a segment.
@@ -131,7 +214,7 @@ pub struct Snow {
     pub mass: f32,
     /// The wood tissue it was laid on.
     pub on: u64,
-    /// Whether it still lies on that wood, or slid off as the wood fell.
+    /// Whether it still lies on that wood, or slid off as the wood died.
     pub fastened: bool,
     /// The share of its weight it started from, and how long it has built up.
     from: f32,
@@ -155,6 +238,10 @@ impl Snow {
     fn collider(&self) -> ColliderId {
         ColliderId::new(self.entity, ColliderRole::PRIMARY, 0)
     }
+
+    fn fastening(&self) -> JointId {
+        JointId::new(self.entity, JointRole::new(1))
+    }
 }
 
 /// A living wood tissue's hinge, as the last step left it.
@@ -164,14 +251,15 @@ pub struct Hinge {
     pub cell: [i32; 2],
     /// Its last load over its safe limit.
     pub utilization: f32,
-    /// How far it has turned since the wood became physical, in radians,
+    /// How far it has turned from the rest it was joined at, in radians,
     /// counterclockwise.
     pub turn: f32,
-    /// How far the wood's end has dropped since then, in cells.
+    /// How far the wood's end hangs below its cell, in cells.
     pub droop: f32,
 }
 
-/// How a body has moved since it was built, to move a drawing with it.
+/// How a body has moved from where it lies at rest, to move a drawing with
+/// it.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Moved {
     from: Vec2,
@@ -180,8 +268,12 @@ pub(super) struct Moved {
 }
 
 impl Moved {
+    fn apply(self, v: Vec2) -> Vec2 {
+        self.to + (v - self.from).rotate_radians(self.turn)
+    }
+
     pub(super) fn point(self, p: RenderPoint) -> RenderPoint {
-        let v = self.to + (Vec2::new(p.x, p.y) - self.from).rotate_radians(self.turn);
+        let v = self.apply(Vec2::new(p.x, p.y));
         RenderPoint::new(v.x, v.y)
     }
 
@@ -207,6 +299,15 @@ impl Moved {
     }
 }
 
+/// A wood tissue's segment as its cells and what grows on it shape it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Shape {
+    length: f32,
+    width: f32,
+    rest: (Vec2, f32),
+    mass: ColliderMassProperties,
+}
+
 /// A tissue and every tissue that grew from it, nearest first.
 pub(super) fn beyond(o: &plants::Observation, id: u64) -> Vec<u64> {
     let mut gone = vec![id];
@@ -224,12 +325,33 @@ pub(super) fn beyond(o: &plants::Observation, id: u64) -> Vec<u64> {
     gone
 }
 
+/// What grows on each tissue, by the tissue's ID.
+type Growing<'a> = BTreeMap<u64, Vec<&'a Tissue>>;
+
+/// Every tree's wood tissue with the tissue it grew from, in ID order, so
+/// that wood comes after the wood it grew on, and what grows on each tissue.
+fn wood_of(o: &plants::Observation) -> (Vec<(&Tissue, &Tissue)>, Growing<'_>) {
+    let tissues: BTreeMap<u64, &Tissue> = o.tissues.iter().map(|t| (t.id, t)).collect();
+    let mut wood: Vec<(&Tissue, &Tissue)> = o
+        .connections
+        .iter()
+        .map(|(p, c)| (tissues[c], tissues[p]))
+        .filter(|(t, _)| t.policy == tree::POLICY && t.role == Role::Wood)
+        .collect();
+    wood.sort_by_key(|(t, _)| t.id);
+    let mut on = Growing::new();
+    for (p, c) in &o.connections {
+        on.entry(*p).or_default().push(tissues[c]);
+    }
+    (wood, on)
+}
+
 impl TreeBed {
     pub(super) fn at(&self, cell: [i32; 2]) -> Vec2 {
         self.terrain.cell_center(CellCoord::new(cell[0], cell[1]))
     }
 
-    /// Make the wood physical, or let it rest and grow again.
+    /// Make the wood physical, or let it rest.
     pub(super) fn toggle_wood(&mut self) {
         if self.wood.physical {
             self.rest_wood();
@@ -242,107 +364,181 @@ impl TreeBed {
     /// grew from: to the wood it grew on, or for a trunk's foot to the dirt.
     pub(super) fn build_wood(&mut self) {
         let o = self.plants.observe();
-        let tissues: BTreeMap<u64, &Tissue> = o.tissues.iter().map(|t| (t.id, t)).collect();
-        let wood: Vec<(&Tissue, &Tissue)> = o
-            .connections
-            .iter()
-            .map(|(p, c)| (tissues[c], tissues[p]))
-            .filter(|(t, _)| t.policy == tree::POLICY && t.role == Role::Wood)
-            .collect();
-        for &(t, parent) in &wood {
-            let (from, to) = (self.at(parent.cell), self.at(t.cell));
-            let axis = to - from;
-            let length = axis.length();
-            let width = 0.5 * f32::from(t.size).sqrt();
-            let rest = ((from + to) * 0.5, axis.y.atan2(axis.x) - FRAC_PI_2);
-            // A square beam of wood, and what grows on it, in the body's
-            // frame.
-            let own = engine_material::WOOD.density * width * width * length;
-            let mut parts = vec![(
-                own,
-                Vec2::ZERO,
-                own * (length * length + width * width) / 12.0,
-            )];
-            for (_, c) in o.connections.iter().filter(|&&(p, _)| p == t.id) {
-                let per_size = match tissues[c].role {
-                    Role::Shoot => NEEDLE_MASS,
-                    Role::Cone => CONE_MASS,
-                    _ => continue,
-                };
-                let at = (self.at(tissues[c].cell) - rest.0).rotate_radians(-rest.1);
-                parts.push((per_size * f32::from(tissues[c].size), at, 0.0));
-            }
-            let mass: f32 = parts.iter().map(|p| p.0).sum();
-            let center = parts.iter().fold(Vec2::ZERO, |sum, p| sum + p.1 * p.0) / mass;
-            let inertia = parts
-                .iter()
-                .map(|&(m, at, own)| own + m * (at - center).length_squared())
-                .sum();
-            let segment = Segment {
-                entity: self.wood.entity(),
-                length,
-                width,
-                rest,
-            };
-            let mut collider = ColliderSpec::capsule(segment.collider(), 0.5 * length, 0.5 * width);
-            collider.mass_properties = Some(ColliderMassProperties {
-                center,
-                mass,
-                inertia,
-            });
-            collider.collision_groups = LIVING;
-            assert!(self.world.insert_body(
-                segment.body(),
-                BodySpec {
-                    kind: BodyKind::Dynamic,
-                    position: rest.0,
-                    angle: rest.1,
-                    linear_damping: DRAG,
-                    angular_damping: DRAG,
-                    ..Default::default()
-                },
-                &[collider],
-            ));
-            self.wood.living.insert(t.id, segment);
+        let (wood, on) = wood_of(&o);
+        for (t, parent) in wood {
+            self.grow_segment(t, parent, on.get(&t.id).map_or(&[], Vec::as_slice));
         }
-        for &(t, parent) in &wood {
-            let segment = self.wood.living[&t.id];
-            let (from, to) = (self.at(parent.cell), self.at(t.cell));
-            let beam = Beam::new(segment.width, segment.width, segment.length);
-            self.world
-                .insert_connection(
-                    segment.hinge(),
-                    ConnectionSpec {
-                        root_body: self
-                            .wood
-                            .living
-                            .get(&parent.id)
-                            .map_or(self.assembly.body(), Segment::body),
-                        body: segment.body(),
-                        root: from,
-                        axis: to - from,
-                        connection: Connection::new(engine_material::WOOD, beam)
-                            .expect("a wood segment's beam"),
-                        bends: true,
-                    },
-                )
-                .expect("a fresh hinge between two bodies");
-        }
+        self.wood.work = Work::default();
         self.wood.physical = true;
     }
 
-    /// The living wood leaves the world with any snow, and the tree grows
-    /// again as it stands. Wood that has fallen stays where it lies.
-    pub(super) fn rest_wood(&mut self) {
-        self.clear_snow();
-        for segment in std::mem::take(&mut self.wood.living).into_values() {
-            self.world.remove_entity(segment.entity);
+    /// Where a wood tissue's segment lies at rest, between the tissue it grew
+    /// from and its own cell, and its mass in its body's frame: a square beam
+    /// of its wood, and each needle and cone on it at its own cell.
+    fn shape(&self, t: &Tissue, parent: &Tissue, on: &[&Tissue]) -> Shape {
+        let (from, to) = (self.at(parent.cell), self.at(t.cell));
+        let axis = to - from;
+        let length = axis.length();
+        let width = 0.5 * f32::from(t.size).sqrt();
+        let rest = ((from + to) * 0.5, axis.y.atan2(axis.x) - FRAC_PI_2);
+        let own = engine_material::WOOD.density * width * width * length;
+        let mut parts = vec![(
+            own,
+            Vec2::ZERO,
+            own * (length * length + width * width) / 12.0,
+        )];
+        for c in on {
+            let per_size = match c.role {
+                Role::Shoot => NEEDLE_MASS,
+                Role::Cone => CONE_MASS,
+                _ => continue,
+            };
+            let at = (self.at(c.cell) - rest.0).rotate_radians(-rest.1);
+            parts.push((per_size * f32::from(c.size), at, 0.0));
         }
-        self.wood.physical = false;
+        let mass: f32 = parts.iter().map(|p| p.0).sum();
+        let center = parts.iter().fold(Vec2::ZERO, |sum, p| sum + p.1 * p.0) / mass;
+        let inertia = parts
+            .iter()
+            .map(|&(m, at, own)| own + m * (at - center).length_squared())
+            .sum();
+        Shape {
+            length,
+            width,
+            rest,
+            mass: ColliderMassProperties {
+                center,
+                mass,
+                inertia,
+            },
+        }
+    }
+
+    /// A segment for wood `t` grown from `parent`, with `on` growing on it.
+    /// It lies where the parent's body has carried the cells it grew between,
+    /// moving as that body moves there, and is hinged to it at the parent's
+    /// cell, or for a trunk's foot to the dirt.
+    fn grow_segment(&mut self, t: &Tissue, parent: &Tissue, on: &[&Tissue]) {
+        let shape = self.shape(t, parent, on);
+        let carrier = self.wood.living.get(&parent.id).copied();
+        let moved = carrier.and_then(|s| self.segment_moved(&s));
+        let place = |v: Vec2| moved.map_or(v, |m| m.apply(v));
+        let turn = moved.map_or(0.0, |m| m.turn);
+        let position = place(shape.rest.0);
+        let (linear_velocity, angular_velocity) = carrier
+            .and_then(|s| {
+                let spin = self.world.motion(s.body())?.angular_velocity;
+                Some((self.world.velocity_at_point(s.body(), position)?, spin))
+            })
+            .unwrap_or_default();
+        let segment = Segment {
+            entity: self.wood.entity(),
+            length: shape.length,
+            width: shape.width,
+            parent: carrier.map(|_| parent.id),
+            size: t.size,
+            mass: shape.mass,
+            rest: shape.rest,
+        };
+        assert!(self.world.insert_body(
+            segment.body(),
+            BodySpec {
+                kind: BodyKind::Dynamic,
+                position,
+                angle: shape.rest.1 + turn,
+                linear_velocity,
+                angular_velocity,
+                linear_damping: DRAG,
+                angular_damping: DRAG,
+                ..Default::default()
+            },
+            &[segment.shape(true)],
+        ));
+        let (from, to) = (self.at(parent.cell), self.at(t.cell));
+        self.world
+            .insert_connection(
+                segment.hinge(),
+                ConnectionSpec {
+                    root_body: carrier.map_or(self.assembly.body(), |s| s.body()),
+                    body: segment.body(),
+                    root: place(from),
+                    axis: (to - from).rotate_radians(turn),
+                    connection: Connection::new(engine_material::WOOD, segment.beam())
+                        .expect("a wood segment's beam"),
+                    bends: true,
+                },
+            )
+            .expect("a fresh hinge between two bodies");
+        self.wood.living.insert(t.id, segment);
+    }
+
+    /// Bring the bodies in step with what growth did at a boundary, before
+    /// the next step. Wood the trees no longer have becomes dead wood, drawn
+    /// as `before`, the bed as the boundary found it, has it. New wood gets a
+    /// segment. Wood that thickened, or whose needles and cones changed, is
+    /// reshaped where it hangs.
+    pub(super) fn sync_wood(&mut self, before: &plants::Observation) {
+        let o = self.plants.observe();
+        let (wood, on) = wood_of(&o);
+        let present: BTreeSet<u64> = wood.iter().map(|(t, _)| t.id).collect();
+        // Everything that went, so that dying wood takes its needles and
+        // cones with it.
+        let remaining: BTreeSet<u64> = o.tissues.iter().map(|t| t.id).collect();
+        let mut gone: BTreeSet<u64> = before
+            .tissues
+            .iter()
+            .map(|t| t.id)
+            .filter(|id| !remaining.contains(id))
+            .collect();
+        gone.extend(self.wood.living.keys().filter(|id| !present.contains(id)));
+        if gone.iter().any(|id| self.wood.living.contains_key(id)) {
+            self.kill(before, &gone.into_iter().collect::<Vec<_>>());
+        }
+        for (t, parent) in wood {
+            let carried = on.get(&t.id).map_or(&[][..], Vec::as_slice);
+            let Some(segment) = self.wood.living.get(&t.id).copied() else {
+                self.grow_segment(t, parent, carried);
+                self.wood.work.grown += 1;
+                continue;
+            };
+            let shape = self.shape(t, parent, carried);
+            if segment.size != t.size || segment.mass != shape.mass {
+                self.reshape(t.id, segment, t.size, shape);
+            }
+        }
+    }
+
+    /// A living segment reshaped where it hangs: its box as wide as its wood
+    /// now is, carrying what now grows on it, and its hinge's beam as
+    /// wide. The hinge keeps the rest it was joined at.
+    fn reshape(&mut self, id: u64, segment: Segment, size: u16, shape: Shape) {
+        let segment = Segment {
+            width: shape.width,
+            size,
+            mass: shape.mass,
+            ..segment
+        };
+        assert!(self.world.replace_colliders(
+            segment.body(),
+            ColliderRole::PRIMARY,
+            &[segment.shape(true)]
+        ));
+        // Mass first, so that the hinge is damped for the body as it is now.
+        self.world.refresh_mass_properties(segment.body());
+        if let Err(why) = self
+            .world
+            .reshape_connection(segment.hinge(), segment.beam())
+        {
+            self.wood.work.refused += 1;
+            self.wood.work.refusal = Some((id, why));
+        }
+        self.wood.living.insert(id, segment);
+        self.wood.work.reshaped += 1;
     }
 
     /// Move the bodies on by `dt`: snow builds up, and the wood beyond a hinge
-    /// the load exhausted falls away.
+    /// the load exhausted falls away. A hinge of dead wood that breaks lets
+    /// the wood beyond it fall from the rest.
     pub(super) fn step_wood(&mut self, dt: f32) {
         if let Some(snow) = &mut self.wood.snow
             && snow.share() < 1.0
@@ -354,29 +550,42 @@ impl TreeBed {
         self.world.step(dt);
         let severed = self.world.severed_connections().to_vec();
         for joint in severed {
-            let broken = self
+            let living = self
                 .wood
                 .living
                 .iter()
                 .find(|(_, s)| s.hinge() == joint)
                 .map(|(&id, _)| id);
-            if let Some(id) = broken {
+            if let Some(id) = living {
                 self.wood.breaks += 1;
                 self.fall(id);
+            } else if self.wood.dead.iter().any(|d| d.segment.hinge() == joint) {
+                self.wood.breaks += 1;
+                self.world.remove_connection(joint);
             }
         }
     }
 
     /// The wood beyond a broken or cut hinge leaves its tree, as in a cut, and
-    /// falls as dead wood. Each of its segments keeps the drawing it and what
-    /// grew on it had, grey, and lands on the dirt. Snow on it slides off.
+    /// falls as dead wood.
     pub(super) fn fall(&mut self, id: u64) {
         let o = self.plants.observe();
         let gone = beyond(&o, id);
+        self.kill(&o, &gone);
+        self.plants.remove_many(&gone).unwrap();
+    }
+
+    /// The living wood of `gone` becomes dead wood where it is, each segment
+    /// drawn grey with what grew on it as `o`, where those tissues still grow,
+    /// has them. Wood hinged to wood that lives on comes away from it; the
+    /// rest keeps its hinges, to one another and to the dirt, so a tree that
+    /// died stands until it breaks. Snow on it slides off. Past the cap, the
+    /// wood that died first is cleared away.
+    fn kill(&mut self, o: &plants::Observation, gone: &[u64]) {
         let mut drawings: BTreeMap<u64, Vec<(i32, RenderPrimitive)>> = BTreeMap::new();
         {
-            let scene = self.scene(&o);
-            for t in gone.iter().map(|id| scene.tissues[id]) {
+            let scene = self.scene(o);
+            for t in gone.iter().filter_map(|id| scene.tissues.get(id)) {
                 if let Some(carrier) = scene.carrier(t) {
                     drawings
                         .entry(carrier)
@@ -385,27 +594,66 @@ impl TreeBed {
                 }
             }
         }
-        for id in &gone {
-            if let Some(segment) = self.wood.living.remove(id) {
-                self.world.set_collision_groups(segment.collider(), FALLEN);
-                self.wood.fallen.push(Fallen {
-                    segment,
-                    drawing: drawings.remove(id).unwrap_or_default(),
-                });
+        let death = self.wood.deaths;
+        self.wood.deaths += 1;
+        for id in gone {
+            let Some(segment) = self.wood.living.remove(id) else {
+                continue;
+            };
+            let parted = segment.parent.is_some_and(|p| !gone.contains(&p));
+            let broken = self
+                .world
+                .connection(segment.hinge())
+                .is_some_and(|c| c.failure.is_some());
+            if parted || broken {
+                self.world.remove_connection(segment.hinge());
             }
+            assert!(self.world.replace_colliders(
+                segment.body(),
+                ColliderRole::PRIMARY,
+                &[segment.shape(false)]
+            ));
+            self.wood.dead.push(Dead {
+                segment,
+                drawing: drawings.remove(id).unwrap_or_default(),
+                death,
+            });
+            self.wood.work.died += 1;
         }
         if let Some(snow) = &mut self.wood.snow
+            && snow.fastened
             && gone.contains(&snow.on)
         {
             // It slides off, and falls with its full weight.
-            self.world
-                .remove_connection(JointId::new(snow.entity, JointRole::new(1)));
-            self.world.set_collision_groups(snow.collider(), FALLEN);
+            self.world.remove_connection(snow.fastening());
+            self.world.set_collision_groups(snow.collider(), DEAD_WOOD);
             self.world.set_gravity_scale(snow.body(), 1.0, true);
             snow.from = 1.0;
             snow.fastened = false;
         }
-        self.plants.remove_many(&gone).unwrap();
+        while self.wood.dead.len() > self.wood.max_dead {
+            let first = self.wood.dead[0].death;
+            let cleared = self
+                .wood
+                .dead
+                .iter()
+                .take_while(|d| d.death == first)
+                .count();
+            for d in self.wood.dead.drain(..cleared) {
+                self.world.remove_entity(d.segment.entity);
+            }
+            self.wood.work.cleared += cleared as u32;
+        }
+    }
+
+    /// The living wood leaves the world with any snow, and the trees grow on
+    /// as their cells stand. Dead wood stays where it is.
+    pub(super) fn rest_wood(&mut self) {
+        self.clear_snow();
+        for segment in std::mem::take(&mut self.wood.living).into_values() {
+            self.world.remove_entity(segment.entity);
+        }
+        self.wood.physical = false;
     }
 
     /// Lay snow of `mass` on the selected wood, else on the tip of the eldest
@@ -461,7 +709,7 @@ impl TreeBed {
         ));
         self.world
             .insert_connection(
-                JointId::new(snow.entity, JointRole::new(1)),
+                snow.fastening(),
                 ConnectionSpec {
                     root_body: segment.body(),
                     body: snow.body(),
@@ -503,8 +751,9 @@ impl TreeBed {
             })
     }
 
-    /// How the body that carries a tissue has moved since it was built: wood
-    /// rides its own segment, and a needle or cone the wood it grows on.
+    /// How the body that carries a tissue has moved from where it lies at
+    /// rest: wood rides its own segment, and a needle or cone the wood it
+    /// grows on.
     pub(super) fn moved(&self, scene: &Scene, t: &Tissue) -> Option<Moved> {
         self.segment_moved(self.wood.living.get(&scene.carrier(t)?)?)
     }
@@ -518,11 +767,11 @@ impl TreeBed {
         })
     }
 
-    /// Fallen wood where it lies, and the snow.
+    /// Dead wood where it is, and the snow.
     pub(super) fn draw_wood(&self, f: &mut RenderFrame) {
-        for fallen in &self.wood.fallen {
-            let moved = self.segment_moved(&fallen.segment);
-            for (z, primitive) in &fallen.drawing {
+        for dead in &self.wood.dead {
+            let moved = self.segment_moved(&dead.segment);
+            for (z, primitive) in &dead.drawing {
                 let primitive = primitive.clone();
                 f.push_primitive(
                     *z,
@@ -570,42 +819,43 @@ impl TreeBed {
             .collect()
     }
 
-    /// The wood: at rest while it grows, or physical, with its most loaded
-    /// hinge and its snow; and what has fallen.
+    /// The wood: at rest, or on its hinges with the most loaded one and the
+    /// snow; and the dead wood against its cap, and the breaks. It follows
+    /// the light's work on one line of the bed's text, so it stays short.
     pub fn wood_summary(&self) -> String {
-        let fallen = format!(
-            "fallen segments {} | breaks {}",
-            self.wood.fallen.len(),
+        let dead = format!(
+            "dead {}/{} | breaks {}",
+            self.wood.dead.len(),
+            self.wood.max_dead,
             self.wood.breaks
         );
         if !self.wood.physical {
-            return format!("Wood at rest while it grows | {fallen}");
+            return format!("Wood at rest | {dead}");
         }
         let hinges = self.hinges();
-        let worst = hinges
+        let wood = hinges
             .iter()
             .max_by(|a, b| a.utilization.total_cmp(&b.utilization))
-            .map_or("none".into(), |h| {
-                format!("{:.2} of safe at {:?}", h.utilization, h.cell)
+            .map_or("Wood physical, none living".into(), |h| {
+                format!(
+                    "Wood on {} hinge{}, most loaded {:.2} of safe at {:?}",
+                    hinges.len(),
+                    if hinges.len() == 1 { "" } else { "s" },
+                    h.utilization,
+                    h.cell
+                )
             });
         let snow = self.wood.snow.map_or("none".into(), |s| {
-            let place = hinges
-                .iter()
-                .find(|h| s.fastened && h.tissue == s.on)
-                .map_or("the dirt, slid off fallen wood".into(), |h| {
-                    format!("wood at {:?}", h.cell)
-                });
-            let building = if s.share() < 1.0 {
-                format!(", {:.0}% built up", 100.0 * s.share())
-            } else {
-                String::new()
-            };
             let weight = if s.heavy() { "heavy" } else { "light" };
-            format!("{weight} on {place}{building}")
+            match hinges.iter().find(|h| s.fastened && h.tissue == s.on) {
+                // Its weight is still building up.
+                Some(h) if s.share() < 1.0 => {
+                    format!("{weight} {:.0}% at {:?}", 100.0 * s.share(), h.cell)
+                }
+                Some(h) => format!("{weight} at {:?}", h.cell),
+                None => format!("{weight} slid off"),
+            }
         });
-        format!(
-            "Wood physical, growth waits | hinges {}, most loaded {worst} | snow {snow} | {fallen}",
-            hinges.len()
-        )
+        format!("{wood} | snow {snow} | {dead}")
     }
 }

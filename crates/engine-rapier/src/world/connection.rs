@@ -56,6 +56,8 @@ pub enum ConnectionRejection {
     Geometry,
     /// The connection has no capacity left to carry a load.
     Exhausted,
+    /// The identity names no connection.
+    Missing,
 }
 
 /// The load the held body put on the root section through the weld in a
@@ -361,6 +363,70 @@ impl PhysicsWorld {
         }
         self.remove_joint(id);
         true
+    }
+
+    /// Give a live connection a new beam where it is joined, as wood does
+    /// when it thickens. Its frames stay, so a hinge keeps the rest it was
+    /// joined at rather than taking the turn it now has. Its spring takes the
+    /// new beam's [`hinge_stiffness`], damped as [`Self::insert_connection`]
+    /// damps one for the held body as it now is, so a held body whose mass
+    /// changed first is damped for its new mass. The work the connection has
+    /// absorbed stays absorbed: it keeps the new beam's capacity less what the
+    /// old one used.
+    ///
+    /// Refused, with nothing changed, when `id` names no connection, the
+    /// connection has severed, the beam is not valid for its material, or the
+    /// new beam's capacity is no more than the work already absorbed.
+    pub fn reshape_connection(
+        &mut self,
+        id: JointId,
+        beam: Beam,
+    ) -> Result<(), ConnectionRejection> {
+        use ConnectionRejection as R;
+        let record = self.connections.get(&id).ok_or(R::Missing)?;
+        if record.failure.is_some() {
+            return Err(R::Exhausted);
+        }
+        let region = record.connection.region();
+        let used = f64::from(region.capacity()) - region.remaining_precise();
+        let material = region.material();
+        let fresh = Connection::new(material, beam).map_err(|_| R::Geometry)?;
+        let remaining = f64::from(fresh.region().capacity()) - used;
+        if remaining <= 0.0 {
+            return Err(R::Exhausted);
+        }
+        let connection =
+            Connection::with_remaining(material, beam, remaining).map_err(|_| R::Geometry)?;
+        let handle = self
+            .joint_indices
+            .get(&id)
+            .and_then(|&index| self.joints.get(index))
+            .map(|entry| entry.handle)
+            .expect("a live connection has its joint");
+        let joint = self
+            .raw
+            .impulse_joints
+            .get(handle)
+            .expect("a live connection has its joint");
+        if is_hinge(joint) {
+            let stiffness = hinge_stiffness(&connection);
+            let ratio = damping_ratio(material.damping);
+            let held = &self.raw.bodies[joint.body2()];
+            let root = (*held.position() * joint.data.local_frame2).translation;
+            let damping = 2.0 * ratio * (stiffness * inertia_about(held, root)).sqrt();
+            self.raw
+                .impulse_joints
+                .get_mut(handle, true)
+                .expect("a live connection has its joint")
+                .data
+                .set_motor_position(JointAxis::AngX, 0.0, stiffness, damping);
+        }
+        self.connections
+            .get_mut(&id)
+            .expect("checked above")
+            .connection = connection;
+        self.invalidate_gravity(super::GravityInvalidation::ExternalEdit);
+        Ok(())
     }
 
     /// The connections the last step severed, in identity order. The next

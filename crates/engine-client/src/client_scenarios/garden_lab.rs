@@ -23,7 +23,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Garden Lab: up/down chooses a control; Space or gamepad bottom face activates it. Left/right moves the opaque shade. Controls include pause/step, speed, light, nutrients, water, shade, inspection, cutting, fresh planting, tissue limits 1–128 and spread 0–8 cells. Limits apply in place; full supplies do not guarantee affordable growth. R restarts; Esc/Start opens host pause. Green living, amber stressed, grey dead; cyan lines show real connections. A pink outline identifies the selected tissue. Physiology ticks are 1000ms, default viewing is 1x, maximum 16x, run limit 480 ticks. Moss controls place deliberate patches on dirt and a movable rock, turn the rock, break its edge, remove it or scrape a strip; olive moss tolerates the dim room, while darkness and the rock's shaded underside still kill it. Light also cycles to dark. The last control shows the tree bed, a conifer beside grass with its own controls and clock (16x to start, up to 64x, 2000-tick run): its sun shines a little from the left, from overhead or a little from the right, its tree's wood and needles let part of the light through, bids show yellow when won, red when refused and grey when outbid, and a control cuts the selected or lowest branch. Physical wood hangs the trees' wood on hinges under gravity while growth waits: light or heavy snow lands on the selected wood or else the lowest branch's tip, and a branch that breaks or is cut falls to the dirt as grey dead wood.",
+    controls_help: "Garden Lab: up/down chooses a control; Space or gamepad bottom face activates it. Left/right moves the opaque shade. Controls include pause/step, speed, light, nutrients, water, shade, inspection, cutting, fresh planting, tissue limits 1–128 and spread 0–8 cells. Limits apply in place; full supplies do not guarantee affordable growth. R restarts; Esc/Start opens host pause. Green living, amber stressed, grey dead; cyan lines show real connections. A pink outline identifies the selected tissue. Physiology ticks are 1000ms, default viewing is 1x, maximum 16x, run limit 480 ticks. Moss controls place deliberate patches on dirt and a movable rock, turn the rock, break its edge, remove it or scrape a strip; olive moss tolerates the dim room, while darkness and the rock's shaded underside still kill it. Light also cycles to dark. The last control shows the tree bed, a conifer beside grass with its own controls and clock (16x to start, up to 64x, 2000-tick run): its sun shines a little from the left, from overhead or a little from the right, its tree's wood and needles let part of the light through, bids show yellow when won, red when refused and grey when outbid, and a control cuts the selected or lowest branch. Physical wood hangs the trees' wood on hinges under gravity as they grow: light or heavy snow lands on the selected wood or else the lowest branch's tip, a branch that breaks, is cut or is shed falls to the dirt as grey dead wood, and a tree that dies stands as dead wood until the bed's 256 dead segments are full and the oldest are cleared.",
     create,
 };
 
@@ -190,8 +190,10 @@ impl ClientScenario for GardenLabClientScenario {
                 .and_then(|t| records.iter().find(|v| v["id"] == t.id).cloned());
             // The wood as bodies: whether it is physical, each living wood
             // tissue's hinge with its load over its safe limit, its turn in
-            // radians and how far its wood's end has dropped, the snow, and
-            // what has fallen.
+            // radians and how far its wood's end hangs below its cell, the
+            // snow, the dead wood against its cap, what keeping the bodies in
+            // step with growth has done, and the bodies and colliders the
+            // world holds.
             let hinges: Vec<_> = bed
                 .hinges()
                 .iter()
@@ -207,9 +209,18 @@ impl ClientScenario for GardenLabClientScenario {
                     "mass":s.mass,"heavy":s.heavy(),"on":s.on,"fastened":s.fastened,"share":s.share(),
                 })
             });
+            let w = bed.wood.work;
+            let work = serde_json::json!({
+                "grown":w.grown,"reshaped":w.reshaped,"died":w.died,"cleared":w.cleared,
+                "refused":w.refused,"refusal":w.refusal.map(|(tissue, why)| serde_json::json!({
+                    "tissue":tissue,"why":format!("{why:?}"),
+                })),
+            });
             let wood = serde_json::json!({
                 "physical":bed.wood.physical,"hinges":hinges,"snow":snow,
-                "fallen":bed.wood.fallen.len(),"breaks":bed.wood.breaks,"summary":bed.wood_summary(),
+                "dead":bed.wood.dead.len(),"max_dead":bed.wood.max_dead,"breaks":bed.wood.breaks,
+                "work":work,"bodies":bed.world().body_count(),"colliders":bed.world().collider_count(),
+                "summary":bed.wood_summary(),
             });
             serde_json::json!({
                 "tick":bo.tick,"seed":bo.seed,
@@ -736,7 +747,7 @@ mod tests {
         capture("sapling-in-grass", &s);
     }
     #[test]
-    fn garden_render_contract_tree_bed_physical_wood_bends_breaks_and_falls() {
+    fn garden_render_contract_tree_bed_physical_wood_bends_breaks_falls_and_dies_standing() {
         let output =
             std::env::var_os("SPACEWARS_GARDEN_RENDER_ARTIFACTS").map(std::path::PathBuf::from);
         if let Some(dir) = &output {
@@ -792,6 +803,7 @@ mod tests {
                 s.advance(std::time::Duration::from_secs_f32(1.0 / 60.0));
             }
         };
+        // The tree grows on at the bed's speed while its wood hangs.
         s.command(Command::PhysicalWood);
         step(&mut s, 8.0);
         let settled = capture("wood-settled", &s);
@@ -804,15 +816,40 @@ mod tests {
         step(&mut s, 3.0);
         assert_eq!(s.shown_tree_bed().unwrap().wood.breaks, 1);
         let fallen = capture("wood-fallen", &s);
-        for ((settled, laden), fallen) in settled.into_iter().zip(laden).zip(fallen) {
+        // Without water, the conifer dies at the bed's fastest and stands as
+        // dead wood.
+        s.command(Command::Water);
+        s.command(Command::Faster);
+        s.command(Command::Faster);
+        let standing = |s: &GardenLabState| {
+            let bed = s.shown_tree_bed().unwrap();
+            bed.grove
+                .trees
+                .iter()
+                .any(|t| t.origin == scenario_garden_lab::TREE_ORIGIN)
+        };
+        let mut seconds = 0;
+        while standing(&s) {
+            step(&mut s, 1.0);
+            seconds += 1;
+            assert!(seconds < 20, "the conifer outlived the drought");
+        }
+        step(&mut s, 2.0);
+        let bed = s.shown_tree_bed().unwrap();
+        assert!(bed.wood.living.is_empty() && bed.wood.dead.len() > 40);
+        assert_eq!(bed.wood.breaks, 1);
+        let died = capture("wood-dead-tree", &s);
+        for (((settled, laden), fallen), died) in
+            settled.into_iter().zip(laden).zip(fallen).zip(died)
+        {
             let [wood, dead, _] = settled;
             assert!(laden[2] > 50, "snow invisible: {laden:?}");
             assert!(fallen[2] > 50, "snow lost: {fallen:?}");
+            // The tree grows on, so its living wood is drawn larger after the
+            // break; the branch is grey on the dirt.
             assert!(fallen[1] > dead + 100, "fallen wood invisible: {fallen:?}");
-            assert!(
-                fallen[0] < wood,
-                "the branch still drawn living: {fallen:?}"
-            );
+            assert!(died[1] > 4 * fallen[1], "the dead tree invisible: {died:?}");
+            assert!(died[0] < wood / 10, "living wood left: {died:?}");
         }
     }
 }

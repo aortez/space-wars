@@ -14,8 +14,8 @@ use std::{cmp::Reverse, collections::BTreeSet};
 mod wood;
 use wood::beyond;
 pub use wood::{
-    CONE_MASS, DRAG, Fallen, GRAVITY, HEAVY_SNOW, Hinge, LIGHT_SNOW, NEEDLE_MASS, SNOW_SECONDS,
-    Segment, Snow, WOOD_DT, Wood,
+    CONE_MASS, DRAG, Dead, GRAVITY, HEAVY_SNOW, Hinge, LIGHT_SNOW, MAX_DEAD, NEEDLE_MASS,
+    SNOW_SECONDS, Segment, Snow, WOOD_DT, Wood, Work,
 };
 #[cfg(test)]
 mod wood_tests;
@@ -90,7 +90,7 @@ pub const TREE_CONTROLS: [(&str, Command); 21] = [
     ("Bids on/off", Command::Bids),
     ("Cut a branch: selected, else lowest", Command::CutBranch),
     (
-        "Physical wood on/off: gravity and breaks; growth waits",
+        "Physical wood on/off: gravity and breaks as trees grow",
         Command::PhysicalWood,
     ),
     (
@@ -134,7 +134,7 @@ pub struct TreeBed {
     pub work: VisibilityCounters,
     pub probes: usize,
     pub dropped_ms: u64,
-    /// The wood as bodies, and what has fallen.
+    /// The wood as bodies, and its dead wood.
     pub wood: Wood,
     pending_ns: u64,
     seed: u64,
@@ -247,15 +247,24 @@ impl TreeBed {
         &self.world
     }
 
-    /// One boundary: light at every blade and needle and at the cells the
-    /// trees ask about, then the trees' bids and the grass's plan, admitted
-    /// together by the runtime. Then the grove takes in the seeds its cones
-    /// dropped and clears away the trees that have died.
+    /// One boundary: the bed grows, and then, while the wood is physical, its
+    /// bodies take in what growth did before the next step.
     pub fn tick(&mut self) {
         let before = self.plants.observe();
         if before.tick >= TREE_MAX_TICKS {
             return;
         }
+        self.grow(&before);
+        if self.wood.physical {
+            self.sync_wood(&before);
+        }
+    }
+
+    /// Light at every blade and needle and at the cells the trees ask about,
+    /// then the trees' bids and the grass's plan, admitted together by the
+    /// runtime. Then the grove takes in the seeds its cones dropped and clears
+    /// away the trees that have died.
+    fn grow(&mut self, before: &plants::Observation) {
         let [x, y] = SUNS[self.sun].1;
         let mut source = full_sun(Vec2::new(x, y));
         source.strength = f32::from(self.intensity);
@@ -270,9 +279,9 @@ impl TreeBed {
             roots: &roots,
             physiology: &roots,
         };
-        let probes = self.grove.probes(&before, &unlit);
+        let probes = self.grove.probes(before, &unlit);
         self.probes = probes.len();
-        let owners = self.grove.owners(&before);
+        let owners = self.grove.owners(before);
         let light = PlantLight::publish_with_probes(
             &mut self.publisher,
             before.tick,
@@ -309,11 +318,11 @@ impl TreeBed {
             roots: &roots,
         };
         // The trees share the intents the grass leaves.
-        self.grass_plan = self.grass.plan(&before, &env);
+        self.grass_plan = self.grass.plan(before, &env);
         let budget = before.config.max_intents - self.grass_plan.intents.len();
         self.rounds = self
             .grove
-            .plan(&before, &env, &senses, &mut self.brain, budget);
+            .plan(before, &env, &senses, &mut self.brain, budget);
         let mut intents: Vec<_> = self
             .rounds
             .iter()
@@ -328,17 +337,14 @@ impl TreeBed {
         self.cleared += tending.cleared.len();
     }
 
-    /// Bodies move in real time while there are any. Physiology runs at the
-    /// bed's speed, unless the wood is physical.
+    /// Bodies move in real time while there are any, and physiology runs at
+    /// the bed's speed.
     pub fn advance(&mut self, dt: Duration) {
         if self.paused || dt.is_zero() {
             return;
         }
-        if self.wood.physical || !self.wood.fallen.is_empty() {
+        if self.wood.physical || !self.wood.dead.is_empty() {
             self.step_wood(dt.as_secs_f32().min(WOOD_DT));
-        }
-        if self.wood.physical {
-            return;
         }
         let incoming = dt.as_nanos().min(u128::from(u64::MAX / MAX_SPEED)) as u64 * self.speed;
         let total = self.pending_ns.saturating_add(incoming);
@@ -517,8 +523,7 @@ impl TreeBed {
             return;
         };
         self.cuts += 1;
-        if let Some(segment) = self.wood.living.get(&cut) {
-            self.world.remove_connection(segment.hinge());
+        if self.wood.living.contains_key(&cut) {
             self.fall(cut);
         } else {
             self.plants.remove_many(&beyond(&o, cut)).unwrap();
@@ -980,8 +985,6 @@ impl TreeBed {
                     "COMPLETE"
                 } else if self.paused {
                     "PAUSED"
-                } else if self.wood.physical {
-                    "physical wood, growth waits"
                 } else {
                     "physiology running"
                 },
@@ -1002,18 +1005,15 @@ impl TreeBed {
             self.grove_summary(),
             self.grass_summary(),
             self.bid_summary(),
-            // Light is not measured while growth waits, so the physical wood
-            // takes the light's line.
-            if self.wood.physical {
-                self.wood_summary()
-            } else {
-                let fallen = if self.wood.fallen.is_empty() {
-                    String::new()
-                } else {
+            // The wood shares the light's line once it is physical or dead.
+            {
+                let wood = if self.wood.physical || !self.wood.dead.is_empty() {
                     format!(" | {}", self.wood_summary())
+                } else {
+                    String::new()
                 };
                 format!(
-                    "Light work rays {} footprints {} colliders {} | probes {} | dropped {}ms{fallen}",
+                    "Light work rays {} footprints {} colliders {} | probes {} | dropped {}ms{wood}",
                     self.work.rays,
                     self.work.footprint_tests,
                     self.work.collider_records,
