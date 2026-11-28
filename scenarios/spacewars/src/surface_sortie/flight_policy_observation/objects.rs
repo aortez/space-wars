@@ -1,5 +1,5 @@
 use super::*;
-use engine_rapier::world::BodyKind;
+use engine_rapier::world::polar::policy::{ObjectExtent, ObjectKind};
 use free_flight::FreeFlightObservation;
 use physics::MechanicalEntity;
 
@@ -8,6 +8,7 @@ type EncodedObjects = (Vec<[f32; 16]>, Vec<Option<PhysicsBodyId>>);
 pub(super) fn encode(
     state: &SurfaceSortieState,
     flight: &FreeFlightObservation,
+    observer: Observer,
     world_radius: f32,
 ) -> Result<EncodedObjects, &'static str> {
     let world = &state.world.physics.world;
@@ -56,7 +57,7 @@ pub(super) fn encode(
                     if index >= state.world.planets.len() || !planets.insert(index) {
                         return Err("unsupported planet body grouping");
                     }
-                    (1, radius.unwrap_or(0.0), 0.0, false)
+                    (ObjectKind::Planet, radius.unwrap_or(0.0), 0.0, false)
                 }
                 Some(MechanicalEntity::Body(BodyId::Sun)) => {
                     if sun_seen {
@@ -65,7 +66,7 @@ pub(super) fn encode(
                     sun_seen = true;
                     let sun = solar.ok_or("solar body has no hazard descriptor")?;
                     (
-                        2,
+                        ObjectKind::Sun,
                         radius.ok_or("sun has no solid shape")?,
                         sun.heat_radius,
                         sun.heat_radius > sun.radius,
@@ -76,10 +77,10 @@ pub(super) fn encode(
                         return Err("invalid enclosing edge");
                     }
                     edge_seen = true;
-                    (3, world_radius, 0.0, false)
+                    (ObjectKind::EnclosingEdge, world_radius, 0.0, false)
                 }
                 _ => match radius {
-                    Some(radius) => (4, radius, 0.0, false),
+                    Some(radius) => (ObjectKind::OtherSolid, radius, 0.0, false),
                     None => continue,
                 },
             };
@@ -88,35 +89,20 @@ pub(super) fn encode(
         }
         // One independently moving rigid body per record. All attached terrain
         // colliders stay with that parent; articulated bodies remain separate.
-        let motion = record.motion;
-        let position = (motion.position - flight.ship.position).rotate_radians(-flight.ship.angle)
-            / world_radius;
-        let velocity = if world.body_kind(record.id) == Some(BodyKind::Fixed) {
-            Vec2::ZERO
-        } else {
-            world
-                .velocity_at_point(record.id, motion.position)
-                .ok_or("missing object origin velocity")?
-        };
-        let velocity =
-            (velocity - flight.ship.velocity).rotate_radians(-flight.ship.angle) / VELOCITY_SCALE;
-        let angle = motion.angle - flight.ship.angle;
         let mut row = [0.0; 16];
         row[0] = 1.0;
-        row[kind] = 1.0;
-        row[5..].copy_from_slice(&[
-            position.x,
-            position.y,
-            velocity.x,
-            velocity.y,
-            angle.sin(),
-            angle.cos(),
-            motion.angular_velocity / SPIN_SCALE,
-            bound / world_radius,
-            hazard_radius / world_radius,
-            f32::from(hazard_enabled),
-            f32::from(record.id == active),
-        ]);
+        row[kind as usize] = 1.0;
+        row[5..].copy_from_slice(&observer.object_inputs(
+            world,
+            record,
+            ObjectExtent {
+                distance_scale: world_radius,
+                radius: bound,
+                hazard_radius,
+                hazard_enabled,
+                active_frame: record.id == active,
+            },
+        )?);
         objects.push(row);
         sources.push(Some(record.id));
     }

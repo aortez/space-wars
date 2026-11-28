@@ -1,5 +1,6 @@
 //! Versioned CPU inference for the C3 learned-flight experiment. The caller owns
 //! goals, observations and physical outcome evaluation; no native fallback.
+use engine_rapier::world::polar::policy::{BAND_EDGES_BODY_LENGTHS, DISTANCE_SCALE};
 use scenario_spacewars::surface_sortie::{
     flight_environment::FlightAction,
     flight_policy_observation::{FlightPolicyInputs, schema},
@@ -170,16 +171,14 @@ impl FlightPolicy {
         if inputs.objects.iter().any(|o| o[0] != 0.0 && o[0] != 1.0) {
             return Err("invalid object mask");
         }
-        let edges = scenario_spacewars::surface_sortie::flight_environment::flight_sensor_config()
-            .radial_edges;
         let mut map = vec![0.0; 4 * 23 * 64];
         for r in 0..23 {
             for a in 0..64 {
                 let i = r * 64 + a;
                 map[i] = inputs.cells[i][0];
                 map[23 * 64 + i] = inputs.cells[i][1];
-                map[2 * 23 * 64 + i] = edges[r] / 300.0;
-                map[3 * 23 * 64 + i] = edges[r + 1] / 300.0;
+                map[2 * 23 * 64 + i] = BAND_EDGES_BODY_LENGTHS[r] / DISTANCE_SCALE;
+                map[3 * 23 * 64 + i] = BAND_EDGES_BODY_LENGTHS[r + 1] / DISTANCE_SCALE;
             }
         }
         let map = conv(

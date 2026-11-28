@@ -52,7 +52,7 @@ observation already carries gravity inputs that no training has exercised.
 
 Reuse the C3 continuous-flight observation and encoder as they stand: the
 goal-relative and self-motion block, the 23-band by 64-sector polar map, the
-512 precise rays, the nearest-surface readings and up to 32 object records,
+128 precise rays with four values each, the nearest-surface readings and up to 32 object records,
 4,009 inputs into the polar-convolution and attention encoder with 39,447
 parameters. These were inspected in the sensor reports and ran through 52
 navigation experiments; what failed there was learning per-tick actuators

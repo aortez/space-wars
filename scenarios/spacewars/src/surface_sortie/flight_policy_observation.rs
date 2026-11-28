@@ -3,14 +3,19 @@
 use super::*;
 use engine_rapier::world::{
     BodyId as PhysicsBodyId, ColliderId,
-    polar::{PolarFilter, PolarSensor},
+    polar::{
+        PolarFilter, PolarSensor,
+        policy::{self, Observer, PolicyMotion},
+    },
 };
-use flight_environment::{ArrivalCriteria, FLIGHT_HZ, FlightAction, flight_sensor_config};
+use flight_environment::{
+    ArrivalCriteria, FLIGHT_BODY_LENGTH, FLIGHT_HZ, FlightAction, flight_sensor_config,
+};
 
 mod objects;
 
 pub const FLIGHT_POLICY_SCHEMA_VERSION: u32 = 2;
-pub const OBJECT_CAPACITY: usize = 32;
+pub use policy::OBJECT_CAPACITY;
 pub const SELF_FEATURES: [&str; 35] = [
     "goal_com_x",
     "goal_com_y",
@@ -81,10 +86,10 @@ pub const OBJECT_FEATURES: [&str; 16] = [
     "hazard_enabled",
     "active_control_frame",
 ];
-pub const DISTANCE_SCALE: f32 = 300.0;
-pub const VELOCITY_SCALE: f32 = 70.0;
-pub const SPIN_SCALE: f32 = 1.8;
-pub const TIME_SCALE: f32 = 30.0;
+pub const DISTANCE_SCALE: f32 = policy::DISTANCE_SCALE * FLIGHT_BODY_LENGTH;
+pub const VELOCITY_SCALE: f32 = policy::SPEED_SCALE * FLIGHT_BODY_LENGTH;
+pub const SPIN_SCALE: f32 = policy::SPIN_SCALE;
+pub const TIME_SCALE: f32 = policy::TIME_SCALE;
 
 /// Planner request and task-clock state, shared by training and runtime.
 /// No trajectory samples, route witness or physical outcome is supplied here.
@@ -190,10 +195,6 @@ pub fn schema() -> serde_json::Value {
 fn finite(v: Vec2) -> bool {
     v.x.is_finite() && v.y.is_finite()
 }
-fn push_vec(out: &mut Vec<f32>, v: Vec2) {
-    out.extend([v.x, v.y]);
-}
-
 impl SurfaceSortieState {
     pub fn flight_policy_observation(
         &self,
@@ -202,9 +203,6 @@ impl SurfaceSortieState {
         context: FlightPolicyContext,
     ) -> Result<FlightPolicyObservation, &'static str> {
         context.validate()?;
-        if sensor.config() != &flight_sensor_config() {
-            return Err("wrong flight sensor configuration");
-        }
         if self.world.physics.material_queries_dirty {
             return Err("flight geometry is not synchronized");
         }
@@ -239,42 +237,35 @@ impl SurfaceSortieState {
         {
             return Err("invalid flight normalization scale");
         }
-        let local = |v: Vec2| v.rotate_radians(-flight.ship.angle);
-        let (objects, object_sources) = objects::encode(self, &flight, world_radius)?;
-        let geometry = sensor.observe(
+        let observer = Observer {
+            origin: flight.ship.position,
+            origin_velocity: flight.ship.velocity,
+            angle: flight.ship.angle,
+            body_length: FLIGHT_BODY_LENGTH,
+        };
+        let (objects, object_sources) = objects::encode(self, &flight, observer, world_radius)?;
+        let geometry = observer.observe(
             world,
-            flight.ship.position,
-            flight.ship.angle,
+            sensor,
             PolarFilter {
                 excluded: &[body.entity],
                 ..Default::default()
             },
         )?;
         let mut self_goal = Vec::with_capacity(SELF_FEATURES.len());
-        push_vec(
-            &mut self_goal,
-            local(context.target_position - com) / DISTANCE_SCALE,
-        );
-        push_vec(
-            &mut self_goal,
-            local(context.target_velocity - velocity) / VELOCITY_SCALE,
-        );
-        push_vec(&mut self_goal, local(velocity) / VELOCITY_SCALE);
-        push_vec(&mut self_goal, local(flight.ship.velocity) / VELOCITY_SCALE);
-        push_vec(
-            &mut self_goal,
-            local(com - flight.ship.position) / DISTANCE_SCALE,
-        );
-        self_goal.push(flight.ship.spin / SPIN_SCALE);
-        push_vec(&mut self_goal, local(flight.gravity) / 45.0);
-        push_vec(
-            &mut self_goal,
-            local(flight.frame_velocity) / VELOCITY_SCALE,
-        );
+        self_goal.extend(observer.motion_inputs(PolicyMotion {
+            goal: context.target_position,
+            goal_velocity: context.target_velocity,
+            center: com,
+            center_velocity: velocity,
+            spin: flight.ship.spin,
+            gravity: flight.gravity,
+            frame_velocity: flight.frame_velocity,
+            frame_spin: flight.planet_motion.spin,
+        }));
         let limits = flight.flight.limits;
         let solar = self.solar_exposure(player);
         self_goal.extend([
-            flight.planet_motion.spin / SPIN_SCALE,
             limits.thrust_acceleration / 45.0,
             limits.turn_speed / SPIN_SCALE,
             limits.turn_acceleration / 6.0,
@@ -296,43 +287,11 @@ impl SurfaceSortieState {
             solar.map_or(0.0, |s| s.intensity),
             f32::from(solar.is_some()),
         ]);
-        let rays = geometry
-            .rays
-            .iter()
-            .map(
-                |ray| match (ray.distance, ray.surface_velocity, ray.collider) {
-                    (Some(d), Some(v), Some(_)) => {
-                        let v = local(v - flight.ship.velocity) / VELOCITY_SCALE;
-                        Ok([1.0, d / DISTANCE_SCALE, v.x, v.y])
-                    }
-                    (None, None, None) => Ok([0.0; 4]),
-                    _ => Err("inconsistent flight ray hit"),
-                },
-            )
-            .collect::<Result<Vec<_>, _>>()?;
-        let nearest = match (
-            geometry.nearest_distance,
-            geometry.nearest_point,
-            geometry.nearest_surface_velocity,
-            geometry.nearest_collider,
-        ) {
-            (Some(d), Some(p), Some(v), Some(_)) => {
-                let p = local(p - flight.ship.position) / DISTANCE_SCALE;
-                let v = local(v - flight.ship.velocity) / VELOCITY_SCALE;
-                [1.0, d / DISTANCE_SCALE, p.x, p.y, v.x, v.y]
-            }
-            (None, None, None, None) => [0.0; 6],
-            _ => return Err("inconsistent nearest flight hit"),
-        };
         let inputs = FlightPolicyInputs {
             self_goal,
-            cells: geometry
-                .cells
-                .iter()
-                .map(|c| [c.sampled_occupancy, c.overlap_coverage])
-                .collect(),
-            rays,
-            nearest,
+            cells: geometry.cells,
+            rays: geometry.rays,
+            nearest: geometry.nearest,
             objects,
         };
         if inputs.self_goal.len() != SELF_FEATURES.len()
@@ -346,8 +305,8 @@ impl SurfaceSortieState {
             tick: flight.tick,
             inputs,
             object_sources,
-            ray_sources: geometry.rays.iter().map(|r| r.collider).collect(),
-            nearest_source: geometry.nearest_collider,
+            ray_sources: geometry.ray_sources,
+            nearest_source: geometry.nearest_source,
         })
     }
 }

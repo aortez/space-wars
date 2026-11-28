@@ -45,16 +45,10 @@ impl SurfaceSortieScenario {
     }
 }
 
+pub const FLIGHT_BODY_LENGTH: f32 = 8.0;
+
 pub fn flight_sensor_config() -> PolarConfig {
-    PolarConfig {
-        sectors: 64,
-        radial_edges: vec![
-            0., 2., 4., 6., 8., 11., 14., 18., 23., 29., 36., 44., 54., 66., 80., 96., 114., 134.,
-            156., 180., 206., 234., 266., 300.,
-        ],
-        angular_samples: 2,
-        radial_samples: 2,
-    }
+    PolarConfig::body_relative(FLIGHT_BODY_LENGTH)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
