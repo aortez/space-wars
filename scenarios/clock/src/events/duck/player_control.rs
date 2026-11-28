@@ -13,8 +13,7 @@ pub(super) const DIVE_TICKS: u32 = 4 * 60;
 const DIVE_GRAVITY_FRACTION: f32 = 2.5;
 
 pub(super) struct PlayerControl {
-    pub session_id: u64,
-    pub seat: u8,
+    pub session: Option<(u64, u8)>,
     pub move_milli: i16,
     pub jump_held: bool,
     pub jump_pending: bool,
@@ -30,10 +29,9 @@ pub(super) struct PlayerControl {
 }
 
 impl PlayerControl {
-    pub fn new(session_id: u64, seat: u8, facing: f32, exit_at_tick: u64) -> Self {
+    pub fn new(session: Option<(u64, u8)>, facing: f32, exit_at_tick: u64) -> Self {
         Self {
-            session_id,
-            seat,
+            session,
             move_milli: 0,
             jump_held: false,
             jump_pending: false,

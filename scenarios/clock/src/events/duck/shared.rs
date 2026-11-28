@@ -108,7 +108,7 @@ impl DuckEvent {
     }
 
     pub fn visit_finished(&self) -> bool {
-        if self.player.is_some() {
+        if self.player_session().is_some() {
             self.player_finished()
         } else {
             self.tick >= DUCK_TICKS

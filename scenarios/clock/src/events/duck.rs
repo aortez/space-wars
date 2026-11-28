@@ -6,6 +6,7 @@ mod controller;
 #[cfg(test)]
 mod debris_tests;
 mod drain;
+pub mod episode;
 #[cfg(test)]
 mod exit_tests;
 #[cfg(test)]
@@ -143,8 +144,7 @@ impl DuckEvent {
 
     fn with_player(mut scene: Self, session_id: u64, seat: u8) -> Self {
         scene.player = Some(PlayerControl::new(
-            session_id,
-            seat,
+            Some((session_id, seat)),
             1.0,
             OPENING_TICKS + PLAYER_EXIT_DELAY_TICKS,
         ));
@@ -172,8 +172,7 @@ impl DuckEvent {
             OPENING_TICKS + EXIT_DELAY_TICKS,
         );
         self.player = Some(PlayerControl::new(
-            session_id,
-            seat,
+            Some((session_id, seat)),
             self.controller.facing(),
             exit_at_tick,
         ));
@@ -184,7 +183,7 @@ impl DuckEvent {
     }
 
     pub fn player_session(&self) -> Option<(u64, u8)> {
-        self.player.as_ref().map(|p| (p.session_id, p.seat))
+        self.player.as_ref().and_then(|p| p.session)
     }
 
     pub fn dive_meter(&self) -> Option<(f32, bool)> {
@@ -236,9 +235,10 @@ impl DuckEvent {
         world: Option<&PhysicsWorld>,
     ) -> Option<engine_common::ClockPlayerDuckState> {
         let player = self.player.as_ref()?;
+        let (session_id, seat) = player.session?;
         Some(engine_common::ClockPlayerDuckState {
-            session_id: player.session_id,
-            player: player.seat,
+            session_id,
+            player: seat,
             phase: self.phase.as_str().into(),
             phase_tick: self.phase_tick,
             move_milli: player.move_milli,
@@ -311,7 +311,6 @@ impl DuckEvent {
 
     /// Mirror the terrain and the character together, as a seed choosing the
     /// other entrance would have. Only before the world exists.
-    #[cfg(test)]
     pub fn face(&mut self, direction: f32) {
         self.terrain.direction = direction;
         self.adopt_frame();
@@ -374,7 +373,7 @@ impl DuckEvent {
         let count = if self.terrain.responsive_floor.is_some() {
             4
         } else {
-            count + usize::from(self.player.is_some())
+            count + usize::from(self.player_session().is_some())
         };
         let world = if arena.idle() {
             let config = crate::arena::world_config(gravity, self.radius);
@@ -389,7 +388,7 @@ impl DuckEvent {
         };
         world.reserve(count + 2, count + 2, 0);
         self.terrain.insert_bodies(world);
-        if self.player.is_some() {
+        if self.player_session().is_some() {
             self.insert_entrance_wall(world);
         }
         world
@@ -833,7 +832,7 @@ impl DuckEvent {
                                 }
                 {
                     self.reset(Some(world), ClockDuckOutcome::Exited);
-                } else if self.player.is_none() && self.tick >= DUCK_TICKS - RESET_TICKS {
+                } else if self.player_session().is_none() && self.tick >= DUCK_TICKS - RESET_TICKS {
                     self.reset(Some(world), ClockDuckOutcome::TimedOut);
                 }
             }
