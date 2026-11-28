@@ -1345,3 +1345,20 @@ fn edited_moving_planet_slopes_steps_and_steep_refusal_for_both_dirt_modes() {
         assert!(refused > 40);
     }
 }
+
+/// A step sights and fires before its controls, and the controls keep those
+/// casts counted while they count their own work afresh.
+#[test]
+fn controls_keep_the_casts_counted_before_them() {
+    let (mut world, mut tanks, _) = unsettled_course(0.0);
+    tanks.work = TankWork {
+        queries: 5,
+        barrel_casts: 1,
+        sight_casts: 2,
+        ..TankWork::default()
+    };
+    tanks.prepare_controls(&mut world, false);
+    assert_eq!(tanks.work.barrel_casts, 1);
+    assert_eq!(tanks.work.sight_casts, 2);
+    assert_ne!(tanks.work.queries, 5);
+}

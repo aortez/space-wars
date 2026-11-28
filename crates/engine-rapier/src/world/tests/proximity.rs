@@ -1,6 +1,7 @@
-//! What is near a point, nearest first and within a bounded look; where a
-//! moved body is before the next step; how a position-driven body will move
-//! through it; and what a body's contacts do to it.
+//! What is near a point, nearest first and within a bounded look; what a ray
+//! passes through; where a moved body is before the next step; how a
+//! position-driven body will move through it; and what a body's contacts do
+//! to it.
 use super::*;
 
 const DT: f32 = 1.0 / 60.0;
@@ -78,6 +79,39 @@ fn nearby_colliders_come_nearest_first_within_a_bounded_look() {
     let near = world.colliders_within(Vec2::new(60.0, 0.0), 100.0, bounded, |_| true);
     assert_eq!(near.visited, 8);
     assert_eq!(near.colliders.len(), 8);
+}
+
+/// A ray passes through the colliders its caller turns away, as through the
+/// entity it excludes, and meets what lies behind them.
+#[test]
+fn a_ray_passes_through_the_colliders_its_caller_turns_away() {
+    let world = boxes(3);
+    let options = RayCastOptions {
+        max_distance: 20.0,
+        solid: true,
+        include_sensors: false,
+        collision_groups: CollisionGroups::ALL,
+        exclude_entity: None,
+    };
+    let met = |keep: &dyn Fn(ColliderId) -> bool| {
+        let hit = world.cast_ray_keeping(Vec2::ZERO, Vec2::X, options, keep);
+        hit.map(|hit| (hit.collider, hit.point))
+    };
+    assert_eq!(met(&|_| true), Some((collider(1), Vec2::new(2.0, 0.0))));
+    assert_eq!(
+        met(&|c| c != collider(1)),
+        Some((collider(2), Vec2::new(5.0, 0.0)))
+    );
+    assert_eq!(
+        met(&|c| c == collider(3)),
+        Some((collider(3), Vec2::new(8.0, 0.0)))
+    );
+    assert_eq!(met(&|_| false), None);
+    let hit = world.cast_ray(Vec2::ZERO, Vec2::X, options).unwrap();
+    assert_eq!(
+        (hit.collider, hit.point),
+        (collider(1), Vec2::new(2.0, 0.0))
+    );
 }
 
 #[test]

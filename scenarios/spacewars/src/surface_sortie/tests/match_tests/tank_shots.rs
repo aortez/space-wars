@@ -16,14 +16,14 @@ use crate::{
 use engine_rapier::{cannon, rover::RoverSpawnPose};
 use std::collections::BTreeSet;
 
-const GOVERNMENT: Allegiance = Allegiance::INITIAL_GOVERNMENT;
-const FIRST: Allegiance = Allegiance::Player(PlayerId::PLAYER_1);
+pub(super) const GOVERNMENT: Allegiance = Allegiance::INITIAL_GOVERNMENT;
+pub(super) const FIRST: Allegiance = Allegiance::Player(PlayerId::PLAYER_1);
 
 /// An elevation in degrees, a facing and a power.
-type Aim = (f32, f32, f32);
+pub(super) type Aim = (f32, f32, f32);
 /// A lob that lands about 14 units along the surface, toward world -Y from a
 /// tank at world +X, in about 100 steps.
-const LOB: Aim = (45.0, 1.0, cannon::MIN_POWER);
+pub(super) const LOB: Aim = (45.0, 1.0, cannon::MIN_POWER);
 /// A shot that lands about 50 units along in about 250 steps.
 const LONG: Aim = (45.0, 1.0, 24.0);
 /// A steep shot at full power, which leaves the planet for good.
@@ -31,7 +31,7 @@ const AWAY: Aim = (70.0, 1.0, cannon::MAX_POWER);
 
 /// A match on the material planet with its spin off. Seat 0's ship stands at
 /// world +Y with its pilot aboard, and seat 1's at -Y.
-fn field() -> SurfaceSortieState {
+pub(super) fn field() -> SurfaceSortieState {
     let mut state = round();
     state.world.planets[0].wrapper_omega = 0.0;
     idle(&mut state, 60);
@@ -43,7 +43,9 @@ fn field() -> SurfaceSortieState {
 /// there, and completes the step that the next placement needs. The planet's
 /// blocks leave a tank room within 6.5 units of world +X, and from 8.9 to
 /// 12.6, 15.1 to 16.7, 19.2 to 19.9 and 22.4 to 23.1 units either side of it.
-fn place(state: &mut SurfaceSortieState, arc: f32, allegiance: Allegiance) -> TankId {
+/// Farther round, of the arcs out to 120 that a step of 3 units tries, a tank
+/// fits at 75, 78, 84, 105, 111, 114 and 117 either side.
+pub(super) fn place(state: &mut SurfaceSortieState, arc: f32, allegiance: Allegiance) -> TankId {
     let planet = state.world.planets[0];
     let up = Vec2::X.rotate_radians(-arc / planet.radius);
     let tank = state
@@ -78,7 +80,7 @@ fn aim(
 }
 
 /// The records of `tank`'s shots, oldest first.
-fn shots(state: &SurfaceSortieState, tank: TankId) -> Vec<TankShot> {
+pub(super) fn shots(state: &SurfaceSortieState, tank: TankId) -> Vec<TankShot> {
     state.world.tank_shots(tank).cloned().collect()
 }
 
@@ -92,7 +94,7 @@ fn rounds(state: &SurfaceSortieState, tank: TankId) -> Vec<DebrisState> {
 }
 
 /// Fires `tank` once as `aim` tells, at `target`, and returns the new shot.
-fn fire(
+pub(super) fn fire(
     state: &mut SurfaceSortieState,
     tank: TankId,
     settings: Aim,

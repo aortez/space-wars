@@ -1460,6 +1460,7 @@ impl SpacewarsScenario {
                 planet.wrapper_angle += planet.wrapper_omega * dt;
             }
         }
+        state.physics.tanks.begin_sight_step();
         update_rover_patrol(state);
 
         let universe_radius = state.config.universe_radius as f32;

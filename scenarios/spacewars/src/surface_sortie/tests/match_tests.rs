@@ -7,6 +7,7 @@ mod material_lasers;
 mod material_shots;
 mod material_tanks;
 mod pod_hull;
+mod tank_sensing;
 mod tank_shots;
 
 #[test]
