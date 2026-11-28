@@ -38,7 +38,7 @@ pub(crate) fn inventory(w: &MainWindow) -> Vec<UiControl> {
             .with_value(w.get_training_snapshot().to_string()),
         UiControl::new("training.status", "Run state", false)
             .with_value(w.get_training_status_code().to_string()),
-        UiControl::new("training.duck.current", "Current replay", false).with_value(format!(
+        UiControl::new("training.duck.current", "Sample replay", false).with_value(format!(
             "{} · {}",
             w.get_duck_current_id(),
             w.get_duck_current_details()
@@ -57,8 +57,8 @@ pub(crate) fn inventory(w: &MainWindow) -> Vec<UiControl> {
         ("training.stop", "Save and stop", w.get_training_can_stop()),
         ("training.new", "New run", w.get_training_can_start()),
         ("training.back", "Back", true),
-        ("training.preview.current", "Current", true),
-        ("training.preview.best", "Best", true),
+        ("training.preview.current", "Sample replay", true),
+        ("training.preview.best", "Best replay", true),
         ("training.duck.term", "Chart term", true),
         ("training.duck.steer", "Generation settings", true),
         ("training.preview.speed", "Replay speed", true),
@@ -72,7 +72,7 @@ pub(crate) fn inventory(w: &MainWindow) -> Vec<UiControl> {
             if w.get_duck_compare() {
                 "Inspect left-door replay"
             } else {
-                "Inspect current brain"
+                "Inspect sample brain"
             },
             !w.get_duck_steering(),
         ),
@@ -87,6 +87,17 @@ pub(crate) fn inventory(w: &MainWindow) -> Vec<UiControl> {
         ),
     ] {
         controls.push(UiControl::new(id, label, enabled));
+    }
+    if w.get_duck_result() && !w.get_duck_steering() {
+        controls.push(UiControl::new(
+            "training.duck.replay.toggle",
+            if w.get_duck_replay_paused() {
+                "Play replay"
+            } else {
+                "Pause replay"
+            },
+            w.get_training_points().row_count() > 0,
+        ));
     }
     if !w.get_duck_steering() && w.get_duck_inspect() >= 0 {
         for (id, label) in BRAIN_ACTIONS {
@@ -140,6 +151,8 @@ pub(crate) fn selected_id(w: &MainWindow) -> &'static str {
     };
     if action == 0 && w.get_training_can_resume() {
         "training.resume"
+    } else if action == 1 && w.get_duck_result() {
+        "training.duck.replay.toggle"
     } else {
         ACTIONS.get(action).copied().unwrap_or("training.back")
     }

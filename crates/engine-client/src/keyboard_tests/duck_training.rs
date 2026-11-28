@@ -48,13 +48,36 @@ fn steering_a_clock_run_updates_the_next_scored_generation_and_preserves_the_rep
     activate("training.preview.best");
     wait(&|| window.get_duck_best_frame().size().width > 0);
     assert!(window.get_duck_best_details().contains("Tick "));
+    assert!(
+        window
+            .get_training_worker_status()
+            .contains("0 active workers")
+    );
+    assert!(window.get_duck_replay_paused());
+    let frozen = window.get_duck_best_details();
+    let until = std::time::Instant::now() + Duration::from_millis(120);
+    wait(&|| std::time::Instant::now() >= until);
+    assert_eq!(window.get_duck_best_details(), frozen);
+    activate("training.preview.speed");
+    activate("training.preview.speed");
+    assert!(window.get_duck_replay_paused());
+    activate("training.duck.replay.toggle");
+    wait(&|| window.get_duck_best_details() != frozen);
+    wait(&|| window.get_duck_replay_paused());
+    let terminal = window.get_duck_best_details();
+    assert!(
+        ["Exited", "Fell", "TimedOut"]
+            .iter()
+            .any(|s| terminal.ends_with(s))
+    );
+    activate("training.duck.replay.toggle");
+    wait(&|| window.get_duck_best_details() != terminal);
+    assert_eq!(window.get_training_status_code(), "completed");
     assert_eq!(window.get_training_points().row_count(), 2);
     assert_eq!(window.get_duck_terms().row_count(), 5);
     let output = std::env::var_os("SPACEWARS_PREVIEW_ARTIFACTS").map(std::path::PathBuf::from);
     if let Some(path) = &output {
         std::fs::create_dir_all(path).unwrap();
-        activate("training.preview.speed");
-        activate("training.preview.speed");
     }
     for (width, height, chart_x, chart_y) in [(800, 480, 739., 84.), (1024, 768, 457., 482.)] {
         window
@@ -80,7 +103,14 @@ fn steering_a_clock_run_updates_the_next_scored_generation_and_preserves_the_rep
                     return false;
                 };
                 now.parse::<u64>().unwrap_or(0)
-                    >= (total.parse::<u64>().unwrap_or(u64::MAX) / 2).clamp(1, 150)
+                    >= (total
+                        .split_whitespace()
+                        .next()
+                        .unwrap()
+                        .parse::<u64>()
+                        .unwrap()
+                        / 2)
+                    .clamp(1, 150)
             };
             wait(&|| {
                 in_play(window.get_duck_best_details())

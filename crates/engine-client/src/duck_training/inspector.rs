@@ -66,10 +66,22 @@ impl View {
                 self.previous = Instant::now();
                 w.set_duck_compare(self.compare.is_some());
             }
-            "training.duck.brain.pause" => {
+            "training.duck.brain.pause" | "training.duck.replay.toggle" => {
                 self.pending_step = false;
                 let speed = w.get_training_preview_speed();
-                if speed == 3 {
+                if w.get_duck_result() {
+                    let play = w.get_duck_replay_paused();
+                    if play && self.visible_replays_finished(w) {
+                        for p in self.playing.iter_mut().flatten() {
+                            p.reset();
+                        }
+                    }
+                    if play && speed == 3 {
+                        set_speed(w, self.resume_speed);
+                    }
+                    w.set_duck_review_playing(play);
+                    self.previous = Instant::now();
+                } else if speed == 3 {
                     set_speed(w, self.resume_speed);
                 } else {
                     self.resume_speed = speed;
@@ -77,10 +89,14 @@ impl View {
                 }
             }
             "training.duck.brain.step" => {
-                if w.get_training_preview_speed() != 3 {
-                    self.resume_speed = w.get_training_preview_speed();
+                if w.get_duck_result() {
+                    w.set_duck_review_playing(false);
+                } else {
+                    if w.get_training_preview_speed() != 3 {
+                        self.resume_speed = w.get_training_preview_speed();
+                    }
+                    set_speed(w, 3);
                 }
-                set_speed(w, 3);
                 self.pending_step = true;
             }
             name => {
@@ -93,6 +109,15 @@ impl View {
             }
         }
         Ok(())
+    }
+
+    fn visible_replays_finished(&self, w: &MainWindow) -> bool {
+        let selected = usize::from(w.get_training_preview_mode() == 2);
+        self.playing
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| self.compare.is_some() || w.get_duck_wide() || *i == selected)
+            .all(|(_, p)| p.as_ref().is_some_and(Playback::terminal))
     }
 
     pub(super) fn play(&mut self, w: &MainWindow) {
@@ -163,7 +188,11 @@ impl View {
             w.set_duck_signal(Default::default());
             w.set_duck_polar(Default::default());
         }
-        let speed = crate::training_preview::speed(w.get_training_preview_speed());
+        let speed = if w.get_duck_replay_paused() {
+            0.
+        } else {
+            crate::training_preview::speed(w.get_training_preview_speed())
+        };
         let manual = self.pending_step;
         let pair_done = paired
             && self
@@ -175,7 +204,7 @@ impl View {
                 continue;
             };
             if (paired && pair_done || !paired && visible[i] && player.terminal())
-                && (manual || speed > 0.)
+                && (manual || (speed > 0. && !w.get_duck_result()))
             {
                 player.terminal_time += elapsed;
                 if manual || player.terminal_time >= Duration::from_secs(2) {
@@ -228,6 +257,9 @@ impl View {
             }
         }
 
+        if w.get_duck_result() && w.get_duck_review_playing() && self.visible_replays_finished(w) {
+            w.set_duck_review_playing(false);
+        }
         for (i, slot) in self.playing.iter_mut().enumerate() {
             if !visible[i] {
                 continue;

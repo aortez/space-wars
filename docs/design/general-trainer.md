@@ -230,14 +230,27 @@ ordered score terms in both generations.
 
 ## Watching and steering
 
-Put the duck alongside ship arrivals in Training. **Current** follows a
-sampled candidate and case. **Best** replays the saved champion on its scored
-case, with its original settings. Label both with candidate, generation,
-case and playback tick. Render the real Clock in both views. Use independent
-replay state so slowing, pinning or dropping preview frames cannot affect
-fitness or worker scheduling.
+The Clock workers score independent candidate–case visits in parallel, stepping
+physics as fast as the available CPU allows. **Sample replay** shows one visit
+after its worker has scored it. **Best replay** shows the winning genome's best
+visit from a finished generation. The two replays use the original settings
+and controls. At **Replay 1×** the display targets 60 physics ticks per second.
+Changing replay speed leaves worker scheduling and fitness unchanged.
 
-Show both views side by side when space permits and provide Current/Best tabs
+DirtSim's Current pane streams frames from an evaluation while it is being
+scored. Its Best pane runs a separate champion simulation paced by wall time.
+The Clock sample uses a finished visit so the operator can pause and step the
+exact controls that earned the score.
+[DirtSim evaluation worker](https://github.com/aortez/dirtsim/blob/0db5f847e7c059b807eb982702ba26fe9f004bf9/apps/src/server/evolution/EvaluationExecutor.cpp#L318-L361) ·
+[DirtSim best playback](https://github.com/aortez/dirtsim/blob/0db5f847e7c059b807eb982702ba26fe9f004bf9/apps/src/server/states/Evolution.cpp#L2172-L2190)
+
+When training completes or is saved and stopped, both panes hold still.
+**Play replay** plays the visible visits once. Their terminal frames stay on
+screen until another playback is requested. Opening a saved replay directly
+from the command line starts playback immediately.
+[Completed four-generation run](../images/training/clock-duck-completed-1024x768.png)
+
+Show both views side by side when space permits and provide replay tabs
 at 800×480. Keep progress, the fitness history, best score by term, and
 steering controls reachable in either layout. Show pending settings with their
 effective generation. The view uses the runner's edit and lifecycle commands.
@@ -278,7 +291,7 @@ decisions and the signed contribution of each final hidden unit. Each of the
 Adding the head bias gives the displayed pre-activation. Applying tanh gives
 the output passed to the creature decoder.
 
-**Both doors** takes the genome and course from the **Best** pane and runs it
+**Both doors** takes the genome and course from the **Best replay** pane and runs it
 from each entrance with the same seed and clock reading. The two visits advance
 together. The scored side uses the recorded controls, and the opposite side
 computes its own controls from its observations. Switch panes to inspect either

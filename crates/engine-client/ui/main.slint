@@ -263,11 +263,11 @@ component DuckReplayPane inherits Rectangle {
     background: #0d1827; border-color: #334655; border-width: 1px; border-radius: 6px;
     Rectangle { x: 1px; y: 2px; width: 3px; height: 36px; background: root.accent; }
     Text {
-        x: 12px; y: 4px; width: 104px; height: 28px; vertical-alignment: center;
+        x: 12px; y: 4px; width: 140px; height: 28px; vertical-alignment: center;
         text: root.heading; color: root.accent; font-size: 19px; font-weight: 700;
     }
     Text {
-        x: 119px; y: 4px; width: parent.width - 194px; height: 28px;
+        x: 154px; y: 4px; width: parent.width - 229px; height: 28px;
         vertical-alignment: center; horizontal-alignment: right; overflow: elide;
         text: root.identity; color: #d6e3eb; font-size: 12px;
     }
@@ -832,6 +832,9 @@ export component MainWindow inherits Window {
     in property <string> duck-best-details;
     in-out property <int> duck-inspect: -1;
     in-out property <bool> duck-compare;
+    out property <bool> duck-result: root.training-status-code == "completed" || root.training-status-code == "stopped";
+    in-out property <bool> duck-review-playing;
+    out property <bool> duck-replay-paused: root.training-preview-speed == 3 || (root.duck-result && !root.duck-review-playing);
     in-out property <int> duck-action;
     in property <[DuckOutput]> duck-current-outputs;
     in property <[DuckOutput]> duck-best-outputs;
@@ -3058,7 +3061,7 @@ export component MainWindow inherits Window {
         }
         if !root.duck-steering && !root.duck-wide: Rectangle {
             x: parent.pad; y: parent.top; width: parent.deck-width; height: 32px;
-            for label[index] in [root.duck-compare ? "Left door" : "Current", root.duck-compare ? "Right door" : "Best"]: MenuButton {
+            for label[index] in [root.duck-compare ? "Left door" : "Sample replay", root.duck-compare ? "Right door" : "Best replay"]: MenuButton {
                 x: index * (parent.width + 6px) / 2; width: (parent.width - 6px) / 2; height: parent.height;
                 text: label; text-size: 14px; primary: root.training-preview-mode == index + 1;
                 selected: root.training-focus == index + (root.duck-inspect >= 0 ? 10 : 4);
@@ -3068,7 +3071,7 @@ export component MainWindow inherits Window {
         if !root.duck-steering && (root.duck-wide || root.training-preview-mode != 2): DuckReplayPane {
             x: parent.pad; y: parent.top + (root.duck-wide ? 0px : 38px);
             width: root.duck-wide ? (parent.deck-width - 12px) / 2 : parent.deck-width; height: parent.deck-height;
-            heading: root.duck-compare ? "Left door" : "Current"; accent: #86d6ed; frame: root.duck-current-frame;
+            heading: root.duck-compare ? "Left door" : "Sample replay"; accent: #86d6ed; frame: root.duck-current-frame;
             outputs: root.duck-current-outputs; inspecting: root.duck-inspect == 0; brain-focus: root.training-focus == 10;
             inspect => { root.training-command("training.duck.brain.current"); }
             identity: root.duck-current-id; details: root.duck-current-details;
@@ -3077,7 +3080,7 @@ export component MainWindow inherits Window {
             x: parent.pad + (root.duck-wide ? (parent.deck-width + 12px) / 2 : 0px);
             y: parent.top + (root.duck-wide ? 0px : 38px);
             width: root.duck-wide ? (parent.deck-width - 12px) / 2 : parent.deck-width; height: parent.deck-height;
-            heading: root.duck-compare ? "Right door" : "Best"; accent: #f4c676; frame: root.duck-best-frame;
+            heading: root.duck-compare ? "Right door" : "Best replay"; accent: #f4c676; frame: root.duck-best-frame;
             outputs: root.duck-best-outputs; inspecting: root.duck-inspect == 1; brain-focus: root.training-focus == 11;
             inspect => { root.training-command("training.duck.brain.best"); }
             identity: root.duck-best-id; details: root.duck-best-details;
@@ -3149,7 +3152,7 @@ export component MainWindow inherits Window {
             y: parent.top + (root.duck-wide ? parent.deck-height + 14px : 0px);
             width: root.duck-wide ? parent.body-width : parent.body-width - parent.deck-width - 12px;
             height: parent.bottom - self.y;
-            identity: root.duck-compare ? (root.duck-inspect == 0 ? "Left door" : "Right door") : root.duck-inspect == 0 ? "Current" : "Best";
+            identity: root.duck-compare ? (root.duck-inspect == 0 ? "Left door" : "Right door") : root.duck-inspect == 0 ? "Sample" : "Best";
             action: ["Move","Jump","Run","Dive"][root.duck-action];
             status: root.duck-inspect-status; polar: root.duck-polar;
             units: root.duck-units; unit-scale: root.duck-unit-scale; signal: root.duck-signal; signal-scale: root.duck-signal-scale;
@@ -3175,7 +3178,7 @@ export component MainWindow inherits Window {
         }
         if !root.duck-steering && root.duck-inspect >= 0: Rectangle {
             x: parent.pad; y: parent.height - (root.duck-wide ? 55px : 45px); width: parent.body-width; height: root.duck-wide ? 40px : 35px;
-            for label[index] in ["Move","Jump","Run","Dive",root.training-preview-speed == 3 ? "Play replay" : "Pause replay","Step decision",root.duck-compare ? "End compare" : "Both doors","Close brain"]: MenuButton {
+            for label[index] in ["Move","Jump","Run","Dive",root.duck-replay-paused ? "Play replay" : "Pause replay","Step decision",root.duck-compare ? "End compare" : "Both doors","Close brain"]: MenuButton {
                 x: index * (parent.width + 5px) / 8; y: 0px; width: (parent.width - 35px) / 8; height: parent.height;
                 text: label; primary: index == root.duck-action || (index == 6 && root.duck-compare);
                 enabled: index != 6 || root.duck-compare || root.training-points.length > 0;
@@ -3185,14 +3188,14 @@ export component MainWindow inherits Window {
         }
         if root.duck-steering || root.duck-inspect < 0: Rectangle {
             x: parent.pad; y: parent.height - (root.duck-wide ? 55px : 45px); width: parent.body-width; height: root.duck-wide ? 40px : 35px;
-            for label[index] in [root.training-can-resume ? "Resume" : "Pause", "Save & stop", "New run", "Back",
-                root.duck-steering ? "Watch" : root.duck-can-edit ? "Steer" : "Settings", root.training-preview-speed-label, root.training-preview-follow ? "Follow" : "Pinned"]: MenuButton {
+            for label[index] in [root.training-can-resume ? "Resume" : "Pause", root.duck-result ? (root.duck-replay-paused ? "Play replay" : "Pause replay") : "Save & stop", "New run", "Back",
+                root.duck-steering ? "Watch" : root.duck-can-edit ? "Steer" : "Settings", "Replay " + root.training-preview-speed-label, root.training-preview-follow ? "Follow" : "Pinned"]: MenuButton {
                 x: index * (parent.width + 6px) / 7; width: (parent.width - 36px) / 7; height: parent.height;
                 text: label; primary: index == 4; text-size: 13px; text-padding: 2px;
                 selected: root.training-focus == (root.duck-steering ? 5 + index : [0,1,2,3,7,8,9][index]);
                 enabled: index == 0 ? (root.training-can-resume || root.training-can-pause) :
-                         index == 1 ? root.training-can-stop : index == 2 ? root.training-can-start : true;
-                activated => { root.training-command([root.training-can-resume ? "training.resume" : "training.pause","training.stop","training.new","training.back","training.duck.steer","training.preview.speed","training.preview.follow"][index]); }
+                         index == 1 ? (root.duck-result ? root.training-points.length > 0 && !root.duck-steering : root.training-can-stop) : index == 2 ? root.training-can-start : true;
+                activated => { root.training-command([root.training-can-resume ? "training.resume" : "training.pause",root.duck-result ? "training.duck.replay.toggle" : "training.stop","training.new","training.back","training.duck.steer","training.preview.speed","training.preview.follow"][index]); }
             }
         }
     }

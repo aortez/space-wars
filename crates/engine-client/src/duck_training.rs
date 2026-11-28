@@ -242,6 +242,7 @@ impl Client {
     pub(super) fn command(&self, w: &MainWindow, id: &str) -> Result<(), String> {
         let mut view = self.view.borrow_mut();
         if id.starts_with("training.duck.brain.")
+            || id == "training.duck.replay.toggle"
             || matches!(id, "training.preview.current" | "training.preview.best")
         {
             view.brain_command(w, id)?;
@@ -350,6 +351,7 @@ impl View {
         self.workers = None;
         self.archive_doors = None;
         self.last_progress.clear();
+        w.set_duck_review_playing(false);
         w.set_duck_compare(false);
         w.set_duck_inspect(-1);
         w.set_duck_action(1);
@@ -460,8 +462,15 @@ impl View {
                 self.error = error;
             }
             Event::Paused => self.state = State::Paused,
-            Event::Stopped => self.state = State::Stopped,
-            Event::Complete => self.state = State::Completed,
+            Event::Stopped | Event::Complete => {
+                self.state = if matches!(event, Event::Complete) {
+                    State::Completed
+                } else {
+                    State::Stopped
+                };
+                self.pending_step = false;
+                w.set_duck_review_playing(false);
+            }
             Event::Failed(error) => {
                 self.state = State::Failed;
                 self.error = error;
@@ -509,7 +518,12 @@ impl View {
         );
         if self.workers.is_none() {
             w.set_training_worker_status(
-                if self.rate > 0.0 {
+                if matches!(self.state, State::Completed | State::Stopped) {
+                    format!(
+                        "0 active workers · Last generation {:.1} visits/s",
+                        self.rate
+                    )
+                } else if self.rate > 0.0 {
                     format!("{:.1} episodes/s", self.rate)
                 } else {
                     "Evaluating cases".into()
