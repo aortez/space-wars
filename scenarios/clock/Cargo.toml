@@ -16,10 +16,10 @@ engine-terrain = { workspace = true }
 engine-water = { workspace = true }
 scenario-scorched-earth = { workspace = true }
 rand = { workspace = true }
+serde = { workspace = true }
 
 [build-dependencies]
 fontdue = { version = "=0.9.3", default-features = false, features = ["std"] }
 
 [dev-dependencies]
-serde = { workspace = true }
 serde_json = { workspace = true }

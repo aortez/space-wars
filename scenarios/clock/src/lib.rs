@@ -100,7 +100,7 @@ use engine_common::{
 };
 pub use events::cell_swap::{CELL_SWAP_FADE_TICKS, CELL_SWAP_MAX_TICKS, CELL_SWAP_TICKS};
 pub use events::digit_slide::DIGIT_SLIDE_TICKS;
-pub use events::duck::DUCK_TICKS;
+pub use events::duck::{DUCK_TICKS, episode as duck_training};
 pub use events::marquee::MARQUEE_TICKS;
 pub use events::meltdown::{
     DRAINING_TICKS, MAX_MELTDOWN_CELLS, MAX_SPILL_PARCELS, MELTING_TICKS, WATER_COLUMNS,
