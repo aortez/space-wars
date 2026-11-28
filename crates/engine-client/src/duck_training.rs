@@ -1,4 +1,6 @@
 //! The native Training view observes one headless Clock job and replays its scored controls.
+mod decision;
+mod inspector;
 mod navigation;
 mod owner;
 mod playback;
@@ -7,19 +9,23 @@ use crate::{DuckScoreTerm, MainWindow, TrainingPoint};
 use engine_agent::{
     duck_recipe::PATTERNS,
     trainer::{Replay, Trainer, TrainerConfig},
+    training_workers::WorkerControl,
 };
 use engine_common::ClockDuckCoursePattern as Pattern;
 pub(crate) use navigation::{handle_action, inventory, selected_id};
 use owner::{Command, Event};
 use playback::Playback;
-use slint::{ComponentHandle, ModelRc, VecModel};
+use slint::{ModelRc, VecModel};
 use std::{
     cell::RefCell,
     path::PathBuf,
     rc::Rc,
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{
+        Arc,
+        mpsc::{self, Receiver, Sender},
+    },
     thread::{self, JoinHandle},
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 pub(super) const RECIPE: i32 = 2;
@@ -126,8 +132,17 @@ struct View {
     history: Vec<Trend>,
     best_terms: Option<[f64; 5]>,
     rate: f64,
-    latest: [Option<Rc<Replay>>; 2],
+    latest: [Option<Arc<Replay>>; 2],
     playing: [Option<Playback>; 2],
+    pinned: [Option<Arc<Replay>>; 2],
+    compare: Option<Arc<Replay>>,
+    fraction: f64,
+    pending_step: bool,
+    resume_speed: i32,
+    follow_after_inspection: bool,
+    workers: Option<WorkerControl>,
+    archive_doors: Option<Receiver<Result<[[u32; 2]; 2], String>>>,
+    last_progress: String,
     previous: Instant,
     error: String,
 }
@@ -136,11 +151,27 @@ impl Client {
     pub(super) fn watch(
         &self,
         w: &MainWindow,
+        directory: PathBuf,
         record: engine_agent::trainer::Generation,
         history: Vec<engine_agent::trainer::GenerationSummary>,
     ) {
         let mut view = self.view.borrow_mut();
         view.reset(w, record.config.clone());
+        if record.door_exits.is_none() {
+            let (send, receive) = mpsc::channel();
+            let summary = record.summary().clone();
+            let dir = directory.clone();
+            if thread::Builder::new()
+                .name("duck-archive-scores".into())
+                .spawn(move || {
+                    let _ = send.send(Trainer::reconstruct_door_exits(&dir, &summary));
+                })
+                .is_ok()
+            {
+                view.archive_doors = Some(receive);
+            }
+        }
+        view.directory = Some(directory);
         view.set_history(history);
         view.event(w, Event::Finished(Box::new(record)));
         view.state = State::Watching;
@@ -158,6 +189,16 @@ impl Client {
             }
         }
         if view.selected {
+            if let Some(rx) = &view.archive_doors
+                && let Ok(result) = rx.try_recv()
+            {
+                let caption = result
+                    .map(door_caption)
+                    .unwrap_or_else(|_| "Archived door scores could not be reproduced".into());
+                w.set_duck_door_exits(caption.into());
+                view.archive_doors = None;
+            }
+            view.worker_status(w);
             view.play(w);
         }
         view.selected
@@ -200,9 +241,17 @@ impl Client {
 
     pub(super) fn command(&self, w: &MainWindow, id: &str) -> Result<(), String> {
         let mut view = self.view.borrow_mut();
+        if id.starts_with("training.duck.brain.")
+            || matches!(id, "training.preview.current" | "training.preview.best")
+        {
+            view.brain_command(w, id)?;
+            view.play(w);
+            return Ok(());
+        }
         match id {
             "training.duck.term" => w.set_duck_term((w.get_duck_term() + 1) % 5),
             "training.duck.steer" => {
+                view.close_inspector(w);
                 w.set_duck_steering(!w.get_duck_steering());
                 w.set_training_focus(if w.get_duck_steering() { 0 } else { 7 });
             }
@@ -266,6 +315,15 @@ impl View {
             rate: 0.0,
             latest: Default::default(),
             playing: Default::default(),
+            pinned: Default::default(),
+            compare: None,
+            fraction: 0.,
+            pending_step: false,
+            resume_speed: 0,
+            follow_after_inspection: true,
+            workers: None,
+            archive_doors: None,
+            last_progress: String::new(),
             previous: Instant::now(),
             error: String::new(),
         }
@@ -285,6 +343,19 @@ impl View {
         self.error.clear();
         self.latest = Default::default();
         self.playing = Default::default();
+        self.pinned = Default::default();
+        self.compare = None;
+        self.pending_step = false;
+        self.fraction = 0.;
+        self.workers = None;
+        self.archive_doors = None;
+        self.last_progress.clear();
+        w.set_duck_compare(false);
+        w.set_duck_inspect(-1);
+        w.set_duck_action(1);
+        w.set_duck_current_outputs(Default::default());
+        w.set_duck_best_outputs(Default::default());
+        w.set_duck_door_exits("Awaiting a scored generation".into());
         w.set_duck_job(true);
         w.set_duck_steering(false);
         w.set_training_preview_mode(1);
@@ -329,7 +400,9 @@ impl View {
                 self.pending = pending;
                 self.set_history(history);
             }
-            Event::Scoring(generation, config) => {
+            Event::Scoring(generation, config, workers) => {
+                self.workers = Some(workers);
+                self.last_progress.clear();
                 if !matches!(self.state, State::Pausing | State::Stopping) {
                     self.state = State::Running;
                 }
@@ -339,9 +412,23 @@ impl View {
                 }
                 self.config = config;
             }
-            Event::Sample(replay) => self.latest[0] = Some(Rc::new(*replay)),
+            Event::Sample(replay) => self.latest[0] = Some(Arc::new(*replay)),
             Event::Finished(generation) => {
                 let record = generation.summary();
+                self.workers = None;
+                w.set_duck_door_exits(
+                    record
+                        .door_exits
+                        .map(door_caption)
+                        .unwrap_or_else(|| {
+                            if self.archive_doors.is_some() {
+                                "Replaying archived cases for exit counts".into()
+                            } else {
+                                "Exit split unavailable in this archive".into()
+                            }
+                        })
+                        .into(),
+                );
                 self.id = record.run_id.clone();
                 self.completed = record.generation;
                 self.generation = record.generation;
@@ -362,8 +449,8 @@ impl View {
                 self.config = record.config.clone();
                 self.best_terms = Some(record.best_terms);
                 self.latest = [
-                    Some(Rc::new(generation.current)),
-                    Some(Rc::new(generation.best)),
+                    Some(Arc::new(generation.current)),
+                    Some(Arc::new(generation.best)),
                 ];
             }
             Event::RecoveryFailed(id, error) => {
@@ -420,14 +507,16 @@ impl View {
             )
             .into(),
         );
-        w.set_training_worker_status(
-            if self.rate > 0.0 {
-                format!("{:.1} episodes/s", self.rate)
-            } else {
-                "Evaluating cases".into()
-            }
-            .into(),
-        );
+        if self.workers.is_none() {
+            w.set_training_worker_status(
+                if self.rate > 0.0 {
+                    format!("{:.1} episodes/s", self.rate)
+                } else {
+                    "Evaluating cases".into()
+                }
+                .into(),
+            );
+        }
         let config = self.pending.as_ref().map(|p| &p.0).unwrap_or(&self.config);
         w.set_duck_edit_status(
             match &self.pending {
@@ -536,64 +625,29 @@ impl View {
         w.set_duck_terms(ModelRc::new(VecModel::from(terms)));
     }
 
-    fn play(&mut self, w: &MainWindow) {
-        let now = Instant::now();
-        let elapsed = now
-            .duration_since(self.previous)
-            .min(Duration::from_millis(250));
-        self.previous = now;
-        if !w.get_training_visible()
-            || w.get_training_setup()
-            || w.get_duck_steering()
-            || w.get_training_history()
-        {
-            return;
-        }
-        let width = w.window().size().width;
-        let target = if w.get_duck_wide() {
-            (width.saturating_sub(56)) / 2
-        } else {
-            width * 56 / 100
-        }
-        .clamp(160, 800);
-        let speed = crate::training_preview::speed(w.get_training_preview_speed());
-        for (i, slot) in self.playing.iter_mut().enumerate() {
-            if !w.get_duck_wide() && usize::from(w.get_training_preview_mode() == 2) != i {
-                continue;
-            }
-            let Some(source) = &self.latest[i] else {
-                continue;
-            };
-            if slot.is_none()
-                || w.get_training_preview_follow()
-                    && slot.as_ref().is_some_and(|s| !s.matches(source))
-            {
-                match Playback::new(Rc::clone(source)) {
-                    Ok(player) => *slot = Some(player),
-                    Err(e) => {
-                        w.set_training_error(e.into());
-                        continue;
-                    }
-                }
-            }
-            if let Some(player) = slot {
-                let (id, details, image) = player.frame(elapsed, speed, target);
-                if i == 0 {
-                    w.set_duck_current_id(id.into());
-                    w.set_duck_current_details(details.into());
-                    if let Some(image) = image {
-                        w.set_duck_current_frame(image);
-                    }
-                } else {
-                    w.set_duck_best_id(id.into());
-                    w.set_duck_best_details(details.into());
-                    if let Some(image) = image {
-                        w.set_duck_best_frame(image);
-                    }
-                }
+    fn worker_status(&mut self, w: &MainWindow) {
+        if let Some(workers) = &self.workers {
+            let s = workers.snapshot();
+            let progress = format!(
+                "{}/{} visits · {} active workers · {:.1} episodes/s",
+                s.batch_completed,
+                self.config.population * self.config.cases_per_generation,
+                s.active,
+                s.episodes_per_second
+            );
+            if self.last_progress != progress {
+                w.set_training_worker_status(progress.as_str().into());
+                self.last_progress = progress;
             }
         }
     }
+}
+
+fn door_caption([left, right]: [[u32; 2]; 2]) -> String {
+    format!(
+        "Exits by door   L {}/{}   ·   R {}/{}",
+        left[0], left[1], right[0], right[1]
+    )
 }
 
 fn number(x: f64) -> String {

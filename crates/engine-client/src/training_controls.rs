@@ -29,6 +29,7 @@ pub(crate) fn install_with_replay(
     window: &MainWindow,
     root: PathBuf,
     archive: Option<(
+        PathBuf,
         engine_agent::trainer::Generation,
         Vec<engine_agent::trainer::GenerationSummary>,
     )>,
@@ -73,6 +74,11 @@ pub(crate) fn install_with_replay(
             window.get_duck_job() && !window.get_training_setup() && !window.get_training_history();
         if is_duck_view
             && (id.starts_with("training.duck.")
+                || (window.get_duck_inspect() >= 0
+                    && matches!(
+                        id.as_str(),
+                        "training.preview.current" | "training.preview.best"
+                    ))
                 || matches!(
                     id.as_str(),
                     "training.pause" | "training.resume" | "training.stop"
@@ -180,9 +186,9 @@ pub(crate) fn install_with_replay(
             publish(&window, &control.snapshot());
         }
     });
-    if let Some((record, history)) = archive {
+    if let Some((directory, record, history)) = archive {
         window.invoke_training_open();
-        duck.client.watch(window, record, history);
+        duck.client.watch(window, directory, record, history);
     }
     Ok(Training {
         _timer: timer,

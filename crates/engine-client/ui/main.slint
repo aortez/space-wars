@@ -1,4 +1,5 @@
 // Root window for the engine-client.
+import { DuckBrainPanel } from "duck-brain.slint";
 
 export struct DeviceInfoRow { id: string, label: string, value: string }
 export struct ControllerRow { id: string, label: string }
@@ -12,6 +13,7 @@ export struct SettingsListRow { id: string, label: string, value: string, help: 
 // A menu's pages of the Clock's settings: the top page, Look and Events.
 export struct ClockMenuPages { top: [SettingsListRow], look: [SettingsListRow], events: [SettingsListRow] }
 export struct ScoreboardRow { player: string, controller: string, wins: string, losses: string, draws: string, won: bool }
+export struct DuckOutput { value: float, applied: float }
 export struct DuckScoreTerm { name: string, value: string, fraction: float }
 export struct TrainingPoint { best: float, median: float }
 
@@ -254,21 +256,59 @@ component DuckReplayPane inherits Rectangle {
     in property <string> details;
     in property <image> frame;
     in property <color> accent;
+    in property <[DuckOutput]> outputs;
+    in property <bool> inspecting;
+    in property <bool> brain-focus;
+    callback inspect();
     background: #0d1827; border-color: #334655; border-width: 1px; border-radius: 6px;
     Rectangle { x: 1px; y: 2px; width: 3px; height: 36px; background: root.accent; }
     Text {
-        x: 12px; y: 4px; width: 86px; height: 28px; vertical-alignment: center;
+        x: 12px; y: 4px; width: 104px; height: 28px; vertical-alignment: center;
         text: root.heading; color: root.accent; font-size: 19px; font-weight: 700;
     }
     Text {
-        x: 92px; y: 4px; width: parent.width - 104px; height: 28px;
+        x: 119px; y: 4px; width: parent.width - 194px; height: 28px;
         vertical-alignment: center; horizontal-alignment: right; overflow: elide;
         text: root.identity; color: #d6e3eb; font-size: 12px;
     }
+    MenuButton {
+        x: parent.width - 67px; y: 5px; width: 60px; height: 26px;
+        text: "Brain"; text-padding: 3px; text-size: 12px; selected: root.brain-focus; primary: root.inspecting;
+        activated => { root.inspect(); }
+    }
     Rectangle {
-        x: 4px; y: 38px; width: parent.width - 8px; height: parent.height - 65px;
+        x: 4px; y: 38px; width: parent.width - 8px; height: parent.height - 107px;
         background: #080d16;
         Image { width: parent.width; height: parent.height; source: root.frame; image-fit: contain; }
+    }
+    for name[i] in ["Move", "Jump", "Run", "Dive"]: Rectangle {
+        x: 6px + i * (parent.width - 9px) / 4; y: parent.height - 65px;
+        width: (parent.width - 21px) / 4; height: 35px; background: #132334; border-radius: 3px;
+        private property <bool> available: i < root.outputs.length;
+        private property <float> value: self.available ? clamp(root.outputs[i].value, -1, 1) : 0;
+        private property <float> applied: self.available ? root.outputs[i].applied : 0;
+        Text { x: 4px; y: 1px; width: parent.width * 0.48; height: 15px; text: name; color: #d4e1e8; font-size: 11px; font-weight: 600; }
+        Text {
+            x: parent.width * 0.48; y: 1px; width: parent.width * 0.52 - 4px; height: 15px;
+            text: !parent.available ? "—" : i == 0 ? (parent.applied < 0 ? "Left" : parent.applied > 0 ? "Right" : "Idle")
+                : parent.applied > 0 ? "Held" : "Off";
+            color: parent.applied != 0 ? #96dfc9 : #9db0be; font-size: 10px; horizontal-alignment: right;
+        }
+        Rectangle {
+            private property <float> signed-value: parent.value;
+            x: 4px; y: 23px; width: parent.width - 42px; height: 4px; background: #334657;
+            Rectangle {
+                x: parent.width * 0.5 * (1 + min(0,parent.signed-value));
+                y: 0px; width: parent.width * 0.5 * abs(parent.signed-value);
+                height: parent.height; background: parent.signed-value < 0 ? #f1a073 : #65d5bb;
+            }
+            Rectangle { x: parent.width * 0.5; y: -2px; width: 1px; height: 8px; background: #b0cad4; }
+        }
+        Text {
+            x: parent.width - 37px; y: 17px; width: 33px; height: 15px;
+            text: !parent.available ? "—" : (parent.value > 0 ? "+" : "") + round(parent.value * 100) / 100;
+            color: #d6e3eb; font-size: 10px; horizontal-alignment: right;
+        }
     }
     Text {
         x: 10px; y: parent.height - 25px; width: parent.width - 20px; height: 23px;
@@ -790,6 +830,18 @@ export component MainWindow inherits Window {
     in property <string> duck-best-id;
     in property <string> duck-current-details;
     in property <string> duck-best-details;
+    in-out property <int> duck-inspect: -1;
+    in-out property <bool> duck-compare;
+    in-out property <int> duck-action;
+    in property <[DuckOutput]> duck-current-outputs;
+    in property <[DuckOutput]> duck-best-outputs;
+    in property <image> duck-polar;
+    in property <[float]> duck-units;
+    in property <[float]> duck-signal;
+    in property <float> duck-unit-scale: 1;
+    in property <float> duck-signal-scale: 1;
+    in property <string> duck-inspect-status;
+    in property <string> duck-door-exits;
     in property <string> duck-chart-range;
     in property <bool> duck-chart-zero;
     in property <[int]> duck-mix-changes;
@@ -2984,7 +3036,7 @@ export component MainWindow inherits Window {
         private property <length> top: root.duck-wide ? 93px : 68px;
         private property <length> bottom: self.height - (root.duck-wide ? 87px : 66px);
         private property <length> deck-width: root.duck-wide ? self.body-width : self.body-width * 0.58;
-        private property <length> deck-height: root.duck-wide ? min(self.body-width * 0.30 + 65px, (self.bottom - self.top) * 0.65) : self.bottom - self.top - 38px;
+        private property <length> deck-height: root.duck-wide ? min(self.body-width * 0.30 + 65px, (self.bottom - self.top) * (root.duck-inspect >= 0 ? 0.52 : 0.65)) : self.bottom - self.top - 38px;
         Text {
             x: parent.pad; y: root.duck-wide ? 15px : 5px; width: parent.width * 0.66; height: 34px;
             text: "Training  /  Clock duck"; color: #f1f6f8;
@@ -3006,27 +3058,31 @@ export component MainWindow inherits Window {
         }
         if !root.duck-steering && !root.duck-wide: Rectangle {
             x: parent.pad; y: parent.top; width: parent.deck-width; height: 32px;
-            for label[index] in ["Current", "Best"]: MenuButton {
+            for label[index] in [root.duck-compare ? "Left door" : "Current", root.duck-compare ? "Right door" : "Best"]: MenuButton {
                 x: index * (parent.width + 6px) / 2; width: (parent.width - 6px) / 2; height: parent.height;
                 text: label; text-size: 14px; primary: root.training-preview-mode == index + 1;
-                selected: root.training-focus == index + 4;
+                selected: root.training-focus == index + (root.duck-inspect >= 0 ? 10 : 4);
                 activated => { root.training-command(index == 0 ? "training.preview.current" : "training.preview.best"); }
             }
         }
         if !root.duck-steering && (root.duck-wide || root.training-preview-mode != 2): DuckReplayPane {
             x: parent.pad; y: parent.top + (root.duck-wide ? 0px : 38px);
             width: root.duck-wide ? (parent.deck-width - 12px) / 2 : parent.deck-width; height: parent.deck-height;
-            heading: "Current"; accent: #86d6ed; frame: root.duck-current-frame;
+            heading: root.duck-compare ? "Left door" : "Current"; accent: #86d6ed; frame: root.duck-current-frame;
+            outputs: root.duck-current-outputs; inspecting: root.duck-inspect == 0; brain-focus: root.training-focus == 10;
+            inspect => { root.training-command("training.duck.brain.current"); }
             identity: root.duck-current-id; details: root.duck-current-details;
         }
         if !root.duck-steering && (root.duck-wide || root.training-preview-mode == 2): DuckReplayPane {
             x: parent.pad + (root.duck-wide ? (parent.deck-width + 12px) / 2 : 0px);
             y: parent.top + (root.duck-wide ? 0px : 38px);
             width: root.duck-wide ? (parent.deck-width - 12px) / 2 : parent.deck-width; height: parent.deck-height;
-            heading: "Best"; accent: #f4c676; frame: root.duck-best-frame;
+            heading: root.duck-compare ? "Right door" : "Best"; accent: #f4c676; frame: root.duck-best-frame;
+            outputs: root.duck-best-outputs; inspecting: root.duck-inspect == 1; brain-focus: root.training-focus == 11;
+            inspect => { root.training-command("training.duck.brain.best"); }
             identity: root.duck-best-id; details: root.duck-best-details;
         }
-        if !root.duck-steering: Rectangle {
+        if !root.duck-steering && root.duck-inspect < 0: Rectangle {
             x: root.duck-wide ? parent.pad : parent.pad + parent.deck-width + 12px;
             y: parent.top + (root.duck-wide ? parent.deck-height + 14px : 0px);
             width: root.duck-wide ? parent.body-width : parent.body-width - parent.deck-width - 12px;
@@ -3085,8 +3141,18 @@ export component MainWindow inherits Window {
                     }
                     Text { x: parent.width - 53px; width: 53px; height: parent.height; text: term.value; color: #f6d49a; font-size: 13px; vertical-alignment: center; horizontal-alignment: right; }
                 }
-                Text { x: 10px; y: parent.height - 19px; width: parent.width - 20px; height: 16px; text: "Bars scale to each term’s charted peak"; color: #9cb0c0; font-size: 10px; overflow: elide; }
+                Text { x: 10px; y: parent.height - 19px; width: parent.width - 20px; height: 16px; text: root.duck-door-exits != "" ? root.duck-door-exits : "Bars scale to each term’s charted peak"; color: #9cb0c0; font-size: 10px; overflow: elide; }
             }
+        }
+        if !root.duck-steering && root.duck-inspect >= 0: DuckBrainPanel {
+            x: root.duck-wide ? parent.pad : parent.pad + parent.deck-width + 12px;
+            y: parent.top + (root.duck-wide ? parent.deck-height + 14px : 0px);
+            width: root.duck-wide ? parent.body-width : parent.body-width - parent.deck-width - 12px;
+            height: parent.bottom - self.y;
+            identity: root.duck-compare ? (root.duck-inspect == 0 ? "Left door" : "Right door") : root.duck-inspect == 0 ? "Current" : "Best";
+            action: ["Move","Jump","Run","Dive"][root.duck-action];
+            status: root.duck-inspect-status; polar: root.duck-polar;
+            units: root.duck-units; unit-scale: root.duck-unit-scale; signal: root.duck-signal; signal-scale: root.duck-signal-scale;
         }
         if root.duck-steering: Rectangle {
             x: parent.pad; y: parent.top; width: parent.body-width; height: parent.bottom - parent.top;
@@ -3103,10 +3169,21 @@ export component MainWindow inherits Window {
         }
         Text {
             x: parent.pad; y: parent.bottom + 2px; width: parent.body-width; height: root.duck-wide ? 27px : 19px;
-            text: root.training-error != "" ? root.training-error : root.duck-steering ? "" : root.duck-edit-status;
+            text: root.training-error != "" ? root.training-error : root.duck-steering ? "" : root.duck-inspect >= 0
+                ? (root.duck-compare ? "Champion · Synchronized left and right entrances" : "Replay controls") : root.duck-edit-status;
             color: root.training-error == "" ? #b2c6ce : #ffb8a7; font-size: 12px; vertical-alignment: center; overflow: elide;
         }
-        Rectangle {
+        if !root.duck-steering && root.duck-inspect >= 0: Rectangle {
+            x: parent.pad; y: parent.height - (root.duck-wide ? 55px : 45px); width: parent.body-width; height: root.duck-wide ? 40px : 35px;
+            for label[index] in ["Move","Jump","Run","Dive",root.training-preview-speed == 3 ? "Play replay" : "Pause replay","Step decision",root.duck-compare ? "End compare" : "Both doors","Close brain"]: MenuButton {
+                x: index * (parent.width + 5px) / 8; y: 0px; width: (parent.width - 35px) / 8; height: parent.height;
+                text: label; primary: index == root.duck-action || (index == 6 && root.duck-compare);
+                enabled: index != 6 || root.duck-compare || root.training-points.length > 0;
+                text-size: 13px; text-padding: 2px; selected: root.training-focus == 12 + index;
+                activated => { root.training-command("training.duck.brain." + ["move","jump","run","dive","pause","step","compare","close"][index]); }
+            }
+        }
+        if root.duck-steering || root.duck-inspect < 0: Rectangle {
             x: parent.pad; y: parent.height - (root.duck-wide ? 55px : 45px); width: parent.body-width; height: root.duck-wide ? 40px : 35px;
             for label[index] in [root.training-can-resume ? "Resume" : "Pause", "Save & stop", "New run", "Back",
                 root.duck-steering ? "Watch" : root.duck-can-edit ? "Steer" : "Settings", root.training-preview-speed-label, root.training-preview-follow ? "Follow" : "Pinned"]: MenuButton {

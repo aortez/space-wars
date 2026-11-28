@@ -33,6 +33,7 @@ fn steering_a_clock_run_updates_the_next_scored_generation_and_preserves_the_rep
     window.set_training_generations(2);
     activate("training.start");
     wait(&|| window.get_training_can_pause());
+    assert!(window.get_training_worker_status().contains("/8 visits"));
     activate("training.duck.steer");
     activate("training.duck.scale.next");
     assert!(window.get_duck_edit_status().contains("generation 2"));
@@ -114,6 +115,8 @@ fn steering_a_clock_run_updates_the_next_scored_generation_and_preserves_the_rep
     // A viewer can follow a historical winner while the job directory has an owner.
     let archive = engine_agent::trainer::Trainer::read_replay(&path, Some(1)).unwrap();
     let winner = archive.0.best_genome[..8].to_owned();
+    let scored = archive.0.best.clone();
+    let expected_doors = archive.0.door_exits.unwrap();
     let viewer = MainWindow::new().unwrap();
     viewer
         .window()
@@ -123,7 +126,7 @@ fn steering_a_clock_run_updates_the_next_scored_generation_and_preserves_the_rep
     let _viewer = training_controls::install_with_replay(
         &viewer,
         viewer_dir.path().to_owned(),
-        Some(archive),
+        Some((path, archive.0, archive.1)),
     )
     .unwrap();
     viewer.show().unwrap();
@@ -132,4 +135,51 @@ fn steering_a_clock_run_updates_the_next_scored_generation_and_preserves_the_rep
     assert_eq!(viewer.get_training_points().row_count(), 1);
     assert!(!viewer.get_training_can_resume());
     assert!(!viewer.get_duck_can_edit());
+    assert!(viewer.get_duck_door_exits().contains(&format!(
+        "L {}/{}",
+        expected_doors[0][0], expected_doors[0][1]
+    )));
+
+    let command = |id| assert!(ui_activation::activate(&viewer, id), "{id}");
+    command("training.duck.brain.best");
+    command("training.duck.brain.pause");
+    command("training.duck.brain.compare");
+    command("training.duck.brain.step");
+    wait(&|| viewer.get_duck_units().row_count() == 64);
+    assert_eq!(viewer.get_duck_best_outputs().row_count(), 4);
+    assert_eq!(viewer.get_duck_current_outputs().row_count(), 4);
+    assert!(viewer.get_duck_current_id().contains(&winner));
+    assert!(viewer.get_duck_current_details().contains("Left door"));
+    assert!(viewer.get_duck_best_details().contains("Right door"));
+    assert!(viewer.get_duck_polar().size().width > 0);
+    let decision_tick = || {
+        viewer
+            .get_duck_inspect_status()
+            .split_whitespace()
+            .nth(1)
+            .unwrap()
+            .parse::<u64>()
+            .unwrap()
+    };
+    let start = decision_tick();
+    let recorded = scored.control_at(start);
+    let outputs = if scored.case.entrance_right {
+        viewer.get_duck_best_outputs()
+    } else {
+        viewer.get_duck_current_outputs()
+    };
+    assert_eq!(
+        outputs.row_data(1).unwrap().applied,
+        f32::from(u8::from(recorded.jump))
+    );
+    command("training.duck.brain.step");
+    wait(&|| decision_tick() == start + u64::from(spacewars_ai::c3::DECISION_TICKS));
+    command("training.duck.brain.current");
+    assert_eq!(decision_tick(), start + 3);
+    command("training.duck.brain.move");
+    assert_eq!(viewer.get_duck_action(), 0);
+    assert!(viewer.get_duck_signal().row_count() >= 2);
+    command("training.duck.brain.close");
+    assert!(!viewer.get_duck_compare());
+    assert_eq!(viewer.get_duck_inspect(), -1);
 }

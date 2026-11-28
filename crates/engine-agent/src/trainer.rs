@@ -2,7 +2,7 @@
 use crate::{
     duck_recipe::{self, DuckCase, DuckControls, Score, Visit},
     evolution::runtime_id,
-    training_workers::{EpisodePool, WorkerConfig},
+    training_workers::{EpisodePool, WorkerConfig, WorkerControl},
 };
 use engine_common::ClockDuckCoursePattern;
 use serde::{Deserialize, Serialize};
@@ -122,6 +122,9 @@ pub struct GenerationSummary {
     pub best_case: DuckCase,
     /// In priority order: exits, alternating tags, clears, non-falls, ticks alive.
     pub best_terms: [f64; 5],
+    /// Champion training visits in entrance order (left, right), each [exits, visits].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub door_exits: Option<[[u32; 2]; 2]>,
     pub mean_terms: [f64; 5],
     pub spread_terms: [f64; 5],
     pub elapsed_seconds: f64,
@@ -145,6 +148,16 @@ impl Generation {
     pub fn summary(&self) -> &GenerationSummary {
         &self.report
     }
+}
+
+fn exits_by_entrance<'a>(visits: impl IntoIterator<Item = &'a Visit>) -> [[u32; 2]; 2] {
+    let mut doors = [[0; 2]; 2];
+    for visit in visits {
+        let [exits, total] = &mut doors[usize::from(visit.case.entrance_right)];
+        *exits += visit.score.exits as u32;
+        *total += 1;
+    }
+    doors
 }
 
 fn reason(err: impl std::fmt::Display) -> String {
@@ -227,6 +240,9 @@ impl Trainer {
     pub fn completed(&self) -> u32 {
         self.state.completed
     }
+    pub fn worker_control(&self) -> WorkerControl {
+        self.pool.control()
+    }
     pub fn config(&self) -> &TrainerConfig {
         &self.state.config
     }
@@ -287,12 +303,48 @@ impl Trainer {
         Ok((record, history))
     }
 
+    /// Re-evaluate a historical champion on its scored cases. A different engine
+    /// build can inspect the archive when every saved fitness term reproduces.
+    pub fn reconstruct_door_exits(
+        dir: &Path,
+        summary: &GenerationSummary,
+    ) -> Result<[[u32; 2]; 2], String> {
+        let state = store::Checkpoint::load(dir)?;
+        if summary.run_id != state.run_id || !(1..=state.completed).contains(&summary.generation) {
+            return Err("Generation does not belong to this run's scored history".into());
+        }
+        let config = &summary.config;
+        config.validate()?;
+        let model = Self::read_genome(dir, &summary.best_genome)?;
+        let cases = duck_recipe::training_cases(
+            config.seed,
+            u64::from(summary.generation),
+            &config.case_mix,
+            config.cases_per_generation,
+        )
+        .map_err(reason)?;
+        let visits = cases
+            .into_iter()
+            .map(|case| duck_recipe::run_model(case, &model, false))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(reason)?;
+        let total: Score = visits.iter().map(|v| v.score).sum();
+        if total.terms().map(|term| term as f64) != summary.best_terms {
+            return Err("Replayed champion scores differ from the recorded fitness terms".into());
+        }
+        Ok(exits_by_entrance(&visits))
+    }
+
+    pub fn read_genome(dir: &Path, id: &str) -> Result<C3Genome, String> {
+        store::load_genome(dir, id)
+    }
+
     pub fn read_champion(dir: &Path) -> Result<C3Genome, String> {
         let state = store::Checkpoint::load(dir)?;
         if state.completed == 0 {
             return Err("No generation has finished".into());
         }
-        store::load_genome(dir, &state.population[0])
+        Self::read_genome(dir, &state.population[0])
     }
 
     pub fn run_generation(&mut self) -> Result<Generation, String> {
@@ -322,7 +374,6 @@ impl Trainer {
             .as_ref()
             .map_or(&self.state.config, |e| &e.config)
             .clone();
-        on_start(generation, &config);
         self.pool
             .control()
             .configure(config.worker_config())
@@ -347,19 +398,24 @@ impl Trainer {
         };
         let results = self
             .pool
-            .map(&tasks, |&(slot, case)| {
-                let visit =
-                    duck_recipe::run_model(cases[case], &population[slot], true).map_err(reason)?;
-                let replay = Replay {
-                    generation,
-                    genome_id: population[slot].id().into(),
-                    visit,
-                };
-                if slot == sample_slot && case == 0 {
-                    on_sample(&replay);
-                }
-                Ok::<_, String>(replay)
-            })
+            .map_with_start(
+                &tasks,
+                || on_start(generation, &config),
+                |&(slot, case)| {
+                    let visit = duck_recipe::run_model(cases[case], &population[slot], true)
+                        .map_err(reason)?;
+                    let replay = Replay {
+                        generation,
+                        genome_id: population[slot].id().into(),
+                        visit,
+                    };
+                    if slot == sample_slot && case == 0 {
+                        store::save_genome(&self.dir, &population[slot])?;
+                        on_sample(&replay);
+                    }
+                    Ok::<_, String>(replay)
+                },
+            )
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
         let scores: Vec<Score> = results
@@ -369,7 +425,9 @@ impl Trainer {
         let mut order: Vec<usize> = (0..scores.len()).collect();
         order.sort_by_key(|&i| std::cmp::Reverse(scores[i]));
         let winner = order[0];
-        let best = results[winner * cases.len()..(winner + 1) * cases.len()]
+        let winner_visits = &results[winner * cases.len()..(winner + 1) * cases.len()];
+        let door_exits = exits_by_entrance(winner_visits.iter().map(|r| &r.visit));
+        let best = winner_visits
             .iter()
             .max_by_key(|r| r.score)
             .unwrap()
@@ -397,6 +455,7 @@ impl Trainer {
                 best_genome: best.genome_id.clone(),
                 best_case: best.case,
                 best_terms: scores[winner].terms().map(|v| v as f64),
+                door_exits: Some(door_exits),
                 mean_terms,
                 spread_terms,
                 elapsed_seconds,

@@ -258,6 +258,46 @@ target/ci/engine-client --training-replay "$run_dir" --training-generation 56
 [Desktop view at 1024×768](../images/training/clock-duck-1024x768.png) ·
 [Best tab at 800×480](../images/training/clock-duck-800x480.png)
 
+### Inspecting a decision
+
+The run header counts completed visits in the current generation and workers
+currently evaluating a visit. The score panel reports the winning genome's
+exits and visits from each entrance on the cases used for that generation.
+
+Both replay panes show Move, Jump, Run and Dive. The bars show the network's
+signed outputs, with zero at the center. The labels show the movement or
+held buttons passed to the body. Choose **Brain** on a pane to pin the replay
+and inspect its latest decision. **Pause replay** holds the scene while
+training continues. **Step decision** advances to the next applied decision
+(three physics ticks during active play).
+
+The polar map centers the duck, draws nearby geometry in cyan and points a
+gold arrow toward the current goal. Select an output to see its last 32
+decisions and the signed contribution of each final hidden unit. Each of the
+64 bars is the unit's activation multiplied by its weight into that output.
+Adding the head bias gives the displayed pre-activation. Applying tanh gives
+the output passed to the creature decoder.
+
+**Both doors** takes the genome and course from the **Best** pane and runs it
+from each entrance with the same seed and clock reading. The two visits advance
+together. The scored side uses the recorded controls, and the opposite side
+computes its own controls from its observations. Switch panes to inspect either
+side at the same tick.
+A visit that finishes first holds its terminal frame until its partner ends.
+
+For example, on case `3628204403383288016` at 15:08, the generation 56
+champion cleared four obstacles and exited at tick 1,401 from the right. From
+the left it cleared none and timed out at tick 2,070.
+
+The inspector recomputes only the replays being viewed. A replay worker checks
+each reconstructed decision against the scored controls before displaying
+network activity. For older archives the viewer can recover the door counts
+by replaying the scored cases and comparing all five aggregate fitness terms
+with the saved generation.
+
+[Inspect a decision at 1024×768](../images/training/clock-brain-1024x768.png) ·
+[Compare entrances at 800×480](../images/training/clock-brain-800x480.png)
+
 ## Background jobs
 
 First host the job in-process for the Training view. Then run that same owner

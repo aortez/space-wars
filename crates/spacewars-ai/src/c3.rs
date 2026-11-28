@@ -36,6 +36,15 @@ pub struct C3Genome {
     id: String,
 }
 
+/// Signed contributions to each actor preactivation, before its output tanh.
+/// Row order is the creature control profile. Column j is the final hidden
+/// activation j times that action's learned output weight j.
+pub struct ActionTrace {
+    pub outputs: [f32; 4],
+    pub biases: [f32; 4],
+    pub contributions: [[f32; 64]; 4],
+}
+
 fn shapes() -> BTreeMap<String, Vec<usize>> {
     encoder::shapes(
         CREATURE_SELF_FEATURES.len(),
@@ -171,6 +180,33 @@ impl C3Genome {
     /// The body decoder validates the four post-activation outputs together
     /// and records a neutral decision if any slot is invalid.
     pub fn infer(&self, observation: &CreatureObservation) -> Result<[f32; 4], ModelError> {
+        Ok(self.forward(observation)?.1)
+    }
+
+    /// Inspect the same forward pass as inference, retaining each output
+    /// unit's signed terms for the replay inspector.
+    pub fn inspect(&self, observation: &CreatureObservation) -> Result<ActionTrace, ModelError> {
+        let (hidden, outputs) = self.forward(observation)?;
+        let weights = &self.file.weights["actor.weight"].values;
+        let contributions = std::array::from_fn(|action| {
+            let row = &weights[action * hidden.len()..][..hidden.len()];
+            std::array::from_fn(|unit| hidden[unit] * row[unit])
+        });
+        Ok(ActionTrace {
+            outputs,
+            biases: self.file.weights["actor.bias"]
+                .values
+                .as_slice()
+                .try_into()
+                .expect("validated actor bias shape"),
+            contributions,
+        })
+    }
+
+    fn forward(
+        &self,
+        observation: &CreatureObservation,
+    ) -> Result<(Vec<f32>, [f32; 4]), ModelError> {
         let encoder = Encoder(&self.file.weights);
         let encoded = encoder
             .encode(Inputs {
@@ -182,7 +218,10 @@ impl C3Genome {
             })
             .map_err(|err| ModelError(err.into()))?;
         let actions = encoder.linear("actor", &encoded, true);
-        Ok(actions.try_into().expect("validated action head shape"))
+        Ok((
+            encoded,
+            actions.try_into().expect("validated action head shape"),
+        ))
     }
 }
 

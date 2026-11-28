@@ -15,6 +15,7 @@ chrono = { workspace = true }
 engine-common = { workspace = true }
 engine-core = { workspace = true }
 engine-agent = { workspace = true }
+engine-rapier = { workspace = true }
 engine-terrain = { workspace = true }
 engine-nes = { workspace = true }
 spacewars-ai = { workspace = true, features = ["terrain-recovery"] }
@@ -57,7 +58,6 @@ lyon_tessellation = { version = "=1.0.20", optional = true }
 [dev-dependencies]
 engine-chess = { workspace = true }
 engine-chess-board = { workspace = true }
-engine-rapier = { workspace = true }
 lyon_tessellation = "=1.0.20"
 
 [build-dependencies]

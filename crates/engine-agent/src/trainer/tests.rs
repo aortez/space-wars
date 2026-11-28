@@ -46,7 +46,27 @@ fn interrupted_generation_resumes_with_the_same_rankings_and_records_boundary_ed
     let mut resumed = Trainer::resume(path.clone()).unwrap();
     assert_eq!(resumed.pending(), Some(&changed));
     assert_eq!(resumed.latest().unwrap().best.visit, first.best.visit);
-    let second = resumed.run_generation().unwrap();
+    let previous_population = resumed.state.population.clone();
+    let workers = resumed.worker_control();
+    let second = resumed
+        .run_generation_observed(
+            |generation, settings| {
+                assert_eq!(generation, 2);
+                let stats = workers.snapshot();
+                assert_eq!(stats.batch_completed, 0);
+                assert_eq!(
+                    stats.queued,
+                    settings.population * settings.cases_per_generation
+                );
+            },
+            |sample| {
+                assert!(!previous_population.contains(&sample.genome_id));
+                let genome = Trainer::read_genome(&path, &sample.genome_id).unwrap();
+                assert_eq!(genome.id(), sample.genome_id);
+            },
+        )
+        .unwrap();
+    assert_eq!(workers.snapshot().batch_completed, 3);
     assert_eq!(second.config, changed);
     let history = resumed.history().unwrap();
     assert_eq!(history[0].config, config);
@@ -130,5 +150,60 @@ fn concurrent_sparse_edits_preserve_both_changes_and_validate_the_pending_popula
             tournament: 4,
             ..config
         }
+    );
+}
+
+#[test]
+fn champion_entrances_match_its_visits_and_older_replays_can_omit_counts() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path();
+    let config = TrainerConfig {
+        seed: 57,
+        population: 2,
+        tournament: 2,
+        cases_per_generation: 3,
+        generations: 1,
+        workers: 1,
+        ..Default::default()
+    };
+    let mut job = Trainer::new(config, dir.into()).unwrap();
+    let record = job.run_generation().unwrap();
+    let expected = [[0, 1], [2, 2]];
+    assert_eq!(record.door_exits, Some(expected));
+    assert_eq!(
+        Trainer::read_replay(dir, Some(1)).unwrap().0.door_exits,
+        Some(expected)
+    );
+
+    let without_counts = |mut json: serde_json::Value| {
+        json.as_object_mut().unwrap().remove("door_exits").unwrap();
+        serde_json::to_vec(&json).unwrap()
+    };
+    let replay = without_counts(serde_json::to_value(&record).unwrap());
+    fs::write(dir.join("replays/1.json"), replay).unwrap();
+    let mut history = without_counts(serde_json::to_value(record.summary()).unwrap());
+    history.push(b'\n');
+    fs::write(dir.join("generations.jsonl"), &history).unwrap();
+    job.state.history_bytes = history.len() as u64;
+    job.state.save(dir).unwrap();
+    drop(job);
+    let (old, history) = Trainer::read_replay(dir, Some(1)).unwrap();
+    assert!(old.door_exits.is_none() && history[0].door_exits.is_none());
+    assert_eq!(
+        Trainer::reconstruct_door_exits(dir, old.summary()).unwrap(),
+        expected
+    );
+    let mut mismatched = history[0].clone();
+    mismatched.best_terms[4] += 1.;
+    assert!(
+        Trainer::reconstruct_door_exits(dir, &mismatched)
+            .unwrap_err()
+            .contains("fitness terms")
+    );
+    assert!(
+        serde_json::to_value(old.summary())
+            .unwrap()
+            .get("door_exits")
+            .is_none()
     );
 }

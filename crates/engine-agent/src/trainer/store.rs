@@ -124,14 +124,17 @@ pub(super) fn load_genome(dir: &Path, id: &str) -> Result<C3Genome, String> {
     }
     Ok(genome)
 }
-pub(super) fn save_population(dir: &Path, population: &[C3Genome]) -> Result<(), String> {
-    for g in population {
-        let path = dir.join("genomes").join(format!("{}.json", g.id()));
-        if !path.try_exists().map_err(reason)? {
-            atomic_write(&path, &g.to_json().map_err(reason)?).map_err(reason)?;
-        }
+pub(super) fn save_genome(dir: &Path, genome: &C3Genome) -> Result<(), String> {
+    let path = dir.join("genomes").join(format!("{}.json", genome.id()));
+    if !path.try_exists().map_err(reason)? {
+        atomic_write(&path, &genome.to_json().map_err(reason)?).map_err(reason)?;
     }
     Ok(())
+}
+pub(super) fn save_population(dir: &Path, population: &[C3Genome]) -> Result<(), String> {
+    population
+        .iter()
+        .try_for_each(|genome| save_genome(dir, genome))
 }
 
 impl Checkpoint {
