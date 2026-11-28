@@ -36,6 +36,10 @@ pub const CREATURE_SELF_FEATURES: [&str; 30] = [
     "previous_dive",
 ];
 
+const OBJECT_MOTION_START: usize = 1 + ObjectKind::ClockExit as usize;
+/// Presence, the object-kind vocabulary, then eleven motion/extent features.
+pub const CREATURE_OBJECT_WIDTH: usize = OBJECT_MOTION_START + 11;
+
 /// Goal and applied controls supplied by the controller host at decision time.
 #[derive(Debug, Clone, Copy)]
 pub struct CreatureContext {
@@ -69,7 +73,7 @@ pub struct CreatureObservation {
     pub geometry: PolicyGeometry,
     /// Presence, six kind flags in ObjectKind order, then the eleven object
     /// motion/extent values. Empty rows are zero including their presence.
-    pub objects: [[f32; 18]; OBJECT_CAPACITY],
+    pub objects: [[f32; CREATURE_OBJECT_WIDTH]; OBJECT_CAPACITY],
     /// Body associated with each present row, for inspecting a replay.
     pub object_sources: [Option<BodyId>; OBJECT_CAPACITY],
 }
@@ -161,7 +165,7 @@ impl CreatureBody {
                 .then(a.2.id.cmp(&b.2.id))
         });
         let support = self.support.and_then(|c| world.collider_body(c.collider));
-        let mut objects = [[0.0; 18]; OBJECT_CAPACITY];
+        let mut objects = [[0.0; CREATURE_OBJECT_WIDTH]; OBJECT_CAPACITY];
         let mut object_sources = [None; OBJECT_CAPACITY];
         for (index, (kind, _, record, radius)) in
             candidates.into_iter().take(OBJECT_CAPACITY).enumerate()
@@ -170,7 +174,7 @@ impl CreatureBody {
             let row = &mut objects[index];
             row[0] = 1.0;
             row[kind as usize] = 1.0;
-            row[7..].copy_from_slice(&observer.object_inputs(
+            row[OBJECT_MOTION_START..].copy_from_slice(&observer.object_inputs(
                 world,
                 record,
                 ObjectExtent {

@@ -18,3 +18,6 @@ scenario-spacewars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["float_roundtrip"] }
 sha2 = { workspace = true }
+
+[dev-dependencies]
+scenario-clock = { workspace = true }

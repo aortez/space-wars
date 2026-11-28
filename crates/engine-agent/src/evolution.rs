@@ -3,6 +3,7 @@
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
+use spacewars_ai::evolution_draws::EvolutionDraws as Draws;
 use spacewars_ai::model::{DenseGenome, DenseModel, ModelContract};
 use std::{
     fmt,
@@ -295,12 +296,12 @@ impl<F: Clone + Ord + Serialize + DeserializeOwned> EvolutionRun<F> {
             }
             let parent = &models[ranks[parent_rank]];
             let mut genome = parent.genome().clone();
-            for value in genome.parameters_mut() {
-                if rng.unit() < self.config.mutation_probability {
-                    *value = (*value + rng.signed() * self.config.mutation_scale)
-                        .clamp(-self.config.parameter_limit, self.config.parameter_limit);
-                }
-            }
+            rng.mutate(
+                genome.parameters_mut(),
+                self.config.mutation_probability,
+                self.config.mutation_scale,
+                self.config.parameter_limit,
+            );
             next.push(Candidate {
                 mutated: &genome != parent.genome(),
                 genome,
@@ -447,46 +448,6 @@ fn hash(value: &impl Serialize) -> Result<String, EvolutionError> {
         "{:x}",
         Sha256::digest(serde_json::to_vec(value).map_err(error)?)
     ))
-}
-
-/// Keyed counters pin the draw algorithm without serializing an RNG library's
-/// internal layout. Each candidate has its own stream, independent of scheduling.
-struct Draws {
-    seed: u64,
-    generation: u64,
-    candidate: u64,
-    domain: &'static [u8],
-    counter: u64,
-}
-impl Draws {
-    fn new(seed: u64, generation: usize, candidate: usize, domain: &'static [u8]) -> Self {
-        Self {
-            seed,
-            generation: generation as u64,
-            candidate: candidate as u64,
-            domain,
-            counter: 0,
-        }
-    }
-    fn next(&mut self) -> u64 {
-        let mut hash = Sha256::new();
-        hash.update(b"spacewars.evolution.draw.v1\0");
-        hash.update(self.domain);
-        for value in [self.seed, self.generation, self.candidate, self.counter] {
-            hash.update(value.to_le_bytes());
-        }
-        self.counter += 1;
-        u64::from_le_bytes(hash.finalize()[..8].try_into().expect("eight digest bytes"))
-    }
-    fn unit(&mut self) -> f32 {
-        (self.next() >> 40) as f32 / 16_777_216.0
-    }
-    fn signed(&mut self) -> f32 {
-        self.unit() * 2.0 - 1.0
-    }
-    fn index(&mut self, count: usize) -> usize {
-        (self.next() % count as u64) as usize
-    }
 }
 
 /// Prototype resumes require the same executable and platform. This deliberately
