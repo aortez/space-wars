@@ -51,6 +51,25 @@ the brain. Such behavior belongs to an explicit component if used. Assistance
 already present in ordinary gameplay remains part of the recorded world/body
 configuration and the task's supported envelope.
 
+### Creature controls v1
+
+A creature brain records `creature_controls_v1`, its observation schema (the
+Clock uses `creature_polar_v1`), and the control slots its body must supply.
+The four post-activation values are finite numbers in [−1, 1]. The decoder
+releases every slot and records an invalid decision if any value is outside
+that interval, non-finite, or the vector has the wrong length.
+
+| Slot | Meaning |
+| --- | --- |
+| 0 · move | Movement along local +x. The Clock rounds the signed fraction to thousandths for its player actuator. |
+| 1 · jump | Held above zero. On the Clock a fresh press on the ground jumps. Holding, releasing, and pressing again follow the ordinary duck controls. |
+| 2 · run | Held above zero. A body without run ignores the slot. |
+| 3 · dive | Held above zero. A body without dive ignores the slot. |
+
+Zero is neutral for every slot. Every creature brain requires move and jump,
+and can declare run or dive required too. Binding checks those requirements
+against the body's controls before its first decision.
+
 ## Goals and final controls
 
 The complete brain is accountable for the controls applied to its actor. A

@@ -206,22 +206,32 @@ impl DuckEvent {
         self.movement = Movement::new(self.width, self.radius);
     }
 
+    #[cfg(test)]
     pub fn set_player_input(&mut self, move_milli: i16, jump: bool, run: bool, dive: bool) {
+        self.set_controls(engine_common::brain_controls::CreatureControls {
+            move_milli,
+            jump,
+            run,
+            dive,
+        });
+    }
+
+    pub fn set_controls(&mut self, controls: engine_common::brain_controls::CreatureControls) {
         if self.phase == EventPhase::Resetting {
             return;
         }
         let Some(player) = &mut self.player else {
             return;
         };
-        player.move_milli = move_milli.clamp(-1000, 1000);
-        player.run_held = run;
-        player.dive_held = dive;
+        player.move_milli = controls.move_milli.clamp(-1000, 1000);
+        player.run_held = controls.run;
+        player.dive_held = controls.dive;
         // No buffered landing jump or opening-phase jump. A new press must
         // happen while running; holding the button never becomes auto-hop.
-        player.jump_pending |= jump
+        player.jump_pending |= controls.jump
             && !player.jump_held
             && matches!(self.phase, EventPhase::Running | EventPhase::Exiting);
-        player.jump_held = jump;
+        player.jump_held = controls.jump;
     }
 
     pub fn dismiss_player(&mut self, world: Option<&mut PhysicsWorld>) {

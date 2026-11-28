@@ -2,6 +2,7 @@
 //! Player input is a command source, not a different actor or physics world.
 use super::*;
 use arena::Owner;
+use engine_common::brain_controls::CreatureControls;
 use events::duck::{DuckEvent, DuckView};
 
 /// A complete setpoint, guarded against another controller or an old visit.
@@ -15,6 +16,17 @@ pub struct ClockDuckInput {
     pub run: bool,
     /// Down intent: release a ledge, otherwise dive while swimming.
     pub dive: bool,
+}
+
+impl From<ClockDuckInput> for CreatureControls {
+    fn from(input: ClockDuckInput) -> Self {
+        Self {
+            move_milli: input.move_milli,
+            jump: input.jump,
+            run: input.run,
+            dive: input.dive,
+        }
+    }
 }
 
 impl ClockDuckInput {
@@ -246,7 +258,7 @@ impl ClockState {
         if let Some(duck) = &mut self.duck_visit
             && duck.player_session() == Some((input.session_id, input.player))
         {
-            duck.set_player_input(input.move_milli, input.jump, input.run, input.dive);
+            duck.set_controls(input.into());
         }
     }
 

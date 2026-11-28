@@ -41,13 +41,7 @@ impl DuckCase {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DuckControls {
-    pub move_milli: i16,
-    pub jump: bool,
-    pub run: bool,
-    pub dive: bool,
-}
+pub use engine_common::brain_controls::CreatureControls as DuckControls;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DuckProgress {
@@ -200,12 +194,7 @@ impl DuckEpisode {
                 ..controls
             };
             let v = self.state.duck_visit.as_mut().expect("active duck visit");
-            v.set_player_input(
-                self.controls.move_milli,
-                controls.jump,
-                controls.run,
-                controls.dive,
-            );
+            v.set_controls(self.controls);
         }
         ClockScenario::step(&mut self.state, &[], Duration::from_nanos(16_666_667));
         let duck = self

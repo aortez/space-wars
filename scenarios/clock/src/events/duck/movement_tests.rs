@@ -438,3 +438,23 @@ fn held_down_and_jump_add_no_vertical_motion_in_dry_air() {
     }
     assert_eq!(held.player.as_ref().unwrap().swim_strokes, 0);
 }
+
+#[test]
+fn a_held_profile_jump_must_release_and_press_again_after_landing() {
+    use engine_common::brain_controls::{BodyProfile, CreatureControls};
+    let mut duck = flat_player(5.0 / 3.0, 1.);
+    let apply = |duck: &mut TestDuck, jump: f32| {
+        let decision = CreatureControls::decode(&[0., jump, 0., 0.], &BodyProfile::duck());
+        assert!(!decision.invalid);
+        duck.set_controls(decision.controls);
+        duck.step();
+    };
+    for _ in 0..150 {
+        apply(&mut duck, 1.);
+    }
+    assert!(duck.grounded());
+    assert_eq!(duck.jumps, 1);
+    apply(&mut duck, 0.);
+    apply(&mut duck, 1.);
+    assert_eq!(duck.jumps, 2);
+}
