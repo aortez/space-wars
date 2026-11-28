@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ClockChessPhase {
-    /// The duck brings the board, packed in its case.
+    /// The duck brings the board, packed in its case, and the crow flies
+    /// in.
     Arriving,
     /// The case opens out into the board.
     Opening,
@@ -19,7 +20,7 @@ pub enum ClockChessPhase {
     Clearing,
     /// The board folds back into its case.
     Closing,
-    /// The duck takes the case away.
+    /// The crow flies out, and the duck takes the case away.
     Leaving,
 }
 
@@ -104,7 +105,7 @@ pub struct ClockChessActor {
     pub white: bool,
     pub pose: ClockChessPose,
     /// Where the bird is, in thousandths of a world unit: for the duck, the
-    /// middle of its body.
+    /// middle of its body, and for the crow, its feet.
     pub position_milli: [i32; 2],
     pub facing_right: bool,
     /// Whether the bird has the packed board with it.
@@ -128,6 +129,6 @@ pub struct ClockChessState {
     /// The board's place, in thousandths of a world unit: its left, bottom,
     /// right and top.
     pub board_milli: [i32; 4],
-    /// The visit's birds that are in the scene.
+    /// The visit's birds that are in the scene, the crow before the duck.
     pub actors: Vec<ClockChessActor>,
 }

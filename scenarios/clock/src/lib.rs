@@ -1396,12 +1396,12 @@ impl ClockState {
 
     /// Admits a visit to the board where a stage stands clear below the
     /// digits. Its duck comes from the edge of the view on its side with the
-    /// board packed, to set it up there. The visit plays the run's
-    /// unfinished match, or a new one, with the duck at the left where it
-    /// can be. Refused, changing nothing, while a visit is at the board,
-    /// while an event or a duck's visit has the floor to itself, where no
-    /// stage stands clear, supported and dry, as over an open drain, and
-    /// when the arena cannot take the visit.
+    /// board packed, to set it up there, and its crow from the edge on the
+    /// other side. The visit plays the run's unfinished match, or a new one,
+    /// with the duck at the left where it can be. Refused, changing nothing,
+    /// while a visit is at the board, while an event or a duck's visit has
+    /// the floor to itself, where no stage stands clear, supported and dry,
+    /// as over an open drain, and when the arena cannot take the visit.
     pub fn admit_chess_visit(&mut self) -> Result<(), chess::Refusal> {
         use chess::stage::{Scene, Side, Stage};
         if self.chess_visit.is_some() {
@@ -1473,7 +1473,7 @@ impl ClockState {
     }
 
     /// Takes the visit to the board away at once, with whatever of it is in
-    /// the arena, its board and its duck, as when it is over or a resize
+    /// the arena, its board and its birds, as when it is over or a resize
     /// ends it.
     fn finish_chess_visit(&mut self) {
         if self.chess_visit.take().is_some() {
@@ -1860,12 +1860,18 @@ impl ClockState {
                 .arena
                 .holds(arena::Owner::Event(ClockEventKind::Falling)),
             birds: {
-                let mut birds = [None; 2 * crow::MAX_CROWS];
+                let mut birds = [None; stranded::BIRDS];
+                let (visiting, chess) = birds.split_at_mut(2 * crow::MAX_CROWS);
                 if let Some(visit) = &self.crow_visit {
-                    for (bird, crow) in birds.chunks_exact_mut(2).zip(visit.crows()) {
+                    for (bird, crow) in visiting.chunks_exact_mut(2).zip(visit.crows()) {
                         bird[0] = Some(crow.position);
                         bird[1] = crow.destination();
                     }
+                }
+                let crow = self.chess_visit.as_ref().map(chess::Visit::crow);
+                if let Some(crow) = crow.filter(|crow| crow.present()) {
+                    chess[0] = Some(crow.position());
+                    chess[1] = crow.destination();
                 }
                 birds
             },
@@ -2502,7 +2508,7 @@ impl ClockState {
             spaceling.drive(world);
         }
         // The chess board takes the shape it has now, its case or its square,
-        // and the duck that carries it steers for the step.
+        // and the birds at it steer for the step.
         if let Some(visit) = &mut self.chess_visit {
             let world = self
                 .arena
@@ -2546,8 +2552,8 @@ impl ClockState {
         self.update_crow(true);
         self.update_stranded(true);
         // The visit to the board takes its tick, and play there with it. Its
-        // duck reads its body back from the step. A visit that is over leaves
-        // the arena.
+        // birds read their bodies back from the step. A visit that is over
+        // leaves the arena.
         if let Some(visit) = &mut self.chess_visit {
             let world = self
                 .arena

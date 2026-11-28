@@ -651,20 +651,32 @@ mod tests {
             phase_tick: 245,
             actions: 17,
             board_milli: [-45_067, -201_600, 45_067, -111_467],
-            actors: vec![ClockChessActor {
-                bird: ClockChessBird::Duck,
-                white: true,
-                pose: ClockChessPose::Moving,
-                position_milli: [-63_100, -194_660],
-                facing_right: true,
-                carrying: false,
-            }],
+            actors: vec![
+                ClockChessActor {
+                    bird: ClockChessBird::Crow,
+                    white: false,
+                    pose: ClockChessPose::Waiting,
+                    position_milli: [61_312, -201_600],
+                    facing_right: false,
+                    carrying: false,
+                },
+                ClockChessActor {
+                    bird: ClockChessBird::Duck,
+                    white: true,
+                    pose: ClockChessPose::Moving,
+                    position_milli: [-63_100, -194_660],
+                    facing_right: true,
+                    carrying: false,
+                },
+            ],
         });
         let json = state.to_json().unwrap();
         for named in [
             r#""phase":"playing""#,
+            r#""bird":"crow""#,
             r#""bird":"duck""#,
             r#""pose":"moving""#,
+            r#""pose":"waiting""#,
             r#""visit_id":3"#,
             r#""match_number":2"#,
         ] {

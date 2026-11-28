@@ -7,6 +7,7 @@ use engine_chess_board::{DARK_SQUARE, LIGHT_SQUARE, MAX_PRIMITIVES};
 use engine_common::{
     ClockEventProfile, ClockLampMode, ClockTimeFormat, RenderColor, RenderPoint, RenderRect,
 };
+use scenario_clock::chess::crow::{self, Crow};
 use scenario_clock::chess::duck::{Duck, LOWER_TICKS, TURN_TICKS, Task};
 use scenario_clock::chess::stage::Side;
 use scenario_clock::chess::{Bird, Exhibition, Phase, Pose, Show, Visit};
@@ -173,6 +174,34 @@ fn duck_pixels(duck: &Duck, viewport: Viewport) -> Pixels {
     )
 }
 
+/// The pixels a crow may be drawn in, however it faces, leans, flies or
+/// hops: its silhouette reaches under a pitch to either side of its feet,
+/// and under one and two thirds above them.
+fn crow_pixels(crow: &Crow, viewport: Viewport) -> Pixels {
+    let (at, pitch) = (crow.position(), crow.pitch());
+    pixels_of(
+        RenderRect {
+            min: RenderPoint::new(at.x - pitch, at.y),
+            max: RenderPoint::new(at.x + pitch, at.y + pitch * 1.65),
+        },
+        viewport,
+    )
+}
+
+/// The pixels the middle of a crow's body is drawn in, whatever the crow
+/// does: clear of its head, its bill, its tail and its legs, and of the
+/// board it stands beside.
+fn crow_body_pixels(crow: &Crow, viewport: Viewport) -> Pixels {
+    let (at, pitch) = (crow.position(), crow.pitch());
+    pixels_of(
+        RenderRect {
+            min: RenderPoint::new(at.x - pitch * 0.3, at.y + pitch * 0.32),
+            max: RenderPoint::new(at.x + pitch * 0.3, at.y + pitch * 0.62),
+        },
+        viewport,
+    )
+}
+
 /// How far along its way between the edge of the view and its room the duck
 /// is, from 0 at the edge to 1 at its room.
 fn along_its_way(visit: &Visit) -> f32 {
@@ -180,6 +209,19 @@ fn along_its_way(visit: &Visit) -> f32 {
     let way = stage.way(stage.duck);
     let from_left = (visit.duck().position().x - way.min.x) / way.width();
     match stage.duck {
+        Side::Left => from_left,
+        Side::Right => 1.0 - from_left,
+    }
+}
+
+/// How far along its way between the frame at the edge of the view and the
+/// board the crow is, from 0 at the frame to 1 at the board.
+fn along_the_crows_way(visit: &Visit) -> f32 {
+    let stage = visit.stage();
+    let side = stage.duck.other();
+    let way = stage.way(side);
+    let from_left = (visit.crow().position().x - way.min.x) / way.width();
+    match side {
         Side::Left => from_left,
         Side::Right => 1.0 - from_left,
     }
@@ -197,57 +239,70 @@ fn move_on_its_way(visit: &Visit, exhibition: &Exhibition) -> Option<f32> {
 type Moment = (&'static str, Phase, fn(&Visit, &Exhibition) -> bool);
 
 /// The moments a visit is drawn at, in the order they come.
-const MOMENTS: [Moment; 13] = [
-    ("01-coming", Phase::Arriving, |visit, _| {
+const MOMENTS: [Moment; 16] = [
+    ("01-over-the-frame", Phase::Arriving, |visit, _| {
+        visit.crow().task() == crow::Task::Coming && along_the_crows_way(visit) >= 0.0
+    }),
+    ("02-flying-in", Phase::Arriving, |visit, _| {
+        visit.crow().task() == crow::Task::Coming && along_the_crows_way(visit) >= 0.5
+    }),
+    ("03-coming", Phase::Arriving, |visit, _| {
         visit.duck().task() == Task::Bringing && along_its_way(visit) >= 0.5
     }),
-    ("02-setting-down", Phase::Arriving, |visit, _| {
+    ("04-setting-down", Phase::Arriving, |visit, _| {
         visit.duck().task() == Task::Lowering && visit.duck().ticks() >= LOWER_TICKS / 2
     }),
-    ("03-opening", Phase::Opening, |visit, _| visit.ticks() >= 22),
-    ("04-placing", Phase::Placing, |visit, _| visit.ticks() >= 60),
-    ("05-set", Phase::Playing, |_, _| true),
-    ("06-first-move", Phase::Playing, |visit, exhibition| {
+    ("05-opening", Phase::Opening, |visit, _| visit.ticks() >= 22),
+    ("06-placing", Phase::Placing, |visit, _| visit.ticks() >= 60),
+    ("07-set", Phase::Playing, |_, _| true),
+    ("08-first-move", Phase::Playing, |visit, exhibition| {
         move_on_its_way(visit, exhibition).is_some_and(|progress| progress >= 0.5)
     }),
-    ("07-second-move", Phase::Playing, |visit, exhibition| {
+    ("09-second-move", Phase::Playing, |visit, exhibition| {
         let moves = exhibition.current().unwrap().game().moves().len();
         moves == 2 && move_on_its_way(visit, exhibition).is_some_and(|progress| progress >= 0.5)
     }),
-    ("08-clearing", Phase::Clearing, |visit, _| {
+    ("10-clearing", Phase::Clearing, |visit, _| {
         visit.ticks() >= 45
     }),
-    ("09-closing", Phase::Closing, |visit, _| visit.ticks() >= 22),
-    ("10-picking-up", Phase::Leaving, |visit, _| {
+    ("11-closing", Phase::Closing, |visit, _| visit.ticks() >= 22),
+    ("12-picking-up", Phase::Leaving, |visit, _| {
         visit.duck().task() == Task::Lifting && visit.duck().ticks() >= LOWER_TICKS / 2
     }),
-    ("11-turning", Phase::Leaving, |visit, _| {
+    ("13-turning", Phase::Leaving, |visit, _| {
         visit.duck().task() == Task::Turning && visit.duck().ticks() >= TURN_TICKS / 3
     }),
-    ("12-going", Phase::Leaving, |visit, _| {
+    ("14-flying-out", Phase::Leaving, |visit, _| {
+        visit.crow().task() == crow::Task::Going && along_the_crows_way(visit) <= 0.5
+    }),
+    ("15-going", Phase::Leaving, |visit, _| {
         visit.duck().task() == Task::Taking && along_its_way(visit) <= 0.5
     }),
-    ("13-through-the-door", Phase::Leaving, |visit, _| {
+    ("16-through-the-door", Phase::Leaving, |visit, _| {
         visit.duck().task() == Task::Taking && along_its_way(visit) <= -0.02
     }),
 ];
 
 /// The shapes a visit adds to the Clock's frame beyond its board: the
-/// duck's silhouette, and what the frame draws of a door that is at all
-/// open, over what it draws of its closed wall.
+/// crow's silhouette with its wing spread, the duck's silhouette, and what
+/// the frame draws of a door that is at all open, over what it draws of its
+/// closed wall.
+const CROW_SHAPES: usize = 74;
 const DUCK_SHAPES: usize = 57;
 const DOOR_SHAPES: usize = 14;
 
 /// A visit is drawn by the CPU raster and the vector paths where its stage
-/// stands, at every size the board is qualified at: the duck bringing the
-/// case and setting it down, the board opening, being set up and in play
-/// with each bird's move on its way, and all of it packed and taken away
-/// again. The GPU scene prepares each of those frames. Nothing else in the
-/// view changes for the visit: not the digits, which go on telling the time,
-/// the AM/PM letters or the date. With `SPACEWARS_CLOCK_ARTIFACTS` set, each
-/// path's pixels and the vector path's shapes are written there.
+/// stands, at every size the board is qualified at: the crow flying in over
+/// the frame to its seat, the duck bringing the case and setting it down,
+/// the board opening, being set up and in play with each bird's move on its
+/// way, and all of it packed and taken away again as the crow flies out.
+/// The GPU scene prepares each of those frames. Nothing else in the view
+/// changes for the visit: not the digits, which go on telling the time, the
+/// AM/PM letters, the date or the frame the crow passes behind. With
+/// `SPACEWARS_CLOCK_ARTIFACTS` set, each path's pixels and the vector path's
+/// shapes are written there.
 #[test]
-fn a_chess_visit_draws_its_board_and_its_duck_below_the_digits_on_both_render_paths() {
+fn a_chess_visit_draws_its_board_and_its_birds_below_the_digits_on_both_render_paths() {
     let output = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS").map(std::path::PathBuf::from);
     if let Some(output) = &output {
         std::fs::create_dir_all(output).unwrap();
@@ -302,6 +357,7 @@ fn a_chess_visit_draws_its_board_and_its_duck_below_the_digits_on_both_render_pa
             let visit = visited.state.chess_visit().expect("a visit");
             let exhibition = visited.state.chess();
             let duck = visit.duck();
+            let crow = visit.crow();
             let frames = visited.render_frames(RenderBackend::Raster, viewport);
             assert_eq!(
                 frames,
@@ -311,16 +367,28 @@ fn a_chess_visit_draws_its_board_and_its_duck_below_the_digits_on_both_render_pa
             let background = plain.render_frames(RenderBackend::Raster, viewport);
             let added = primitives(&frames[0]) - primitives(&background[0]);
             let door = duck.door_area();
-            let most = MAX_PRIMITIVES + DUCK_SHAPES + door.map_or(0, |_| DOOR_SHAPES);
-            assert!(added <= most, "{name} {moment}: {added} shapes");
-            // Packed, the visit is its case, its duck and its door.
+            // The crow's wing is a shape of its own, while it is spread.
+            let crows = match (crow.present(), crow.wing()) {
+                (false, _) => 0,
+                (true, None) => CROW_SHAPES - 1,
+                (true, Some(_)) => CROW_SHAPES,
+            };
+            let birds = crows + DUCK_SHAPES + door.map_or(0, |_| DOOR_SHAPES);
+            assert!(
+                added <= MAX_PRIMITIVES + birds,
+                "{name} {moment}: {added} shapes"
+            );
+            // Packed, the visit is its case, its birds and its door.
             if let Show::Case(_) = visit.show(exhibition) {
-                let shapes = 3 + DUCK_SHAPES + door.map_or(0, |_| DOOR_SHAPES);
-                assert_eq!(added, shapes, "{name} {moment}");
+                assert_eq!(added, 3 + birds, "{name} {moment}");
             }
             shapes.push(added);
-            if visit.pose(Bird::Duck, exhibition) == Pose::Moving {
-                leaned.push((moment, duck.lean()));
+            let moving = |bird| visit.pose(bird, exhibition) == Pose::Moving;
+            if moving(Bird::Crow) {
+                leaned.push((moment, Bird::Crow, crow.lean(), duck.lean()));
+            }
+            if moving(Bird::Duck) {
+                leaned.push((moment, Bird::Duck, duck.lean(), crow.lean()));
             }
             // The GPU scene, which the cabinets draw through, prepares the
             // same frame.
@@ -341,7 +409,7 @@ fn a_chess_visit_draws_its_board_and_its_duck_below_the_digits_on_both_render_pa
                 plain_drawn = Some((background[0].clone(), pixels));
             }
             let (_, before) = plain_drawn.as_ref().unwrap();
-            // Where the visit draws: its board or its case, its duck, and
+            // Where the visit draws: its board or its case, its birds, and
             // its door while that is open, with the shadow the frame gives
             // an open door.
             let shown = match visit.show(exhibition) {
@@ -360,7 +428,19 @@ fn a_chess_visit_draws_its_board_and_its_duck_below_the_digits_on_both_render_pa
                 ]
             });
             let mut allowed = vec![shown, ducks];
+            allowed.extend(crow.present().then(|| crow_pixels(crow, viewport)));
             allowed.extend(doors);
+            // The frame's rail at the edge of the view the crow flies in
+            // over, but for the pixels along its inner edge.
+            let rail = match stage.duck.other() {
+                Side::Left => [0.0, 0.0, frame_width - EDGE, viewport.height],
+                Side::Right => [
+                    viewport.width - frame_width + EDGE,
+                    0.0,
+                    viewport.width,
+                    viewport.height,
+                ],
+            };
             for ((backend, pixels), (_, before)) in drawn.iter().zip(before) {
                 let what = format!("{name} {moment} {backend}");
                 if let Some(output) = &output {
@@ -380,6 +460,23 @@ fn a_chess_visit_draws_its_board_and_its_duck_below_the_digits_on_both_render_pa
                 let in_view = ducks[2] > EDGE && ducks[0] < viewport.width - EDGE;
                 let seen = changed_in(pixels, before, ducks);
                 assert_eq!(seen.is_some(), in_view, "{what}: the duck at {ducks:?}");
+                // The crow is drawn where its body is, wherever that is
+                // inside the frame, and the frame is drawn over it.
+                if crow.present() {
+                    let body = crow_body_pixels(crow, viewport);
+                    let seen = changed_in(pixels, before, body).is_some();
+                    let inside = frame_width + EDGE..=viewport.width - frame_width - EDGE;
+                    if inside.contains(&body[0]) && inside.contains(&body[2]) {
+                        assert!(seen, "{what}: no crow at {body:?}");
+                    } else if body[2] <= 0.0 || body[0] >= viewport.width {
+                        assert!(!seen, "{what}: a crow at {body:?}");
+                    }
+                }
+                assert_eq!(
+                    changed_in(pixels, before, rail),
+                    None,
+                    "{what}: the frame at {rail:?}"
+                );
                 // All of the board's place changes: the case wherever it is
                 // while it is packed, and the board's square once it is
                 // open.
@@ -412,7 +509,7 @@ fn a_chess_visit_draws_its_board_and_its_duck_below_the_digits_on_both_render_pa
                         assert!(within(case, place, EDGE), "{what}: {place:?}");
                     }
                 }
-                if moment != "05-set" {
+                if moment != "07-set" {
                     continue;
                 }
                 // Set up, every empty square shows its own colour all over,
@@ -453,14 +550,17 @@ fn a_chess_visit_draws_its_board_and_its_duck_below_the_digits_on_both_render_pa
             let index = MOMENTS.iter().position(|(name, ..)| *name == moment);
             shapes[index.unwrap()]
         };
-        assert!(of("04-placing") < of("05-set"), "{name}");
-        assert!(of("08-clearing") < of("07-second-move"), "{name}");
-        // The duck leans over the board for its own move, and not for the
-        // crow's.
-        assert_eq!(leaned.len(), 1, "{name}: {leaned:?}");
-        assert!(leaned[0].1 > 0.9, "{name}: {leaned:?}");
+        assert!(of("06-placing") < of("07-set"), "{name}");
+        assert!(of("10-clearing") < of("09-second-move"), "{name}");
+        // Each bird leans over the board for its own move, and not for the
+        // other's.
+        assert_eq!(leaned.len(), 2, "{name}: {leaned:?}");
+        assert_ne!(leaned[0].1, leaned[1].1, "{name}: {leaned:?}");
+        for (_, _, own, others) in &leaned {
+            assert!(*own > 0.9 && *others < 0.1, "{name}: {leaned:?}");
+        }
 
-        // Once the duck has gone with the board, the view is as it would
+        // Once the birds have gone with the board, the view is as it would
         // have been.
         while visited.state.chess_visit().is_some() {
             assert!(ticks < 6_000, "{name}: the visit never left");
@@ -476,20 +576,24 @@ fn a_chess_visit_draws_its_board_and_its_duck_below_the_digits_on_both_render_pa
 }
 
 /// The Clock's state publishes a visit to the board for as long as it
-/// lasts, with its duck under it as the visit's own bird: in the visit's
-/// claim on the arena, in no duck's or crow's state, and gone from the state
-/// once it has walked out.
+/// lasts, with its crow and its duck under it as the visit's own birds: in
+/// the visit's claim on the arena, in no duck's or crow's state, and gone
+/// from the state once they have left.
 #[test]
-fn clock_state_publishes_a_chess_visit_with_its_duck_as_the_visits_own() {
+fn clock_state_publishes_a_chess_visit_with_its_birds_as_the_visits_own() {
     use engine_common::{ClockArenaOwner, ClockChessBird, ClockChessPose};
     let mut visited = clock(Viewport::new(800.0, 480.0));
     assert_eq!(visited.clock_state().unwrap().chess, None);
     visited.state.admit_chess_visit().expect("a visit");
-    let duck_plays_white = {
+    let white = {
         let current = visited.state.chess().current().unwrap();
-        current.bird(Color::White) == Bird::Duck
+        match current.bird(Color::White) {
+            Bird::Crow => ClockChessBird::Crow,
+            Bird::Duck => ClockChessBird::Duck,
+        }
     };
-    let mut poses = Vec::new();
+    let mut birds = Vec::new();
+    let mut poses = [Vec::new(), Vec::new()];
     let mut carried = Vec::new();
     let mut packed = false;
     let mut ticks = 0;
@@ -511,16 +615,25 @@ fn clock_state_publishes_a_chess_visit_with_its_duck_as_the_visits_own() {
         // The visit's birds are in its own state and in no other's.
         assert!(state.duck.is_none() && state.player_duck.is_none());
         assert!(state.crow.is_none() && state.crows.is_empty());
-        assert!(chess.actors.len() <= 1);
         assert!(claim.population.bodies >= chess.actors.len());
         assert!(claim.population.within(claim.budget));
+        let present: Vec<_> = chess.actors.iter().map(|actor| actor.bird).collect();
+        if birds.last() != Some(&present) {
+            birds.push(present);
+        }
         for actor in &chess.actors {
-            assert_eq!(actor.bird, ClockChessBird::Duck);
-            assert_eq!(actor.white, duck_plays_white);
+            assert_eq!(actor.white, actor.bird == white);
+            let (poses, carries) = match actor.bird {
+                ClockChessBird::Crow => (&mut poses[0], false),
+                ClockChessBird::Duck => (&mut poses[1], true),
+            };
             if poses.last() != Some(&actor.pose) {
                 poses.push(actor.pose);
             }
-            if carried.last() != Some(&actor.carrying) {
+            // Only the duck ever has the case.
+            if !carries {
+                assert!(!actor.carrying);
+            } else if carried.last() != Some(&actor.carrying) {
                 carried.push(actor.carrying);
             }
         }
@@ -547,16 +660,44 @@ fn clock_state_publishes_a_chess_visit_with_its_duck_as_the_visits_own() {
         ticks += 1;
         assert!(ticks < 6_000, "the visit never left");
     }
-    // It came with the case, sat without it, and left with it again.
-    assert_eq!(carried, [true, false, true]);
+    // Both birds were there from the first, the crow before the duck, and
+    // the crow had flown out before the duck had walked out.
     assert_eq!(
-        poses,
+        birds,
+        [
+            vec![ClockChessBird::Crow, ClockChessBird::Duck],
+            vec![ClockChessBird::Duck],
+            vec![],
+        ]
+    );
+    // The duck came with the case, sat without it, and left with it again.
+    assert_eq!(carried, [true, false, true]);
+    let [crows, ducks] = poses;
+    let (first, second) = match white {
+        ClockChessBird::Crow => (crows, ducks),
+        ClockChessBird::Duck => (ducks, crows),
+    };
+    assert_eq!(
+        first,
         [
             ClockChessPose::Arriving,
             ClockChessPose::Setting,
             ClockChessPose::Waiting,
             ClockChessPose::Moving,
             ClockChessPose::Waiting,
+            ClockChessPose::Packing,
+            ClockChessPose::Leaving,
+        ]
+    );
+    // The visit was asked to pack up as the second move set out, and the
+    // bird that made it went from its move to packing.
+    assert_eq!(
+        second,
+        [
+            ClockChessPose::Arriving,
+            ClockChessPose::Setting,
+            ClockChessPose::Waiting,
+            ClockChessPose::Moving,
             ClockChessPose::Packing,
             ClockChessPose::Leaving,
         ]

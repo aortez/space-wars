@@ -1,5 +1,4 @@
 use super::*;
-use crate::crow::MAX_CROWS;
 use crate::{
     ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState,
     arena::Owner,
@@ -994,15 +993,15 @@ fn with_no_block_to_shelter_under_it_waits_out_the_rain_on_top_of_a_block() {
 
 /// The birds the spaceling sees when a visit's only crow is `at`, going to
 /// `going`.
-fn one_crow(at: Option<Vec2>, going: Option<Vec2>) -> [Option<Vec2>; 2 * MAX_CROWS] {
-    let mut birds = [None; 2 * MAX_CROWS];
+fn one_crow(at: Option<Vec2>, going: Option<Vec2>) -> [Option<Vec2>; BIRDS] {
+    let mut birds = [None; BIRDS];
     birds[0] = at;
     birds[1] = going;
     birds
 }
 
 /// What is around the spaceling in `state`, with `birds` there.
-fn around(state: &ClockState, birds: [Option<Vec2>; 2 * MAX_CROWS]) -> Surroundings<'_> {
+fn around(state: &ClockState, birds: [Option<Vec2>; BIRDS]) -> Surroundings<'_> {
     Surroundings {
         surfaces: &state.published,
         birds,

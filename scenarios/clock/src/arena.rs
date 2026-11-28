@@ -210,11 +210,12 @@ impl Owner {
                     count(&ids::canonical::STRANDED) + count(&ids::canonical::STRANDED_PERCHES);
                 Population::new(bodies, bodies)
             }
-            // The board, packed or set up, and the duck, each with one
-            // collider.
+            // The board, packed or set up, the duck and the crow, each with
+            // one collider.
             Self::Chess => {
-                let bodies =
-                    count(&ids::canonical::CHESS_BOARD) + count(&ids::canonical::CHESS_DUCK);
+                let bodies = count(&ids::canonical::CHESS_BOARD)
+                    + count(&ids::canonical::CHESS_CROW)
+                    + count(&ids::canonical::CHESS_DUCK);
                 Population::new(bodies, bodies)
             }
         }
@@ -264,7 +265,7 @@ impl Owner {
             Self::Spider => &[SPIDER, SPIDER_FRAME, SPIDER_SURFACES],
             Self::Crow => &[CROW, CROW_PERCHES],
             Self::Stranded => &[STRANDED, STRANDED_PERCHES],
-            Self::Chess => &[CHESS_BOARD, CHESS_DUCK],
+            Self::Chess => &[CHESS_BOARD, CHESS_CROW, CHESS_DUCK],
         }
     }
 }
@@ -507,15 +508,17 @@ pub(crate) fn mechanics_config(layout: Layout) -> PhysicsWorldConfig {
 }
 
 /// The collision group of a visit's first crow. The magpie shares it: it
-/// comes only for the coins, when the crows have no perches.
+/// comes only for the coins, when the crows have no perches. So do the birds
+/// of a visit to the chess board, which keep below the face, where no perch
+/// is.
 const FIRST_CROW: u32 = 1 << 1;
 
 /// The collision groups the birds belong to, and nothing else does: one for
 /// each crow a visit may hold.
 const BIRDS: u32 = ((1 << crate::crow::MAX_CROWS) - 1) * FIRST_CROW;
 
-/// A bird, the magpie or a visit's first crow: it meets everything there is
-/// but the frame and a visit's later crows.
+/// A bird, the magpie, a bird at the chess board or a visit's first crow: it
+/// meets everything there is but the frame and a visit's later crows.
 pub(crate) const BIRD: CollisionGroups = crow(0);
 
 /// Crow `member` of a visit, which meets everything there is but the frame
@@ -1263,8 +1266,8 @@ mod tests {
 
     #[test]
     fn the_chess_visits_room_is_kept_for_it_whoever_else_holds_the_arena() {
-        // Its board and its duck, each a body with one collider.
-        assert_eq!(Owner::Chess.budget(), Population::new(2, 2));
+        // Its board, its duck and its crow, each a body with one collider.
+        assert_eq!(Owner::Chess.budget(), Population::new(3, 3));
         // Outside the duel, whoever may hold the arena may hold it beside a
         // visit to the board, and nobody takes the room the visit needs.
         let fixtures = [Owner::Fixture(0), Owner::Fixture(1), Owner::Fixture(2)];
@@ -1547,6 +1550,8 @@ pub(crate) mod ids {
         pub(crate) const CHESS_BOARD: Range<u64> = 8801..8802;
         /// The duck that carries the chess board in and out, and plays at it.
         pub(crate) const CHESS_DUCK: Range<u64> = 8802..8803;
+        /// The crow that flies in to play at the chess board.
+        pub(crate) const CHESS_CROW: Range<u64> = 8803..8804;
         /// The duel, its monotonic material allocator and reserved conversion tail.
         pub(crate) const TANKS: Range<u64> = 20_000..60_000;
         /// Retained soil, the one resident today that outlives its admitting
@@ -1633,6 +1638,7 @@ pub(crate) mod ids {
             ("STRANDED_PERCHES", STRANDED_PERCHES),
             ("CHESS_BOARD", CHESS_BOARD),
             ("CHESS_DUCK", CHESS_DUCK),
+            ("CHESS_CROW", CHESS_CROW),
             ("SOIL", SOIL),
             ("TEST_OBSTACLES", TEST_OBSTACLES),
         ];
