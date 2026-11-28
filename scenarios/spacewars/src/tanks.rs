@@ -220,6 +220,8 @@ pub struct TankWork {
     pub spatial_exhaustions: usize,
     /// Underlying pairs, manifolds and contacts visited before filtering.
     pub contact_traversal: usize,
+    /// Casts along a barrel as a tank fires: one for each shot fired.
+    pub barrel_casts: usize,
 }
 
 /// Most recent placement attempt, including rejected admission.
@@ -480,7 +482,11 @@ impl Tanks {
     /// Bounded lookahead in the current contact frame. Refusal only changes motor
     /// intent: no pose correction, teleport, or artificial ground is introduced.
     pub(crate) fn prepare_controls(&mut self, physics: &mut PhysicsWorld, dirty: bool) {
-        self.work = TankWork::default();
+        // The step's firing came first, and its casts stay counted.
+        self.work = TankWork {
+            barrel_casts: self.work.barrel_casts,
+            ..TankWork::default()
+        };
         for tank in self.actors.values_mut() {
             let Some(chassis) = physics.motion(tank.assembly.bodies()[0]) else {
                 continue;
@@ -1390,8 +1396,10 @@ impl super::SpacewarsState {
         let Tanks {
             actors,
             shots_fired,
+            work,
             ..
         } = &mut self.physics.tanks;
+        work.barrel_casts = 0;
         let world = &self.physics.world;
         for (&id, tank) in actors {
             let own = flying.iter().filter(|&&tank| tank == id).count();
@@ -1415,6 +1423,7 @@ impl super::SpacewarsState {
                     exclude_entity: Some(tank.assembly.entity()),
                     ..Default::default()
                 };
+                work.barrel_casts += 1;
                 let met = world.cast_ray(from, along, options).map(|hit| hit.point);
                 blocked = met.is_some();
                 met

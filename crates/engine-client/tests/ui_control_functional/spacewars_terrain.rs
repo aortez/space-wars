@@ -99,6 +99,20 @@ fn planetary_tank_fixture_motion_support_and_lifecycle() {
     );
 }
 
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn planetary_tank_fire_fixture_strikes_and_cleans_up() {
+    run_planetary_tank_fixtures(
+        &["planetary-tank-fire", "planetary-tank-fire-angular"],
+        &[
+            (60, "lob"),
+            (240, "crater"),
+            (340, "intercept"),
+            (600, "cleanup"),
+        ],
+    );
+}
+
 fn run_planetary_tank_fixtures(scenarios: &[&str], milestones: &[(usize, &str)]) {
     use super::*;
     for &scenario in scenarios {
@@ -139,9 +153,31 @@ fn run_planetary_tank_fixtures(scenarios: &[&str], milestones: &[(usize, &str)])
                     assert_eq!(diagnostics["tank_fixture_pilots"], "1");
                     let sample: serde_json::Value =
                         serde_json::from_str(&diagnostics["tank_fixture_latest"]).unwrap();
-                    assert_eq!(sample["tanks"].as_array().unwrap().len(), 2);
+                    let tanks = if scenario.contains("fire") { 3 } else { 2 };
+                    assert_eq!(sample["tanks"].as_array().unwrap().len(), tanks);
                     if label == "gap" {
                         assert_eq!(sample["tanks"][0]["blocked"], true);
+                    }
+                    // The firing fixture's shots fired, shots ended and
+                    // craters only grow, so a sample taken late still shows
+                    // them. A shot fired has its round in flight or has ended.
+                    let fire = &sample["fire"];
+                    let ended = fire["ended"].as_u64();
+                    let flying = fire["rounds"].as_array().map(|rounds| rounds.len() as u64);
+                    let fired = ended.zip(flying).map(|(ended, flying)| ended + flying);
+                    match label {
+                        "lob" => assert!(fired >= Some(1), "{fire}"),
+                        "crater" => {
+                            assert_eq!(fire["craters"], 1, "{fire}");
+                            assert!(ended >= Some(3), "{fire}");
+                        }
+                        // The shot at the flying ship is on its way, or has
+                        // ended.
+                        "intercept" => assert_eq!(fired, Some(5), "{fire}"),
+                        "cleanup" if scenario.contains("fire") => {
+                            assert_eq!(ended, Some(5), "{fire}");
+                        }
+                        _ => {}
                     }
                     if label == "cleanup" {
                         assert_eq!(diagnostics["tank_fixture_passed"], "true");
