@@ -432,17 +432,20 @@ the trees grow. Each wood tissue becomes a body: a box from the tissue it grew
 from to its own cell, as wide as the wood is drawn. A hinge joins it where it
 grew from, to the wood it grew on or, at a trunk's foot, to the dirt. The hinge
 is a beam of wood with a square section as wide as the segment, as long as it,
-with wood's bending stiffness, strength and damping
-([connection loads](design/material-connection-loads.md)). The segment weighs
-wood's 0.6 per cubic cell, and each needle and cone tissue adds 0.02 and 0.05
-per size to the wood it grows on. Gravity is 9.81 cells per second squared, a
-cell being a meter. The bodies move in real time, a step for each of the lab's
-sixty updates a second. An air drag of 1 per second settles a branch within
-seconds, rather than the most of a minute wood's own damping would take.
-Living wood touches nothing, since its segments overlap where they join and
-where the trunk meets the dirt, and light passes it, since its tissues shade
-at their cells. Turned off, the living wood and any snow leave the world, and
-the trees grow on as their cells stand.
+with wood's bending stiffness, strength and damping ([connection
+loads](design/material-connection-loads.md)). The segment weighs wood's 0.6 per
+cubic cell, and each needle and cone tissue adds 0.02 and 0.05 per size to the
+wood it grows on. Gravity is 9.81 cells per second squared, a cell being a
+meter. The bodies move in real time, a step for each of the lab's sixty updates
+a second. An air drag of 1 per second settles a branch within seconds, rather
+than the most of a minute wood's own damping would take. Living wood is solid
+to all but living wood: dead wood and loose snow land on it, and it lands on
+the dirt. Living wood passes living wood, since its segments overlap where they
+join, and the two bodies of a hinge never touch, so a trunk's foot stands in
+the dirt it is hinged to. Light passes living wood's bodies, since its tissues
+shade at their cells: the bed names them to the light as transparent. Turned
+off, the living wood and any snow leave the world, and the trees grow on as
+their cells stand.
 
 The trees' cells stay the shape their wood rests in. Growth and light work on
 them as they do at rest, and the bodies and the drawing carry the sag. At each
@@ -461,13 +464,19 @@ same bodies, moving as they were, drawn grey with what grew on them. The tree
 loses those tissues and their shares of the stores, as in any cut. Wood hinged
 to living wood comes away from it, and keeps its other hinges, so a tree that
 dies stands on them, its foot still on the dirt, until it breaks. Dead wood,
-and snow that slid off it, lands on the dirt, passes through wood and shades
-where it lies. A box ends at the cells its wood spans, so a thick trunk's
-lowest segments, which a capsule's rounded ends would push into the soil, stand
-clear of it. The bed keeps at most 256 segments of dead wood, as many as it has
-tissues, and past that clears away the wood that died first, with all that
-died with it. Resting the wood leaves dead wood where it is, and replanting the
-bed removes it.
+and snow that slid off it, lands on the dirt and on living wood, passes through
+dead wood and shades where it lies. Wood that dies lies in the living wood it
+came away from, as a branch's first segment starts inside its trunk. So it
+passes through all wood until a step finds it clear of the living wood, and is
+never thrown out of it. Dead wood that living wood grows into, or is built over
+when the wood is made physical again, passes through it the same way. What
+rests on a branch falls through it when that branch dies, since dead wood
+passes through dead wood. A box ends at the cells its wood spans, so a thick
+trunk's lowest segments, which a capsule's rounded ends would push into the
+soil, stand clear of it. The bed keeps at most 256 segments of dead wood, as
+many as it has tissues, and past that clears away the wood that died first,
+with all that died with it. Resting the wood leaves dead wood where it is, and
+replanting the bed removes it.
 
 **Light snow** and **Heavy snow** lay a block of snow of mass 1 or 5 on top of
 the selected wood, or else on the tip of the planted tree's lowest branch, on
@@ -496,13 +505,27 @@ tip against 0.32 to the thinner one's, and laid by the trunk on the thinner
 branch's first segment, it adds 0.02, a twentieth as much, to that branch's
 tip.
 
+A branch that falls lands on the branch below. On the grass's side the second
+tier's branch, five cells of wood, hangs two cells above the lowest. Cut away,
+it lands on the lowest branch with a blow that loads its root to 1.01 of its
+safe load, and then lies on it, 3 cells above the dirt: the root carries 0.56
+where it carried 0.32, and its tip droops 0.44 cells where it drooped 0.28. The
+third tier's branch, four cells of wood, cut away instead, lands on the
+second's, whose root then carries 0.19 where it carried 0.12. Cut away in turn,
+the second tier's branch drops with what it carried onto the lowest, which
+breaks 0.8 s later at 1.42 of its safe load, and the three branches lie on the
+dirt. Under light snow on its tip the lowest branch carries 0.63, and the
+second tier's branch alone, cut onto it, breaks it 1.1 s later. Light snow on
+the tip of the third tier's branch slides off when that branch is cut, and
+comes to rest with it on the second's, which holds both at 0.30.
+
 Growing on at 16x from tick 600, the conifer and the young trees from its seeds
 gain 48 segments in a minute, to tick 1560, and segments are reshaped 219
 times. No hinge is refused or breaks. Checked every 5 s, none carries more than
 0.35 of its safe load, and no segment lies more than 0.008 cells from the wood
 it hangs from. Over the first 30 s the trees grow exactly as at rest: a bed
 whose wood rests reaches the same tissues, stores and ledger at the same tick.
-The minute of the lab's updates takes 4.65 s to compute against 4.35 s at rest,
+The minute of the lab's updates takes 4.69 s to compute against 4.36 s at rest,
 with 103 bodies at its end. The light's work counts each living segment it
 passes as a collider record, 13,802 against 134 at rest, with the same rays and
 footprints. Heavy snow laid after 8 s of growth, at tick 728, still breaks the
@@ -524,23 +547,31 @@ the pile.
 | 1280×720 | ![The conifer between two young trees, its lowest right branch tilted slightly down from the trunk](screenshots/garden-lab/tree-wood-settled-1280x720-raster.png) | ![The conifer with a block of snow on the tip of its lowest right branch, which bends down toward the grass](screenshots/garden-lab/tree-wood-heavy-snow-1280x720-raster.png) | ![The conifer without its lowest right branch, which lies grey on the dirt between the trunk and the grass with the snow at its tip](screenshots/garden-lab/tree-wood-fallen-1280x720-raster.png) | ![Three conifers standing grey and dead on the dirt over dead grass, the broken branch lying grey by the big one's trunk](screenshots/garden-lab/tree-wood-dead-tree-1280x720-raster.png) |
 | 800×480 | ![The conifer between two young trees, its lowest right branch tilted slightly down from the trunk](screenshots/garden-lab/tree-wood-settled-800x480-raster.png) | ![The conifer with a block of snow on the tip of its lowest right branch, which bends down toward the grass](screenshots/garden-lab/tree-wood-heavy-snow-800x480-raster.png) | ![The conifer without its lowest right branch, which lies grey on the dirt between the trunk and the grass with the snow at its tip](screenshots/garden-lab/tree-wood-fallen-800x480-raster.png) | ![Three conifers standing grey and dead on the dirt over dead grass, the broken branch lying grey by the big one's trunk](screenshots/garden-lab/tree-wood-dead-tree-800x480-raster.png) |
 
-The pictures are from the window-free renderer without the text, with the trees
-growing at 16x: 8 s after the wood became physical at tick 600, 0.9 s after
-heavy snow was laid, 3 s after that, and at tick 1110, 2 s after the conifer
-died of the drought that turning the water off at 64x began. The render
-contract's command above regenerates them with the others. The light's line
-gives the wood after it while the wood is physical or any is dead: its hinges
-with the most loaded one, the snow, the dead segments against the cap, and the
-breaks. A selected wood tissue shows its hinge's load and turn. The status's
-`tree_bed` adds `wood`: whether it is `physical`; each living wood tissue's
-hinge, with its `utilization`, its `turn` in radians from the rest it was
-joined at and how far its wood's end hangs below its cell, in `droop`; the
+| | Caught by the branch below | Broken under two |
+| --- | --- | --- |
+| 1280×720 | ![The conifer with its third right branch lying grey along the second, which holds it](screenshots/garden-lab/tree-wood-caught-1280x720-raster.png) | ![The conifer without its three lowest right branches, which lie grey in a heap on the dirt by its trunk](screenshots/garden-lab/tree-wood-broke-under-1280x720-raster.png) |
+| 800×480 | ![The conifer with its third right branch lying grey along the second, which holds it](screenshots/garden-lab/tree-wood-caught-800x480-raster.png) | ![The conifer without its three lowest right branches, which lie grey in a heap on the dirt by its trunk](screenshots/garden-lab/tree-wood-broke-under-800x480-raster.png) |
+
+The pictures are from the window-free renderer without the text. The first four
+have the trees growing at 16x: 8 s after the wood became physical at tick 600,
+0.9 s after heavy snow was laid, 3 s after that, and at tick 1110, 2 s after
+the conifer died of the drought that turning the water off at 64x began. The
+last two hold the trees' clock at tick 600: 8 s after the third tier's branch
+on the grass's side was cut away, and 10 s after the second tier's was cut in
+turn. The render contract's command above regenerates them with the others. The
+light's line gives the wood after it while the wood is physical or any is dead:
+its hinges with the most loaded one, the snow, the dead segments against the
+cap, and the breaks. A selected wood tissue shows its hinge's load and turn.
+The status's `tree_bed` adds `wood`: whether it is `physical`; each living wood
+tissue's hinge, with its `utilization`, its `turn` in radians from the rest it
+was joined at and how far its wood's end hangs below its cell, in `droop`; the
 `snow`, with its `mass`, the wood it is `on`, whether it is still `fastened`
-there and the `share` of its weight built up; the `dead` segments and the cap,
-`max_dead`; the `breaks`; the `work` of keeping the bodies in step with growth,
-in segments `grown`, `reshaped`, `died` and `cleared`, with the hinges
-`refused` a new beam and the last `refusal`; the world's `bodies` and
-`colliders`; and the `summary`.
+there, whether, slid off, it is `parting` from living wood it lies in, and the
+`share` of its weight built up; the `dead` segments and the cap, `max_dead`,
+with how many of them are `parting`; the `breaks`; the `work` of keeping the
+bodies in step with growth, in segments `grown`, `reshaped`, `died` and
+`cleared`, with the hinges `refused` a new beam and the last `refusal`; the
+world's `bodies` and `colliders`; and the `summary`.
 
 `wood_tests` checks, with the trees' clock held, that the grown tree made
 physical is first drawn where it was, then sags and settles near the droop and
@@ -559,15 +590,25 @@ with no other joint and nothing stale in the world; that no hinge was refused,
 broke or set the lowest branch upright; and that the trees grew exactly as a
 bed at rest. It checks that thickened wood keeps its hinge's turn and settles
 no lower; that wood shed at a boundary comes away from the trunk with the
-motion it had, drawn grey with its needles, and lands on the dirt; that the
-conifer killed by drought stands as dead wood on its hinges for 5 s, and
-replanting removes it; and that past a cap of ten, the first branch cut is
-cleared with its hinges when the second falls. The window-free
+motion it had, drawn grey with its needles, and lands on the lowest branch,
+which holds it; that the conifer killed by drought stands as dead wood on its
+hinges for 5 s, and replanting removes it; and that past a cap of ten, the
+first branch cut is cleared with its hinges when the second falls. With the
+clock held again, it checks that the third tier's branch, cut away, lies on the
+second's, which carries more for it, and that the second's, cut in turn, breaks
+the lowest under the two, leaving all three on the dirt with one hinge gone for
+each cut and the break; that a cut branch's first segment alone goes on passing
+through wood, that none is thrown, that at rest all of it falls to the dirt,
+and that physical again the segment lying in the rebuilt trunk passes through
+it without moving; and that snow on a cut branch slides off and comes to rest
+with it on the branch below. The window-free
 `garden_render_contract_tree_bed_physical_wood_bends_breaks_falls_and_dies_standing`
-counts living wood, grey wood and snow pixels at both viewports. The full-only
-functional case above makes the wood physical and lays light snow on the tip of
-the lowest branch left after its earlier cut while the bed waits. It checks
-that the branch droops as the trees grow on, then, with the bed waiting again,
-that a cut moves the lowest branch's segments from the hinges to the dead wood
-and that the snow stays fastened unless its branch was cut. It runs the dead
-wood down to the dirt, and checks that resting the wood leaves it there.
+counts living wood, grey wood and snow pixels at both viewports, and
+`garden_render_contract_tree_bed_living_wood_catches_a_cut_branch_and_breaks_under_two`
+counts the grey wood caught and then fallen. The full-only functional case
+above makes the wood physical and lays light snow on the tip of the lowest
+branch left after its earlier cut while the bed waits. It checks that the
+branch droops as the trees grow on, then, with the bed waiting again, that a
+cut moves the lowest branch's segments from the hinges to the dead wood and
+that the snow stays fastened unless its branch was cut. It runs the dead wood
+down to the dirt, and checks that resting the wood leaves it there.

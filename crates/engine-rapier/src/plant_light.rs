@@ -1,7 +1,7 @@
 //! Bounded overhead-only environment publication for one support-local tissue set.
 use crate::{
     root_uptake::RootUptake,
-    world::{BodyMotion, OpaqueFootprint, TranslucentFootprint},
+    world::{BodyMotion, ColliderId, OpaqueFootprint, TranslucentFootprint},
 };
 use engine_core::{
     Color,
@@ -39,6 +39,10 @@ pub struct WorldOccluders<'a> {
     pub tick: u64,
     pub geometry_generation: u64,
     pub footprints: &'a [OpaqueFootprint],
+    /// Colliders of this support's world that light passes, at most
+    /// `MAX_OPTICAL_EXCLUSIONS`: the bodies of plants whose tissues already
+    /// shade at their cells, which would otherwise shade twice.
+    pub transparent: &'a [ColliderId],
 }
 
 /// One publication per completed tick, shared by every plant on this support.
@@ -77,6 +81,7 @@ impl<'a, 'w> PlantLight<'a, 'w> {
                 tick,
                 geometry_generation,
                 footprints: &[],
+                transparent: &[],
             },
         )
     }
@@ -221,7 +226,7 @@ impl<'a, 'w> PlantLight<'a, 'w> {
             .collect();
         let geometry = roots.world.query_snapshot();
         let visibility = geometry
-            .lighting_visibility(&footprints, &[])?
+            .lighting_visibility(&footprints, occluders.transparent)?
             .with_translucent(&translucent)?;
         let measured = if probes.is_empty() {
             Vec::new()

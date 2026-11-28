@@ -49,7 +49,8 @@ pub struct LightingVisibility<'a> {
     counters: std::cell::Cell<VisibilityCounters>,
     footprints: &'a [OpaqueFootprint],
     translucent: &'a [TranslucentFootprint],
-    transparent: &'a [ColliderId],
+    /// In order, so that a ray finds each collider in it quickly.
+    transparent: Vec<ColliderId>,
 }
 
 impl QuerySnapshot {
@@ -71,7 +72,7 @@ impl QuerySnapshot {
     pub fn lighting_visibility<'a>(
         &'a self,
         footprints: &'a [OpaqueFootprint],
-        transparent: &'a [ColliderId],
+        transparent: &[ColliderId],
     ) -> Result<LightingVisibility<'a>, LightingError> {
         if self.colliders.len() > MAX_LIGHT_COLLIDERS
             || footprints.len() > MAX_LIGHT_FOOTPRINTS
@@ -128,6 +129,8 @@ impl QuerySnapshot {
         {
             return Err(LightingError::Capacity);
         }
+        let mut transparent = transparent.to_vec();
+        transparent.sort_unstable();
         Ok(LightingVisibility {
             snapshot: self,
             counters: std::cell::Cell::new(VisibilityCounters::default()),
@@ -240,7 +243,7 @@ impl Visibility for LightingVisibility<'_> {
             let Some(collider_id) = decode_collider(collider.user_data) else {
                 continue;
             };
-            if self.transparent.contains(&collider_id) {
+            if self.transparent.binary_search(&collider_id).is_ok() {
                 continue;
             }
             let id = light_collider_id(collider_id);

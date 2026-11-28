@@ -282,6 +282,7 @@ impl TreeBed {
         let probes = self.grove.probes(before, &unlit);
         self.probes = probes.len();
         let owners = self.grove.owners(before);
+        let living = self.living_colliders();
         let light = PlantLight::publish_with_probes(
             &mut self.publisher,
             before.tick,
@@ -294,6 +295,7 @@ impl TreeBed {
                 tick: before.tick,
                 geometry_generation: before.tick,
                 footprints: &[],
+                transparent: &living,
             },
             &probes,
             &|t| {

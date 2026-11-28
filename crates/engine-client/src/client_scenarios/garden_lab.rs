@@ -207,6 +207,7 @@ impl ClientScenario for GardenLabClientScenario {
             let snow = bed.wood.snow.map(|s| {
                 serde_json::json!({
                     "mass":s.mass,"heavy":s.heavy(),"on":s.on,"fastened":s.fastened,"share":s.share(),
+                    "parting":s.parting,
                 })
             });
             let w = bed.wood.work;
@@ -219,6 +220,7 @@ impl ClientScenario for GardenLabClientScenario {
             let wood = serde_json::json!({
                 "physical":bed.wood.physical,"hinges":hinges,"snow":snow,
                 "dead":bed.wood.dead.len(),"max_dead":bed.wood.max_dead,"breaks":bed.wood.breaks,
+                "parting":bed.wood.dead.iter().filter(|d| d.parting).count(),
                 "work":work,"bodies":bed.world().body_count(),"colliders":bed.world().collider_count(),
                 "summary":bed.wood_summary(),
             });
@@ -850,6 +852,101 @@ mod tests {
             assert!(fallen[1] > dead + 100, "fallen wood invisible: {fallen:?}");
             assert!(died[1] > 4 * fallen[1], "the dead tree invisible: {died:?}");
             assert!(died[0] < wood / 10, "living wood left: {died:?}");
+        }
+    }
+    #[test]
+    fn garden_render_contract_tree_bed_living_wood_catches_a_cut_branch_and_breaks_under_two() {
+        let output =
+            std::env::var_os("SPACEWARS_GARDEN_RENDER_ARTIFACTS").map(std::path::PathBuf::from);
+        if let Some(dir) = &output {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        let near = |p: &slint::Rgb8Pixel, c: [u8; 3]| {
+            (i16::from(p.r) - i16::from(c[0])).abs() < 12
+                && (i16::from(p.g) - i16::from(c[1])).abs() < 12
+                && (i16::from(p.b) - i16::from(c[2])).abs() < 12
+        };
+        // Grey dead wood, at both viewports.
+        let capture = |name: &str, s: &GardenLabState| -> Vec<usize> {
+            let frame = GardenLabScenario::render_frame(s);
+            let mut found = Vec::new();
+            for (w, h) in [(1280u32, 720u32), (800, 480)] {
+                let viewport = Viewport::new(w as f32, h as f32);
+                let pixels = raster(&frame, viewport);
+                found.push(
+                    pixels
+                        .as_slice()
+                        .iter()
+                        .filter(|p| near(p, [128, 102, 102]))
+                        .count(),
+                );
+                let export = svg(&frame, viewport);
+                assert!(!export.contains("NaN"));
+                if let Some(dir) = &output {
+                    let stem = format!("tree-{name}-{w}x{h}");
+                    write_png(&dir.join(format!("{stem}-raster.png")), &pixels);
+                    std::fs::write(dir.join(format!("{stem}-vector.svg")), &export).unwrap();
+                }
+            }
+            if let Some(dir) = &output {
+                let bed = s.shown_tree_bed().unwrap();
+                let state = serde_json::json!({"simulation_seconds":bed.plants.observe().tick,
+                    "tree":bed.tree_summary(),"wood":bed.wood_summary(),"preview_only":true});
+                std::fs::write(
+                    dir.join(format!("tree-{name}-state.json")),
+                    serde_json::to_vec_pretty(&state).unwrap(),
+                )
+                .unwrap();
+            }
+            found
+        };
+        let mut s = GardenLabScenario::init((), 42);
+        s.command(Command::TreeBed);
+        let bed = s.tree_bed.as_mut().unwrap();
+        while bed.plants.observe().tick < 600 {
+            bed.tick();
+        }
+        // With the bed paused, each step moves the bodies and holds the
+        // trees' clock, so the cut branches do not grow back meanwhile.
+        s.command(Command::PhysicalWood);
+        s.command(Command::Pause);
+        let step = |s: &mut GardenLabState, seconds: f32| {
+            for _ in 0..(seconds * 60.0).round() as u32 {
+                s.command(Command::Step);
+            }
+        };
+        let cut = |s: &mut GardenLabState, cell: [i32; 2]| {
+            let bed = s.tree_bed.as_mut().unwrap();
+            bed.selected = bed
+                .plants
+                .observe()
+                .tissues
+                .iter()
+                .position(|t| t.cell == cell)
+                .unwrap();
+            s.command(Command::CutBranch);
+        };
+        step(&mut s, 6.0);
+        // The third tier's branch on the grass's side, cut away, lands on
+        // the second tier's and lies there.
+        cut(&mut s, [13, 14]);
+        step(&mut s, 8.0);
+        let bed = s.shown_tree_bed().unwrap();
+        assert_eq!((bed.wood.dead.len(), bed.wood.breaks), (4, 0));
+        let caught = capture("wood-caught", &s);
+        // The second tier's branch, cut away in turn, drops with it onto
+        // the lowest branch, which breaks, and all three lie on the dirt.
+        cut(&mut s, [13, 12]);
+        step(&mut s, 10.0);
+        let bed = s.shown_tree_bed().unwrap();
+        assert_eq!((bed.wood.dead.len(), bed.wood.breaks), (15, 1));
+        assert_eq!(bed.plants.observe().tick, 600);
+        let broken = capture("wood-broke-under", &s);
+        for (caught, broken) in caught.into_iter().zip(broken) {
+            assert!(caught > 500, "caught wood invisible: {caught}");
+            // The three branches lie over one another, so they show less
+            // grey than three times one.
+            assert!(broken > caught + 500, "{broken} after {caught}");
         }
     }
 }

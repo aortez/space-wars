@@ -33,6 +33,47 @@ fn hold(bed: &mut TreeBed, seconds: f32) {
     }
 }
 
+/// Cut the wood at `cell` away, with all beyond it.
+fn cut(bed: &mut TreeBed, cell: [i32; 2]) {
+    let o = bed.plants.observe();
+    bed.selected = o
+        .tissues
+        .iter()
+        .position(|t| t.cell == cell && t.role == Role::Wood)
+        .unwrap();
+    bed.command(Command::CutBranch);
+}
+
+/// How far above the dirt each segment of dead wood lies, at its middle.
+fn heights(bed: &TreeBed) -> Vec<f32> {
+    let surface = bed.at([0, TOP_DIRT]).y + 0.5;
+    bed.wood
+        .dead
+        .iter()
+        .map(|d| bed.world.motion(d.segment.body()).unwrap().position.y - surface)
+        .collect()
+}
+
+/// Which segments of dead wood pass through wood.
+fn parting(bed: &TreeBed) -> Vec<bool> {
+    bed.wood.dead.iter().map(|d| d.parting).collect()
+}
+
+/// The fastest any dead wood moves.
+fn fastest(bed: &TreeBed) -> f32 {
+    bed.wood
+        .dead
+        .iter()
+        .map(|d| {
+            bed.world
+                .motion(d.segment.body())
+                .unwrap()
+                .linear_velocity
+                .length()
+        })
+        .fold(0.0, f32::max)
+}
+
 fn hinge(bed: &TreeBed, cell: [i32; 2]) -> Hinge {
     *bed.hinges()
         .iter()
@@ -567,17 +608,13 @@ fn wood_the_tree_sheds_comes_away_with_the_motion_it_had() {
     let o = bed.plants.observe();
     assert!(!o.tissues.iter().any(|t| branch.contains(&t.id)));
 
-    // It falls to the dirt, where it lies.
-    hold(&mut bed, 6.0);
-    let surface = bed.at([0, TOP_DIRT]).y + 0.5;
-    for segment in &dead {
+    // It lands on the lowest branch, two cells below, which holds it.
+    hold(&mut bed, 8.0);
+    assert_eq!(bed.wood.breaks, 0);
+    for (segment, height) in dead.iter().zip(heights(&bed)) {
+        assert!((2.5..3.6).contains(&height), "shed wood {height} up");
         let m = bed.world.motion(segment.body()).unwrap();
-        assert!(
-            m.position.y < surface + 1.0,
-            "shed wood at {:?}",
-            m.position
-        );
-        assert!(m.linear_velocity.length() < 0.05, "still moving: {m:?}");
+        assert!(m.linear_velocity.length() < 0.1, "still moving: {m:?}");
     }
 }
 
@@ -677,4 +714,169 @@ fn past_the_cap_the_wood_that_died_first_is_cleared() {
     assert_eq!(bed.world.joint_count(), joints - 7);
     assert_eq!(bed.world.identity_fault(), None);
     assert!(bed.wood_summary().contains("| dead 6/10 |"));
+}
+
+#[test]
+fn living_wood_stops_what_falls_on_it_and_holds_it_or_breaks() {
+    let mut bed = grown();
+    bed.command(Command::PhysicalWood);
+    hold(&mut bed, 6.0);
+    let (joints, living) = (bed.world.joint_count(), bed.wood.living.len());
+    let second = hinge(&bed, [13, 12]).utilization;
+    let lowest = hinge(&bed, [13, 10]).utilization;
+
+    // The third tier's branch, cut away, lands on the second's, two cells
+    // below it, which holds it and carries more for it.
+    cut(&mut bed, [13, 14]);
+    assert_eq!(bed.wood.dead.len(), 4);
+    hold(&mut bed, 8.0);
+    assert_eq!(bed.wood.breaks, 0);
+    for height in heights(&bed) {
+        assert!((4.6..5.8).contains(&height), "cut wood {height} up");
+    }
+    assert!(fastest(&bed) < 0.1);
+    let carrying = hinge(&bed, [13, 12]).utilization;
+    assert!(
+        carrying > 1.3 * second && carrying < 0.5,
+        "{carrying} after {second}"
+    );
+    assert!((hinge(&bed, [13, 10]).utilization - lowest).abs() < 0.02);
+
+    // Cut away in turn, the second tier's branch drops with what it carried
+    // onto the lowest, which breaks under them, and all of it lies on the
+    // dirt.
+    cut(&mut bed, [13, 12]);
+    assert_eq!(bed.wood.dead.len(), 9);
+    let mut peak: f32 = 0.0;
+    for _ in 0..(10.0 / WOOD_DT) as u32 {
+        bed.step_wood(WOOD_DT);
+        if let Some(h) = bed.hinges().iter().find(|h| h.cell == [13, 10]) {
+            peak = peak.max(h.utilization);
+        }
+    }
+    assert!(peak > 1.0, "the lowest branch carried {peak}");
+    assert_eq!(bed.wood.breaks, 1);
+    assert_eq!(bed.wood.dead.len(), 15);
+    assert_eq!(bed.wood.living.len(), living - 15);
+    for height in heights(&bed) {
+        assert!(height < 0.7, "dead wood {height} up");
+    }
+    assert!(fastest(&bed) < 0.05);
+    // Each cut and the break took one hinge, with nothing left behind.
+    assert_eq!(bed.world.joint_count(), joints - 3);
+    assert_eq!(bed.world.identity_fault(), None);
+}
+
+#[test]
+fn dead_wood_passes_through_the_living_wood_it_lies_in_until_it_is_clear() {
+    let mut bed = grown();
+    bed.command(Command::PhysicalWood);
+    hold(&mut bed, 6.0);
+
+    // A cut branch lies in the trunk it grew from. The next step finds all
+    // but its first segment clear of living wood, and none is thrown: they
+    // start to fall.
+    cut(&mut bed, [13, 12]);
+    assert_eq!(parting(&bed), [true; 5]);
+    bed.step_wood(WOOD_DT);
+    assert_eq!(parting(&bed), [true, false, false, false, false]);
+    assert!(fastest(&bed) < 0.5, "thrown at {}", fastest(&bed));
+    // The lowest branch catches the rest, and the first hangs on in the
+    // trunk.
+    hold(&mut bed, 8.0);
+    assert_eq!(parting(&bed), [true, false, false, false, false]);
+    assert!(heights(&bed).iter().all(|h| *h > 2.5));
+
+    // At rest the living wood leaves the world. Nothing holds the dead wood
+    // up or lies in its way, and it falls to the dirt.
+    bed.command(Command::PhysicalWood);
+    bed.step_wood(WOOD_DT);
+    assert_eq!(parting(&bed), [false; 5]);
+    hold(&mut bed, 6.0);
+    assert!(heights(&bed).iter().all(|h| *h < 0.7));
+    assert!(fastest(&bed) < 0.01);
+    let lying: Vec<Vec2> = bed
+        .wood
+        .dead
+        .iter()
+        .map(|d| bed.world.motion(d.segment.body()).unwrap().position)
+        .collect();
+
+    // Physical again, the trunk is built where the first segment lies. That
+    // segment passes through wood again, and is not thrown from the trunk.
+    bed.command(Command::PhysicalWood);
+    assert_eq!(parting(&bed), [true, false, false, false, false]);
+    hold(&mut bed, 2.0);
+    assert_eq!(bed.wood.breaks, 0);
+    for (dead, was) in bed.wood.dead.iter().zip(&lying) {
+        let m = bed.world.motion(dead.segment.body()).unwrap();
+        assert!(
+            (m.position - *was).length() < 0.05,
+            "moved to {:?}",
+            m.position
+        );
+    }
+    assert_eq!(bed.world.identity_fault(), None);
+}
+
+#[test]
+fn snow_that_slides_off_cut_wood_lands_on_the_branch_below() {
+    let mut bed = grown();
+    bed.command(Command::PhysicalWood);
+    hold(&mut bed, 6.0);
+    let second = hinge(&bed, [13, 12]).utilization;
+    // Light snow on the tip of the third tier's branch.
+    let o = bed.plants.observe();
+    bed.selected = o.tissues.iter().position(|t| t.cell == [16, 14]).unwrap();
+    bed.command(Command::LightSnow);
+    hold(&mut bed, 6.0);
+    assert!(bed.wood.snow.is_some_and(|s| s.fastened && !s.parting));
+
+    // The branch is cut away. Its snow slides off, passing through wood
+    // until it is clear, and comes to rest with the branch on the second
+    // tier's, which holds both.
+    cut(&mut bed, [13, 14]);
+    assert!(bed.wood.snow.is_some_and(|s| !s.fastened && s.parting));
+    hold(&mut bed, 8.0);
+    let snow = bed.wood.snow.unwrap();
+    assert!(!snow.fastened && !snow.parting);
+    let m = bed.world.motion(snow.body()).unwrap();
+    let up = m.position.y - (bed.at([0, TOP_DIRT]).y + 0.5);
+    assert!((4.6..5.4).contains(&up), "snow {up} up");
+    assert!(m.linear_velocity.length() < 0.1, "still moving: {m:?}");
+    assert_eq!(bed.wood.breaks, 0);
+    let carrying = hinge(&bed, [13, 12]).utilization;
+    assert!(
+        carrying > 2.0 * second && carrying < 0.5,
+        "{carrying} after {second}"
+    );
+    assert!(bed.wood_summary().contains("snow light slid off |"));
+}
+
+#[test]
+fn living_wood_that_comes_loose_lands_on_the_dirt() {
+    let mut bed = grown();
+    bed.command(Command::PhysicalWood);
+    hold(&mut bed, 6.0);
+    // The lowest branch's root hinge is taken away by hand, as nothing in
+    // the bed yet does: its wood lives on and falls.
+    let o = bed.plants.observe();
+    let root = o.tissues.iter().find(|t| t.cell == [13, 10]).unwrap().id;
+    let branch: Vec<Segment> = beyond(&o, root)
+        .iter()
+        .filter_map(|id| bed.wood.living.get(id).copied())
+        .collect();
+    assert_eq!(branch.len(), 6);
+    assert!(bed.world.remove_connection(branch[0].hinge()));
+    hold(&mut bed, 6.0);
+    // It lies on the dirt, not under it, and its first segment in the trunk
+    // it passes through.
+    let surface = bed.at([0, TOP_DIRT]).y + 0.5;
+    for segment in &branch {
+        let m = bed.world.motion(segment.body()).unwrap();
+        let up = m.position.y - surface;
+        assert!((0.1..0.7).contains(&up), "living wood {up} up");
+        assert!(m.linear_velocity.length() < 0.05, "still moving: {m:?}");
+    }
+    assert_eq!((bed.wood.breaks, bed.wood.dead.len()), (0, 0));
 }
