@@ -226,6 +226,9 @@ pub(crate) fn install(window: &MainWindow, root: PathBuf) -> Result<Browser, std
             }
             "genomes.seed" => {
                 let Some(entry) = s.component() else { return };
+                if w.get_training_recipe() == crate::duck_training::RECIPE {
+                    w.set_training_recipe(0);
+                }
                 w.set_training_seed_genome(serde_json::to_string(&entry.genome).unwrap().into());
                 w.set_training_seed_label(format!("Selected {}", &entry.id[..12]).into());
                 w.set_genomes_visible(false);

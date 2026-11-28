@@ -14,13 +14,28 @@ pub(crate) struct Training {
     _preview: crate::training_preview::Preview,
     _history: crate::training_history::Browser,
     _manager: TrainingManager,
+    _duck: crate::duck_training::Job,
 }
 
+#[cfg(test)]
 pub(crate) fn install(
     window: &MainWindow,
     root: PathBuf,
 ) -> Result<Training, engine_agent::evolution::EvolutionError> {
+    install_with_replay(window, root, None)
+}
+
+pub(crate) fn install_with_replay(
+    window: &MainWindow,
+    root: PathBuf,
+    archive: Option<(
+        engine_agent::trainer::Generation,
+        Vec<engine_agent::trainer::GenerationSummary>,
+    )>,
+) -> Result<Training, engine_agent::evolution::EvolutionError> {
     let manager = TrainingManager::new(root.clone())?;
+    let duck = crate::duck_training::install(root.clone(), archive.is_none())
+        .map_err(|e| engine_agent::evolution::EvolutionError(e.to_string()))?;
     let history = crate::training_history::install(window, root)
         .map_err(|e| engine_agent::evolution::EvolutionError(e.to_string()))?;
     let control = manager.control();
@@ -42,6 +57,7 @@ pub(crate) fn install(
     });
     let weak = window.as_weak();
     let commands = control.clone();
+    let duck_commands = duck.client.clone();
     window.on_training_command(move |id| {
         let Some(window) = weak.upgrade() else { return };
         if !window.get_training_visible() || !window.get_launcher_visible() {
@@ -53,14 +69,43 @@ pub(crate) fn install(
         {
             return;
         }
+        let is_duck_view =
+            window.get_duck_job() && !window.get_training_setup() && !window.get_training_history();
+        if is_duck_view
+            && (id.starts_with("training.duck.")
+                || matches!(
+                    id.as_str(),
+                    "training.pause" | "training.resume" | "training.stop"
+                ))
+        {
+            if let Err(error) = duck_commands.command(&window, id.as_str()) {
+                window.set_training_error(error.into());
+            }
+            return;
+        }
         let result = match id.as_str() {
             "training.workers.previous" | "training.workers.next" => {
-                let options = worker_options();
-                let current = commands.snapshot().workers.unwrap().config;
+                let mut options = worker_options();
+                if window.get_training_recipe() == crate::duck_training::RECIPE {
+                    options.retain(|c| {
+                        matches!(
+                            c,
+                            WorkerConfig::Fixed { .. }
+                                | WorkerConfig::Auto {
+                                    target_cpu_percent: 75,
+                                    ..
+                                }
+                        )
+                    });
+                }
+                let current =
+                    selected_workers(&window, commands.snapshot().workers.unwrap().config);
                 let index = options.iter().position(|c| *c == current).unwrap_or(1) as i32;
                 let delta = if id.ends_with("previous") { -1 } else { 1 };
+                let next = options[(index + delta).rem_euclid(options.len() as i32) as usize];
                 commands
-                    .set_workers(options[(index + delta).rem_euclid(options.len() as i32) as usize])
+                    .set_workers(next)
+                    .map(|()| window.set_training_worker_label(worker_label(next).into()))
             }
             id if id.starts_with("training.history.") => {
                 window.invoke_history_command(id.into());
@@ -85,9 +130,20 @@ pub(crate) fn install(
                 window.set_training_focus(0);
                 return;
             }
+            "training.start" if window.get_training_recipe() == crate::duck_training::RECIPE => {
+                let workers = match commands.snapshot().workers.map(|s| s.config) {
+                    Some(WorkerConfig::Fixed { workers }) => workers,
+                    _ => 0,
+                };
+                if let Err(error) = duck_commands.start(&window, workers) {
+                    window.set_training_error(error.into());
+                }
+                return;
+            }
             "training.start" => {
                 let result = setup_spec(&window).and_then(|spec| commands.start(spec));
                 if result.is_ok() {
+                    duck_commands.deselect(&window);
                     window.set_training_setup(false);
                     window.set_training_focus(0);
                 }
@@ -106,7 +162,9 @@ pub(crate) fn install(
                 return;
             }
         };
-        publish(&window, &commands.snapshot());
+        if !duck_commands.refresh(&window) {
+            publish(&window, &commands.snapshot());
+        }
         publish_setup(&window);
         if let Err(e) = result {
             window.set_training_error(e.to_string().into());
@@ -114,16 +172,24 @@ pub(crate) fn install(
     });
     let timer = Timer::default();
     let weak = window.as_weak();
+    let duck_view = duck.client.clone();
     timer.start(TimerMode::Repeated, Duration::from_millis(100), move || {
-        if let Some(window) = weak.upgrade() {
+        if let Some(window) = weak.upgrade()
+            && !duck_view.poll(&window)
+        {
             publish(&window, &control.snapshot());
         }
     });
+    if let Some((record, history)) = archive {
+        window.invoke_training_open();
+        duck.client.watch(window, record, history);
+    }
     Ok(Training {
         _timer: timer,
         _preview: preview,
         _history: history,
         _manager: manager,
+        _duck: duck,
     })
 }
 
@@ -149,6 +215,17 @@ fn worker_options() -> Vec<WorkerConfig> {
             .map(|workers| WorkerConfig::Fixed { workers }),
     );
     options
+}
+
+fn selected_workers(window: &MainWindow, config: WorkerConfig) -> WorkerConfig {
+    if window.get_training_setup()
+        && window.get_training_recipe() == crate::duck_training::RECIPE
+        && matches!(config, WorkerConfig::Auto { .. })
+    {
+        WorkerConfig::default()
+    } else {
+        config
+    }
 }
 
 fn worker_label(config: WorkerConfig) -> String {
@@ -182,6 +259,23 @@ fn setup_spec(window: &MainWindow) -> Result<JobSpec, engine_agent::evolution::E
 }
 
 pub(crate) fn publish_setup(window: &MainWindow) {
+    if window.get_training_recipe() == crate::duck_training::RECIPE {
+        window.set_training_recipe_label("Clock duck · Platforms".into());
+        window.set_training_setup_detail(
+            "Cross the Clock course, tag alternating walls and find the exit.".into(),
+        );
+        window.set_training_seed_label(
+            format!("{} random C3 genomes", window.get_training_population()).into(),
+        );
+        window.set_training_budget(
+            format!(
+                "Shared polar senses · Creature controls · {}",
+                window.get_training_worker_label()
+            )
+            .into(),
+        );
+        return;
+    }
     let spec = match setup_spec(window) {
         Ok(spec) => spec,
         Err(e) => {
@@ -246,12 +340,12 @@ fn cycle(value: i32, values: &[i32], direction: i32) -> i32 {
 fn adjust(window: &MainWindow, id: &str) {
     let direction = if id.ends_with("previous") { -1 } else { 1 };
     if id.starts_with("training.recipe.") {
-        window.set_training_recipe(1 - window.get_training_recipe());
-        window.set_training_generations(if window.get_training_recipe() == 0 {
-            48
-        } else {
-            32
-        });
+        let recipe = (window.get_training_recipe() + direction).rem_euclid(3);
+        window.set_training_recipe(recipe);
+        window.set_training_generations([48, 32, 8][recipe as usize]);
+        if recipe == crate::duck_training::RECIPE {
+            window.set_training_population(8);
+        }
     } else if id.starts_with("training.population.") {
         window.set_training_population(cycle(
             window.get_training_population(),
@@ -291,7 +385,9 @@ fn state_label(state: JobState) -> &'static str {
 
 pub(crate) fn publish(window: &MainWindow, snapshot: &JobSnapshot) {
     if let Some(workers) = &snapshot.workers {
-        window.set_training_worker_label(worker_label(workers.config).into());
+        window.set_training_worker_label(
+            worker_label(selected_workers(window, workers.config)).into(),
+        );
         let cpu = workers
             .machine_cpu_percent
             .map_or_else(|| "CPU —".into(), |p| format!("CPU {p:.0}%"));
@@ -438,6 +534,9 @@ pub(crate) fn inventory(window: &MainWindow) -> Vec<UiControl> {
     if window.get_training_history() {
         return crate::training_history::inventory(window);
     }
+    if window.get_duck_job() && !window.get_training_setup() {
+        return crate::duck_training::inventory(window);
+    }
     let mut controls = vec![
         UiControl::new("training.status", "Run state", false)
             .with_value(window.get_training_status_code().to_string()),
@@ -568,6 +667,9 @@ pub(crate) fn selected_id(window: &MainWindow) -> &'static str {
     if window.get_training_history() {
         return crate::training_history::selected_id(window);
     }
+    if window.get_duck_job() && !window.get_training_setup() {
+        return crate::duck_training::selected_id(window);
+    }
     if window.get_training_setup() {
         match window.get_training_focus() {
             0 => "training.recipe.next",
@@ -602,6 +704,10 @@ pub(crate) fn selected_id(window: &MainWindow) -> &'static str {
 pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
     if window.get_training_history() {
         crate::training_history::handle_action(window, action);
+        return;
+    }
+    if window.get_duck_job() && !window.get_training_setup() {
+        crate::duck_training::handle_action(window, action);
         return;
     }
     let setup = window.get_training_setup();

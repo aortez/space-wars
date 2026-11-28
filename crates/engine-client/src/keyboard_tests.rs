@@ -8,6 +8,7 @@ use std::time::Duration;
 struct TestPlatform;
 
 mod brain_assemblies;
+mod duck_training;
 mod training_history;
 
 #[test]

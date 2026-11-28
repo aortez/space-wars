@@ -12,6 +12,7 @@ export struct SettingsListRow { id: string, label: string, value: string, help: 
 // A menu's pages of the Clock's settings: the top page, Look and Events.
 export struct ClockMenuPages { top: [SettingsListRow], look: [SettingsListRow], events: [SettingsListRow] }
 export struct ScoreboardRow { player: string, controller: string, wins: string, losses: string, draws: string, won: bool }
+export struct DuckScoreTerm { name: string, value: string, fraction: float }
 export struct TrainingPoint { best: float, median: float }
 
 component ScoreboardTable inherits Rectangle {
@@ -244,6 +245,35 @@ component MenuButton inherits Rectangle {
         clicked => {
             if (!UserActivity.notify()) { root.activated(); }
         }
+    }
+}
+
+component DuckReplayPane inherits Rectangle {
+    in property <string> heading;
+    in property <string> identity;
+    in property <string> details;
+    in property <image> frame;
+    in property <color> accent;
+    background: #0d1827; border-color: #334655; border-width: 1px; border-radius: 6px;
+    Rectangle { x: 1px; y: 2px; width: 3px; height: 36px; background: root.accent; }
+    Text {
+        x: 12px; y: 4px; width: 86px; height: 28px; vertical-alignment: center;
+        text: root.heading; color: root.accent; font-size: 19px; font-weight: 700;
+    }
+    Text {
+        x: 92px; y: 4px; width: parent.width - 104px; height: 28px;
+        vertical-alignment: center; horizontal-alignment: right; overflow: elide;
+        text: root.identity; color: #d6e3eb; font-size: 12px;
+    }
+    Rectangle {
+        x: 4px; y: 38px; width: parent.width - 8px; height: parent.height - 65px;
+        background: #080d16;
+        Image { width: parent.width; height: parent.height; source: root.frame; image-fit: contain; }
+    }
+    Text {
+        x: 10px; y: parent.height - 25px; width: parent.width - 20px; height: 23px;
+        text: root.details; color: #b3c7d3; font-size: 12px;
+        vertical-alignment: center; overflow: elide;
     }
 }
 
@@ -750,6 +780,24 @@ export component MainWindow inherits Window {
     in property <int> training-preview-tick;
     out property <int> training-preview-width: Math.max(64, Math.min(root.width / 1px - 32, 760) - 48);
     out property <int> training-preview-height: Math.max(48, Math.min(root.height / 1px - 24, 520) - 386);
+    in property <bool> duck-job;
+    in property <bool> duck-can-edit;
+    in-out property <bool> duck-steering;
+    in-out property <int> duck-term: 2;
+    in property <image> duck-current-frame;
+    in property <image> duck-best-frame;
+    in property <string> duck-current-id;
+    in property <string> duck-best-id;
+    in property <string> duck-current-details;
+    in property <string> duck-best-details;
+    in property <string> duck-chart-range;
+    in property <bool> duck-chart-zero;
+    in property <[int]> duck-mix-changes;
+    in property <string> duck-score-label;
+    in property <[DuckScoreTerm]> duck-terms;
+    in property <[string]> duck-settings;
+    in property <string> duck-edit-status;
+    out property <bool> duck-wide: root.width >= 920px;
     callback training-open();
     callback training-command(string);
     in-out property <bool> training-history: false;
@@ -2737,7 +2785,7 @@ export component MainWindow inherits Window {
         }
     }
 
-    if root.training-visible && root.launcher-visible && !root.training-history: Rectangle {
+    if root.training-visible && root.launcher-visible && !root.training-history && (root.training-setup || !root.duck-job): Rectangle {
         x: 0px; y: 0px; width: parent.width; height: parent.height; background: #050514;
         MenuPage {
             available-width: parent.width; available-height: parent.height;
@@ -2760,7 +2808,7 @@ export component MainWindow inherits Window {
 
             if root.training-setup: Rectangle {
                 x: 24px; y: 84px; width: parent.width - 48px; height: parent.height - 180px;
-                for label[index] in ["Curriculum", "Population", "Generations", "Run seed"]: ChoiceRow {
+                for label[index] in ["Trainee / recipe", "Population", "Generations", "Run seed"]: ChoiceRow {
                     x: 0px; y: index * 52px; width: parent.width; height: 44px;
                     label: label;
                     value: index == 0 ? root.training-recipe-label : index == 1 ? root.training-population : index == 2 ? root.training-generations : root.training-seed;
@@ -2925,6 +2973,149 @@ export component MainWindow inherits Window {
                     text: "Back"; selected: root.training-focus == 3;
                     activated => { root.training-command("training.back"); }
                 }
+            }
+        }
+    }
+
+    if root.training-visible && root.launcher-visible && root.duck-job && !root.training-setup && !root.training-history: Rectangle {
+        width: parent.width; height: parent.height; background: #0b1420;
+        private property <length> pad: root.duck-wide ? 22px : 12px;
+        private property <length> body-width: self.width - 2 * self.pad;
+        private property <length> top: root.duck-wide ? 93px : 68px;
+        private property <length> bottom: self.height - (root.duck-wide ? 87px : 66px);
+        private property <length> deck-width: root.duck-wide ? self.body-width : self.body-width * 0.58;
+        private property <length> deck-height: root.duck-wide ? min(self.body-width * 0.30 + 65px, (self.bottom - self.top) * 0.65) : self.bottom - self.top - 38px;
+        Text {
+            x: parent.pad; y: root.duck-wide ? 15px : 5px; width: parent.width * 0.66; height: 34px;
+            text: "Training  /  Clock duck"; color: #f1f6f8;
+            font-size: root.duck-wide ? 27px : 22px; font-weight: 700; vertical-alignment: center;
+        }
+        Text {
+            x: parent.pad; y: root.duck-wide ? 53px : 37px; width: parent.body-width; height: 20px;
+            text: root.training-progress-label + "   ·   " + root.training-worker-status;
+            color: #a6bac9; font-size: root.duck-wide ? 14px : 12px; vertical-alignment: center; overflow: elide;
+        }
+        Text {
+            x: parent.width * 0.66; y: root.duck-wide ? 18px : 6px; width: parent.width * 0.34 - parent.pad; height: 30px;
+            text: root.training-status; color: #83dbbf; font-size: 15px; font-weight: 600;
+            vertical-alignment: center; horizontal-alignment: right; overflow: elide;
+        }
+        Rectangle {
+            x: parent.pad; y: parent.top - 8px; width: parent.body-width; height: 3px; background: #283948;
+            Rectangle { x: 0px; y: 0px; width: parent.width * root.training-progress; height: parent.height; background: #58c7ac; }
+        }
+        if !root.duck-steering && !root.duck-wide: Rectangle {
+            x: parent.pad; y: parent.top; width: parent.deck-width; height: 32px;
+            for label[index] in ["Current", "Best"]: MenuButton {
+                x: index * (parent.width + 6px) / 2; width: (parent.width - 6px) / 2; height: parent.height;
+                text: label; text-size: 14px; primary: root.training-preview-mode == index + 1;
+                selected: root.training-focus == index + 4;
+                activated => { root.training-command(index == 0 ? "training.preview.current" : "training.preview.best"); }
+            }
+        }
+        if !root.duck-steering && (root.duck-wide || root.training-preview-mode != 2): DuckReplayPane {
+            x: parent.pad; y: parent.top + (root.duck-wide ? 0px : 38px);
+            width: root.duck-wide ? (parent.deck-width - 12px) / 2 : parent.deck-width; height: parent.deck-height;
+            heading: "Current"; accent: #86d6ed; frame: root.duck-current-frame;
+            identity: root.duck-current-id; details: root.duck-current-details;
+        }
+        if !root.duck-steering && (root.duck-wide || root.training-preview-mode == 2): DuckReplayPane {
+            x: parent.pad + (root.duck-wide ? (parent.deck-width + 12px) / 2 : 0px);
+            y: parent.top + (root.duck-wide ? 0px : 38px);
+            width: root.duck-wide ? (parent.deck-width - 12px) / 2 : parent.deck-width; height: parent.deck-height;
+            heading: "Best"; accent: #f4c676; frame: root.duck-best-frame;
+            identity: root.duck-best-id; details: root.duck-best-details;
+        }
+        if !root.duck-steering: Rectangle {
+            x: root.duck-wide ? parent.pad : parent.pad + parent.deck-width + 12px;
+            y: parent.top + (root.duck-wide ? parent.deck-height + 14px : 0px);
+            width: root.duck-wide ? parent.body-width : parent.body-width - parent.deck-width - 12px;
+            height: parent.bottom - self.y;
+            Rectangle {
+                x: 0px; y: 0px; width: root.duck-wide ? (parent.width - 12px) / 2 : parent.width;
+                height: root.duck-wide ? parent.height : parent.height * 0.48 - 4px;
+                background: #101e2b; border-radius: 6px;
+                Text {
+                    x: 10px; y: 4px; width: parent.width - 102px; height: 24px;
+                    text: "Fitness by generation"; color: #eef4f6; font-size: root.duck-wide ? 17px : 14px;
+                    font-weight: 600; vertical-alignment: center;
+                }
+                MenuButton {
+                    x: parent.width - 91px; y: 3px; width: 85px; height: 27px;
+                    text: ["Exits", "Wall tags", "Clears", "Survival", "Ticks"][root.duck-term] + " ›";
+                    selected: root.training-focus == 6; text-size: 12px; text-padding: 3px;
+                    activated => { root.training-command("training.duck.term"); }
+                }
+                Rectangle {
+                    x: 11px; y: 35px; width: parent.width - 22px; height: max(1px, parent.height - 61px);
+                    background: #0b1520; clip: true;
+                    for boundary in root.duck-mix-changes: Rectangle {
+                        x: boundary * parent.width / max(1,root.training-points.length); width: 1px; height: parent.height; background: #829d9d;
+                        Text { x: 2px; y: 0px; width: 28px; height: 13px; text: "Mix"; color: #add5c8; font-size: 10px; }
+                    }
+                    for point[index] in root.training-points: Rectangle {
+                        x: (index + 0.5) * parent.width / max(1,root.training-points.length) - self.width / 2;
+                        width: min(52px,parent.width / max(1,root.training-points.length)); height: parent.height;
+                        Rectangle { x: 0px; y: parent.height * (1 - point.best); width: parent.width * 0.47; height: parent.height * point.best; background: #edbd70; }
+                        Rectangle { x: parent.width * 0.5; y: parent.height * (1 - point.median); width: parent.width * 0.47; height: parent.height * point.median; background: #77c8de; }
+                    }
+                    if root.training-points.length == 0 || root.duck-chart-zero: Text { width: parent.width; height: parent.height; horizontal-alignment: center; vertical-alignment: center; text: root.duck-chart-zero ? "Zero across these generations" : "Waiting for generation 1"; color: #91a7b8; font-size: 12px; }
+                }
+                Text {
+                    x: 11px; y: parent.height - 23px; width: parent.width - 22px; height: 19px;
+                    text: root.duck-chart-range; color: #b4c8d2; font-size: 11px; vertical-alignment: center; overflow: elide;
+                }
+            }
+            Rectangle {
+                x: root.duck-wide ? (parent.width + 12px) / 2 : 0px;
+                y: root.duck-wide ? 0px : parent.height * 0.48 + 4px;
+                width: root.duck-wide ? (parent.width - 12px) / 2 : parent.width;
+                height: parent.height - self.y; background: #101e2b; border-radius: 6px;
+                Text {
+                    x: 10px; y: 3px; width: parent.width - 20px; height: 24px;
+                    text: root.duck-score-label; color: #eef4f6; font-size: root.duck-wide ? 17px : 14px;
+                    font-weight: 600; vertical-alignment: center;
+                }
+                for term[index] in root.duck-terms: Rectangle {
+                    x: 10px; y: 28px + index * (parent.height - 49px) / 5; width: parent.width - 20px; height: (parent.height - 49px) / 5;
+                    Text { x: 0px; y: 0px; width: 88px; height: parent.height; text: term.name; color: #c2d1dc; font-size: 12px; vertical-alignment: center; }
+                    Rectangle {
+                        x: 90px; y: parent.height / 2 - 2px; width: max(1px,parent.width - 147px); height: 4px; background: #283b4c;
+                        Rectangle { x: 0px; y: 0px; width: parent.width * term.fraction; height: parent.height; background: #edbd70; }
+                    }
+                    Text { x: parent.width - 53px; width: 53px; height: parent.height; text: term.value; color: #f6d49a; font-size: 13px; vertical-alignment: center; horizontal-alignment: right; }
+                }
+                Text { x: 10px; y: parent.height - 19px; width: parent.width - 20px; height: 16px; text: "Bars scale to each term’s charted peak"; color: #9cb0c0; font-size: 10px; overflow: elide; }
+            }
+        }
+        if root.duck-steering: Rectangle {
+            x: parent.pad; y: parent.top; width: parent.body-width; height: parent.bottom - parent.top;
+            Text { x: 0px; y: 0px; width: parent.width; height: 29px; text: "Generation settings"; color: white; font-weight: 700; font-size: 21px; }
+            Text { y: 32px; width: parent.width; height: 20px; text: root.duck-edit-status; color: #edbd70; font-size: 13px; overflow: elide; }
+            for label[index] in ["Population", "Mutation probability", "Mutation scale", "Tournament", "Course mix"]: ChoiceRow {
+                x: 0px; y: 58px + index * min(52px, (parent.height - 58px) / 5);
+                width: parent.width; height: min(46px, (parent.height - 58px) / 5 - 3px);
+                label: label; value: root.duck-settings[index]; selected: root.training-focus == index;
+                enabled: root.duck-can-edit;
+                previous => { root.training-command("training.duck." + ["population","probability","scale","tournament","mix"][index] + ".previous"); }
+                next => { root.training-command("training.duck." + ["population","probability","scale","tournament","mix"][index] + ".next"); }
+            }
+        }
+        Text {
+            x: parent.pad; y: parent.bottom + 2px; width: parent.body-width; height: root.duck-wide ? 27px : 19px;
+            text: root.training-error != "" ? root.training-error : root.duck-steering ? "" : root.duck-edit-status;
+            color: root.training-error == "" ? #b2c6ce : #ffb8a7; font-size: 12px; vertical-alignment: center; overflow: elide;
+        }
+        Rectangle {
+            x: parent.pad; y: parent.height - (root.duck-wide ? 55px : 45px); width: parent.body-width; height: root.duck-wide ? 40px : 35px;
+            for label[index] in [root.training-can-resume ? "Resume" : "Pause", "Save & stop", "New run", "Back",
+                root.duck-steering ? "Watch" : root.duck-can-edit ? "Steer" : "Settings", root.training-preview-speed-label, root.training-preview-follow ? "Follow" : "Pinned"]: MenuButton {
+                x: index * (parent.width + 6px) / 7; width: (parent.width - 36px) / 7; height: parent.height;
+                text: label; primary: index == 4; text-size: 13px; text-padding: 2px;
+                selected: root.training-focus == (root.duck-steering ? 5 + index : [0,1,2,3,7,8,9][index]);
+                enabled: index == 0 ? (root.training-can-resume || root.training-can-pause) :
+                         index == 1 ? root.training-can-stop : index == 2 ? root.training-can-start : true;
+                activated => { root.training-command([root.training-can-resume ? "training.resume" : "training.pause","training.stop","training.new","training.back","training.duck.steer","training.preview.speed","training.preview.follow"][index]); }
             }
         }
     }
