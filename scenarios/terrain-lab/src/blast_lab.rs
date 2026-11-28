@@ -24,7 +24,7 @@ use crate::{FIXED_HZ, ORE, ROCK};
 
 const GROUND: PhysicsId = PhysicsId::new(1);
 const PLANET_RADIUS: f32 = 16.0;
-const GRAVITY: f32 = 18.0;
+const GRAVITY: f32 = engine_rapier::SURFACE_GRAVITY;
 const DT: f32 = 1.0 / FIXED_HZ as f32;
 const SLOPE: f32 = 0.25;
 const MAX_ACTIVE_PULSES: usize = 8;

@@ -172,6 +172,16 @@ fn tanks(state: &SurfaceSortieState) -> Vec<(TankId, Allegiance)> {
         .collect()
 }
 
+/// The tanks' proving ground has the garrison's planet: as large and as heavy
+/// as the one this game is played on.
+#[test]
+fn the_tanks_proving_ground_has_the_garrisons_planet() {
+    let proving = crate::SpacewarsScenario::init_tank_proving_ground(42).planets[0];
+    let played = SurfaceSortieScenario::init_material(42, 1).world.planets[0];
+    assert_eq!(proving.radius, played.radius);
+    assert_eq!(proving.mass, played.mass);
+}
+
 #[test]
 fn tank_allegiance_is_claimant_relative_readable_and_adds_no_seat() {
     let mut state = garrison(2);

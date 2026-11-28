@@ -624,7 +624,7 @@ impl SurfaceSortieScenario {
         let mut world = Self::init(SurfaceMotionPreset::Orbit, seed).world;
         let planet = &mut world.planets[0];
         planet.radius = radius;
-        planet.mass = 18.0 / (60.0 * GRAVITY) * (radius * BODY_BOUNDS_RADIUS_SCALE + 0.9).powi(2);
+        planet.mass = surface_mass(radius);
         planet.wrapper_omega = spin;
         planet.orbit_omega = orbit;
         world.sun.as_mut().unwrap().mass =

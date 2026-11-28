@@ -47,7 +47,7 @@ impl Default for SpacelingLabConfig {
     fn default() -> Self {
         Self {
             planet_angular_velocity: 0.025,
-            gravity_acceleration: 18.0,
+            gravity_acceleration: engine_rapier::SURFACE_GRAVITY,
         }
     }
 }

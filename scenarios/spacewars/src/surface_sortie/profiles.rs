@@ -11,7 +11,7 @@ pub enum GeneratedSurfaceProfile {
     SurfaceV1,
 }
 
-pub(super) const SURFACE_GRAVITY: f32 = 18.0;
+pub(super) use engine_rapier::SURFACE_GRAVITY;
 pub(super) const SUN_SURFACE_GRAVITY: f32 = 3.0;
 pub(super) const SPIN_GRAVITY_FRACTION: f32 = 0.02;
 pub(super) const MAX_SPIN: f32 = 0.04;

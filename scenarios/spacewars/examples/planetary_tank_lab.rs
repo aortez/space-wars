@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         step_us.push(started.elapsed().as_secs_f64() * 1_000_000.0);
         trace.push(fixture.sample());
         if let Some(path) = &args.output {
-            if [0, 119, 239, 419, 429, 599].contains(&tick) {
+            if [0, 119, 239, 419, 469, 599].contains(&tick) {
                 fs::write(
                     path.join(format!("step-{tick:03}.svg")),
                     svg::svg(&fixture.frame()),

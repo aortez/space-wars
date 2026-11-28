@@ -1,4 +1,5 @@
-//! Tanks firing the shared cannon's rounds on the terrain fixture's planet.
+//! Tanks firing the shared cannon's rounds on their proving ground, whose
+//! planet pulls as the planets tanks fight on do.
 use super::*;
 use crate::{
     DebrisKind, PlayerId, SpacewarsScenario, SpacewarsState, physics::MechanicalEntity,
@@ -17,10 +18,10 @@ fn idle(state: &mut SpacewarsState, ticks: usize) {
     }
 }
 
-/// The terrain fixture's planet with its spin off and both ships far from
-/// it, after the step that placing a tank needs.
+/// The proving ground with its planet's spin off and both ships far from it,
+/// after the step that placing a tank needs.
 fn planet() -> SpacewarsState {
-    let mut state = SpacewarsScenario::init_terrain_fixture(42);
+    let mut state = SpacewarsScenario::init_tank_proving_ground(42);
     state.planets[0].wrapper_omega = 0.0;
     state.ships[0].position = Vec2::new(250.0, 850.0);
     state.ships[1].position = Vec2::new(750.0, 850.0);
@@ -396,8 +397,8 @@ fn a_round_falls_by_the_planets_gravity_every_tick() {
         panic!("{:?}", state.debris);
     };
     // Seven steps hold a whole cycle of debris gravity, and in these the
-    // round rises and starts to fall well clear of everything but its own
-    // tank, which it passes through.
+    // round climbs well clear of everything but its own tank, which it passes
+    // through.
     for step in 1..=7 {
         idle(&mut state, 1);
         let [after] = rounds(&state, tank)[..] else {
@@ -459,24 +460,51 @@ fn a_round_expires_after_six_hundred_ticks_without_bursting_and_leaves_no_wreck(
     assert_eq!(rock.life, life);
 }
 
-/// Fires a round from a tank of `shooter`'s at `power`, 5° up toward a tank
-/// of `target`'s 10 units along the surface, and steps until the round is
-/// gone. Returns the target and the shot and blast hits on it.
+/// Fires a round from a tank of `shooter`'s at the least power, `elevation`
+/// degrees up toward a tank of `target`'s that stands braked 8.7 units along
+/// the surface, and steps until the round is gone. Returns the target and the
+/// shot and blast hits on it.
 fn exchange(
     shooter: Allegiance,
     target: Allegiance,
-    power: f32,
+    elevation: f32,
 ) -> (SpacewarsState, TankId, Vec<f32>, Vec<BlastHit>) {
     let mut state = planet();
     let tank = place(&mut state, Vec2::Y, 0.0, shooter);
-    let victim = place(&mut state, Vec2::Y, 10.0, target);
-    idle(&mut state, 60);
-    aim(&mut state, tank, 5.0, 1.0, power, true);
+    let victim = place(&mut state, Vec2::Y, 9.0, target);
+    // Braked, each tank comes to rest about where it was put. Left to roll,
+    // the target was still moving along its ledge as the trigger was pulled.
+    let braked = TankCommand {
+        brake: true,
+        ..TankCommand::default()
+    };
+    for id in [tank, victim] {
+        assert!(state.command_tank(id, braked));
+    }
+    idle(&mut state, 120);
+    let planet = state.planets[0];
+    let around = |id: TankId| {
+        let hull = state.tank_snapshot(id).unwrap().assembly.chassis;
+        (hull.position - planet.position).angle_radians()
+    };
+    let apart = ((around(tank) - around(victim)) * planet.radius).abs();
+    assert!((8.5..8.9).contains(&apart), "{apart}");
+    let fire = TankCommand {
+        elevation: elevation.to_radians(),
+        power: cannon::MIN_POWER,
+        fire: true,
+        ..braked
+    };
+    assert!(state.command_tank(tank, fire));
     idle(&mut state, 1);
-    aim(&mut state, tank, 5.0, 1.0, power, false);
+    let hold = TankCommand {
+        fire: false,
+        ..fire
+    };
+    assert!(state.command_tank(tank, hold));
     let entity = MechanicalEntity::Tank(victim.entity());
     let (mut shots, mut blasts) = (Vec::new(), Vec::new());
-    for _ in 0..60 {
+    for _ in 0..150 {
         let flying = !rounds(&state, tank).is_empty();
         let hits = state.shot_hits.values().filter(|hit| hit.target == entity);
         shots.extend(hits.map(|hit| hit.health));
@@ -497,8 +525,8 @@ fn exchange(
 #[test]
 fn a_direct_hit_and_a_blast_name_the_side_of_the_tank_that_fired() {
     for (shooter, target) in [(GOVERNMENT, FIRST), (SECOND, GOVERNMENT)] {
-        // At full power the round strikes the other tank and bursts on it.
-        let (state, victim, shots, blasts) = exchange(shooter, target, cannon::MAX_POWER);
+        // Aimed low, the round strikes the other tank and bursts on it.
+        let (state, victim, shots, blasts) = exchange(shooter, target, 5.0);
         let [shot] = shots[..] else {
             panic!("{shooter:?} {shots:?}");
         };
@@ -511,9 +539,10 @@ fn a_direct_hit_and_a_blast_name_the_side_of_the_tank_that_fired() {
         assert_eq!(last.cause, TankDamageCause::Round);
         assert_eq!(last.amount, shot);
         assert_eq!(last.source, Some(shooter));
-        // At the least power it falls short and bursts on the ground, and its
-        // blast reaches the other tank.
-        let (state, victim, shots, blasts) = exchange(shooter, target, cannon::MIN_POWER);
+        // Lobbed at 45°, it clears the other tank's hull by more than a unit,
+        // comes down about 3 units past it and bursts on the ground, and its
+        // blast reaches that tank.
+        let (state, victim, shots, blasts) = exchange(shooter, target, 45.0);
         assert!(shots.is_empty(), "{shooter:?}");
         let [blast] = blasts[..] else {
             panic!("{shooter:?} {blasts:?}");
@@ -550,13 +579,15 @@ fn a_round_bursts_on_terrain() {
     idle(&mut state, 60);
     let craters = state.terrain_cannon_hits();
     let removed = state.terrain_removed_cells();
-    aim(&mut state, tank, 5.0, 1.0, cannon::MIN_POWER, true);
+    // A steep lob at the least power comes down about 6 units from the tank
+    // that fired it, within its blast's reach of that tank.
+    aim(&mut state, tank, 75.0, 1.0, cannon::MIN_POWER, true);
     idle(&mut state, 1);
-    aim(&mut state, tank, 5.0, 1.0, cannon::MIN_POWER, false);
+    aim(&mut state, tank, 75.0, 1.0, cannon::MIN_POWER, false);
     let mut steps = 1;
     while !rounds(&state, tank).is_empty() {
         assert!(state.blast_hits.is_empty());
-        assert!(steps < 30, "the round must land");
+        assert!(steps < 150, "the round must land");
         idle(&mut state, 1);
         steps += 1;
     }

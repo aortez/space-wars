@@ -8,7 +8,7 @@ use engine_rapier::world::{
 fn step(tanks: &mut Tanks, world: &mut PhysicsWorld) {
     tanks.begin_gravity_step();
     for body in tanks.bodies() {
-        tanks.record_gravity(body, Vec2::new(0.0, -18.0));
+        tanks.record_gravity(body, Vec2::new(0.0, -engine_rapier::SURFACE_GRAVITY));
     }
     tanks.prepare_controls(world, false);
     world.step(1.0 / 60.0);
@@ -58,7 +58,7 @@ fn course(angle: f32) -> (PhysicsWorld, Tanks, TankId) {
 
 fn unsettled_course(angle: f32) -> (PhysicsWorld, Tanks, TankId) {
     let mut world = PhysicsWorld::new(PhysicsWorldConfig {
-        gravity: Vec2::new(0.0, -18.0),
+        gravity: Vec2::new(0.0, -engine_rapier::SURFACE_GRAVITY),
         ..Default::default()
     });
     solid(
@@ -373,7 +373,7 @@ fn repeated_host_clear_readmission_and_physics_restore_preserve_actor_handles() 
         crate::SpacewarsScenario::step(state, &[], std::time::Duration::from_secs_f32(1.0 / 60.0));
     };
     for mode in [DirtMode::Round, DirtMode::Angular] {
-        let mut state = crate::SpacewarsScenario::init_terrain_fixture(42);
+        let mut state = crate::SpacewarsScenario::init_tank_proving_ground(42);
         state
             .enable_loose_terrain(crate::surface_sortie::dirt_config(mode))
             .unwrap();
@@ -483,7 +483,7 @@ fn steep_material_slope_refuses_motor_intent_without_righting_the_body() {
     for tick in 0..120 {
         tanks.begin_gravity_step();
         for body in tanks.bodies() {
-            tanks.record_gravity(body, Vec2::new(0.0, -18.0));
+            tanks.record_gravity(body, Vec2::new(0.0, -engine_rapier::SURFACE_GRAVITY));
         }
         let motions: Vec<_> = tanks
             .bodies()
@@ -917,7 +917,7 @@ fn naturally_released_grain_piles_support_drive_and_brake_for_both_shapes() {
 #[test]
 fn host_admission_exhaustion_and_full_capacity_do_no_partial_insertion() {
     use engine_common::Scenario;
-    let mut state = crate::SpacewarsScenario::init_terrain_fixture(42);
+    let mut state = crate::SpacewarsScenario::init_tank_proving_ground(42);
     crate::SpacewarsScenario::step(
         &mut state,
         &[],
@@ -1019,8 +1019,10 @@ fn edited_planet_course(
         .enable_loose_terrain(crate::surface_sortie::dirt_config(mode))
         .unwrap();
     state.terrain.surface = engine_terrain::TerrainSurface::Interpolated;
+    // A smaller planet, weighted for the pull tanks fight under. The course
+    // is cut below its bounds, where the pull is a little less.
     state.planets[0].radius = 24.0;
-    state.planets[0].mass = crate::body_mass(24.0);
+    state.planets[0].mass = crate::surface_mass(24.0);
     state.physics =
         crate::physics::SpacewarsPhysics::new(500.0, &state.ships, None, &state.planets);
     state.physics.material_planets.insert(0);

@@ -64,7 +64,7 @@ impl Default for TerrainLabConfig {
             cell_size: 0.5,
             angular_velocity: 0.04,
             orbit_radius: 4.0,
-            gravity_acceleration: 18.0,
+            gravity_acceleration: engine_rapier::SURFACE_GRAVITY,
             mining_tools: MiningToolProfile::DEFAULTS,
             impacts: TerrainImpactConfig::default(),
         }

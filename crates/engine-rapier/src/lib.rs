@@ -22,3 +22,11 @@ pub mod grass;
 pub mod moss;
 
 pub mod tree;
+
+/// How hard the ground pulls, in units per second squared, in the games made
+/// for walking, driving and lobbing shells: Scorched Earth's field, which the
+/// Clock hosts at its own scale, the terrain, rover and spaceling labs, and
+/// the planets Spacewars' surface games are played on, which are weighted to
+/// pull about this at their surfaces. The powers of a tank's [`cannon`] are
+/// tuned to it. Spacewars' arcade planets pull about 39 times as hard.
+pub const SURFACE_GRAVITY: f32 = 18.0;

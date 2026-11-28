@@ -93,7 +93,7 @@ fn planetary_tank_fixture_motion_support_and_lifecycle() {
             (60, "drive"),
             (180, "brake"),
             (300, "gap"),
-            (430, "fall"),
+            (470, "fall"),
             (600, "cleanup"),
         ],
     );

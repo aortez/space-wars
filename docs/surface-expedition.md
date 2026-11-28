@@ -145,10 +145,15 @@ gives the barrel's pivot.
   ship, a pod or a pilot on foot, a player's round counts once for that
   player's seat, whether it struck or only its blast reached, and a
   government's counts for none.
-- On the terrain fixture's planet, a round at full power lands within about 8
-  units of the tank that fired it. A slow shot bursts close enough for its
-  blast to reach that tank, and a steep one falls back onto it once its
-  clearance ends.
+- This game's planets are weighted to pull about what Scorched's ground
+  does, 18, at their surfaces, so a round's arcs are Scorched's, bent round
+  the planet. On a 60-radius planet, a round fired at 45° comes down about 14
+  units along the surface at power 12, 50 at power 24, 84 at power 30, more
+  than a fifth of the way round, and 97 at power 32, after nine and a half
+  seconds. From power 33 it is still in flight when it expires, and at full
+  power it leaves faster than that planet's escape speed, about 45. A steep
+  shot at the least power comes down beside the tank that fired it: about 6
+  units off at 75°, within its blast's reach, and on the tank itself at 85°.
 
 ### Two-player expedition
 
@@ -398,6 +403,17 @@ regressions cover the barrel's aim on the planet's top and flank, a held
 trigger against the reload and both limits, a round's exit and launch
 velocity, its clearance, gravity and expiry, the credit for each side, and a
 burst on terrain.
+
+The driving fixture and the driving and firing regressions run on the tanks'
+proving ground, `SpacewarsScenario::init_tank_proving_ground`, or on a planet
+of their own weighed the same way. The proving ground is the terrain
+fixture's world with its planet weighing what the planet of Surface Sortie
+and `spacewars-terrain` does, so tanks are tried under the pull they fight
+under. The terrain fixture's own planet keeps the arcade game's pull, about
+39 times as strong, under which a full-power round came down about 8 units
+from its tank. The surface games' pull is named once, as
+`engine_rapier::SURFACE_GRAVITY`, which Scorched Earth, the labs and this
+game's planets read.
 
 Positive AI flight/capture fixtures now let their otherwise idle opponent
 depart through real controls only when its landing feet support it on the
