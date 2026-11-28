@@ -1,7 +1,8 @@
 //! The tree bed's wood as bodies under gravity. Each wood tissue becomes a
 //! segment from the tissue it grew from to its own cell, a box as it is drawn,
 //! joined there by a hinge with the bending stiffness and strength of a square
-//! wood beam as wide as the segment. The trunk's foot is hinged to the dirt.
+//! wood beam as wide as the segment. The trunk's foot is hinged to its tree's
+//! roots, which `roots` anchors in the dirt.
 //! Needles and cones weigh on the wood they grow on. Snow on a branch bends it
 //! further. A load that exhausts a hinge breaks the wood beyond it away: the
 //! tree loses those tissues, as in a cut, and they fall to the dirt as dead
@@ -111,6 +112,17 @@ pub struct Wood {
     pub snow: Option<Snow>,
     /// Hinges that the load broke.
     pub breaks: u32,
+    /// Each living tree's root plate, by its organism.
+    pub plates: BTreeMap<u64, Plate>,
+    /// Dead trees' root plates, which hold their dead wood.
+    pub dead_plates: Vec<DeadPlate>,
+    /// Roots whose anchor gave way. They grip nothing again, at rest or
+    /// physical, for as long as their tree has them.
+    pub pulled: BTreeSet<u64>,
+    /// Anchors that the load broke, and trees it uprooted.
+    pub pulls: u32,
+    pub uprooted: u32,
+    pub wind: Wind,
     /// What keeping the bodies in step with growth has done since the wood
     /// became physical.
     pub work: Work,
@@ -127,6 +139,12 @@ impl Default for Wood {
             max_dead: MAX_DEAD,
             snow: None,
             breaks: 0,
+            plates: BTreeMap::new(),
+            dead_plates: Vec::new(),
+            pulled: BTreeSet::new(),
+            pulls: 0,
+            uprooted: 0,
+            wind: Wind::default(),
             work: Work::default(),
             entities: 0,
             deaths: 0,
@@ -135,7 +153,7 @@ impl Default for Wood {
 }
 
 impl Wood {
-    fn entity(&mut self) -> PhysicsId {
+    pub(super) fn entity(&mut self) -> PhysicsId {
         self.entities += 1;
         PhysicsId::new(FIRST_ENTITY + self.entities - 1)
     }
@@ -168,13 +186,15 @@ pub struct Segment {
     pub entity: PhysicsId,
     pub length: f32,
     pub width: f32,
-    /// The living wood it was hinged to when it was built, or none for the
-    /// dirt.
+    /// The living wood it was hinged to when it was built, or none for a
+    /// trunk's foot, hinged to its tree's roots.
     pub parent: Option<u64>,
-    /// Its wood's size, and the mass of it and what grows on it in its
-    /// body's frame, when it was last shaped.
+    /// Its wood's size, the mass of it and what grows on it in its body's
+    /// frame, and the sail its needles and cones add, when it was last
+    /// shaped.
     size: u16,
     mass: ColliderMassProperties,
+    sail: f32,
     /// Where the body lies at rest, where the tissue's drawing lies: its
     /// center and its angle, with its y axis along the segment.
     rest: (Vec2, f32),
@@ -205,6 +225,12 @@ impl Segment {
 
     fn half(&self) -> Vec2 {
         Vec2::new(0.5 * self.width, 0.5 * self.length)
+    }
+
+    /// What it turns to a wind: its width, its length, and the sail of the
+    /// needles and cones on it.
+    pub(super) fn sail(&self) -> (f32, f32, f32) {
+        (self.width, self.length, self.sail)
     }
 
     /// The beam of its hinge: wood with a square section as wide as the
@@ -297,7 +323,16 @@ pub(super) struct Moved {
 }
 
 impl Moved {
-    fn apply(self, v: Vec2) -> Vec2 {
+    /// From lying unturned at `from` to lying at `to`, turned by `turn`.
+    pub(super) fn between(from: Vec2, to: Vec2, turn: f32) -> Self {
+        Self { from, to, turn }
+    }
+
+    pub(super) fn turn(self) -> f32 {
+        self.turn
+    }
+
+    pub(super) fn apply(self, v: Vec2) -> Vec2 {
         self.to + (v - self.from).rotate_radians(self.turn)
     }
 
@@ -363,6 +398,7 @@ struct Shape {
     width: f32,
     rest: (Vec2, f32),
     mass: ColliderMassProperties,
+    sail: f32,
 }
 
 /// A tissue and every tissue that grew from it, nearest first.
@@ -417,10 +453,12 @@ impl TreeBed {
         }
     }
 
-    /// Every tree's wood as segments where it now grows, each hinged where it
-    /// grew from: to the wood it grew on, or for a trunk's foot to the dirt.
+    /// Every tree's roots as a plate anchored in the dirt, and its wood as
+    /// segments where it now grows, each hinged where it grew from: to the
+    /// wood it grew on, or for a trunk's foot to its tree's roots.
     pub(super) fn build_wood(&mut self) {
         let o = self.plants.observe();
+        self.sync_plates(&o);
         let (wood, on) = wood_of(&o);
         for (t, parent) in wood {
             self.grow_segment(t, parent, on.get(&t.id).map_or(&[], Vec::as_slice));
@@ -444,14 +482,16 @@ impl TreeBed {
             Vec2::ZERO,
             own * (length * length + width * width) / 12.0,
         )];
+        let mut sail = 0.0;
         for c in on {
-            let per_size = match c.role {
-                Role::Shoot => NEEDLE_MASS,
-                Role::Cone => CONE_MASS,
+            let (per_size, sail_per_size) = match c.role {
+                Role::Shoot => (NEEDLE_MASS, NEEDLE_SAIL),
+                Role::Cone => (CONE_MASS, CONE_SAIL),
                 _ => continue,
             };
             let at = (self.at(c.cell) - rest.0).rotate_radians(-rest.1);
             parts.push((per_size * f32::from(c.size), at, 0.0));
+            sail += sail_per_size * f32::from(c.size);
         }
         let mass: f32 = parts.iter().map(|p| p.0).sum();
         let center = parts.iter().fold(Vec2::ZERO, |sum, p| sum + p.1 * p.0) / mass;
@@ -468,24 +508,36 @@ impl TreeBed {
                 mass,
                 inertia,
             },
+            sail,
         }
     }
 
     /// A segment for wood `t` grown from `parent`, with `on` growing on it.
-    /// It lies where the parent's body has carried the cells it grew between,
-    /// moving as that body moves there, and is hinged to it at the parent's
-    /// cell, or for a trunk's foot to the dirt.
+    /// It lies where the body that carries it, the wood it grew on or for a
+    /// trunk's foot its tree's roots, has carried the cells it grew between.
+    /// It moves as that body moves there, and is hinged to it at the parent's
+    /// cell.
     fn grow_segment(&mut self, t: &Tissue, parent: &Tissue, on: &[&Tissue]) {
         let shape = self.shape(t, parent, on);
         let carrier = self.wood.living.get(&parent.id).copied();
-        let moved = carrier.and_then(|s| self.segment_moved(&s));
+        let (holder, moved) = match carrier {
+            Some(s) => (s.body(), self.segment_moved(&s)),
+            None => {
+                let plate = &self.wood.plates[&t.organism];
+                (plate.body(), self.plate_moved(plate))
+            }
+        };
         let place = |v: Vec2| moved.map_or(v, |m| m.apply(v));
         let turn = moved.map_or(0.0, |m| m.turn);
         let position = place(shape.rest.0);
-        let (linear_velocity, angular_velocity) = carrier
-            .and_then(|s| {
-                let spin = self.world.motion(s.body())?.angular_velocity;
-                Some((self.world.velocity_at_point(s.body(), position)?, spin))
+        let (linear_velocity, angular_velocity) = self
+            .world
+            .motion(holder)
+            .and_then(|m| {
+                Some((
+                    self.world.velocity_at_point(holder, position)?,
+                    m.angular_velocity,
+                ))
             })
             .unwrap_or_default();
         let segment = Segment {
@@ -495,6 +547,7 @@ impl TreeBed {
             parent: carrier.map(|_| parent.id),
             size: t.size,
             mass: shape.mass,
+            sail: shape.sail,
             rest: shape.rest,
         };
         assert!(self.world.insert_body(
@@ -511,12 +564,17 @@ impl TreeBed {
             },
             &[segment.shape(LIVING)],
         ));
+        if carrier.is_none() {
+            // A trunk's foot stands in the dirt its roots hold it in.
+            self.world
+                .pass_through(segment.entity, self.assembly.body().entity);
+        }
         let (from, to) = (self.at(parent.cell), self.at(t.cell));
         self.world
             .insert_connection(
                 segment.hinge(),
                 ConnectionSpec {
-                    root_body: carrier.map_or(self.assembly.body(), |s| s.body()),
+                    root_body: holder,
                     body: segment.body(),
                     root: place(from),
                     axis: (to - from).rotate_radians(turn),
@@ -552,6 +610,7 @@ impl TreeBed {
         if gone.iter().any(|id| self.wood.living.contains_key(id)) {
             self.kill(before, &gone.into_iter().collect::<Vec<_>>());
         }
+        self.sync_plates(&o);
         for (t, parent) in wood {
             let carried = on.get(&t.id).map_or(&[][..], Vec::as_slice);
             let Some(segment) = self.wood.living.get(&t.id).copied() else {
@@ -574,6 +633,7 @@ impl TreeBed {
             width: shape.width,
             size,
             mass: shape.mass,
+            sail: shape.sail,
             ..segment
         };
         assert!(self.world.replace_colliders(
@@ -594,9 +654,11 @@ impl TreeBed {
         self.wood.work.reshaped += 1;
     }
 
-    /// Move the bodies on by `dt`: snow builds up, and the wood beyond a hinge
-    /// the load exhausted falls away. A hinge of dead wood that breaks lets
-    /// the wood beyond it fall from the rest.
+    /// Move the bodies on by `dt`: snow builds up, the wind blows, and the
+    /// wood beyond a hinge the load exhausted falls away. A hinge of dead wood
+    /// that breaks lets the wood beyond it fall from the rest. A root whose
+    /// anchor the load exhausted grips nothing again, and a tree that no root
+    /// holds is uprooted.
     pub(super) fn step_wood(&mut self, dt: f32) {
         if let Some(snow) = &mut self.wood.snow
             && snow.share() < 1.0
@@ -605,6 +667,7 @@ impl TreeBed {
             self.world
                 .set_gravity_scale(snow.body(), snow.share(), true);
         }
+        self.blow(dt);
         self.world.step(dt);
         let severed = self.world.severed_connections().to_vec();
         for joint in severed {
@@ -620,9 +683,13 @@ impl TreeBed {
             } else if self.wood.dead.iter().any(|d| d.segment.hinge() == joint) {
                 self.wood.breaks += 1;
                 self.world.remove_connection(joint);
+            } else {
+                self.pull(joint);
             }
         }
+        self.uproot();
         self.settle();
+        self.sweep();
     }
 
     /// How a segment's box lies now.
@@ -722,12 +789,14 @@ impl TreeBed {
 
     /// The living wood of `gone` becomes dead wood where it is, each segment
     /// drawn grey with what grew on it as `o`, where those tissues still grow,
-    /// has them. Wood hinged to wood that lives on comes away from it; the
-    /// rest keeps its hinges, to one another and to the dirt, so a tree that
-    /// died stands until it breaks. Snow on it slides off. Past the cap, the
-    /// wood that died first is cleared away.
-    fn kill(&mut self, o: &plants::Observation, gone: &[u64]) {
+    /// has them. Wood hinged to wood or roots that live on comes away from
+    /// them; the rest keeps its hinges, to one another and to its roots,
+    /// which die with their tree and hold on, so a tree that died stands
+    /// until it breaks or is uprooted. Snow on it slides off. Past the cap,
+    /// the wood that died first is cleared away.
+    pub(super) fn kill(&mut self, o: &plants::Observation, gone: &[u64]) {
         let mut drawings: BTreeMap<u64, Vec<(i32, RenderPrimitive)>> = BTreeMap::new();
+        let mut roots: BTreeMap<u64, Vec<(i32, RenderPrimitive)>> = BTreeMap::new();
         {
             let scene = self.scene(o);
             for t in gone.iter().filter_map(|id| scene.tissues.get(id)) {
@@ -736,16 +805,29 @@ impl TreeBed {
                         .entry(carrier)
                         .or_default()
                         .extend(self.tissue_drawing(&scene, t, DEAD));
+                } else if t.policy == tree::POLICY && t.role == Role::Root {
+                    roots
+                        .entry(t.organism)
+                        .or_default()
+                        .extend(self.tissue_drawing(&scene, t, DEAD));
                 }
             }
         }
         let death = self.wood.deaths;
         self.wood.deaths += 1;
+        let standing = self.standing_plates(gone);
         for id in gone {
             let Some(segment) = self.wood.living.remove(id) else {
                 continue;
             };
-            let parted = segment.parent.is_some_and(|p| !gone.contains(&p));
+            let parted = match segment.parent {
+                Some(p) => !gone.contains(&p),
+                // A foot comes away from roots that live on.
+                None => self
+                    .world
+                    .connection(segment.hinge())
+                    .is_some_and(|c| standing.contains(&c.root_body)),
+            };
             let broken = self
                 .world
                 .connection(segment.hinge())
@@ -780,6 +862,7 @@ impl TreeBed {
             snow.fastened = false;
             snow.parting = true;
         }
+        self.kill_plates(gone, roots, death);
         while self.wood.dead.len() > self.wood.max_dead {
             let first = self.wood.dead[0].death;
             let cleared = self
@@ -791,17 +874,28 @@ impl TreeBed {
             for d in self.wood.dead.drain(..cleared) {
                 self.world.remove_entity(d.segment.entity);
             }
+            // Its roots go with it.
+            let world = &mut self.world;
+            self.wood.dead_plates.retain(|d| {
+                if d.death == first {
+                    world.remove_entity(d.plate.entity);
+                }
+                d.death != first
+            });
             self.wood.work.cleared += cleared as u32;
         }
     }
 
-    /// The living wood leaves the world with any snow, and the trees grow on
-    /// as their cells stand. Dead wood stays where it is.
+    /// The living wood and roots leave the world with any snow, the wind
+    /// drops, and the trees grow on as their cells stand. Dead wood stays
+    /// where it is, with its roots.
     pub(super) fn rest_wood(&mut self) {
         self.clear_snow();
         for segment in std::mem::take(&mut self.wood.living).into_values() {
             self.world.remove_entity(segment.entity);
         }
+        self.rest_plates();
+        self.wood.wind = Wind::default();
         self.wood.physical = false;
     }
 
@@ -902,9 +996,12 @@ impl TreeBed {
     }
 
     /// How the body that carries a tissue has moved from where it lies at
-    /// rest: wood rides its own segment, and a needle or cone the wood it
-    /// grows on.
+    /// rest: wood rides its own segment, a needle or cone the wood it grows
+    /// on, and a tree's root its tree's plate.
     pub(super) fn moved(&self, scene: &Scene, t: &Tissue) -> Option<Moved> {
+        if t.policy == tree::POLICY && t.role == Role::Root {
+            return self.plate_moved(self.wood.plates.get(&t.organism)?);
+        }
         self.segment_moved(self.wood.living.get(&scene.carrier(t)?)?)
     }
 
@@ -917,8 +1014,9 @@ impl TreeBed {
         })
     }
 
-    /// Dead wood where it is, and the snow.
+    /// Dead wood where it is with its roots, and the snow.
     pub(super) fn draw_wood(&self, f: &mut RenderFrame) {
+        self.draw_plates(f);
         for dead in &self.wood.dead {
             let moved = self.segment_moved(&dead.segment);
             for (z, primitive) in &dead.drawing {

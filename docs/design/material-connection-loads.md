@@ -12,7 +12,9 @@ branches, limbs and fixtures that hold until they are overloaded, and decide
 what a severing means. A connection that [bends](#connections-that-bend)
 (#224) is a hinge instead of a weld: a spring with the beam's own bending
 stiffness holds the held body's turn, so a branch sags under its load and
-springs back when the load is lifted.
+springs back when the load is lifted. An [anchor](#anchors) (#225) holds a
+body in its support by springs in every direction, as the ground holds a root,
+so that several anchors share a load by where they hold.
 
 ## Welds and identity
 
@@ -110,6 +112,38 @@ whose capacity is no more than the work already absorbed, with `Exhausted`;
 and a beam that is not valid for the material with `Geometry`. A refusal
 changes nothing.
 
+## Anchors
+
+`PhysicsWorld::insert_anchor` holds a body in its support as the ground holds a
+root. An `AnchorSpec` names the support, the held body, the point where it
+holds, the held length's direction and the connection. No axis of an anchor is
+locked. A force-based spring holds each: the two linear ones with
+`anchor_stiffness`, the connection law's own axial `stiffness * area / length`
+for the beam, and the turn with `hinge_stiffness`. A settled anchor therefore
+gives by the law's elastic extension for the force it carries, whichever way
+that points, and turns by its elastic rotation for the moment.
+
+Two bodies may share any number of anchors, and their give is what lets them
+share a load. Rigid joints between the same two bodies would leave the solver
+to split it as it happened to. Each anchor carries its stiffness times how far
+its own point has moved. So like anchors share a weight evenly, and one farther
+from the center the held body turns about carries more of a turning load, at a
+longer arm. An anchor's frame is fixed in its support, as any joint's is: it
+follows a support that moves, and a dynamic support takes the reaction.
+
+Each spring's impulse is a solver row of its own, which Rapier leaves as it is,
+so the three impulses are the load: along the beam, across it and about the
+anchor. The sample reports them as a weld's, with tension positive. The law is
+charged with the moment and with the whole force as its axial load: what holds
+an anchor gives way to a pull whichever way it points. A weld's and a hinge's
+shear still charge nothing. An exhausted anchor severs as any connection does,
+and `connection`, `remove_connection`, `severed_connections` and the save treat
+it as one. `reshape_connection` gives its springs the new beam's stiffnesses.
+Contacts between the two bodies stay off while any anchor joins them. Each
+spring is damped at insertion for the held body alone, the linear ones for its
+mass and the turning one for its inertia about the anchor, at the ratio a
+hinge's is.
+
 ## Charging and severing
 
 Each step makes one `engine_material::connection` call with the step's duration
@@ -150,10 +184,11 @@ are unchanged byte for byte and no snapshot version changes. A build without
 connections refuses a save that has them, as trailing snapshot data. A hinge's
 spring is saved with the joints, so a record that bends holds nothing more and
 the section's layout is unchanged. Restoring checks each record against the
-saved joints. A live connection needs its own fixed weld or its own hinge
-between its own bodies, and a severed one needs no joint. A hinge's spring must
-have its beam's stiffness, a force-based model, a rest angle of zero, unbounded
-force and finite damping. A record must hold a failure exactly when its
+saved joints. A live connection needs its own fixed weld, its own hinge or its
+own anchor between its own bodies, and a severed one needs no joint. A hinge's
+spring must have its beam's stiffness, a force-based model, a rest angle of
+zero, unbounded force and finite damping, and so must each of an anchor's
+three, on no locked axis. A record must hold a failure exactly when its
 capacity is exhausted. As for registered
 regions, material names are not saved: a restored connection's material is
 named `connection`. Clones copy the records. The severed list is transient, as
@@ -259,10 +294,50 @@ settles all the way.
   and the original is cloned. Both copies swing and sever exactly as the
   original, and the restored world writes the same save bytes.
 
+`world::tests::anchor` hangs a level bar eight units long below a fixed
+support, at both scales, from anchors of a brittle material whose beam is half
+a unit square and a unit long.
+
+- **Give:** one anchor at the bar's middle, safe to four times its weight,
+  gives 0.05 units under it, the law's extension, within the 0.1% the test
+  allows. That holds at 60 and 240 Hz with four solver iterations and at 60 Hz
+  with one and with eight, and for an anchor that points down, across or
+  between the two. The weight reads as tension along a beam that points down
+  and as shear across one that points right, and either way the anchor is
+  charged for a quarter of its safe stress, which costs nothing.
+- **Sharing:** four anchors at 3 and 1 units either side of the middle hold a
+  bar whose center of mass lies a unit off it. They carry 0.10, 0.20, 0.30 and
+  0.40 of the weight from the far side to the near, each also bent by the bar's
+  slight turn, within 0.2% of the weight of what the springs' stiffnesses give
+  for a rigid bar. Together they carry the weight where it lies.
+- **Letting go:** with the outer anchor toward the weight as stiff as the rest
+  but safe to three tenths of the weight, it lets go within half a second as
+  the bar settles onto it, alone. The three that are left carry the weight as
+  they then lie, within 0.5% of the weight: the one beside the weight five
+  sixths of it, and the far one holding its end down.
+- **Following:** with every anchor safe to three tenths of the weight, and the
+  weight coming on over two seconds, the outer anchor toward it lets go once
+  about three quarters of it is on, the rest follow within half a second, the
+  far one last, and the bar falls. With its weight in the middle, the same
+  anchors hold the bar at five sixths of their safe stress and charge nothing.
+- **Saves and clones:** a world saved with half the weight on is restored, and
+  the original is cloned. Both copies let all four anchors go exactly as the
+  original does, and the restored world writes the same save bytes.
+- **Reshaping:** an anchor given a beam twice as thick where it holds gives
+  half as far and is charged for half the stress.
+- **Refusals:** an anchor is refused as a connection is, its identity is taken
+  by an anchor or a weld alike, and removing the held body removes its anchors.
+
 ## Limits
 
-- **No shear:** the law does not model shear, so `shear` is reported but
-  never charged.
+- **No shear:** the law does not model shear, so a weld's or a hinge's `shear`
+  is reported but never charged. An anchor's is charged, as part of its pull.
+- **One grip in every direction:** an anchor holds along its beam and across
+  it with the same stiffness, and gives way to the same force either way,
+  pushed or pulled.
+- **Anchors damped singly:** each anchor is damped for the held body alone, so
+  many anchors on one body damp it by more than the material's ratio, by the
+  square root of their number, and less where that body carries others.
 - **Elastic sag only:** a weld does not sag at all, and a hinge's turn is all
   elastic. A yielding branch keeps no bend before it breaks, and the law's
   fallback progression stands in for plastic rotation.

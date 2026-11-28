@@ -11,12 +11,19 @@ use engine_core::plants::{
 use engine_rapier::tree::TreeSenses;
 use std::{cmp::Reverse, collections::BTreeSet};
 
+mod roots;
 mod wood;
-use wood::beyond;
+pub use roots::{
+    Anchor, CONE_SAIL, DeadPlate, FALLEN, GRIP, NEEDLE_SAIL, Plate, ROOT_MASS, WIND_RISE,
+    WIND_SECONDS, WINDS, Wind,
+};
 pub use wood::{
     CONE_MASS, DRAG, Dead, GRAVITY, HEAVY_SNOW, Hinge, LIGHT_SNOW, MAX_DEAD, NEEDLE_MASS,
     SNOW_SECONDS, Segment, Snow, WOOD_DT, Wood, Work,
 };
+use wood::{Moved, beyond};
+#[cfg(test)]
+mod roots_tests;
 #[cfg(test)]
 mod wood_tests;
 
@@ -70,7 +77,7 @@ const UPRIGHT: [[f32; 2]; 5] = [
     [0.766, 0.643],
 ];
 
-pub const TREE_CONTROLS: [(&str, Command); 21] = [
+pub const TREE_CONTROLS: [(&str, Command); 22] = [
     ("Pause / resume", Command::Pause),
     ("Single step", Command::Step),
     ("Faster (max 64x)", Command::Faster),
@@ -88,7 +95,10 @@ pub const TREE_CONTROLS: [(&str, Command); 21] = [
     ("Underground inspection", Command::Inspect),
     ("Inspect next tissue", Command::Select),
     ("Bids on/off", Command::Bids),
-    ("Cut a branch: selected, else lowest", Command::CutBranch),
+    (
+        "Cut a branch or root: selected, else lowest branch",
+        Command::CutBranch,
+    ),
     (
         "Physical wood on/off: gravity and breaks as trees grow",
         Command::PhysicalWood,
@@ -98,6 +108,7 @@ pub const TREE_CONTROLS: [(&str, Command); 21] = [
         Command::LightSnow,
     ),
     ("Heavy snow on/off: the same", Command::HeavySnow),
+    ("Wind toward the grass: calm / breeze / gale", Command::Wind),
     ("Plant a tree seed in the grass", Command::PlantSeedling),
     ("Plant fresh tree and grass", Command::PlantTree),
     ("Back to grass bed", Command::GrassBed),
@@ -403,6 +414,7 @@ impl TreeBed {
             Command::PhysicalWood => self.toggle_wood(),
             Command::LightSnow => self.snow(LIGHT_SNOW),
             Command::HeavySnow => self.snow(HEAVY_SNOW),
+            Command::Wind => self.turn_wind(),
             Command::PlantSeedling => self.plant_seedling(),
             Command::PlantTree => {
                 // Fresh seeds of each, under the same settings.
@@ -510,15 +522,16 @@ impl TreeBed {
             .find(|r| r.view.point.tissue == id)
     }
 
-    /// Cut the selected branch, or else the eldest tree's lowest, with
-    /// everything that grew beyond the cut. As in cutting grass, their shares
-    /// are lost. Physical wood falls where it was cut.
+    /// Cut the selected branch or root, or else the eldest tree's lowest
+    /// branch, with everything that grew beyond the cut. As in cutting grass,
+    /// their shares are lost. Physical wood falls where it was cut, and a cut
+    /// root no longer holds its tree.
     fn cut_branch(&mut self) {
         let o = self.plants.observe();
         let owners = self.grove.owners(&o);
         let chosen = self
             .selection()
-            .filter(|t| branch(&owners, t))
+            .filter(|t| branch(&owners, t) || root(&o, t))
             .map(|t| t.id)
             .or_else(|| self.lowest_branch(&o));
         let Some(cut) = chosen else {
@@ -529,6 +542,9 @@ impl TreeBed {
             self.fall(cut);
         } else {
             self.plants.remove_many(&beyond(&o, cut)).unwrap();
+            if self.wood.physical {
+                self.sync_plates(&self.plants.observe());
+            }
         }
     }
 
@@ -913,9 +929,12 @@ impl TreeBed {
                 if r.bid.action == TreeAction::Wait {
                     continue;
                 }
-                // A bid's marks ride the body of the point that made it.
-                let point = scene.tissues.get(&r.view.point.tissue);
-                let mark = |at: RenderPoint| point.map_or(at, |t| place(t, at));
+                // A bid's marks ride the body of the point that made it, and
+                // go with a point the bed has lost since.
+                let Some(point) = scene.tissues.get(&r.view.point.tissue) else {
+                    continue;
+                };
+                let mark = |at: RenderPoint| place(point, at);
                 let at = mark(p(cell_of(r)));
                 let color = match r.outcome {
                     Outcome::Won(_) => WON,
@@ -1004,7 +1023,15 @@ impl TreeBed {
             "Brown wood | green needles and blades | rust cones | tan seeds | amber stressed | grey dead | white roots | bids: yellow won, red refused, grey outbid | pink selected"
                 .into(),
             self.tree_summary(),
-            self.grove_summary(),
+            // The roots share the grove's line while they hold bodies up.
+            {
+                let roots = if self.wood.physical {
+                    format!(" | {}", self.roots_summary())
+                } else {
+                    String::new()
+                };
+                format!("{}{roots}", self.grove_summary())
+            },
             self.grass_summary(),
             self.bid_summary(),
             // The wood shares the light's line once it is physical or dead.
@@ -1041,8 +1068,18 @@ impl TreeBed {
                             h.turn.to_degrees()
                         )
                     });
+            let anchor = if self.wood.pulled.contains(&t.id) {
+                " | pulled out of the dirt".into()
+            } else {
+                self.anchors()
+                    .into_iter()
+                    .find(|a| a.tissue == t.id)
+                    .map_or(String::new(), |a| {
+                        format!(" | anchor {:.2} of safe", a.utilization)
+                    })
+            };
             lines.push(format!(
-                "Tissue {} | {owner} {:?} | size {} | health {} | reserves {:?} | shade {} shortage {}{hinge}",
+                "Tissue {} | {owner} {:?} | size {} | health {} | reserves {:?} | shade {} shortage {}{hinge}{anchor}",
                 t.id,
                 t.role,
                 t.size,
@@ -1124,6 +1161,14 @@ fn branch(owners: &BTreeMap<u64, &Tree>, t: &Tissue) -> bool {
         && owners
             .get(&t.organism)
             .is_some_and(|tree| t.cell[0] != tree.origin[0])
+}
+
+/// A root to cut is a tree's root that grew from another: every root but its
+/// seed.
+fn root(o: &plants::Observation, t: &Tissue) -> bool {
+    t.policy == tree::POLICY
+        && t.role == Role::Root
+        && o.connections.iter().any(|&(_, child)| child == t.id)
 }
 
 /// A filled oval, upright or lying.

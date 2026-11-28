@@ -210,6 +210,35 @@ impl ClientScenario for GardenLabClientScenario {
                     "parting":s.parting,
                 })
             });
+            // The roots that hold: each gripping root's anchor with its load
+            // over its safe limit and the force it carries along its root and
+            // across it, how far each living tree's root plate has turned in
+            // radians, the roots that have pulled out, the anchors the load
+            // broke and the trees it uprooted. Then the wind: its name, and
+            // its push now as it rises or drops.
+            let anchors: Vec<_> = bed
+                .anchors()
+                .iter()
+                .map(|a| {
+                    serde_json::json!({
+                        "tissue":a.tissue,"cell":a.cell,"utilization":a.utilization,"pull":a.pull,
+                    })
+                })
+                .collect();
+            let leans: Vec<_> = bed
+                .leans()
+                .iter()
+                .map(|(organism, turn)| serde_json::json!({"organism":organism,"turn":turn}))
+                .collect();
+            let roots = serde_json::json!({
+                "anchors":anchors,"leans":leans,"pulled":bed.wood.pulled.len(),
+                "pulls":bed.wood.pulls,"uprooted":bed.wood.uprooted,
+                "dead_plates":bed.wood.dead_plates.len(),"summary":bed.roots_summary(),
+            });
+            let wind = serde_json::json!({
+                "name":scenario_garden_lab::WINDS[bed.wood.wind.level].0,
+                "level":bed.wood.wind.level,"push":bed.wood.wind.push,
+            });
             let w = bed.wood.work;
             let work = serde_json::json!({
                 "grown":w.grown,"reshaped":w.reshaped,"died":w.died,"cleared":w.cleared,
@@ -222,7 +251,7 @@ impl ClientScenario for GardenLabClientScenario {
                 "dead":bed.wood.dead.len(),"max_dead":bed.wood.max_dead,"breaks":bed.wood.breaks,
                 "parting":bed.wood.dead.iter().filter(|d| d.parting).count(),
                 "work":work,"bodies":bed.world().body_count(),"colliders":bed.world().collider_count(),
-                "summary":bed.wood_summary(),
+                "summary":bed.wood_summary(),"roots":roots,"wind":wind,
             });
             serde_json::json!({
                 "tick":bo.tick,"seed":bo.seed,
@@ -947,6 +976,114 @@ mod tests {
             // The three branches lie over one another, so they show less
             // grey than three times one.
             assert!(broken > caught + 500, "{broken} after {caught}");
+        }
+    }
+    #[test]
+    fn garden_render_contract_tree_bed_roots_hold_a_tree_in_a_gale_until_they_are_cut() {
+        let output =
+            std::env::var_os("SPACEWARS_GARDEN_RENDER_ARTIFACTS").map(std::path::PathBuf::from);
+        if let Some(dir) = &output {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        let near = |p: &slint::Rgb8Pixel, c: [u8; 3]| {
+            (i16::from(p.r) - i16::from(c[0])).abs() < 12
+                && (i16::from(p.g) - i16::from(c[1])).abs() < 12
+                && (i16::from(p.b) - i16::from(c[2])).abs() < 12
+        };
+        // Grey dead wood and roots, at both viewports.
+        let capture = |name: &str, s: &GardenLabState| -> Vec<usize> {
+            let frame = GardenLabScenario::render_frame(s);
+            let mut found = Vec::new();
+            for (w, h) in [(1280u32, 720u32), (800, 480)] {
+                let viewport = Viewport::new(w as f32, h as f32);
+                let pixels = raster(&frame, viewport);
+                found.push(
+                    pixels
+                        .as_slice()
+                        .iter()
+                        .filter(|p| near(p, [128, 102, 102]))
+                        .count(),
+                );
+                let export = svg(&frame, viewport);
+                assert!(!export.contains("NaN"));
+                if let Some(dir) = &output {
+                    let stem = format!("tree-{name}-{w}x{h}");
+                    write_png(&dir.join(format!("{stem}-raster.png")), &pixels);
+                    std::fs::write(dir.join(format!("{stem}-vector.svg")), &export).unwrap();
+                }
+            }
+            if let Some(dir) = &output {
+                let bed = s.shown_tree_bed().unwrap();
+                let state = serde_json::json!({"simulation_seconds":bed.plants.observe().tick,
+                    "tree":bed.tree_summary(),"wood":bed.wood_summary(),
+                    "roots":bed.roots_summary(),"preview_only":true});
+                std::fs::write(
+                    dir.join(format!("tree-{name}-state.json")),
+                    serde_json::to_vec_pretty(&state).unwrap(),
+                )
+                .unwrap();
+            }
+            found
+        };
+        let mut s = GardenLabScenario::init((), 42);
+        s.command(Command::TreeBed);
+        let bed = s.tree_bed.as_mut().unwrap();
+        while bed.plants.observe().tick < 600 {
+            bed.tick();
+        }
+        // With the bed paused, each step moves the bodies and holds the
+        // trees' clock, so the cut roots do not grow back meanwhile.
+        s.command(Command::PhysicalWood);
+        s.command(Command::Pause);
+        let step = |s: &mut GardenLabState, seconds: f32| {
+            for _ in 0..(seconds * 60.0).round() as u32 {
+                s.command(Command::Step);
+            }
+        };
+        let cut = |s: &mut GardenLabState, cell: [i32; 2]| {
+            let bed = s.tree_bed.as_mut().unwrap();
+            bed.selected = bed
+                .plants
+                .observe()
+                .tissues
+                .iter()
+                .position(|t| t.cell == cell)
+                .unwrap();
+            s.command(Command::CutBranch);
+        };
+        let gale = |s: &mut GardenLabState| {
+            s.command(Command::Wind);
+            s.command(Command::Wind);
+        };
+        step(&mut s, 6.0);
+        // On all its roots the conifer leans into the gale and holds.
+        gale(&mut s);
+        step(&mut s, 12.0);
+        let bed = s.shown_tree_bed().unwrap();
+        assert_eq!(bed.anchors().len(), 32);
+        assert_eq!(
+            (bed.wood.pulls, bed.wood.uprooted, bed.wood.breaks),
+            (0, 0, 0)
+        );
+        assert!(bed.roots_summary().contains("| wind gale |"));
+        let held = capture("roots-gale", &s);
+        // In the calm its two side roots are cut, with all that grew from
+        // them. The gale then pulls the roots it has left out of the dirt,
+        // and it falls toward the grass and dies there.
+        s.command(Command::Wind);
+        step(&mut s, 6.0);
+        cut(&mut s, [13, 7]);
+        cut(&mut s, [11, 7]);
+        assert_eq!(s.shown_tree_bed().unwrap().anchors().len(), 17);
+        gale(&mut s);
+        step(&mut s, 14.0);
+        let bed = s.shown_tree_bed().unwrap();
+        assert_eq!((bed.wood.pulls, bed.wood.uprooted), (17, 1));
+        assert_eq!((bed.wood.living.len(), bed.wood.dead.len()), (0, 54));
+        assert_eq!(bed.plants.observe().tick, 600);
+        let down = capture("roots-uprooted", &s);
+        for (held, down) in held.into_iter().zip(down) {
+            assert!(down > held + 1000, "the fallen tree invisible: {down}");
         }
     }
 }

@@ -27,7 +27,7 @@ pub mod tree_bed;
 use tree_bed::next_light;
 pub use tree_bed::{
     SUNS, TREE_CONTROLS, TREE_GRASS_ORIGIN, TREE_MAX_TICKS, TREE_ORIGIN, TREE_SEEDLING_ORIGIN,
-    TreeBed,
+    TreeBed, WINDS,
 };
 
 pub const TICK_MS: u64 = 1000;
@@ -93,6 +93,7 @@ pub enum Command {
     PhysicalWood,
     LightSnow,
     HeavySnow,
+    Wind,
 }
 impl Command {
     pub fn action(self) -> Action {
@@ -145,6 +146,7 @@ impl Command {
             Self::PhysicalWood,
             Self::LightSnow,
             Self::HeavySnow,
+            Self::Wind,
         ]
         .get(*v as usize)
         .copied()
@@ -803,7 +805,8 @@ impl GardenLabState {
             | Command::PlantSeedling
             | Command::PhysicalWood
             | Command::LightSnow
-            | Command::HeavySnow => {}
+            | Command::HeavySnow
+            | Command::Wind => {}
         }
     }
     /// Time passes only for the bed that is shown.
