@@ -15,6 +15,7 @@ engine-common = { workspace = true }
 engine-core = { workspace = true }
 scenario-spacewars = { workspace = true }
 scenario-line-mover = { workspace = true }
+scenario-clock = { workspace = true }
 spacewars-ai = { workspace = true }
 clap = { workspace = true }
 rayon = { workspace = true }
