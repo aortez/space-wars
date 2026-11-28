@@ -8,6 +8,8 @@
 use super::*;
 use std::f32::consts::TAU;
 
+pub mod policy;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PolarConfig {
     pub sectors: usize,
@@ -102,6 +104,10 @@ pub struct PolarSensor {
 
 impl PolarSensor {
     pub fn new(config: PolarConfig) -> Result<Self, &'static str> {
+        Self::with_margin(config, 0.001)
+    }
+
+    fn with_margin(config: PolarConfig, margin: f32) -> Result<Self, &'static str> {
         if !(8..=256).contains(&config.sectors)
             || !(2..=65).contains(&config.radial_edges.len())
             || !(1..=8).contains(&config.angular_samples)
@@ -122,7 +128,6 @@ impl PolarSensor {
         }
         let delta = TAU / (config.sectors * config.angular_samples) as f32;
         let half = delta / 2.;
-        let margin = 0.001;
         let range = *config.radial_edges.last().unwrap();
         let max_arc_overreach = range * (1. / half.cos() - 1.) + margin / half.cos();
         let mut subcells = Vec::new();

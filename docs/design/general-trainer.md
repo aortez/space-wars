@@ -84,6 +84,14 @@ then run a creature brain on a spaceling on the same course, then on a planet.
 Those two transfer tests change body and world separately.
 [#752](https://github.com/aortez/space-wars/issues/752)
 
+The [Clock benchmark](../../scenarios/clock/examples/duck_polar_benchmark.rs)
+samples a scripted Platforms visit every six ticks. Across three runs of 110
+observations each, the median full observation took 0.343–0.350 ms on a Ryzen
+7 9800X3D and 2.368–2.379 ms on sw-picade-2 (Pi 4). The respective p95 ranges
+were 0.93–3.30 ms and 2.63–2.70 ms. These are single-worker measurements of
+sensing and encoding with the optimized CI profile. The timer excludes
+scenario stepping, sensor construction, inference and rendering.
+
 ## Evolving the polar network
 
 Use C3's polar convolution, ray encoder, masked attention over objects and

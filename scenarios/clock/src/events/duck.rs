@@ -23,6 +23,7 @@ mod platform_tests;
 mod player_control;
 #[cfg(test)]
 mod player_ledge_tests;
+mod polar;
 mod responsive;
 #[cfg(test)]
 mod responsive_tests;

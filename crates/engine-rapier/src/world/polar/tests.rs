@@ -1,6 +1,73 @@
 use super::*;
 
 #[test]
+fn creature_reads_the_same_course_at_two_body_sizes_and_gravity_directions() {
+    use policy::{CreatureBody, CreatureContext, ObjectKind};
+
+    fn read_course(length: f32, angle: f32) -> policy::CreatureObservation {
+        let mut world = PhysicsWorld::new(Default::default());
+        let origin = Vec2::new(12., -40.);
+        let actor = block(&mut world, 1, origin, Vec2::splat(0.5 * length));
+        let ledge = block(&mut world, 2, origin, Vec2::new(1.25, 0.3) * length);
+        let ledge = BodyId::new(ledge, BodyRole::PRIMARY);
+        world.set_pose(
+            ledge,
+            origin + (Vec2::new(3., -1.) * length).rotate_radians(angle),
+            angle,
+            false,
+        );
+        world.step(1. / 60.);
+        let body = CreatureBody {
+            id: BodyId::new(actor, BodyRole::PRIMARY),
+            body_length: length,
+            width: length,
+            height: length,
+            top_speed: 5. * length,
+            jump_height: 2. * length,
+            gravity: (Vec2::new(0., -20.) * length).rotate_radians(angle),
+            health_fraction: 1.,
+            support: None,
+            can_run: false,
+            can_dive: true,
+        };
+        let sensor = PolarSensor::for_body_length(length).unwrap();
+        assert_eq!(sensor.config().radial_edges[1], 0.25 * length);
+        assert_eq!(sensor.config().radial_edges[23], 37.5 * length);
+        body.observe(
+            &world,
+            &sensor,
+            CreatureContext {
+                goal: origin + (Vec2::X * 3. * length).rotate_radians(angle),
+                goal_velocity: Vec2::ZERO,
+                remaining_seconds: 15.,
+                previous_move: -0.5,
+                previous_jump: true,
+                previous_run: true,
+                previous_dive: false,
+            },
+            |_| ObjectKind::OtherSolid,
+        )
+        .unwrap()
+    }
+
+    let reference = read_course(8., 0.);
+    let other = read_course(2., 1.1);
+    assert_eq!(reference.geometry.cells.len(), 23 * 64);
+    assert_eq!(reference.geometry.rays.len(), 128);
+    assert!(reference.geometry.nearest[1] > 0.);
+    assert!(reference.geometry.rays.iter().any(|ray| ray[0] == 1.));
+    assert_eq!(
+        reference.objects.iter().filter(|row| row[0] == 1.).count(),
+        1
+    );
+    assert_eq!(reference.self_goal[0], 3. / 37.5);
+    assert_eq!(reference.self_goal[12], -20. / policy::ACCELERATION_SCALE);
+    assert_eq!(&reference.self_goal[26..], &[-0.5, 1., 0., 0.]);
+    for (i, (a, b)) in reference.values().zip(other.values()).enumerate() {
+        assert!((a - b).abs() < 1e-5, "feature {i}: {a} / {b}");
+    }
+}
+#[test]
 fn hit_velocities_include_rotation_and_preserve_misses_and_inside_hits() {
     let mut world = PhysicsWorld::new(Default::default());
     let id = BodyId::new(PhysicsId::new(7), BodyRole::PRIMARY);

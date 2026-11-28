@@ -61,6 +61,55 @@ fn toggle(state: &mut ClockState, player: u8) {
     );
 }
 
+#[test]
+fn duck_polar_senses_use_world_goals_and_only_visible_doors() {
+    use engine_core::Vec2;
+    use engine_rapier::world::polar::policy::{CreatureContext, ObjectKind};
+    for direction in [-1., 1.] {
+        let mut state = ready(1.6, 42);
+        toggle(&mut state, 1);
+        state.duck_visit.as_mut().unwrap().face(direction);
+        let sensor = state.duck_polar_sensor().unwrap();
+        let context = CreatureContext {
+            goal: Vec2::ZERO,
+            goal_velocity: Vec2::ZERO,
+            remaining_seconds: 20.,
+            previous_move: 0.,
+            previous_jump: false,
+            previous_run: false,
+            previous_dive: false,
+        };
+        assert!(state.duck_polar_observation(&sensor, context).is_err());
+        ticks(&mut state, 40);
+        let duck = state.duck_scene().unwrap();
+        let position = duck.render_position(duck.position().unwrap());
+        let before = state.duck_polar_observation(&sensor, context).unwrap();
+        assert!((before.self_goal[0] + position.x / sensor.config().radial_edges[23]).abs() < 1e-5);
+        assert_eq!(before.self_goal[0].signum(), direction);
+        assert_eq!(&before.self_goal[19..21], &[1., 1.]);
+        assert!(
+            before
+                .objects
+                .iter()
+                .any(|row| row[ObjectKind::ClockEntrance as usize] == 1.)
+        );
+        assert!(
+            before
+                .objects
+                .iter()
+                .all(|row| row[ObjectKind::ClockExit as usize] == 0.)
+        );
+        ticks(&mut state, 60);
+        let later = state.duck_polar_observation(&sensor, context).unwrap();
+        assert!(
+            later
+                .objects
+                .iter()
+                .any(|row| row[ObjectKind::ClockExit as usize] == 1.)
+        );
+    }
+}
+
 fn input(state: &ClockState, move_milli: i16, jump: bool) -> Action {
     let (session_id, player) = state.player_duck_session().unwrap();
     ClockAction::player_duck_input(ClockDuckInput {
