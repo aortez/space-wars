@@ -43,6 +43,17 @@ pub(super) const ANGULAR_COMPARISON_REGISTRATION: ScenarioRegistration = Scenari
     create: create_comparison_angular,
     ..COMPARISON_REGISTRATION
 };
+pub(super) const FIRE_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "planetary-tank-fire",
+    controls_help: "Planetary tank firing fixture: a government tank fires a scripted round at each player's tank, at a ship landed beyond its horizon, which the ground shields from its flat shot, and at a flying ship. Start/Esc pauses; Restart repeats the seed. Commands come from the shared acceptance script.",
+    create: create_fire,
+    ..REGISTRATION
+};
+pub(super) const ANGULAR_FIRE_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "planetary-tank-fire-angular",
+    create: create_fire_angular,
+    ..FIRE_REGISTRATION
+};
 fn create_comparison(
     seed: u64,
     _: &Settings,
@@ -62,12 +73,32 @@ fn create_comparison_angular(
     Ok(make_comparison(seed, true))
 }
 fn make_comparison(seed: u64, angular: bool) -> Box<dyn ClientScenario> {
-    let mut client = make(seed, angular);
+    let mut client = make(seed, angular, FixtureCase::Cut);
     client.comparison = true;
     Box::new(client)
 }
+fn create_fire(
+    seed: u64,
+    _: &Settings,
+    _: Viewport,
+    _: ScenarioStartMode,
+    _: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    Ok(Box::new(make(seed, false, FixtureCase::Fire)))
+}
+fn create_fire_angular(
+    seed: u64,
+    _: &Settings,
+    _: Viewport,
+    _: ScenarioStartMode,
+    _: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    Ok(Box::new(make(seed, true, FixtureCase::Fire)))
+}
 struct PlanetaryTanks {
     comparison: bool,
+    /// Whether the fixture runs its firing case.
+    fire: bool,
     fixture: TankFixture,
     trace: Vec<FixtureSample>,
     angular: bool,
@@ -81,7 +112,7 @@ fn create(
     _: ScenarioStartMode,
     _: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
-    Ok(Box::new(make(seed, false)))
+    Ok(Box::new(make(seed, false, FixtureCase::Cut)))
 }
 fn create_angular(
     seed: u64,
@@ -90,11 +121,12 @@ fn create_angular(
     _: ScenarioStartMode,
     _: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
-    Ok(Box::new(make(seed, true)))
+    Ok(Box::new(make(seed, true, FixtureCase::Cut)))
 }
-fn make(seed: u64, angular: bool) -> PlanetaryTanks {
+fn make(seed: u64, angular: bool, case: FixtureCase) -> PlanetaryTanks {
     PlanetaryTanks {
         comparison: false,
+        fire: case == FixtureCase::Fire,
         fixture: TankFixture::new(
             seed,
             if angular {
@@ -102,7 +134,7 @@ fn make(seed: u64, angular: bool) -> PlanetaryTanks {
             } else {
                 DirtMode::Round
             },
-            FixtureCase::Cut,
+            case,
         ),
         trace: Vec::new(),
         angular,
@@ -117,6 +149,12 @@ impl ClientScenario for PlanetaryTanks {
                 &ANGULAR_COMPARISON_REGISTRATION
             } else {
                 &COMPARISON_REGISTRATION
+            }
+        } else if self.fire {
+            if self.angular {
+                &ANGULAR_FIRE_REGISTRATION
+            } else {
+                &FIRE_REGISTRATION
             }
         } else if self.angular {
             &ANGULAR_REGISTRATION
@@ -238,19 +276,24 @@ mod tests {
     #[test]
     fn client_script_pause_and_cleanup() {
         for angular in [false, true] {
-            let mut client = make(42, angular);
-            let before = client.runtime_diagnostics();
-            client.step(&[], Duration::ZERO);
-            assert_eq!(before, client.runtime_diagnostics());
-            for _ in 0..MEASURED_STEPS {
+            for case in [FixtureCase::Cut, FixtureCase::Fire] {
+                let mut client = make(42, angular, case);
+                let id = client.registration().id;
+                assert_eq!(id.contains("fire"), case == FixtureCase::Fire, "{id}");
+                assert_eq!(id.ends_with("angular"), angular, "{id}");
+                let before = client.runtime_diagnostics();
+                client.step(&[], Duration::ZERO);
+                assert_eq!(before, client.runtime_diagnostics());
+                for _ in 0..MEASURED_STEPS {
+                    client.step(&[], Duration::from_secs_f32(1.0 / 60.0));
+                }
+                let done = client.runtime_diagnostics();
+                assert!(done.contains("tank_fixture_passed=true"), "{done}");
+                assert!(done.contains("tank_fixture_actors=0"));
+                assert!(done.contains("tank_fixture_pilots=1"));
                 client.step(&[], Duration::from_secs_f32(1.0 / 60.0));
+                assert_eq!(done, client.runtime_diagnostics());
             }
-            let done = client.runtime_diagnostics();
-            assert!(done.contains("tank_fixture_passed=true"), "{done}");
-            assert!(done.contains("tank_fixture_actors=0"));
-            assert!(done.contains("tank_fixture_pilots=1"));
-            client.step(&[], Duration::from_secs_f32(1.0 / 60.0));
-            assert_eq!(done, client.runtime_diagnostics());
         }
     }
 }

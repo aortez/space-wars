@@ -227,7 +227,8 @@ fn a_shots_record_tells_how_its_round_left_the_barrel() {
 }
 
 /// A record marks a barrel that something stood in, and tells where the
-/// round started instead of at the muzzle.
+/// round started instead of at the muzzle. Such a round bursts in its first
+/// step on what blocks the barrel, and its own tank pays for the blast.
 #[test]
 fn a_shots_record_marks_a_blocked_barrel() {
     for (along, blocked) in [(1.6, true), (3.6, false)] {
@@ -259,11 +260,34 @@ fn a_shots_record_marks_a_blocked_barrel() {
         assert_eq!(launch.blocked, blocked, "{along}");
         assert_eq!(launch.position, round.position, "{along}");
         let reach = (launch.position - launch.pivot).length();
-        if blocked {
-            assert!(reach < 1.6, "{reach}");
-        } else {
+        if !blocked {
             assert_eq!(launch.position, s.muzzle_position);
+            continue;
         }
+        assert!(reach < 1.6, "{reach}");
+        let mut rocks = state.world.debris.iter();
+        let rock = rocks.find(|piece| piece.kind == DebrisKind::Asteroid);
+        let rock = ShotBody::Debris(rock.and_then(|piece| piece.id()).expect("the rock"));
+        let (id, before) = (shot.id, health(&state, tank));
+        idle(&mut state, 1);
+        let [shot] = &state.world.tank_shots_ended[..] else {
+            panic!("{:?}", state.world.tank_shots_ended);
+        };
+        assert_eq!((shot.id, shot.flight.steps), (id, 1));
+        let end = shot.end.as_ref().unwrap();
+        let struck = ShotOutcome::Burst {
+            on: Some(ShotStop::Body(rock)),
+        };
+        assert_eq!(end.outcome, struck);
+        // The blast costs the tank that fired it far more than it costs the
+        // rock, which it breaks.
+        let lost = before - health(&state, tank);
+        assert!(lost > 10.0, "{lost}");
+        let [own, broken] = end.harm[..] else {
+            panic!("{:?}", end.harm);
+        };
+        assert_eq!((own.body, broken.body), (ShotBody::Tank(tank), rock));
+        assert!((own.health - lost).abs() < 1.0e-3, "{own:?} {lost}");
     }
 }
 

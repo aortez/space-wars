@@ -202,6 +202,10 @@
       "reason": "Additional material-world variant of the shared lifecycle; terrain, combat, jetpack and travel representatives stay on PRs."
     },
     {
+      "test": "spacewars_terrain::planetary_tank_fire_fixture_strikes_and_cleans_up",
+      "reason": "Both firing fixtures through ten seconds of scripted shots in both renderers; the fixture's unit test checks the same script, and the drive/pause fixture stays on PRs."
+    },
+    {
       "test": "spacewars_terrain::planetary_tank_fixture_motion_support_and_lifecycle",
       "reason": "Four fixtures through support loss, falling and cleanup in both renderers; one drive/pause fixture stays on PRs."
     },

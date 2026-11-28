@@ -129,7 +129,9 @@ has reloaded, 75 ticks after it last fired, and while fewer than 4 of its
 rounds and 8 tanks' rounds in all are in flight. Ships' shells don't count. A
 round leaves the muzzle, or the point where something other than its own tank
 stands in the barrel, at its power along the barrel plus the velocity the hull
-gives the barrel's pivot.
+gives the barrel's pivot. A round that starts in a blocked barrel bursts in its
+first step on what blocks it, and its blast costs the tank that fired it about
+19 health.
 
 - A round is a shell of the cannon's size and mass, in its casing, carrying its
   [payload](design/material-sources.md#payloads). It meets every solid from
@@ -465,21 +467,75 @@ game's planets read.
 Shot record regressions fire real tanks on the material planet, where the
 ground pulls about 18, and in the rounds' weightless fixture above it. They
 cover a record's launch against the round and the hull as it fired; a blocked
-barrel; a new id for each shot, and no record for a refused trigger; a target's
-motion as the tank fired and after each step, and the round's closest approach
-to where a flying ship really was; a target that the shot destroys, one that
-left the game in the step before, one that a host moved, and targets that the
-world holds no body for; a burst on the ground and direct hits on a tank, a
-ship, a pod and a pilot on foot, against what each lost, and ejection
-protection; a burst among eleven rocks, which lists the eight it cost most; two
-rounds that end in one step; expiry, and the steps that advance nothing; a
-round that a laser destroys in flight, one whose shell leaves the game, one
-whose shell comes back, and one that a host kills on its last tick; a round
-that outlives the tank that fired it; the last four ended shots, kept by when
-they ended; removal, clearing and a rebuilt world; a named target that changes
-nothing but its shots' records and blocks no claim; and the same records from
-a second run and from a clone taken with rounds in flight. A round that stops
-on a rover is covered in the arcade world, beside the shots' own tests.
+barrel, and its round's burst on what blocks it; a new id for each shot, and no
+record for a refused trigger; a target's motion as the tank fired and after
+each step, and the round's closest approach to where a flying ship really was;
+a target that the shot destroys, one that left the game in the step before, one
+that a host moved, and targets that the world holds no body for; a burst on the
+ground and direct hits on a tank, a ship, a pod and a pilot on foot, against
+what each lost, and ejection protection; a burst among eleven rocks, which
+lists the eight it cost most; two rounds that end in one step; expiry, and the
+steps that advance nothing; a round that a laser destroys in flight, one whose
+shell leaves the game, one whose shell comes back, and one that a host kills on
+its last tick; a round that outlives the tank that fired it; the last four
+ended shots, kept by when they ended; removal, clearing and a rebuilt world; a
+named target that changes nothing but its shots' records and blocks no claim;
+and the same records from a second run and from a clone taken with rounds in
+flight. A round that stops on a rover is covered in the arcade world, beside
+the shots' own tests.
+
+The firing fixture is the tank fixture's third case, `FixtureCase::Fire`, on
+the same proving ground, whose planet turns and is carried along. A government
+tank on the planet's top is commanded by a pinned script, `FIRE_SCRIPT`: one
+shot each reload, each with an elevation, a facing, a power and the target it
+is meant for. The launcher runs it as `planetary-tank-fire` and
+`planetary-tank-fire-angular`. `planetary_tank_lab --case fire --tanks 3` runs
+it headless, and its result lists the cannon's settings, the cast's places and
+the script. The script fires:
+
+- a 45° lob at power 13.2 onto player 1's tank, 14 units clockwise along the
+  surface, and one at power 18.3 onto player 2's, 26.5 units clockwise. They
+  land after 94 and 139 steps and cost the tanks 22.4 and 22.8 health, which
+  name the government as their source.
+- its flattest shot, 5° at power 20, at seat 0's ship, which has come down 52
+  units the other way and stands there on its tail, held by nothing but the
+  ordinary rules. It is never quite at rest: it turns 9° against the ground
+  over the run and slides half a unit. The ship is beyond the tank's horizon:
+  the straight line from the muzzle to it passes through the planet, more than
+  a unit under its surface. The round bursts on the ground half way there, 26
+  units from its tank, and digs the run's one crater.
+- a 40° lob at power 24 over that horizon onto the same ship, which it strikes
+  after 243 steps for 9.4 life.
+- a 33° shot at power 35 at seat 1's ship, which the script carries round the
+  planet at 8 units a second, its hull about 24 units up. The round meets it
+  after 65 steps for 8.5 life.
+
+Each aim has room on both sides: the lobs at the tanks and the landed ship hit
+across about 2 units of power, and the shot at the flying ship across 15. The
+proving ground's rover drives behind the landed ship, 21 units from it at the
+nearest, and no burst reaches it. The fixture's checks, which its unit test,
+the lab example and the launcher entries all run, hold for both dirt shapes:
+
+- every shot ended as its record tells, its target lost in that step what the
+  record tells, and it harmed nothing else; the flat shot harmed nothing;
+- each round had fallen more than a unit and a half toward the planet half a
+  second after it left, and the long lob's fall turned with it round the
+  planet;
+- each round left with the hull's motion, about 2 units a second on this
+  planet, on top of the cannon's;
+- after every step the tank's records were those of its rounds in flight and
+  of the last four of its shots to end, and two rounds flew at once at most,
+  of the four a cannon may have;
+- a step cast along a barrel once for each shot it fired, and not otherwise;
+- each round carried one payload, and the ground burst dug one crater;
+- material is conserved, and the crater's dirt is released in the configured
+  shape;
+- and the tanks' control work stays within the driving cases' bound for each
+  tank.
+
+A second fixture built from the seed replays every sample, the rounds' motion
+included. No check counts what the weapons do for a payload in flight: by
+reading, they look at every body once a step while one flies, however many fly.
 
 Positive AI flight/capture fixtures now let their otherwise idle opponent
 depart through real controls only when its landing feet support it on the

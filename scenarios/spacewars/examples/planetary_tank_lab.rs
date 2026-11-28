@@ -2,7 +2,7 @@
 use clap::{Parser, ValueEnum};
 use engine_common::DirtMode;
 use scenario_spacewars::tank_fixture::{
-    FIXTURE_VERSION, FixtureCase, MEASURED_STEPS, TankFixture, WARMUP_STEPS,
+    FIXTURE_VERSION, FixtureCase, MEASURED_STEPS, TankFixture, WARMUP_STEPS, fire_settings,
 };
 use sha2::{Digest, Sha256};
 use std::{error::Error, fs, path::PathBuf, time::Instant};
@@ -19,6 +19,7 @@ enum Shape {
 enum Case {
     Drive,
     Cut,
+    Fire,
 }
 #[derive(Parser)]
 struct Args {
@@ -42,12 +43,20 @@ struct Args {
 }
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
+    // The firing case has its cast of three tanks or nothing to fire.
+    let tanks: &[u8] = match args.case {
+        Case::Drive | Case::Cut => &[0, 2],
+        Case::Fire => &[3],
+    };
     if !args.json
-        || ![0, 2].contains(&args.tanks)
+        || !tanks.contains(&args.tanks)
         || args.steps != MEASURED_STEPS
         || args.warmup_steps != WARMUP_STEPS
     {
-        return Err("requires --json, --tanks 0|2, --warmup-steps 120 and --steps 600".into());
+        return Err(
+            "requires --json, --tanks 0|2 (3 for --case fire), --warmup-steps 120 and --steps 600"
+                .into(),
+        );
     }
     if let Some(path) = &args.output {
         fs::create_dir(path)?;
@@ -59,6 +68,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let case = match args.case {
         Case::Drive => FixtureCase::Drive,
         Case::Cut => FixtureCase::Cut,
+        Case::Fire => FixtureCase::Fire,
+    };
+    // The steps whose drawings are kept: the driving script's turns, or the
+    // firing script's rounds in flight and their bursts.
+    let snapshots: &[usize] = match args.case {
+        Case::Drive | Case::Cut => &[0, 119, 239, 419, 469, 599],
+        Case::Fire => &[59, 93, 180, 213, 222, 340, 364, 467, 599],
     };
     let mut fixture = TankFixture::with_tanks(args.seed, shape, case, args.tanks as usize);
     let mut trace = Vec::with_capacity(args.steps);
@@ -70,7 +86,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         step_us.push(started.elapsed().as_secs_f64() * 1_000_000.0);
         trace.push(fixture.sample());
         if let Some(path) = &args.output {
-            if [0, 119, 239, 419, 469, 599].contains(&tick) {
+            if snapshots.contains(&tick) {
                 fs::write(
                     path.join(format!("step-{tick:03}.svg")),
                     svg::svg(&fixture.frame()),
@@ -94,10 +110,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         repeated.push(replay.sample());
     }
     let replay_matches = bytes == serde_json::to_vec(&repeated)?;
-    let result = serde_json::json!({
+    let mut result = serde_json::json!({
         "schema_version":1,"fixture":FIXTURE_VERSION,
         "shape":match args.shape {Shape::Round=>"round",Shape::Angular=>"angular"},
-        "case":match args.case {Case::Drive=>"drive",Case::Cut=>"cut"},
+        "case":match args.case {Case::Drive=>"drive",Case::Cut=>"cut",Case::Fire=>"fire"},
         "tanks":args.tanks,"seed":args.seed,"warmup_steps":args.warmup_steps,"steps":args.steps,
         "replay_matches":replay_matches,"replay_sha256":replay_sha256,
         "step_us":step_us,
@@ -105,6 +121,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         "tank_contacts":trace.iter().map(|s|s.contact_traversal).collect::<Vec<_>>(),
         "assertions":assertions,
     });
+    if matches!(args.case, Case::Fire) {
+        // The cannon's settings, the cast's places and the script that the
+        // run fired under.
+        result["fire"] = fire_settings();
+    }
     if let Some(path) = &args.output {
         fs::write(path.join("trace.json"), bytes)?;
         fs::write(
