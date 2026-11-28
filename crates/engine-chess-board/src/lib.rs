@@ -38,10 +38,10 @@ mod tests;
 
 use std::fmt;
 
-use engine_chess::{Game, Move, Outcome, Position, Revision, Square};
+use engine_chess::{Color, Game, Move, Outcome, Position, Revision, Square};
 use engine_common::{RenderPoint, RenderRect};
 
-pub use draw::{MAX_PRIMITIVES, draw};
+pub use draw::{DARK as DARK_SQUARE, FRAME_COLOR, LIGHT as LIGHT_SQUARE, MAX_PRIMITIVES, draw};
 
 /// The height in pixels of the shortest screen the game runs on. A host
 /// knows only how much of its world its camera shows, so a board judges its
@@ -60,12 +60,51 @@ const FRAME: f32 = 0.25;
 /// The side of a board, frame included, in squares.
 const SIDE: f32 = 8.0 + 2.0 * FRAME;
 
-/// Which side of the board is nearer the bottom of the screen.
+/// The share of a board's side that its frame takes on each side.
+pub const FRAME_SHARE: f32 = FRAME / SIDE;
+
+/// Which way a board lies on the screen: which player's side is nearer its
+/// bottom, or, turned a quarter for players seen sitting at its left and
+/// right, which player's side is at its left.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Orientation {
     #[default]
     WhiteAtBottom,
     BlackAtBottom,
+    /// White's back rank runs up the left side, with a1 at its top, as White
+    /// sees the board from the left.
+    WhiteAtLeft,
+    /// White's back rank runs up the right side, with a1 at its bottom, as
+    /// White sees the board from the right.
+    WhiteAtRight,
+}
+
+/// A side of a board's frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Edge {
+    Bottom,
+    Top,
+    Left,
+    Right,
+}
+
+impl Orientation {
+    /// The side of the frame nearer the pieces `color` starts with.
+    pub(crate) fn edge(self, color: Color) -> Edge {
+        let white = match self {
+            Self::WhiteAtBottom => Edge::Bottom,
+            Self::BlackAtBottom => Edge::Top,
+            Self::WhiteAtLeft => Edge::Left,
+            Self::WhiteAtRight => Edge::Right,
+        };
+        match (color, white) {
+            (Color::White, edge) => edge,
+            (Color::Black, Edge::Bottom) => Edge::Top,
+            (Color::Black, Edge::Top) => Edge::Bottom,
+            (Color::Black, Edge::Left) => Edge::Right,
+            (Color::Black, Edge::Right) => Edge::Left,
+        }
+    }
 }
 
 /// How finely a board draws its pieces and marks.
@@ -188,9 +227,12 @@ impl Board {
     /// Where `square` lies: its column from the left and its row from the
     /// bottom.
     fn place(&self, square: Square) -> (u8, u8) {
+        let (file, rank) = (square.file(), square.rank());
         match self.orientation {
-            Orientation::WhiteAtBottom => (square.file(), square.rank()),
-            Orientation::BlackAtBottom => (7 - square.file(), 7 - square.rank()),
+            Orientation::WhiteAtBottom => (file, rank),
+            Orientation::BlackAtBottom => (7 - file, 7 - rank),
+            Orientation::WhiteAtLeft => (rank, 7 - file),
+            Orientation::WhiteAtRight => (7 - rank, file),
         }
     }
 
@@ -222,6 +264,8 @@ impl Board {
         match self.orientation {
             Orientation::WhiteAtBottom => Square::new(column, row),
             Orientation::BlackAtBottom => Square::new(7 - column, 7 - row),
+            Orientation::WhiteAtLeft => Square::new(7 - row, column),
+            Orientation::WhiteAtRight => Square::new(row, 7 - column),
         }
     }
 }
@@ -340,6 +384,10 @@ pub struct Presentation {
     /// both kings' squares are marked.
     pub outcome: Option<Outcome>,
     pub transition: Option<Transition>,
+    /// Squares whose pieces are left off, as while a host sets the board up
+    /// or packs it away. A piece in motion is left off with the square it
+    /// left. The squares themselves and their marks are drawn as usual.
+    pub hidden: Squares,
 }
 
 impl Presentation {
@@ -353,6 +401,7 @@ impl Presentation {
             mark_turn: true,
             outcome: game.outcome(),
             transition: None,
+            hidden: Squares::EMPTY,
         }
     }
 

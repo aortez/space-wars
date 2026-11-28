@@ -5298,6 +5298,7 @@ name = "scenario-clock"
 version = "0.1.0"
 dependencies = [
  "engine-chess",
+ "engine-chess-board",
  "engine-common",
  "engine-core",
  "engine-rapier",

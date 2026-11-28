@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use engine_chess::{Color, Piece, PieceKind, Position, Revision, Square};
-use engine_chess_board::{Board, Detail, Orientation, Presentation, fixture};
+use engine_chess_board::{Board, Detail, Orientation, Presentation, Squares, fixture};
 use engine_common::{Camera2, RenderFrame, RenderPoint, RenderRect};
 use i_slint_core::graphics::{ImageInner, SharedImageBuffer};
 use slint::{Image, Rgb8Pixel, SharedPixelBuffer};
@@ -66,7 +66,7 @@ fn frame(board: &Board, presentation: &Presentation) -> RenderFrame {
 
 /// The frame drawn by each backend: the raster adapter's pixels, and the
 /// vector adapter's paths rasterized through Slint's SVG loader.
-fn captures(
+pub(crate) fn captures(
     frame: &RenderFrame,
     viewport: Viewport,
 ) -> [(&'static str, SharedPixelBuffer<Rgb8Pixel>); 2] {
@@ -339,6 +339,7 @@ fn every_kind_and_colour_of_piece_differs_from_the_rest_at_the_least_sizes() {
                     mark_turn: false,
                     outcome: None,
                     transition: None,
+                    hidden: Squares::EMPTY,
                 };
                 let frame = frame(&board, &presentation);
                 for (index, (backend, pixels)) in captures(&frame, viewport).into_iter().enumerate()

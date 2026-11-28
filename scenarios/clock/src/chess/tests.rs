@@ -431,12 +431,25 @@ fn clock_moves(state: &ClockState) -> &[Move] {
     state.chess().current().expect("a match").game().moves()
 }
 
+/// Ticks from a visit's admission to its first tick of play.
+fn setup_ticks() -> u64 {
+    [Phase::Arriving, Phase::Opening, Phase::Placing]
+        .iter()
+        .map(|phase| phase.ticks().expect("a timed phase"))
+        .sum()
+}
+
 #[test]
 fn the_board_takes_only_ticks_that_move_and_pays_no_heed_to_the_time_of_day() {
     let mut quiet = clock(21);
     let mut busy = clock(21);
-    assert!(quiet.admit_chess_play() && busy.admit_chess_play());
-    assert!(!busy.admit_chess_play(), "one play at a time");
+    assert_eq!(quiet.admit_chess_visit(), Ok(()));
+    assert_eq!(busy.admit_chess_visit(), Ok(()));
+    assert_eq!(
+        busy.admit_chess_visit(),
+        Err(Refusal::Busy),
+        "one visit at a time"
+    );
 
     let at = |hour, minute, second| ClockReading::new(hour, minute, second).expect("a time");
     let date = |day| ClockDate::new(2026, 11, day).expect("a date");
@@ -445,14 +458,16 @@ fn the_board_takes_only_ticks_that_move_and_pays_no_heed_to_the_time_of_day() {
         let reading = ClockAction::set_reading(at(9, 59, second % 60));
         ClockScenario::step(&mut busy, &[reading], Duration::ZERO);
     }
-    assert_eq!(busy.chess_play().expect("play").ticks(), 0);
+    let visit = busy.chess_visit().expect("a visit");
+    assert_eq!((visit.phase(), visit.ticks()), (Phase::Arriving, 0));
 
-    for tick in 1..=600 {
-        let actions = match tick {
-            100 => vec![ClockAction::set_reading(at(10, 0, 0))],
-            200 => vec![ClockAction::set_reading(at(23, 59, 59).with_date(date(25)))],
-            201 => vec![ClockAction::set_reading(at(0, 0, 0).with_date(date(26)))],
-            400 => vec![ClockAction::set_reading(at(3, 15, 0))],
+    let setup = setup_ticks();
+    for tick in 1..=setup + 600 {
+        let actions = match tick.checked_sub(setup) {
+            Some(100) => vec![ClockAction::set_reading(at(10, 0, 0))],
+            Some(200) => vec![ClockAction::set_reading(at(23, 59, 59).with_date(date(25)))],
+            Some(201) => vec![ClockAction::set_reading(at(0, 0, 0).with_date(date(26)))],
+            Some(400) => vec![ClockAction::set_reading(at(3, 15, 0))],
             _ => Vec::new(),
         };
         ClockScenario::step(&mut busy, &actions, TICK);
@@ -462,45 +477,56 @@ fn the_board_takes_only_ticks_that_move_and_pays_no_heed_to_the_time_of_day() {
             quiet.chess().current(),
             "tick {tick}"
         );
-        assert_eq!(clock_moves(&busy).len(), tick / 300, "tick {tick}");
+        let played = tick.saturating_sub(setup) / Pace::CLOCK.turn;
+        assert_eq!(clock_moves(&busy).len() as u64, played, "tick {tick}");
     }
 }
 
 #[test]
-fn a_resize_ends_play_and_the_match_goes_on_at_the_next_visit_but_not_into_a_new_run() {
+fn a_resize_ends_the_visit_and_the_match_goes_on_at_the_next_but_not_into_a_new_run() {
+    let ticks = |state: &mut ClockState, count: u64| {
+        for _ in 0..count {
+            ClockScenario::step(state, &[], TICK);
+        }
+    };
+    let setup = setup_ticks();
+    let turn = Pace::CLOCK.turn;
     let mut reference = clock(22);
-    reference.admit_chess_play();
-    for _ in 0..900 {
-        ClockScenario::step(&mut reference, &[], TICK);
-    }
+    reference.admit_chess_visit().expect("a visit");
+    ticks(&mut reference, setup + 3 * turn);
     let moves = clock_moves(&reference).to_vec();
     assert_eq!(moves.len(), 3);
 
     let mut state = clock(22);
-    state.admit_chess_play();
-    for _ in 0..600 {
-        ClockScenario::step(&mut state, &[], TICK);
-    }
+    state.admit_chess_visit().expect("a visit");
+    ticks(&mut state, setup + 2 * turn);
     let aspect_ratio = state.aspect_ratio();
     state.set_aspect_ratio(aspect_ratio * 0.8);
     assert_ne!(state.aspect_ratio(), aspect_ratio);
-    assert!(state.chess_play().is_none(), "a resize ends the visit");
+    // A resize takes the board away at once, with its claim on the arena.
+    assert!(state.chess_visit().is_none(), "a resize ends the visit");
+    assert!(!state.arena.holds(crate::arena::Owner::Chess));
+    let board =
+        engine_rapier::world::PhysicsId::new(crate::arena::ids::canonical::CHESS_BOARD.start);
+    assert!(
+        state
+            .arena
+            .world()
+            .is_none_or(|world| !world.contains_entity(board))
+    );
 
     // Away from the board, nothing is played.
-    for _ in 0..1_000 {
-        ClockScenario::step(&mut state, &[], TICK);
-    }
+    ticks(&mut state, 1_000);
     assert_eq!(clock_moves(&state), &moves[..2]);
 
-    // The next visit plays on from there.
-    assert!(state.admit_chess_play());
-    for _ in 0..300 {
-        ClockScenario::step(&mut state, &[], TICK);
-    }
+    // The next visit sets the board up in the new view, and plays on from
+    // where the last left off.
+    assert_eq!(state.admit_chess_visit(), Ok(()));
+    ticks(&mut state, setup + turn);
     assert_eq!(state.chess().current().expect("a match").number(), 1);
     assert_eq!(clock_moves(&state), moves);
 
-    assert!(state.end_chess_play() && !state.end_chess_play());
+    assert!(state.pack_chess_visit() && !state.pack_chess_visit());
     assert!(
         clock(22).chess().current().is_none(),
         "a new run has no match"

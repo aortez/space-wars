@@ -31,8 +31,12 @@ use engine_common::background::{Background, Steps};
 
 use crate::events::FIXED_HZ;
 
+pub mod stage;
 #[cfg(test)]
 mod tests;
+mod visit;
+
+pub use visit::{MOVE_TICKS, Phase, Show, Visit};
 
 /// The players.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -169,6 +173,50 @@ impl Pace {
         quota: 4_000,
         settings: Level::Normal.settings(),
     };
+}
+
+/// The visits to the board a run stages by itself, so that the real client
+/// shows them before the Clock's schedule brings the birds. Ordinary Clock
+/// stages none.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum FixtureStart {
+    #[default]
+    None,
+    /// One visit after another. Each sets the board up, plays two moves and
+    /// packs the board away. The first starts a match, and the rest go on
+    /// with it.
+    Visits,
+}
+
+impl FixtureStart {
+    /// Ticks without a visit at the board before the fixture admits the
+    /// next.
+    pub const PAUSE: u64 = 3 * FIXED_HZ as u64;
+    /// Ticks a visit plays before the fixture asks it to pack up: two turns,
+    /// and a second for the second move to arrive and be seen.
+    pub const PLAY: u64 = 2 * Pace::CLOCK.turn + FIXED_HZ as u64;
+
+    /// The fixture `SPACEWARS_CLOCK_CHESS_FIXTURE` names: `visits`.
+    pub fn from_override(value: Option<&str>) -> Self {
+        match value {
+            Some("visits") => Self::Visits,
+            _ => Self::None,
+        }
+    }
+}
+
+/// Why a visit to the board was turned away. Nothing changed: the scene and
+/// the match are as they were.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Refusal {
+    /// A visit is at the board already.
+    Busy,
+    /// An event or a duck's visit has the floor to itself.
+    Floor,
+    /// No stage stands clear, supported and dry below the digits.
+    Stage(stage::Refusal),
+    /// The arena cannot take the board.
+    Arena(engine_common::ClockArenaUnavailable),
 }
 
 /// What the birds do at the board in a tick.

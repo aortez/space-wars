@@ -3,7 +3,7 @@ use engine_common::{Camera2, RenderFrame, RenderPoint, RenderPrimitive, RenderRe
 
 use super::*;
 use crate::fixture::{self, Fixture};
-use crate::{Board, Detail, Orientation, Presentation, Selection, Transition};
+use crate::{Board, Detail, Orientation, Presentation, Selection, Squares, Transition};
 
 /// Sides of a board in a view 480 units high: compact at its least, and
 /// full.
@@ -356,8 +356,16 @@ fn the_frame_is_lit_on_the_side_of_the_player_to_move_while_the_game_is_on() {
                 RenderPrimitive::Polygon(polygon)
                     if polygon.fill.map(|fill| fill.color) == Some(TURN) =>
                 {
-                    let bottom = polygon.points.iter().any(|point| point.y == bounds.min.y);
-                    Some(if bottom { "bottom" } else { "top" })
+                    let touches = |on: &dyn Fn(&RenderPoint) -> bool| polygon.points.iter().any(on);
+                    Some(if touches(&|point| point.y == bounds.min.y) {
+                        "bottom"
+                    } else if touches(&|point| point.y == bounds.max.y) {
+                        "top"
+                    } else if touches(&|point| point.x == bounds.min.x) {
+                        "left"
+                    } else {
+                        "right"
+                    })
                 }
                 _ => None,
             })
@@ -369,12 +377,105 @@ fn the_frame_is_lit_on_the_side_of_the_player_to_move_while_the_game_is_on() {
     let mut black_above = named("check");
     black_above.orientation = Orientation::WhiteAtBottom;
     assert_eq!(lit(&black_above), Some("top"));
+    // Turned a quarter, the side of the player to move.
+    let turned = |name, orientation| Fixture {
+        orientation,
+        ..named(name)
+    };
+    assert_eq!(
+        lit(&turned("start", Orientation::WhiteAtLeft)),
+        Some("left")
+    );
+    assert_eq!(
+        lit(&turned("check", Orientation::WhiteAtLeft)),
+        Some("right")
+    );
+    assert_eq!(
+        lit(&turned("start", Orientation::WhiteAtRight)),
+        Some("right")
+    );
+    assert_eq!(
+        lit(&turned("check", Orientation::WhiteAtRight)),
+        Some("left")
+    );
     let mut unmarked = named("start");
     unmarked.presentation.mark_turn = false;
     assert_eq!(lit(&unmarked), None);
     assert_eq!(lit(&named("checkmate")), None);
     // While a move is on its way, it is still the turn of its player.
     assert_eq!(lit(&named("capture")), Some("bottom"));
+}
+
+#[test]
+fn pieces_left_off_are_not_drawn_and_nothing_else_changes() {
+    let start = named("start");
+    let board = board(FULL_SIDE, start.orientation);
+    let white = |presentation: &Presentation| -> Squares {
+        squares()
+            .filter(|&square| {
+                presentation
+                    .position
+                    .piece_at(square)
+                    .is_some_and(|piece| piece.color == Color::White)
+            })
+            .collect()
+    };
+    let without_white = Presentation {
+        hidden: white(&start.presentation),
+        ..start.presentation.clone()
+    };
+    let (standing, moving) = placed(&board, &without_white);
+    assert!(moving.is_empty());
+    assert_eq!(standing.len(), 16);
+    assert!(
+        standing
+            .iter()
+            .all(|placed| placed.piece.color == Color::Black)
+    );
+    // The frame, the mark of the turn and the squares come first, as they
+    // were. Every piece's part drawn is one drawn before, and every one left
+    // off lies on White's two ranks.
+    let (all, some) = (
+        drawn(&board, &start.presentation),
+        drawn(&board, &without_white),
+    );
+    let (all, some) = (&all.layers[0].primitives, &some.layers[0].primitives);
+    let squares = 3 + 32;
+    assert_eq!(all[..squares], some[..squares]);
+    let mut left_off: Vec<_> = all[squares..].iter().collect();
+    for primitive in &some[squares..] {
+        let index = left_off
+            .iter()
+            .position(|other| *other == primitive)
+            .expect("drawn before");
+        left_off.remove(index);
+    }
+    assert!(!left_off.is_empty());
+    let second_rank = board.square_rect(square("a2")).max.y;
+    for primitive in left_off {
+        let RenderPrimitive::Polygon(polygon) = primitive else {
+            panic!("a piece is drawn in polygons: {primitive:?}");
+        };
+        assert!(
+            polygon.points.iter().all(|point| point.y <= second_rank),
+            "{polygon:?}"
+        );
+    }
+    // A piece in motion is left off with the square it left. The pawn it
+    // takes stands on its own square until the move arrives.
+    let capture = named("capture");
+    let left = Presentation {
+        hidden: [square("e4")].into_iter().collect(),
+        ..capture.presentation.clone()
+    };
+    let (standing, moving) = placed(&board, &left);
+    assert!(moving.is_empty());
+    assert!(on(&standing, &board, "d5").is_some());
+    assert!(on(&standing, &board, "e4").is_none());
+    assert_eq!(
+        placed(&board, &capture.presentation).0.len(),
+        standing.len()
+    );
 }
 
 #[test]

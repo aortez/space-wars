@@ -86,9 +86,16 @@ fn no_board_fits_a_view_or_an_area_that_is_not_a_number() {
     assert!(fit(backwards, 480.0).is_err());
 }
 
+const ORIENTATIONS: [Orientation; 4] = [
+    Orientation::WhiteAtBottom,
+    Orientation::BlackAtBottom,
+    Orientation::WhiteAtLeft,
+    Orientation::WhiteAtRight,
+];
+
 #[test]
-fn every_square_maps_to_its_place_and_back_either_way_up() {
-    for orientation in [Orientation::WhiteAtBottom, Orientation::BlackAtBottom] {
+fn every_square_maps_to_its_place_and_back_every_way_round() {
+    for orientation in ORIENTATIONS {
         let board = Board::fit(area(170.0), 480.0, orientation).unwrap();
         for square in squares() {
             let rect = board.square_rect(square);
@@ -131,6 +138,44 @@ fn white_at_bottom_has_a1_lower_left_and_black_at_bottom_turns_the_board() {
     assert!(corner(&white, "a8").y > corner(&white, "a1").y);
     for (name, opposite) in [("a1", "h8"), ("h1", "a8"), ("e4", "d5"), ("c7", "f2")] {
         assert_eq!(corner(&white, name), corner(&black, opposite));
+    }
+}
+
+#[test]
+fn turned_a_quarter_white_sits_at_the_left_or_at_the_right() {
+    let fit = |orientation| Board::fit(area(170.0), 480.0, orientation).unwrap();
+    let (bottom, left, right) = (
+        fit(Orientation::WhiteAtBottom),
+        fit(Orientation::WhiteAtLeft),
+        fit(Orientation::WhiteAtRight),
+    );
+    let corner = |board: &Board, name| board.square_rect(square(name)).min;
+    let frame = left.square_side() / 4.0;
+    let bounds = left.bounds();
+    // White's back rank runs up the left side, from h1 at its foot to a1
+    // at its top, and Black's down the right.
+    assert_eq!(
+        corner(&left, "h1"),
+        RenderPoint::new(bounds.min.x + frame, bounds.min.y + frame)
+    );
+    assert_eq!(corner(&left, "a1").x, corner(&left, "h1").x);
+    assert!(corner(&left, "a1").y > corner(&left, "h1").y);
+    assert!(corner(&left, "a8").x > corner(&left, "a1").x);
+    assert_eq!(corner(&left, "a8").y, corner(&left, "a1").y);
+    // Each is a quarter turn of White at the bottom, clockwise for White at
+    // the left, about the centre of the board.
+    let middle = |board: &Board, square| {
+        let rect = board.square_rect(square);
+        let bounds = board.bounds();
+        (
+            (rect.min.x + rect.max.x - bounds.min.x - bounds.max.x) / 2.0,
+            (rect.min.y + rect.max.y - bounds.min.y - bounds.max.y) / 2.0,
+        )
+    };
+    for square in squares() {
+        let (x, y) = middle(&bottom, square);
+        assert_eq!(middle(&left, square), (y, -x), "{square}");
+        assert_eq!(middle(&right, square), (-y, x), "{square}");
     }
 }
 

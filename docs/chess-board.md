@@ -15,12 +15,17 @@ no font is needed, and every backend draws them the same way.
    `view_height` is the height of the world that the camera shows. A board
    too small to read is refused with `TooSmall { needed }`, which gives the
    side, in world units, that would be enough. White is at the bottom unless
-   the host asks for `Orientation::BlackAtBottom`.
+   the host asks for `Orientation::BlackAtBottom`. For players seen sitting
+   at the board's left and right, `WhiteAtLeft` and `WhiteAtRight` turn the
+   board a quarter. White's back rank then runs up that side, with the a-file
+   at White's own left, and the pieces still stand upright.
 2. Each frame, build a `Presentation`. `Presentation::of(&game)` gives the
    position, its revision, the last move, the result and the mark of the
    turn. The host can add the piece a player has picked up, with
    `Selection::of(&game, square)` listing where it may legally go, and a
-   `Transition` to show a move in motion.
+   `Transition` to show a move in motion. A host that sets the board up or
+   packs it away piece by piece lists in `hidden` the squares whose pieces
+   are left off. Those squares and their marks are drawn as usual.
 3. Call `draw(&mut frame, z, &board, &presentation)`. Drawing only adds to the
    frame, on layer `z`. It never plays a move or changes a game. The same
    board and presentation always give the same primitives, all inside
@@ -30,6 +35,10 @@ no font is needed, and every backend draws them the same way.
 4. For input, `board.square_at(point)` gives the square under a point of the
    world, or `None` on the frame and beyond it. `board.square_rect(square)`
    gives the area a square covers.
+5. A host that draws the board coming or going in its own way, as the Clock
+   does while its board unfolds, can use the board's colours, `FRAME_COLOR`,
+   `LIGHT_SQUARE` and `DARK_SQUARE`, and `FRAME_SHARE`, the share of the
+   board's side that the frame takes on each side.
 
 The board marks these things on its squares:
 
@@ -88,9 +97,10 @@ camera, 480 units high, a board with compact pieces needs a side of 85 units
 and one with full pieces needs 136. A board of 64 to 80 units, as #403
 suggested, is too small: at 80 units a square is 9.4 pixels on the
 HyperPixel. About 96 units lie below the Clock's face at 800×480, enough for
-the least compact board; where the board goes is for #374 to decide. On the
-Picade, 1024×768, the same board is 1.6 times as many pixels, and it keeps
-the pieces chosen for the HyperPixel.
+the least compact board, and the Clock stands its board there
+([Chess board](clock.md#chess-board-405)). On the Picade, 1024×768, the same
+board is 1.6 times as many pixels, and it keeps the pieces chosen for the
+HyperPixel.
 
 Rendered captures set these limits; counting primitives cannot say whether a
 piece can be read. Earlier designs eight cells high could not be read at 8
@@ -148,7 +158,9 @@ ones.
 
 The crate's own tests cover:
 
-- the square mapping, either way up;
+- the square mapping, all four ways round;
+- the turn's mark on the side of the player to move, all four ways round;
+- pieces left off, with nothing else changed;
 - hit testing on the frame and beyond it;
 - refusing boards that are too small;
 - that every primitive is filled, finite and inside the board, with no more
