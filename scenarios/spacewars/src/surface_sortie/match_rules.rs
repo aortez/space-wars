@@ -476,7 +476,7 @@ pub(crate) fn apply_contacts(
                         continue;
                     }
                     if matches!(entity, MechanicalEntity::Spaceling(_)) {
-                        external_hits.push((pilot.vehicle.0, shell.owner_id));
+                        external_hits.push((pilot.vehicle.0, shell.seat()));
                     }
                     (amount, PilotDamageCause::Missile)
                 } else if debris.is_some_and(|(_, d)| d.damage_scalar == 0.0) {

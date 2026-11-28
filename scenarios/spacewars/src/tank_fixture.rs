@@ -12,7 +12,7 @@ use crate::{
     tanks::{TankCommand, TankId},
 };
 
-pub const FIXTURE_VERSION: &str = "planetary-tank-237-v1";
+pub const FIXTURE_VERSION: &str = "planetary-tank-237-v2";
 pub const WARMUP_STEPS: usize = 120;
 pub const MEASURED_STEPS: usize = 600;
 
@@ -33,7 +33,8 @@ pub struct TankSample {
     pub supported: bool,
     pub relative_speed: Option<f32>,
     pub blocked: bool,
-    pub aim: f32,
+    pub elevation: f32,
+    pub facing: f32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -179,7 +180,9 @@ impl TankFixture {
                 TankCommand {
                     drive: if index == 0 && drive { 1.0 } else { 0.0 },
                     brake: index == 1 || !drive,
-                    turret_angle: if index == 0 { 0.3 } else { -0.4 },
+                    elevation: if index == 0 { 0.3 } else { 0.4 },
+                    facing: if index == 0 { 1.0 } else { -1.0 },
+                    ..TankCommand::default()
                 }
             ));
         }
@@ -283,7 +286,8 @@ impl TankFixture {
                             .dot(Vec2::new(support.normal.y, -support.normal.x))
                     }),
                     blocked: s.drive_blocked,
-                    aim: s.command.turret_angle,
+                    elevation: s.command.elevation,
+                    facing: s.command.facing,
                 }
             })
             .collect();
@@ -458,9 +462,10 @@ impl TankFixture {
             (
                 "independent_controls",
                 independent.abs() < 0.8
-                    && trace
-                        .iter()
-                        .all(|s| s.tanks[0].aim == 0.3 && s.tanks[1].aim == -0.4),
+                    && trace.iter().all(|s| {
+                        (s.tanks[0].elevation, s.tanks[0].facing) == (0.3, 1.0)
+                            && (s.tanks[1].elevation, s.tanks[1].facing) == (0.4, -1.0)
+                    }),
             ),
             (
                 "supported_drive_and_brake",

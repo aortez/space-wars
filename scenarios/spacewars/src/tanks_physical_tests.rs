@@ -412,7 +412,8 @@ fn repeated_host_clear_readmission_and_physics_restore_preserve_actor_handles() 
                         a,
                         TankCommand {
                             drive: 1.0,
-                            turret_angle: 0.4,
+                            elevation: 0.4,
+                            facing: -1.0,
                             ..Default::default()
                         },
                     ),

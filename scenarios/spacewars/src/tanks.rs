@@ -6,18 +6,23 @@
 //!
 //! Each tank keeps what is left of its armor. The host's weapons and contact
 //! charges wear it, and the host breaks up a tank whose armor fails (#238).
+//!
+//! Each tank's cannon fires the shared cannon's rounds by its rules, in
+//! [`cannon`], as Scorched Earth's tanks do. A round is a shell in the host's
+//! debris, a body in the world from the step it is fired in.
 
 use std::collections::BTreeMap;
 
 use engine_core::Vec2;
 use engine_rapier::{
+    cannon::{self, Barrel, Carriage},
     rover::{RoverAssembly, RoverControl, RoverSnapshot, RoverSpawnPose, RoverSpec},
     world::{
         BodyId, BodyMotion, ColliderId, PhysicsId, PhysicsWorld, RayCastOptions, SurfaceContact,
     },
 };
 
-use crate::Allegiance;
+use crate::{Allegiance, DebrisState};
 
 pub const MAX_TANKS: usize = 16;
 /// A tank's health when placed, with its armor whole.
@@ -38,7 +43,7 @@ impl TankId {
 
     /// The tank whose physics entity has the value `entity`, if the value is
     /// in the tanks' range.
-    fn of_entity(entity: u64) -> Option<Self> {
+    pub(crate) fn of_entity(entity: u64) -> Option<Self> {
         entity
             .checked_sub(ENTITY_BASE)
             .filter(|&id| id > 0)
@@ -64,8 +69,9 @@ pub struct TankDamage {
     pub cause: TankDamageCause,
     /// The health it cost.
     pub amount: f32,
-    /// The side whose round or laser it was. A contact has none, and neither
-    /// does a round no player fired.
+    /// The side whose round or laser it was: a ship's player, or the side of
+    /// the tank that fired the round. A contact has none, and neither does a
+    /// shell no ship or tank fired.
     pub source: Option<Allegiance>,
 }
 
@@ -86,12 +92,46 @@ pub(crate) struct Wreck {
     pub bodies: Option<[(BodyMotion, f32); 3]>,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TankCommand {
     pub drive: f32,
     pub brake: bool,
-    /// Aim relative to the chassis, in radians.
-    pub turret_angle: f32,
+    /// How far the barrel aims above the horizontal, in radians, from
+    /// [`cannon::MIN_ELEVATION`] to [`cannon::MAX_ELEVATION`]. The horizontal
+    /// is square to the tank's up, against the gravity its chassis feels.
+    pub elevation: f32,
+    /// The side the barrel aims toward: 1 for the side clockwise of the
+    /// tank's up, and -1 for the other.
+    pub facing: f32,
+    /// How fast a round leaves the barrel, relative to the hull, from
+    /// [`cannon::MIN_POWER`] to [`cannon::MAX_POWER`].
+    pub power: f32,
+    /// Whether the trigger is held. A held trigger fires each time the cannon
+    /// may.
+    pub fire: bool,
+}
+
+impl Default for TankCommand {
+    /// No drive and no brake, the barrel 45° up toward the side clockwise of
+    /// up at the power halfway between the limits, and the trigger released.
+    fn default() -> Self {
+        Self {
+            drive: 0.0,
+            brake: false,
+            elevation: 45.0_f32.to_radians(),
+            facing: 1.0,
+            power: (cannon::MIN_POWER + cannon::MAX_POWER) * 0.5,
+            fire: false,
+        }
+    }
+}
+
+/// The tank whose cannon fired a round, and the side that tank fights for,
+/// which the round's hits name.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TankRound {
+    pub tank: TankId,
+    pub allegiance: Allegiance,
 }
 
 #[derive(Debug, Clone)]
@@ -105,6 +145,29 @@ struct Tank {
     command: TankCommand,
     blocked: bool,
     gravity: [Vec2; 3],
+    /// The tick its cannon has reloaded by.
+    reloaded: u64,
+}
+
+impl Tank {
+    /// Which way is up where the tank stands: against the gravity its
+    /// chassis felt in the last step, or the hull's up if it felt none.
+    fn up(&self, angle: f32) -> Vec2 {
+        let gravity = self.gravity[0];
+        if gravity.length_squared() > 0.0 {
+            -gravity.normalized()
+        } else {
+            Vec2::Y.rotate_radians(angle)
+        }
+    }
+
+    /// The way the barrel points as the tank's command aims it, and the
+    /// barrel, on a chassis at `position` turned `angle`.
+    fn barrel(&self, position: Vec2, angle: f32) -> (Vec2, Barrel) {
+        let direction =
+            cannon::direction(self.command.elevation, self.command.facing, self.up(angle));
+        (direction, Barrel::new(position, angle, direction))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -116,10 +179,13 @@ pub struct TankSnapshot {
     pub last_damage: Option<TankDamage>,
     pub command: TankCommand,
     pub assembly: RoverSnapshot,
+    /// The barrel's pivot.
     pub mount_position: Vec2,
     pub mount_velocity: Vec2,
     pub muzzle_position: Vec2,
     pub muzzle_direction: Vec2,
+    /// The barrel holds its aim as the hull turns, so its muzzle moves as its
+    /// pivot does.
     pub muzzle_velocity: Vec2,
     pub mount_angular_velocity: f32,
     pub drive_blocked: bool,
@@ -300,19 +366,28 @@ impl Tanks {
                 command: TankCommand::default(),
                 blocked: false,
                 gravity: [Vec2::ZERO; 3],
+                reloaded: 0,
             },
         );
         Some(id)
     }
 
     /// Apply source-independent motor intent; no simulation step or gravity is applied.
+    /// Each value is held to its range, and a command with a value that is
+    /// not a finite number is refused.
     pub fn command(
         &mut self,
         physics: &mut PhysicsWorld,
         id: TankId,
         command: TankCommand,
     ) -> bool {
-        if !command.drive.is_finite() || !command.turret_angle.is_finite() {
+        let values = [
+            command.drive,
+            command.elevation,
+            command.facing,
+            command.power,
+        ];
+        if !values.iter().all(|value| value.is_finite()) {
             return false;
         }
         let Some(tank) = self.actors.get_mut(&id) else {
@@ -320,6 +395,11 @@ impl Tanks {
         };
         let command = TankCommand {
             drive: command.drive.clamp(-1.0, 1.0),
+            elevation: command
+                .elevation
+                .clamp(cannon::MIN_ELEVATION, cannon::MAX_ELEVATION),
+            facing: if command.facing >= 0.0 { 1.0 } else { -1.0 },
+            power: command.power.clamp(cannon::MIN_POWER, cannon::MAX_POWER),
             ..command
         };
         if !tank.assembly.set_control(
@@ -338,10 +418,9 @@ impl Tanks {
     pub fn snapshot(&self, physics: &PhysicsWorld, id: TankId) -> Option<TankSnapshot> {
         let tank = self.actors.get(&id)?;
         let assembly = tank.assembly.snapshot_bounded(physics, CONTACT_BUDGET)?;
-        let mount_position =
-            assembly.chassis.position + Vec2::new(0.0, 0.8).rotate_radians(assembly.chassis.angle);
-        let muzzle_direction =
-            Vec2::from_radians(assembly.chassis.angle + tank.command.turret_angle);
+        let (muzzle_direction, barrel) =
+            tank.barrel(assembly.chassis.position, assembly.chassis.angle);
+        let mount_velocity = physics.velocity_at_point(tank.assembly.bodies()[0], barrel.pivot)?;
         let remaining = std::cell::Cell::new(CONTACT_BUDGET);
         Some(TankSnapshot {
             id,
@@ -361,13 +440,10 @@ impl Tanks {
                     c.normal.dot(Vec2::Y.rotate_radians(assembly.chassis.angle)) > 0.7
                         && c.separation <= 0.05
                 }),
-            mount_position,
-            mount_velocity: physics.velocity_at_point(tank.assembly.bodies()[0], mount_position)?,
-            muzzle_position: mount_position + muzzle_direction * 2.5,
-            muzzle_velocity: physics.velocity_at_point(
-                tank.assembly.bodies()[0],
-                mount_position + muzzle_direction * 2.5,
-            )?,
+            mount_position: barrel.pivot,
+            mount_velocity,
+            muzzle_position: barrel.muzzle,
+            muzzle_velocity: mount_velocity,
             mount_angular_velocity: assembly.chassis.angular_velocity,
             muzzle_direction,
             assembly,
@@ -811,7 +887,8 @@ mod tests {
             a,
             TankCommand {
                 drive: 1.0,
-                turret_angle: 0.3,
+                elevation: 0.3,
+                facing: -1.0,
                 ..Default::default()
             },
         );
@@ -1023,29 +1100,80 @@ mod tests {
             )
             .unwrap();
         let before = tanks.snapshot(&physics, b).unwrap();
+        assert_eq!(before.command, TankCommand::default());
+        assert_eq!(
+            TankCommand::default(),
+            TankCommand {
+                drive: 0.0,
+                brake: false,
+                elevation: 45.0_f32.to_radians(),
+                facing: 1.0,
+                power: 30.0,
+                fire: false,
+            }
+        );
+        // Each value is held to its range, and any input below zero faces the
+        // other way.
         assert!(tanks.command(
             &mut physics,
             a,
             TankCommand {
                 drive: 2.0,
                 brake: true,
-                turret_angle: 0.7
+                elevation: 2.0,
+                facing: -0.25,
+                power: 100.0,
+                fire: true,
             }
         ));
         assert_eq!(tanks.snapshot(&physics, b).unwrap(), before);
-        assert_eq!(tanks.snapshot(&physics, a).unwrap().command.drive, 1.0);
-        assert!(!tanks.command(
-            &mut physics,
-            a,
-            TankCommand {
-                drive: f32::NAN,
-                ..TankCommand::default()
+        let held = TankCommand {
+            drive: 1.0,
+            brake: true,
+            elevation: cannon::MAX_ELEVATION,
+            facing: -1.0,
+            power: cannon::MAX_POWER,
+            fire: true,
+        };
+        assert_eq!(tanks.snapshot(&physics, a).unwrap().command, held);
+        let low = TankCommand {
+            elevation: 0.0,
+            facing: 0.0,
+            power: 0.0,
+            ..held
+        };
+        assert!(tanks.command(&mut physics, b, low));
+        let held_low = TankCommand {
+            elevation: cannon::MIN_ELEVATION,
+            facing: 1.0,
+            power: cannon::MIN_POWER,
+            ..held
+        };
+        assert_eq!(tanks.snapshot(&physics, b).unwrap().command, held_low);
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let refused = [
+                TankCommand {
+                    drive: value,
+                    ..TankCommand::default()
+                },
+                TankCommand {
+                    elevation: value,
+                    ..TankCommand::default()
+                },
+                TankCommand {
+                    facing: value,
+                    ..TankCommand::default()
+                },
+                TankCommand {
+                    power: value,
+                    ..TankCommand::default()
+                },
+            ];
+            for command in refused {
+                assert!(!tanks.command(&mut physics, a, command), "{command:?}");
             }
-        ));
-        assert_eq!(
-            tanks.snapshot(&physics, a).unwrap().command.turret_angle,
-            0.7
-        );
+        }
+        assert_eq!(tanks.snapshot(&physics, a).unwrap().command, held);
         tanks.clear(&mut physics);
     }
 }
@@ -1196,8 +1324,91 @@ impl super::SpacewarsState {
     pub fn clear_tanks(&mut self) {
         self.physics.tanks.clear(&mut self.physics.world);
     }
+
+    /// Fires each tank that holds its trigger, in id order, where the shared
+    /// cannon lets it: once it has reloaded, and while fewer than
+    /// [`cannon::MAX_ROUNDS_PER_CANNON`] of its rounds and [`cannon::MAX_ROUNDS`]
+    /// tanks' rounds in all are in flight. A round leaves where the barrel's
+    /// cast stops, or else at the muzzle, at the velocity the cannon gives it.
+    /// Runs before the step's debris takes its bodies.
+    pub(super) fn fire_tanks(&mut self) {
+        let mut flying: Vec<TankId> = self
+            .debris
+            .iter()
+            .filter(|item| !item.dead)
+            .filter_map(|item| item.tank_round.map(|round| round.tank))
+            .collect();
+        let tanks = &mut self.physics.tanks;
+        let world = &self.physics.world;
+        for (&id, tank) in &mut tanks.actors {
+            let own = flying.iter().filter(|&&tank| tank == id).count();
+            if !tank.command.fire
+                || cannon::may_fire(self.tick, tank.reloaded, own, flying.len()).is_err()
+            {
+                continue;
+            }
+            let chassis = tank.assembly.bodies()[0];
+            let (Some(motion), Some(center)) =
+                (world.motion(chassis), world.center_of_mass(chassis))
+            else {
+                continue;
+            };
+            let (direction, barrel) = tank.barrel(motion.position, motion.angle);
+            let position = barrel.exit(|from, along| {
+                let options = RayCastOptions {
+                    max_distance: along.length(),
+                    collision_groups: super::physics::tank_round_groups(),
+                    exclude_entity: Some(tank.assembly.entity()),
+                    ..Default::default()
+                };
+                world.cast_ray(from, along, options).map(|hit| hit.point)
+            });
+            let carriage = Carriage::new(motion, center);
+            let velocity =
+                cannon::launch_velocity(direction, tank.command.power, barrel.pivot, carriage);
+            let round = TankRound {
+                tank: id,
+                allegiance: tank.allegiance,
+            };
+            tank.reloaded = self.tick + cannon::RELOAD_TICKS;
+            self.debris.push(DebrisState::new_tank_round(
+                round, self.tick, position, velocity,
+            ));
+            flying.push(id);
+        }
+    }
+
+    /// Lets each round pass through the tank that fired it on its first
+    /// [`cannon::CLEARANCE_TICKS`] steps, which carry it clear of that tank's
+    /// hull, and ends that on the step its age reaches them. Every other tank
+    /// meets it from launch. Runs once the step's rounds have bodies, before
+    /// the step.
+    pub(super) fn clear_rounds(&mut self) {
+        let clearance = u64::from(cannon::CLEARANCE_TICKS);
+        let world = &mut self.physics.world;
+        for item in self.debris.iter().filter(|item| !item.dead) {
+            let Some(round) = item.tank_round else {
+                continue;
+            };
+            let entity = PhysicsId::new(item.physics_id);
+            let tank = PhysicsId::new(round.tank.entity());
+            // A tank that is gone has nothing left to clear.
+            let clearing = self.tick.saturating_sub(item.spawn_tick) < clearance
+                && self.physics.tanks.actors.contains_key(&round.tank);
+            let passing = world.passes_through(entity);
+            if clearing && passing != Some(tank) {
+                world.pass_through(entity, tank);
+            } else if !clearing && passing.is_some() {
+                world.end_pass_through(entity);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 #[path = "tanks_physical_tests.rs"]
 mod physical_tests;
+
+#[cfg(test)]
+#[path = "tanks_fire_tests.rs"]
+mod fire_tests;

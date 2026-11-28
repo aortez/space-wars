@@ -111,6 +111,45 @@ laser and hard crashes wear a tank's armor, as
 [Spacewars bodies](design/material-sources.md#spacewars-bodies) describes, and
 a tank whose armor fails breaks up.
 
+### Tank fire
+
+A tank's command aims its cannon and holds its trigger. `TankCommand` gives the
+barrel's `elevation`, 5° to 85° above the horizontal; its `facing`, 1 for the
+side clockwise of the tank's up and -1 for the other; the `power` a round
+leaves at, 12 to 48 relative to the hull; and whether `fire` is held. Each
+value is held to its range, and a command with a value that isn't a finite
+number is refused. Up is against the gravity the tank's chassis feels, or the
+hull's up where it feels none, so a tilted tank aims as a level one does.
+
+Tanks fire the shared cannon's rounds by its rules, in
+`crates/engine-rapier/src/cannon.rs`, which
+[Scorched Earth](scorched-earth.md#armor-and-shells) fires by and tests. Each
+step, the tanks holding their triggers fire in id order, each once its cannon
+has reloaded, 75 ticks after it last fired, and while fewer than 4 of its
+rounds and 8 tanks' rounds in all are in flight. Ships' shells don't count. A
+round leaves the muzzle, or the point where something other than its own tank
+stands in the barrel, at its power along the barrel plus the velocity the hull
+gives the barrel's pivot.
+
+- A round is a shell of the cannon's size and mass, in its casing, carrying its
+  [payload](design/material-sources.md#payloads). It meets every solid from
+  launch, except that it passes through the tank that fired it on its first 8
+  steps, which carry it clear of the hull. Every other tank meets it at once.
+- It falls by the gravity where it is on every tick, as the tanks do, rather
+  than by seven times that on every 7th tick, as other debris does.
+- It flies for 600 ticks and then vanishes without bursting. Terrain it lands
+  on takes a ship's shell's crater, and it bursts there. It never leaves a
+  wreck.
+- Its hits, direct and by its blast, name the side of the tank that fired it,
+  a government's or a player's. Where a match credits a seat with a hit on a
+  ship, a pod or a pilot on foot, a player's round counts once for that
+  player's seat, whether it struck or only its blast reached, and a
+  government's counts for none.
+- On the terrain fixture's planet, a round at full power lands within about 8
+  units of the tank that fired it. A slow shot bursts close enough for its
+  blast to reach that tank, and a steep one falls back onto it once its
+  clearance ends.
+
 ### Two-player expedition
 
 Each pilot has its own assigned ship, input state, landing gate, transfer
@@ -354,7 +393,11 @@ the last tank beside a flying ship; a lost flag footing that keeps every tank
 with its allegiance and damage; a health bar that stays above a tank on its
 back; a claim that completes on the tick its last defender dies, while the
 defender's wreck never counts; and a world rebuilt from its seed after tanks
-fought, as a restart rebuilds it, which holds nothing of them.
+fought, as a restart rebuilds it, which holds nothing of them. Firing
+regressions cover the barrel's aim on the planet's top and flank, a held
+trigger against the reload and both limits, a round's exit and launch
+velocity, its clearance, gravity and expiry, the credit for each side, and a
+burst on terrain.
 
 Positive AI flight/capture fixtures now let their otherwise idle opponent
 depart through real controls only when its landing feet support it on the

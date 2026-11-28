@@ -217,6 +217,53 @@ fn a_blast_charges_a_pod_and_a_pilot_on_foot_unless_protection_covers_them() {
             assert_eq!(blasted > 0.0, !covered, "{case}: {blasted}");
             let lost = before - health(&state, target);
             assert!((lost - blasted).abs() < 1.0e-3, "{case}: {lost} {blasted}");
+            // The match records the blast as the round's hit, for the seat
+            // that fired it. Protection keeps the target out of the blast,
+            // which then records nothing on it.
+            let hits = u64::from(!covered);
+            assert_eq!(state.combat_telemetry(0).cannon_hits, hits, "{case}");
+            let source = (!covered).then_some("cannon");
+            assert_eq!(state.combat_telemetry(1).last_hit_source, source, "{case}");
+        }
+    }
+}
+
+/// A tank's round counts once for the seat of the player whose tank fired
+/// it, though both its shot and its blast charge what it strikes, and a
+/// government's round counts for no seat. The target records the hit either
+/// way.
+#[test]
+fn a_tank_round_counts_once_for_its_players_seat_and_a_governments_for_none() {
+    let tank = crate::tanks::TankId::of_entity(crate::tanks::ENTITY_BASE + 1).unwrap();
+    let sides = [
+        (crate::Allegiance::Player(PlayerId::PLAYER_1), 1),
+        (crate::Allegiance::INITIAL_GOVERNMENT, 0),
+    ];
+    for target in [Target::Pod, Target::OnFoot] {
+        for (allegiance, hits) in sides {
+            let case = format!("{target:?}, {allegiance:?}");
+            let mut state = fixture(target);
+            let motion = state.impact_motion(1).unwrap();
+            state.world.debris.push(DebrisState::new_tank_round(
+                crate::tanks::TankRound { tank, allegiance },
+                state.world.tick,
+                motion.center_of_mass - Vec2::X * 8.0,
+                motion.velocity + Vec2::X * 300.0,
+            ));
+            let mut struck = false;
+            let mut burst = false;
+            for _ in 0..30 {
+                idle(&mut state, 1);
+                let mut shots = state.world.shot_hits.values();
+                struck |= shots.any(|hit| hit.target == entity(target));
+                let mut blasts = state.world.blast_hits.iter();
+                burst |= blasts.any(|hit| hit.target == entity(target));
+            }
+            assert!(struck && burst, "{case}: struck {struck}, burst {burst}");
+            assert_eq!(state.combat_telemetry(0).cannon_hits, hits, "{case}");
+            assert_eq!(state.combat_telemetry(1).cannon_hits, 0, "{case}");
+            let source = state.combat_telemetry(1).last_hit_source;
+            assert_eq!(source, Some("cannon"), "{case}");
         }
     }
 }
