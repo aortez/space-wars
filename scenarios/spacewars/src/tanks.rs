@@ -1381,9 +1381,11 @@ impl super::SpacewarsState {
     /// [`cannon::MAX_ROUNDS_PER_CANNON`] of its rounds and [`cannon::MAX_ROUNDS`]
     /// tanks' rounds in all are in flight. A round leaves where the barrel's
     /// cast stops, or else at the muzzle, at the velocity the cannon gives it.
-    /// Runs before the step's debris takes its bodies. Returns the record
-    /// that each shot fired starts, for [`Self::record_tank_shots`] to keep
-    /// once the world holds the step's bodies. A refused shot starts none.
+    /// Runs once the step has reconciled the physics with the game, and
+    /// before the rounds it fires take bodies, so the barrel is cast against
+    /// the world as the last step left it, less the bodies of what has left
+    /// the game since. Returns the record that each shot fired starts, for
+    /// [`Self::record_tank_shots`] to keep. A refused shot starts none.
     #[must_use = "each round fired names a record that the step must keep"]
     pub(super) fn fire_tanks(&mut self) -> Vec<TankShot> {
         let mut flying: Vec<TankId> = self

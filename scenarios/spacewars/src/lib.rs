@@ -1527,8 +1527,16 @@ impl SpacewarsScenario {
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
 
         let lifecycle_started = Instant::now();
+        // The tanks fire once the world holds the bodies of just what the
+        // game holds, so nothing that has left the game stands in a barrel.
+        // Their rounds then take bodies as the rest of the debris did.
+        let mut lifecycle = reconcile_physics(state, dt);
+        let fired_from = state.debris.len();
         let fired = state.fire_tanks();
-        let lifecycle = reconcile_physics(state, dt);
+        let rounds = &mut state.debris[fired_from..];
+        state
+            .physics
+            .admit_debris(state.tick, rounds, &mut lifecycle);
         state.record_tank_shots(fired);
         shots::launch(state);
         state.clear_rounds();

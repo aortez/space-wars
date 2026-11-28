@@ -1452,27 +1452,9 @@ impl SpacewarsPhysics {
                 active.insert(item.physics_id);
             }
 
-            let key = DebrisColliderKey {
-                signature: debris_signature(item),
-                armed: if self.surface_recovery
-                    && item.kind == DebrisKind::Fragment
-                    && item.owner_id.is_some()
-                {
-                    // Half a second at the scenario's fixed 60 Hz. Keep collisions
-                    // with terrain/debris/opponent vehicles during breakup grace.
-                    tick.saturating_sub(item.spawn_tick) >= RECOVERY_BREAKUP_GRACE_TICKS
-                } else {
-                    // A tank's round is armed from launch. Its clearance keeps
-                    // it off the tank that fired it.
-                    item.tank_round.is_some() || item.spawn_tick < tick
-                },
-                kind: item.kind,
-            };
+            let key = self.debris_key(tick, item);
             if self.debris_keys.get(&item.physics_id) != Some(&key) {
-                let entity = PhysicsId::new(item.physics_id);
-                lifecycle.removed += usize::from(self.world.remove_entity(entity));
-                lifecycle.added += usize::from(self.insert_debris(item, key.armed));
-                self.debris_keys.insert(item.physics_id, key);
+                self.replace_debris(item, key, lifecycle);
             } else {
                 synchronize_debris_to_physics(&mut self.world, item);
             }
@@ -1488,6 +1470,57 @@ impl SpacewarsPhysics {
             lifecycle.removed += usize::from(self.world.remove_entity(PhysicsId::new(id)));
             self.debris_keys.remove(&id);
         }
+    }
+
+    /// Gives bodies to debris that the game added after the step reconciled,
+    /// such as the rounds its tanks fired, as reconciling it would have.
+    pub(super) fn admit_debris(
+        &mut self,
+        tick: u64,
+        debris: &mut [DebrisState],
+        lifecycle: &mut PhysicsLifecycle,
+    ) {
+        for item in debris.iter_mut().filter(|item| !item.dead) {
+            if item.physics_id == 0 || self.debris_keys.contains_key(&item.physics_id) {
+                item.physics_id = self.allocate_debris_id();
+            }
+            let key = self.debris_key(tick, item);
+            self.replace_debris(item, key, lifecycle);
+        }
+    }
+
+    /// What decides `item`'s body on `tick`: its shape, and whether it meets
+    /// everything yet.
+    fn debris_key(&self, tick: u64, item: &DebrisState) -> DebrisColliderKey {
+        DebrisColliderKey {
+            signature: debris_signature(item),
+            armed: if self.surface_recovery
+                && item.kind == DebrisKind::Fragment
+                && item.owner_id.is_some()
+            {
+                // Half a second at the scenario's fixed 60 Hz. Keep collisions
+                // with terrain/debris/opponent vehicles during breakup grace.
+                tick.saturating_sub(item.spawn_tick) >= RECOVERY_BREAKUP_GRACE_TICKS
+            } else {
+                // A tank's round is armed from launch. Its clearance keeps
+                // it off the tank that fired it.
+                item.tank_round.is_some() || item.spawn_tick < tick
+            },
+            kind: item.kind,
+        }
+    }
+
+    /// Gives `item` a new body for `key`, in place of any body its id had.
+    fn replace_debris(
+        &mut self,
+        item: &DebrisState,
+        key: DebrisColliderKey,
+        lifecycle: &mut PhysicsLifecycle,
+    ) {
+        let entity = PhysicsId::new(item.physics_id);
+        lifecycle.removed += usize::from(self.world.remove_entity(entity));
+        lifecycle.added += usize::from(self.insert_debris(item, key.armed));
+        self.debris_keys.insert(item.physics_id, key);
     }
 
     fn insert_world_boundary(&mut self, radius: f32) -> bool {
