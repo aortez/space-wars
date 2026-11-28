@@ -1,5 +1,9 @@
 # Evolutionary training and genome browser
 
+The [general trainer design](general-trainer.md) extends the ship-arrival
+workflow to the Clock duck and then NES Falling. It defines shared polar
+senses, creature controls, headless jobs, live edits and Current/Best replay.
+
 **Flight-controller direction, 2026-10-22:** the
 [learned flight controller plan](learned-flight-controller-v1.md) governs the
 next flight skill: layered planning and control, physical task outcomes, no
