@@ -4,6 +4,7 @@ use crate::{
     genome_library::{self, Practice, Trial, valid_id},
     ship_arrival::{self, PracticeBrain},
 };
+use engine_common::brain_controls::{BodyProfile, BrainBinding};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use spacewars_ai::guidance::{self, Policy};
@@ -50,11 +51,25 @@ impl Definition {
         if self.version != expected.version || self.host != expected.host {
             return Err(error(format!("Unsupported practice host: {}", self.host)));
         }
-        if self.organism != expected.organism
-            || self.required_capabilities != expected.required_capabilities
-        {
+        // V1 assemblies already pin their control and observation IDs in the
+        // guidance component. The outer organism label is descriptive.
+        let contract = &self.brain.contract;
+        let host_contract = &expected.brain.contract;
+        let slots = ["turn", "thrust", "brake"];
+        BrainBinding {
+            profile: contract.action.clone(),
+            senses: contract.observation.clone(),
+            required_controls: slots.map(String::from).to_vec(),
+        }
+        .bind(&BodyProfile {
+            profile: &host_contract.action,
+            senses: &host_contract.observation,
+            controls: &slots,
+        })
+        .map_err(error)?;
+        if self.required_capabilities != expected.required_capabilities {
             return Err(error(
-                "This practice host does not support the assembly's organism or required capabilities.",
+                "This practice host does not support the assembly's required capabilities.",
             ));
         }
         if self.brain != expected.brain {

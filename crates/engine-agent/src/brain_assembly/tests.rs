@@ -186,3 +186,24 @@ fn corrupt_behavior_is_excluded_but_damaged_names_do_not_replace_behavior() {
     assert!(load(dir.path(), "../outside").is_err());
     assert!(genome_library::resolve(&dir.path().join("genomes"), "../outside").is_err());
 }
+
+#[test]
+fn v1_ship_identity_and_binding_use_the_recorded_contract() {
+    let controller = "0".repeat(64);
+    let definition = Definition::arrival(&controller);
+    let archived = Artifact::new(definition.clone()).unwrap();
+    assert_eq!(
+        archived.id,
+        "e74c122e3ceb0f017a93e3645c931f403c64d53ab38585f9f5014f2ca83bbfe5"
+    );
+    let bytes = serde_json::to_vec(&archived).unwrap();
+    assert_eq!(
+        serde_json::from_slice::<Artifact>(&bytes).unwrap(),
+        archived
+    );
+    let mut alternate = definition.clone();
+    alternate.organism = "another_pilot".into();
+    assert!(alternate.require_supported().is_ok());
+    alternate.brain.contract.action = "creature_controls_v1".into();
+    assert!(alternate.require_supported().is_err());
+}

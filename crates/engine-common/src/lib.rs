@@ -12,6 +12,7 @@ use serde::{
 
 mod activity_settings;
 pub mod background;
+pub mod brain_controls;
 mod clock_arena;
 mod clock_digit_surfaces;
 mod clock_font;
