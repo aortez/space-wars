@@ -1095,6 +1095,44 @@ fn garden_lab_tree_bed_grows_cuts_and_returns_in_both_renderers() {
             let tip = hinge(&snowy).unwrap();
             assert!(tip["droop"].as_f64().unwrap() > 0.2, "{tip}");
             assert!(tree_tick(&snowy) > tree_tick(&physical), "growth waited");
+            // Every root of a tree with wood anchors it in the dirt. While the
+            // bed runs, a breeze toward the grass leans the trees on their roots,
+            // which hold, and the control's next two presses bring the gale and
+            // then the calm.
+            let anchors = snowy["tree_bed"]["wood"]["roots"]["anchors"]
+                .as_array()
+                .unwrap()
+                .len();
+            assert!(anchors > 20, "{anchors} anchors");
+            choose_tree(
+                h,
+                &mut s,
+                &mut t,
+                control(scenario_garden_lab::Command::Wind),
+            );
+            let breeze = scenario_garden_lab::WINDS[1];
+            let blown = snapshot(h, |v| {
+                let wind = &v["tree_bed"]["wood"]["wind"];
+                wind["name"] == breeze.0 && wind["push"].as_f64() == Some(f64::from(breeze.1))
+            });
+            let roots = &blown["tree_bed"]["wood"]["roots"];
+            let lean = roots["leans"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter_map(|l| l["turn"].as_f64())
+                .fold(0.0, f64::min);
+            assert!(lean < -0.001, "the breeze leans no tree: {roots}");
+            assert_eq!(
+                (&roots["pulls"], &roots["uprooted"]),
+                (&json!(0), &json!(0))
+            );
+            press(h, &mut s, InputButton::South);
+            press(h, &mut s, InputButton::South);
+            snapshot(h, |v| {
+                let wind = &v["tree_bed"]["wood"]["wind"];
+                wind["name"] == "calm" && wind["push"].as_f64() == Some(0.0)
+            });
             choose_tree(
                 h,
                 &mut s,

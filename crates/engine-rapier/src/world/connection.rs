@@ -5,6 +5,9 @@
 //! its weld leaves at the end of that step and its record stays, failed.
 //! A connection that bends is a hinge rather than a rigid weld: a spring with
 //! the beam's own bending stiffness holds the held body's turn about the root.
+//! An anchor holds a body in its support as the ground holds a root: springs
+//! with the beam's own stiffness hold it along the beam, across it and in its
+//! turn, so that several anchors share a load by where they hold.
 //! Callers name a connection by a stable joint identity and never see the
 //! backend's joint types. See `docs/design/material-connection-loads.md`.
 
@@ -46,6 +49,32 @@ pub struct ConnectionSpec {
     pub bends: bool,
 }
 
+/// Where a body is anchored in its support, and what holds it there.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AnchorSpec {
+    /// The body that holds, such as the ground around a root.
+    pub support: BodyId,
+    /// The body it holds, such as a tree's roots.
+    pub body: BodyId,
+    /// Where it holds, in world coordinates. Both bodies are joined there as
+    /// they now lie, and the load is measured there.
+    pub at: Vec2,
+    /// The held length's direction from the support into the held body, in
+    /// world coordinates, along which the load reads as axial. Its length
+    /// does not matter.
+    pub axis: Vec2,
+    /// What holds, and its beam: the held length's section and length.
+    pub connection: Connection,
+}
+
+/// How a connection joins its two bodies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Joining {
+    Weld,
+    Hinge,
+    Anchor,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConnectionRejection {
     /// The identity already names a joint or a connection, failed or not.
@@ -64,13 +93,16 @@ pub enum ConnectionRejection {
 /// step: the solver's final-substep impulse over that substep, as for a
 /// tether's tension. A jolt that ends before the final substep does not show
 /// here. Directions are the beam's as welded, so they turn with the root body.
+/// An anchor's whole force charges the law as its pull, whichever way it
+/// points, so its shear charges too.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct ConnectionLoadSample {
     /// Force along the beam, `mu wu / s^2`: positive in tension, where the
     /// held body pulls away from the root, and negative in compression.
     pub axial: f32,
     /// Force across the beam, positive toward the counterclockwise side of
-    /// its direction. The law does not model shear, so this charges nothing.
+    /// its direction. The law does not model shear, so on a weld or a hinge
+    /// this charges nothing.
     pub shear: f32,
     /// Bending moment at the root section, `mu wu^2 / s^2`, positive
     /// counterclockwise. A branch reaching right under gravity bends its root
@@ -212,6 +244,15 @@ pub fn hinge_stiffness(connection: &Connection) -> f32 {
     connection.region().material().stiffness * beam.second_moment() / beam.length
 }
 
+/// The stiffness with which an anchor holds along its beam and across it,
+/// `mu / s^2`: the connection law's own axial `stiffness * area / length`. An
+/// anchor therefore gives by the law's elastic extension for the force it
+/// carries.
+pub fn anchor_stiffness(connection: &Connection) -> f32 {
+    let beam = connection.beam();
+    connection.region().material().stiffness * beam.area() / beam.length
+}
+
 /// The damping ratio at which a free swing loses `damping`, the material's
 /// fraction of stored elastic energy, each cycle: `-ln(1 - damping) / 4 pi`,
 /// at most critical.
@@ -233,6 +274,22 @@ fn inertia_about(body: &RigidBody, point: Vector) -> f32 {
     mass.local_mprops.principal_inertia() + mass.local_mprops.mass() * arm.length_squared()
 }
 
+/// The springs of an anchor of `connection` that holds `held` at `point`:
+/// its stiffness and damping along and across the beam, then in its turn.
+/// Each is damped as a hinge's spring is, for the held body alone.
+fn anchor_springs(connection: &Connection, held: &RigidBody, point: Vector) -> [(f32, f32); 2] {
+    let ratio = damping_ratio(connection.region().material().damping);
+    let mass = if held.is_dynamic() { held.mass() } else { 0.0 };
+    let (pull, turn) = (anchor_stiffness(connection), hinge_stiffness(connection));
+    [
+        (pull, 2.0 * ratio * (pull * mass).sqrt()),
+        (
+            turn,
+            2.0 * ratio * (turn * inertia_about(held, point)).sqrt(),
+        ),
+    ]
+}
+
 impl PhysicsWorld {
     /// Join two existing bodies where they now lie, with a connection that
     /// carries the load: a rigid weld, or a hinge that bends. Contacts between
@@ -249,75 +306,146 @@ impl PhysicsWorld {
         id: JointId,
         spec: ConnectionSpec,
     ) -> Result<(), ConnectionRejection> {
+        let joining = if spec.bends {
+            Joining::Hinge
+        } else {
+            Joining::Weld
+        };
+        self.join(
+            id,
+            spec.root_body,
+            spec.body,
+            spec.root,
+            spec.axis,
+            spec.connection,
+            joining,
+        )
+    }
+
+    /// Anchor a body in its support where they now lie. An anchor is neither
+    /// rigid nor a hinge: springs hold the held body at the anchor along its
+    /// beam and across it, each with [`anchor_stiffness`], and hold its turn
+    /// with [`hinge_stiffness`]. Several anchors between the same two bodies
+    /// therefore share a load by where they hold: one farther from the center
+    /// the held body turns about gives further and carries more. The whole
+    /// force an anchor carries charges the law as its pull, whichever way it
+    /// points, with its moment. Contacts between the two bodies stay off
+    /// while any of their anchors holds.
+    ///
+    /// Each spring is damped once, here, for the held body alone, as a
+    /// hinge's is.
+    pub fn insert_anchor(
+        &mut self,
+        id: JointId,
+        spec: AnchorSpec,
+    ) -> Result<(), ConnectionRejection> {
+        self.join(
+            id,
+            spec.support,
+            spec.body,
+            spec.at,
+            spec.axis,
+            spec.connection,
+            Joining::Anchor,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn join(
+        &mut self,
+        id: JointId,
+        root_body: BodyId,
+        body: BodyId,
+        root: Vec2,
+        axis: Vec2,
+        connection: Connection,
+        joining: Joining,
+    ) -> Result<(), ConnectionRejection> {
         use ConnectionRejection as R;
         if self.joint_indices.contains_key(&id) || self.connections.contains_key(&id) {
             return Err(R::Taken);
         }
-        let (Some(root_handle), Some(body_handle)) = (
-            self.body_handle(spec.root_body),
-            self.body_handle(spec.body),
-        ) else {
+        let (Some(root_handle), Some(body_handle)) =
+            (self.body_handle(root_body), self.body_handle(body))
+        else {
             return Err(R::Bodies);
         };
-        if spec.root_body == spec.body {
+        if root_body == body {
             return Err(R::Bodies);
         }
-        let length = spec.axis.length();
-        if !finite_vec2(spec.root)
-            || !finite_vec2(spec.axis)
-            || !length.is_finite()
-            || length <= 0.0
-        {
+        let length = axis.length();
+        if !finite_vec2(root) || !finite_vec2(axis) || !length.is_finite() || length <= 0.0 {
             return Err(R::Geometry);
         }
-        if spec.connection.failed() {
+        if connection.failed() {
             return Err(R::Exhausted);
         }
         // The frame's x axis runs along the beam, so the weld's first locked
         // axis carries the axial load and its second the shear. Built from the
         // axis itself, with no trigonometry that could round differently
         // elsewhere.
-        let direction = spec.axis / length;
+        let direction = axis / length;
         let frame = Pose::from_parts(
-            super::to_rapier(spec.root),
+            super::to_rapier(root),
             Rotation::from_cos_sin_unchecked(direction.x, direction.y),
         );
         let root_pose = *self.raw.bodies[root_handle].position();
         let body_pose = *self.raw.bodies[body_handle].position();
-        let joint: GenericJoint = if spec.bends {
-            let stiffness = hinge_stiffness(&spec.connection);
-            let ratio = damping_ratio(spec.connection.region().material().damping);
-            let inertia = inertia_about(&self.raw.bodies[body_handle], frame.translation);
-            // A force-based spring, so that its stiffness is a real moment per
-            // radian rather than an acceleration scaled by the bodies' masses.
-            GenericJointBuilder::new(JointAxesMask::LOCKED_REVOLUTE_AXES)
+        let joint: GenericJoint = match joining {
+            Joining::Hinge => {
+                let stiffness = hinge_stiffness(&connection);
+                let ratio = damping_ratio(connection.region().material().damping);
+                let inertia = inertia_about(&self.raw.bodies[body_handle], frame.translation);
+                // A force-based spring, so that its stiffness is a real moment
+                // per radian rather than an acceleration scaled by the bodies'
+                // masses.
+                GenericJointBuilder::new(JointAxesMask::LOCKED_REVOLUTE_AXES)
+                    .local_frame1(root_pose.inverse() * frame)
+                    .local_frame2(body_pose.inverse() * frame)
+                    .contacts_enabled(false)
+                    .motor_model(JointAxis::AngX, MotorModel::ForceBased)
+                    .motor_position(
+                        JointAxis::AngX,
+                        0.0,
+                        stiffness,
+                        2.0 * ratio * (stiffness * inertia).sqrt(),
+                    )
+                    .build()
+            }
+            Joining::Anchor => {
+                let [pull, turn] = anchor_springs(
+                    &connection,
+                    &self.raw.bodies[body_handle],
+                    frame.translation,
+                );
+                // No axis is locked: a force-based spring holds each.
+                GenericJointBuilder::new(JointAxesMask::empty())
+                    .local_frame1(root_pose.inverse() * frame)
+                    .local_frame2(body_pose.inverse() * frame)
+                    .contacts_enabled(false)
+                    .motor_model(JointAxis::LinX, MotorModel::ForceBased)
+                    .motor_position(JointAxis::LinX, 0.0, pull.0, pull.1)
+                    .motor_model(JointAxis::LinY, MotorModel::ForceBased)
+                    .motor_position(JointAxis::LinY, 0.0, pull.0, pull.1)
+                    .motor_model(JointAxis::AngX, MotorModel::ForceBased)
+                    .motor_position(JointAxis::AngX, 0.0, turn.0, turn.1)
+                    .build()
+            }
+            Joining::Weld => FixedJointBuilder::new()
                 .local_frame1(root_pose.inverse() * frame)
                 .local_frame2(body_pose.inverse() * frame)
                 .contacts_enabled(false)
-                .motor_model(JointAxis::AngX, MotorModel::ForceBased)
-                .motor_position(
-                    JointAxis::AngX,
-                    0.0,
-                    stiffness,
-                    2.0 * ratio * (stiffness * inertia).sqrt(),
-                )
                 .build()
-        } else {
-            FixedJointBuilder::new()
-                .local_frame1(root_pose.inverse() * frame)
-                .local_frame2(body_pose.inverse() * frame)
-                .contacts_enabled(false)
-                .build()
-                .into()
+                .into(),
         };
-        let inserted = self.insert_raw_joint(id, spec.root_body, spec.body, joint);
+        let inserted = self.insert_raw_joint(id, root_body, body, joint);
         debug_assert!(inserted, "a checked identity and bodies");
         self.connections.insert(
             id,
             ConnectionRecord {
-                root_body: spec.root_body,
-                body: spec.body,
-                connection: spec.connection,
+                root_body,
+                body,
+                connection,
                 load: ConnectionLoadSample::default(),
                 failure: None,
             },
@@ -370,7 +498,8 @@ impl PhysicsWorld {
     /// joined at rather than taking the turn it now has. Its spring takes the
     /// new beam's [`hinge_stiffness`], damped as [`Self::insert_connection`]
     /// damps one for the held body as it now is, so a held body whose mass
-    /// changed first is damped for its new mass. The work the connection has
+    /// changed first is damped for its new mass. An anchor's springs take the
+    /// new beam's stiffnesses the same way. The work the connection has
     /// absorbed stays absorbed: it keeps the new beam's capacity less what the
     /// old one used.
     ///
@@ -420,6 +549,19 @@ impl PhysicsWorld {
                 .expect("a live connection has its joint")
                 .data
                 .set_motor_position(JointAxis::AngX, 0.0, stiffness, damping);
+        } else if is_anchor(joint) {
+            let held = &self.raw.bodies[joint.body2()];
+            let at = (*held.position() * joint.data.local_frame2).translation;
+            let [pull, turn] = anchor_springs(&connection, held, at);
+            let data = &mut self
+                .raw
+                .impulse_joints
+                .get_mut(handle, true)
+                .expect("a live connection has its joint")
+                .data;
+            data.set_motor_position(JointAxis::LinX, 0.0, pull.0, pull.1);
+            data.set_motor_position(JointAxis::LinY, 0.0, pull.0, pull.1);
+            data.set_motor_position(JointAxis::AngX, 0.0, turn.0, turn.1);
         }
         self.connections
             .get_mut(&id)
@@ -457,7 +599,10 @@ impl PhysicsWorld {
             else {
                 continue;
             };
-            let [axial, shear, moment] = if is_hinge(joint) {
+            let anchor = is_anchor(joint);
+            let [axial, shear, moment] = if anchor {
+                anchor_impulses(joint)
+            } else if is_hinge(joint) {
                 hinge_impulses(joint, &self.raw.bodies)
             } else {
                 root_impulses(joint, &self.raw.bodies)
@@ -468,15 +613,23 @@ impl PhysicsWorld {
                 moment: moment * per_impulse,
                 ..ConnectionLoadSample::default()
             };
+            // What holds an anchor gives way to the force it carries,
+            // whichever way that points.
+            let pull = if anchor {
+                load.axial.hypot(load.shear)
+            } else {
+                load.axial
+            };
             let Ok(outcome) = engine_material::connection(
                 &record.connection,
                 ConnectionLoad {
                     moment: load.moment,
-                    axial: load.axial,
+                    axial: pull,
                     duration: dt,
-                    // A weld is rigid and a hinge's turn is all elastic, so
-                    // neither measures plastic rotation or extension, and the
-                    // law's documented progression stands in for both.
+                    // A weld is rigid, and a hinge's turn and an anchor's
+                    // give are all elastic, so none measures plastic rotation
+                    // or extension, and the law's documented progression
+                    // stands in for both.
                     measured_plastic_rotation: None,
                     measured_plastic_extension: None,
                 },
@@ -642,6 +795,48 @@ fn is_connection_hinge(joint: &GenericJoint, connection: &Connection) -> bool {
         && spring.max_force == f32::MAX
 }
 
+/// Whether a connection's joint is an anchor: no axis locked, and a spring on
+/// each.
+fn is_anchor(joint: &ImpulseJoint) -> bool {
+    joint.data.locked_axes.is_empty() && joint.data.motor_axes == ANCHOR_AXES
+}
+
+/// The axes an anchor's springs hold: along its beam, across it and its turn.
+const ANCHOR_AXES: JointAxesMask = JointAxesMask::LIN_X
+    .union(JointAxesMask::LIN_Y)
+    .union(JointAxesMask::ANG_X);
+
+/// An anchor as [`PhysicsWorld::insert_anchor`] builds one for `connection`:
+/// no locked axis and a force-based spring on each, at rest where it was
+/// joined, with the beam's stiffnesses and any damping.
+fn is_connection_anchor(joint: &GenericJoint, connection: &Connection) -> bool {
+    let spring = |axis, stiffness: f32| {
+        joint.motor(axis).is_some_and(|spring| {
+            spring.model == MotorModel::ForceBased
+                && spring.target_pos == 0.0
+                && spring.target_vel == 0.0
+                && spring.stiffness == stiffness
+                && spring.damping.is_finite()
+                && spring.damping >= 0.0
+                && spring.max_force == f32::MAX
+        })
+    };
+    joint.locked_axes.is_empty()
+        && joint.motor_axes == ANCHOR_AXES
+        && spring(JointAxis::LinX, anchor_stiffness(connection))
+        && spring(JointAxis::LinY, anchor_stiffness(connection))
+        && spring(JointAxis::AngX, hinge_stiffness(connection))
+}
+
+/// The impulses an anchor carried on its support, at the anchor and in its
+/// own frame: along the beam, across it and about the anchor. Each spring is
+/// a row of its own, which the solver leaves as it is, so each impulse is the
+/// load itself.
+fn anchor_impulses(joint: &ImpulseJoint) -> [f32; 3] {
+    [JointAxis::LinX, JointAxis::LinY, JointAxis::AngX]
+        .map(|axis| joint.data.motor(axis).map_or(0.0, |motor| motor.impulse))
+}
+
 /// The impulses a hinge carried on the root body, at the root and in its own
 /// frame: along the beam, across it and about the root. Its spring is a row
 /// of its own whose impulse is the moment. Rapier orthogonalizes the two
@@ -686,8 +881,8 @@ fn hinge_impulses(joint: &ImpulseJoint, bodies: &RigidBodySet) -> [f32; 3] {
 }
 
 /// Rebuild saved connections and check each against the saved joints: a live
-/// connection keeps its weld or hinge between its own bodies, and a failed one
-/// has none.
+/// connection keeps its weld, hinge or anchor between its own bodies, and a
+/// failed one has none.
 pub(super) fn restore_connections(
     reader: &mut std::io::Cursor<&[u8]>,
     joints: &[JointEntry],
@@ -709,6 +904,7 @@ pub(super) fn restore_connections(
             let joint = impulse_joints.get(entry.handle).ok_or_else(invalid)?;
             if joint.data.locked_axes != JointAxesMask::LOCKED_FIXED_AXES
                 && !is_connection_hinge(&joint.data, &record.connection)
+                && !is_connection_anchor(&joint.data, &record.connection)
             {
                 return Err(invalid());
             }

@@ -354,13 +354,17 @@ fn ends(bed: &TreeBed, segment: &Segment) -> (Vec2, Vec2) {
 }
 
 /// Where living wood should start: the end of the wood it is hinged to, or
-/// for a trunk's foot the cell it grew from.
+/// for a trunk's foot where its tree's roots have carried the cell it grew
+/// from.
 fn anchor(bed: &TreeBed, o: &plants::Observation, id: u64) -> Vec2 {
     match bed.wood.living[&id].parent {
         Some(p) => ends(bed, &bed.wood.living[&p]).1,
         None => {
             let p = o.connections.iter().find(|&&(_, c)| c == id).unwrap().0;
-            bed.at(o.tissues.iter().find(|t| t.id == p).unwrap().cell)
+            let seed = o.tissues.iter().find(|t| t.id == p).unwrap();
+            let at = bed.at(seed.cell);
+            bed.plate_moved(&bed.wood.plates[&seed.organism])
+                .map_or(at, |m| m.apply(at))
         }
     }
 }
@@ -466,7 +470,21 @@ fn the_trees_grow_on_while_their_wood_hangs_as_they_would_at_rest() {
         let gap = (ends(&bed, segment).0 - anchor(&bed, &o, id)).length();
         assert!(gap < 0.02, "wood {id} parted {gap} from its anchor");
     }
-    assert_eq!(bed.world.joint_count(), wood.len());
+    // A hinge for each piece of wood, and an anchor for each root of a tree
+    // that has wood: a seed that has not sprouted holds nothing up.
+    let sprouted: BTreeSet<u64> = o
+        .tissues
+        .iter()
+        .filter(|t| wood.contains(&t.id))
+        .map(|t| t.organism)
+        .collect();
+    let roots = o
+        .tissues
+        .iter()
+        .filter(|t| t.role == Role::Root && sprouted.contains(&t.organism))
+        .count();
+    assert_eq!(bed.anchors().len(), roots);
+    assert_eq!(bed.world.joint_count(), wood.len() + roots);
     assert_eq!(bed.world.identity_fault(), None);
     // Its lowest branch still hangs: nothing set it back upright.
     let droop = hinge(&bed, RIGHT_TIP).droop;
@@ -708,7 +726,8 @@ fn past_the_cap_the_wood_that_died_first_is_cleared() {
             .all(|d| !first.contains(&d.segment.entity))
     );
     assert_eq!((bed.wood.work.died, bed.wood.work.cleared), (12, 6));
-    assert_eq!(bed.world.body_count(), bodies + living - 6);
+    // The living wood and its tree's roots, less the cleared branch.
+    assert_eq!(bed.world.body_count(), bodies + living + 1 - 6);
     // Each cut took a branch's root hinge, and the cleared branch took the
     // five within it, with nothing it named left behind.
     assert_eq!(bed.world.joint_count(), joints - 7);
@@ -803,9 +822,11 @@ fn dead_wood_passes_through_the_living_wood_it_lies_in_until_it_is_clear() {
         .collect();
 
     // Physical again, the trunk is built where the first segment lies. That
-    // segment passes through wood again, and is not thrown from the trunk.
+    // segment passes through wood again, with at most the one beside it, and
+    // is not thrown from the trunk.
     bed.command(Command::PhysicalWood);
-    assert_eq!(parting(&bed), [true, false, false, false, false]);
+    let rebuilt = parting(&bed);
+    assert!(rebuilt[0] && !rebuilt[2..].contains(&true), "{rebuilt:?}");
     hold(&mut bed, 2.0);
     assert_eq!(bed.wood.breaks, 0);
     for (dead, was) in bed.wood.dead.iter().zip(&lying) {

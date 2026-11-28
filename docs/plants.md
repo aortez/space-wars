@@ -596,7 +596,8 @@ severed fragment, cannot be shed, so a brain can never drop its whole plant.
 In the plant runtime, wood stays lightweight tissue on cells, with no bodies,
 colliders or loads. Garden Lab's tree bed can hang its trees' wood on hinges as
 bodies while they grow, their cells the shape the wood rests in
-([Physical wood](garden-lab.md#physical-wood-224)); anchorage is #225's.
+([Physical wood](garden-lab.md#physical-wood-224)), held in the dirt by their
+roots ([Roots that hold](garden-lab.md#roots-that-hold-225)).
 `engine-material`'s `TissueTable` gains a wood entry in the same role order.
 The grass and moss policies act only on their own tissue, so wood in a shared
 runtime counts only toward the runtime's ceilings.

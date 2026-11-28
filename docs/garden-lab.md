@@ -286,9 +286,10 @@ ticks, catch-up limit and fractional carry. A run stops aging at 2000 ticks.
 | Underground inspection | Shows or hides roots and the links between tissues. |
 | Inspect next tissue | Moves the pink selection through the bed's tissue in ID order. |
 | Bids on/off | Shows or hides each point's last bid. |
-| Cut a branch | Cuts the selected wood and everything beyond it, if it is off its tree's trunk; otherwise the planted tree's lowest branch, on the grass's side first. The cut tissue's shares are lost. Physical wood falls where it was cut. |
+| Cut a branch or root | Cuts the selected wood and everything beyond it, if it is off its tree's trunk, or the selected root of a tree and every root that grew from it, unless it is the tree's seed; otherwise the planted tree's lowest branch, on the grass's side first. The cut tissue's shares are lost. Physical wood falls where it was cut, and a cut root no longer holds its tree. |
 | Physical wood on/off | Hangs the trees' wood on hinges under gravity while they grow; off, the living wood leaves the world and the trees grow on as their cells stand. See [Physical wood](#physical-wood-224). |
 | Light snow, heavy snow | Lays snow on the selected wood, else the tip of the planted tree's lowest branch, on the grass's side first, making the wood physical; the same control again clears it. |
+| Wind | Cycles calm, a breeze and a gale that blow toward the grass, making the wood physical. See [Roots that hold](#roots-that-hold-225). |
 | Plant a tree seed in the grass | Lifts the grass from column 22, two cells right of the grass's seed, with its shares, and plants a tree seed in its top cell of dirt. Nothing happens if a tree holds that cell or the one above it. |
 | Plant fresh tree and grass | Replaces every plant with fresh seeds of the tree and grass, under the same settings. |
 | Back to grass bed | Shows the grass bed. |
@@ -423,16 +424,18 @@ its shadow, and cuts the lowest branch. It plants a seed in the grass and finds
 it in the status as an unsprouted tree with no parent, with the grass gone from
 its column but not from either side, makes the wood physical as described
 [below](#physical-wood-224), and returns to the grass bed, retaining a PNG/JSON
-pair at each stage. It took 96 seconds under local Xvfb.
+pair at each stage. It took 112 seconds under local Xvfb, on a machine busy
+with other work.
 
 ### Physical wood (#224)
 
 **Physical wood on/off** hangs every tree's wood on hinges under gravity while
 the trees grow. Each wood tissue becomes a body: a box from the tissue it grew
 from to its own cell, as wide as the wood is drawn. A hinge joins it where it
-grew from, to the wood it grew on or, at a trunk's foot, to the dirt. The hinge
-is a beam of wood with a square section as wide as the segment, as long as it,
-with wood's bending stiffness, strength and damping ([connection
+grew from, to the wood it grew on or, at a trunk's foot, to its tree's roots,
+which hold the tree in the dirt ([Roots that hold](#roots-that-hold-225)). The
+hinge is a beam of wood with a square section as wide as the segment, as long
+as it, with wood's bending stiffness, strength and damping ([connection
 loads](design/material-connection-loads.md)). The segment weighs wood's 0.6 per
 cubic cell, and each needle and cone tissue adds 0.02 and 0.05 per size to the
 wood it grows on. Gravity is 9.81 cells per second squared, a cell being a
@@ -441,11 +444,11 @@ a second. An air drag of 1 per second settles a branch within seconds, rather
 than the most of a minute wood's own damping would take. Living wood is solid
 to all but living wood: dead wood and loose snow land on it, and it lands on
 the dirt. Living wood passes living wood, since its segments overlap where they
-join, and the two bodies of a hinge never touch, so a trunk's foot stands in
-the dirt it is hinged to. Light passes living wood's bodies, since its tissues
-shade at their cells: the bed names them to the light as transparent. Turned
-off, the living wood and any snow leave the world, and the trees grow on as
-their cells stand.
+join, and the two bodies of a hinge never touch. A trunk's foot stands half in
+the dirt, and passes through it. Light passes living wood's bodies, since its
+tissues shade at their cells: the bed names them to the light as transparent.
+Turned off, the living wood, its roots' bodies and any snow leave the world,
+the wind drops, and the trees grow on as their cells stand.
 
 The trees' cells stay the shape their wood rests in. Growth and light work on
 them as they do at rest, and the bodies and the drawing carry the sag. At each
@@ -463,20 +466,22 @@ Wood beyond a break or a cut, and wood a tree sheds, becomes dead wood: the
 same bodies, moving as they were, drawn grey with what grew on them. The tree
 loses those tissues and their shares of the stores, as in any cut. Wood hinged
 to living wood comes away from it, and keeps its other hinges, so a tree that
-dies stands on them, its foot still on the dirt, until it breaks. Dead wood,
-and snow that slid off it, lands on the dirt and on living wood, passes through
-dead wood and shades where it lies. Wood that dies lies in the living wood it
-came away from, as a branch's first segment starts inside its trunk. So it
-passes through all wood until a step finds it clear of the living wood, and is
-never thrown out of it. Dead wood that living wood grows into, or is built over
-when the wood is made physical again, passes through it the same way. What
-rests on a branch falls through it when that branch dies, since dead wood
-passes through dead wood. A box ends at the cells its wood spans, so a thick
-trunk's lowest segments, which a capsule's rounded ends would push into the
-soil, stand clear of it. The bed keeps at most 256 segments of dead wood, as
-many as it has tissues, and past that clears away the wood that died first,
-with all that died with it. Resting the wood leaves dead wood where it is, and
-replanting the bed removes it.
+dies stands on them, its foot still on its roots, which die with it and hold
+on, until it breaks or is uprooted. Dead wood, and snow that slid off it, lands
+on the dirt and on living wood, passes through dead wood and shades where it
+lies. Wood that dies lies in the living wood it came away from, as a branch's
+first segment starts inside its trunk. So it passes through all wood until a
+step finds it clear of the living wood, and is never thrown out of it. Dead
+wood that living wood grows into, or is built over when the wood is made
+physical again, passes through it the same way. What rests on a branch falls
+through it when that branch dies, since dead wood passes through dead wood. A
+box ends at the cells its wood spans, so a thick trunk's lowest segments, which
+a capsule's rounded ends would push into the soil, stand clear of it. The bed
+keeps at most 256 segments of dead wood, as many as it has tissues, and past
+that clears away the wood that died first, with all that died with it, its
+roots among it. Dead wood and roots that fall out of the bed are cleared away
+too. Resting the wood leaves dead wood where it is, and replanting the bed
+removes it.
 
 **Light snow** and **Heavy snow** lay a block of snow of mass 1 or 5 on top of
 the selected wood, or else on the tip of the planted tree's lowest branch, on
@@ -491,25 +496,28 @@ dies slides off. Resting the wood clears the snow.
 With seed 42 at tick 600, held there, the grown conifer's most loaded hinge is
 the root of its lowest branch toward the grass, six cells of wood, five of size
 two and a tip of size one. Its own weight holds that hinge at 0.32 of its safe
-load, after a first swing to 0.57, and its tip droops 0.28 cells, after a first
-swing to 0.50. The tip settles within 0.01 cells in 6 s, and without the air's
+load, after a first swing to 0.58, and its tip droops 0.29 cells, after a first
+swing to 0.53. The tip settles within 0.01 cells in 6 s, and without the air's
 drag it would take 46 s. The thicker lowest branch on the other side droops
-0.16. Light snow on the first branch's tip doubles its droop to 0.60 cells, at
-0.63 of the root's safe load, after swinging it to 0.68; laid at its full
-weight at once, it would swing it to 0.81. Cleared, the branch springs back to
-within 0.01 of where it hung. Heavy snow bends it to 1.19 cells at its tip and
-breaks its root 0.98 s after it is laid, at 1.2 times the safe load. The
-broken branch first touches the dirt a third of a second later, and the snow
-lands by its tip. The same light snow adds 0.16 cells to the thicker branch's
+0.17. Each droop includes the 0.01 cells the whole tree sinks on its roots.
+Light snow on the first branch's tip doubles its droop to 0.61 cells, at 0.63
+of the root's safe load, after swinging it to 0.69; laid at its full weight at
+once, it would swing it to 0.83. Cleared, the branch springs back to within
+0.01 of where it hung. Heavy snow bends it to 1.20 cells at its tip and breaks
+its root 0.98 s after it is laid, at 1.2 times the safe load. The broken branch
+first touches the dirt a third of a second later, and the snow lands by its
+tip. The same light snow adds 0.16 cells to the thicker branch's tip against
+0.32 to the thinner one's, and laid by the trunk on the thinner branch's first
+segment, it adds 0.01, a thirtieth as much, to that branch's tip. The same light snow adds 0.16 cells to the thicker branch's
 tip against 0.32 to the thinner one's, and laid by the trunk on the thinner
 branch's first segment, it adds 0.02, a twentieth as much, to that branch's
 tip.
 
 A branch that falls lands on the branch below. On the grass's side the second
 tier's branch, five cells of wood, hangs two cells above the lowest. Cut away,
-it lands on the lowest branch with a blow that loads its root to 1.01 of its
-safe load, and then lies on it, 3 cells above the dirt: the root carries 0.56
-where it carried 0.32, and its tip droops 0.44 cells where it drooped 0.28. The
+it lands on the lowest branch with a blow that loads its root to 0.99 of its
+safe load, and then lies on it, 3 cells above the dirt: the root carries 0.55
+where it carried 0.32, and its tip droops 0.43 cells where it drooped 0.29. The
 third tier's branch, four cells of wood, cut away instead, lands on the
 second's, whose root then carries 0.19 where it carried 0.12. Cut away in turn,
 the second tier's branch drops with what it carried onto the lowest, which
@@ -517,7 +525,7 @@ breaks 0.8 s later at 1.42 of its safe load, and the three branches lie on the
 dirt. Under light snow on its tip the lowest branch carries 0.63, and the
 second tier's branch alone, cut onto it, breaks it 1.1 s later. Light snow on
 the tip of the third tier's branch slides off when that branch is cut, and
-comes to rest with it on the second's, which holds both at 0.30.
+comes to rest with it on the second's, which holds both at 0.29.
 
 Growing on at 16x from tick 600, the conifer and the young trees from its seeds
 gain 48 segments in a minute, to tick 1560, and segments are reshaped 219
@@ -525,14 +533,16 @@ times. No hinge is refused or breaks. Checked every 5 s, none carries more than
 0.35 of its safe load, and no segment lies more than 0.008 cells from the wood
 it hangs from. Over the first 30 s the trees grow exactly as at rest: a bed
 whose wood rests reaches the same tissues, stores and ledger at the same tick.
-The minute of the lab's updates takes 4.69 s to compute against 4.36 s at rest,
-with 103 bodies at its end. The light's work counts each living segment it
-passes as a collider record, 13,802 against 134 at rest, with the same rays and
-footprints. Heavy snow laid after 8 s of growth, at tick 728, still breaks the
-lowest branch a second later. Made physical at tick 30 and run at 64x, the
-grove reaches 102 segments by tick 2000 without a break. Without water at 64x
-from tick 600, the conifer dies at tick 776, and its 54 segments stand as dead
-wood without a break.
+The minute of the lab's updates takes 12% more processor time than at rest,
+4.49 s against 4.01 s at the best of five runs each on a busy machine; the wood
+alone, before it stood on roots, took 9% more. It ends with 106 bodies, three
+of them the trees' roots. The light's work counts each living segment and root
+plate it passes as a collider record, 14,204 against 134 at rest, with the same
+rays and footprints. Heavy snow laid after 8 s of growth, at tick 728, still
+breaks the lowest branch a second later. Made physical at tick 30 and run at
+64x, the grove reaches 102 segments by tick 2000 without a break. Without water
+at 64x from tick 600, the conifer dies at tick 776, and its 54 segments stand
+as dead wood without a break.
 
 Shed wood is the brain's to avoid. After the functional case's cut at tick 650
 and its seed in the grass, the young tree from the seed at x 26 grows a bare
@@ -544,8 +554,8 @@ the pile.
 
 | | Under its own weight | Heavy snow, about to break | Broken, on the dirt | Dead, standing |
 | --- | --- | --- | --- | --- |
-| 1280×720 | ![The conifer between two young trees, its lowest right branch tilted slightly down from the trunk](screenshots/garden-lab/tree-wood-settled-1280x720-raster.png) | ![The conifer with a block of snow on the tip of its lowest right branch, which bends down toward the grass](screenshots/garden-lab/tree-wood-heavy-snow-1280x720-raster.png) | ![The conifer without its lowest right branch, which lies grey on the dirt between the trunk and the grass with the snow at its tip](screenshots/garden-lab/tree-wood-fallen-1280x720-raster.png) | ![Three conifers standing grey and dead on the dirt over dead grass, the broken branch lying grey by the big one's trunk](screenshots/garden-lab/tree-wood-dead-tree-1280x720-raster.png) |
-| 800×480 | ![The conifer between two young trees, its lowest right branch tilted slightly down from the trunk](screenshots/garden-lab/tree-wood-settled-800x480-raster.png) | ![The conifer with a block of snow on the tip of its lowest right branch, which bends down toward the grass](screenshots/garden-lab/tree-wood-heavy-snow-800x480-raster.png) | ![The conifer without its lowest right branch, which lies grey on the dirt between the trunk and the grass with the snow at its tip](screenshots/garden-lab/tree-wood-fallen-800x480-raster.png) | ![Three conifers standing grey and dead on the dirt over dead grass, the broken branch lying grey by the big one's trunk](screenshots/garden-lab/tree-wood-dead-tree-800x480-raster.png) |
+| 1280×720 | ![The conifer between two young trees, its lowest right branch tilted slightly down from the trunk](screenshots/garden-lab/tree-wood-settled-1280x720-raster.png) | ![The conifer with a block of snow on the tip of its lowest right branch, which bends down toward the grass](screenshots/garden-lab/tree-wood-heavy-snow-1280x720-raster.png) | ![The conifer without its lowest right branch, which lies grey on the dirt between the trunk and the grass with the snow at its tip](screenshots/garden-lab/tree-wood-fallen-1280x720-raster.png) | ![Three conifers standing grey and dead on their grey roots over dead grass, the broken branch lying grey by the big one's trunk](screenshots/garden-lab/tree-wood-dead-tree-1280x720-raster.png) |
+| 800×480 | ![The conifer between two young trees, its lowest right branch tilted slightly down from the trunk](screenshots/garden-lab/tree-wood-settled-800x480-raster.png) | ![The conifer with a block of snow on the tip of its lowest right branch, which bends down toward the grass](screenshots/garden-lab/tree-wood-heavy-snow-800x480-raster.png) | ![The conifer without its lowest right branch, which lies grey on the dirt between the trunk and the grass with the snow at its tip](screenshots/garden-lab/tree-wood-fallen-800x480-raster.png) | ![Three conifers standing grey and dead on their grey roots over dead grass, the broken branch lying grey by the big one's trunk](screenshots/garden-lab/tree-wood-dead-tree-800x480-raster.png) |
 
 | | Caught by the branch below | Broken under two |
 | --- | --- | --- |
@@ -612,3 +622,137 @@ branch droops as the trees grow on, then, with the bed waiting again, that a
 cut moves the lowest branch's segments from the hinges to the dead wood and
 that the snow stays fastened unless its branch was cut. It runs the dead wood
 down to the dirt, and checks that resting the wood leaves it there.
+
+### Roots that hold (#225)
+
+While the wood is physical, its roots hold each tree. A tree's roots are one
+body, its root plate. Each root tissue weighs 0.15 per size at its cell, a
+cell's length of wood as wide as wood of that size, and the body touches
+nothing and shades nothing. The trunk's foot is hinged to it. Every root that
+lies in dirt anchors the plate there
+([anchors](design/material-connection-loads.md#anchors)): springs hold the
+plate at the root's cell, and hold its turn, with the stiffness of a beam of
+the root's own section, a cell long, made of the dirt's grip. The grip has a
+hundredth of wood's stiffness and a twelfth of its strength, 2,000 and 240, so
+a root gives an eighth of a cell before the dirt lets go of it, and pulls out
+long before it would snap. An anchor carries its stiffness times how far its
+own cell has moved. So the anchors share the tree's weight evenly, and share
+whatever turns the tree by where they hold: roots that reach wide and deep
+carry the most of it, at the longest arms. Grass keeps its roots as they were,
+with no bodies.
+
+A load the grip cannot hold safely charges the same connection law as an
+overloaded hinge, and an anchor it exhausts lets go for good: its root grips
+nothing again, at rest or physical, for as long as its tree has it. What it
+carried passes to the anchors that are left. A tree whose last anchor lets go
+is uprooted: it leaves the bed's plants, as in a cut at its seed, and its wood
+and roots die where they are and fall. A tree that dies standing keeps its
+roots as it keeps its wood: they die with it and hold it by the anchors they
+had.
+
+The plates keep step with growth as the wood does. At each boundary, before the
+next step, a root that grew is anchored where its tree's plate has carried its
+cell, a root the tree shed or lost to a cut gives up its anchor, and the plate
+weighs what its roots now weigh. A tree gets its plate with its first wood: a
+seed that has not sprouted holds nothing up. **Cut a branch or root** cuts the
+selected root of a tree with every root that grew from it, as it cuts a branch,
+and the roots that are left hold the tree.
+
+**Wind** is the bed's sideways load, toward the grass: calm, a breeze and a
+gale in turn, of 2 and 6 per unit of sail. It makes the wood physical if it is
+not, and rises and drops by the gale's push in 3 s, so that it leans on a tree
+rather than striking it. A segment's sail is the face it turns to the wind, as
+deep as it is wide: its length where it stands and its width where it points
+along the wind, with 0.15 per size for each needle tissue on it and 0.05 for
+each cone. The wind is still at the dirt and full from 4 cells above it. It
+pushes living wood, and dead wood while it still stands: joined, through the
+wood it grew on, to roots that have not turned 45 degrees from where they grew.
+Fallen wood lies where it fell. Resting the wood drops the wind.
+
+With seed 42 at tick 600, held there, the grown conifer's wood weighs 28.9 and
+its 32 roots 9.6. Its anchors carry that weight between them, the most loaded
+at 0.10 of its safe load, and the tree sinks 0.01 cells on them. The breeze
+pushes it with 84, a fifth of its weight: it leans 0.24 degrees on its roots,
+its top moves 0.6 cells toward the grass, and the most loaded anchor carries
+0.24. That anchor is the root that reaches farthest toward the grass and
+deepest, at [15, 1]. The gale pushes the tree with 271, seven tenths of its
+weight: it leans 0.76 degrees, its top moves 1.9 cells, that anchor carries
+0.58, the trunk's foot 0.49 and its most loaded hinge, on the thin trunk at
+[12, 17], 0.61. The dirt holds its windward roots down and its lee roots up:
+the column of roots farthest to windward, which pressed on the dirt in the
+calm, now pulls up on it. Nothing lets go, and in the calm again the tree
+stands as it stood.
+
+Roots cut away leave the rest to carry more. The root that leaves the seed
+toward the grass has seven more beyond it, and the one on the other side six.
+With either cut, the conifer still stands in the gale, its most loaded anchor
+at 0.86 or 0.82. With both cut, 17 anchors hold it in the calm, at 0.17 at
+most. The same gale then pulls them out: the first lets go 2.7 s after the wind
+begins to rise, at nine tenths of the gale's push, with the tree leaning 1.5
+degrees, and the other 16 follow within half a second. Uprooted, the tree goes
+over toward the grass and comes to rest 10 s after the wind began to rise. It
+lies on its branches, reaching 12.8 cells from where it stood, with its root
+plate turned 70 degrees out of the dirt. Four of its dead hinges break in the
+fall, and all 54 segments stay in the bed.
+
+At tick 1200 the conifer and the two young trees from its seeds, twelve roots
+each, stand in the gale with their most loaded anchors at 0.61, 0.45 and 0.65.
+Growing on at 16x from tick 600 for a minute, the trees end on 56 anchors with
+none above 0.22, none let go, and they grow exactly as at rest. The conifer
+killed by drought stands on its dead roots' 32 anchors, and leans in the gale
+as it did alive.
+
+A root plate is rigid, and the dirt's grip is the same in every direction and
+at every depth. A root's intake does not depend on its anchor: a root that
+pulled out still feeds its tree. The plates and the trunks' feet pass through
+the dirt, so a fallen tree's roots are drawn through it. A tree lives or dies
+whole when its roots let go: its cells cannot lie down. Dirt cannot yet be dug
+away from roots, and the trees' brain does not yet sense what its anchors
+carry; both are #225's next steps.
+
+| | Held in the gale | Uprooted |
+| --- | --- | --- |
+| 1280×720 | ![The conifer bent toward the grass from its foot to its top, every branch still on it](screenshots/garden-lab/tree-roots-gale-1280x720-raster.png) | ![The conifer lying grey across the grass on its branches, its roots turned up out of the dirt where it stood](screenshots/garden-lab/tree-roots-uprooted-1280x720-raster.png) |
+| 800×480 | ![The conifer bent toward the grass from its foot to its top, every branch still on it](screenshots/garden-lab/tree-roots-gale-800x480-raster.png) | ![The conifer lying grey across the grass on its branches, its roots turned up out of the dirt where it stood](screenshots/garden-lab/tree-roots-uprooted-800x480-raster.png) |
+
+The pictures are from the window-free renderer without the text, with the
+trees' clock held at tick 600: 12 s into the gale on all its roots, and 14 s
+into the gale that followed the cutting of both side roots in the calm. While
+the wood is physical the grove's line gives the roots after it: the living
+trees' anchors with the most loaded one, the wind, with its push while that
+rises or drops, and the anchors pulled out and trees uprooted since planting. A
+selected root shows what its anchor carries, or that it pulled out of the dirt.
+A dead tree's roots are drawn under inspection, and wherever no anchor holds
+them. A bid's marks now go with a point the bed has lost, where they stayed in
+the air until the next decision. The status's `wood` adds `roots`: each
+gripping root's anchor in `anchors`, with its `utilization` and the force it
+carries along its root and across it, in `pull`; how far each living tree's
+root plate has turned, in radians, in `leans`; the roots now `pulled` out; the
+anchors the load has broken, in `pulls`; the trees `uprooted`; the
+`dead_plates`; and the `summary`. It adds `wind`, with its `name`, its `level`
+and its `push` now.
+
+`roots_tests` checks, with the trees' clock held, that the grown conifer made
+physical has one body for its roots, anchored at each of its 32 roots, with its
+trunk's foot hinged to it, and that the anchors together carry its weight
+straight down; that a breeze and a gale lean it further each, load the anchor
+farthest to lee and deepest most, hold the windward roots down and the lee
+roots up, carry the wind's push, and leave it as it stood when the wind drops,
+with no line of the bed's text longer than the window; that with both side
+roots cut the same gale pulls every anchor out, a few at a time, and the tree
+leaves the bed's plants, falls toward the grass with its roots turned over and
+comes to rest there, the same bodies as it stood on; that with either side root
+cut it holds; and that a root made to let go grips nothing again through rest
+and growth and says so when selected. With the clock running, it checks that
+the conifer killed by drought stands on the anchors its roots had and leans in
+the gale; and that from tick 300 every root the trees grow is anchored before
+the next step, with the plate as heavy as its roots. It checks that resting
+takes the living roots' bodies and the wind, and that roots and a trunk's foot
+cut loose by hand fall out of the bed and are cleared. `wood_tests` now
+measures a trunk's foot against where its roots have carried it, and counts an
+anchor for every root of a sprouted tree. The window-free
+`garden_render_contract_tree_bed_roots_hold_a_tree_in_a_gale_until_they_are_cut`
+draws the two pictures and counts the fallen tree's grey. The full-only
+functional case above, once its snow has built up and while the bed runs, turns
+the wind to a breeze, checks that a tree leans on roots that hold, and brings
+the calm back.
