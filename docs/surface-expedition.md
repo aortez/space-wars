@@ -119,7 +119,8 @@ side clockwise of the tank's up and -1 for the other; the `power` a round
 leaves at, 12 to 48 relative to the hull; and whether `fire` is held. Each
 value is held to its range, and a command with a value that isn't a finite
 number is refused. Up is against the gravity the tank's chassis feels, or the
-hull's up where it feels none, so a tilted tank aims as a level one does.
+hull's up where it feels none, so a tilted tank aims as a level one does. A
+tank's snapshot gives that up as of the last step, as its `up`.
 
 Tanks fire the shared cannon's rounds by its rules, in
 `crates/engine-rapier/src/cannon.rs`, which
@@ -203,6 +204,37 @@ shots to end. When a tank leaves the world its ended records go with it, and
 its rounds in flight keep theirs until they end. Clearing the tanks drops
 every record, and a rebuilt world starts with none. No two shots in a world
 share an id, and a record that has ended never changes.
+
+#### Opponents and sight
+
+A tank can tell which units near it oppose it, for its own control to choose
+among. `tank_opponents` gives the units of other sides whose centers of mass
+lie within a range of the barrel's pivot: the nearest 8, nearest first. Ships
+and pods, pilots on foot and rovers fight for their players, and tanks for
+their own sides, so a government's tank opposes every player's unit and none
+of its own government's. A unit counts while the game holds it and the world
+holds its body. A ship the game holds dead is no opponent, though its body
+stays until the step reconciles. Nothing of a player the game holds
+eliminated is anyone's opponent, so a pilot who has died is none, though the
+world still holds the pilot's body. Telling opponents casts nothing.
+
+`tank_sight` tells whether the line from a tank's barrel's pivot to a body's
+center of mass meets anything else first. The line meets what a round would,
+except the tank itself and shells, so the planet blocks a unit beyond the
+horizon and a rock between them blocks it too, but a tank's own round on its
+way hides nothing. Each line is one cast. The tanks' work counts every tank's
+lines together as `sight_casts`, from the start of a step until the start of
+the next, so lines told between steps count with the step before them.
+
+The world answers a line as its last step left it, less the bodies it has let
+go since, and may miss a body it has taken up or moved since until the next
+step. Between steps it may still hold the bodies of some of what left the
+game in the last step, such as a rover destroyed then. Once a step has brought
+the world to just what the game holds, it holds none of them.
+
+Sensing regressions on the material planet cover the nearest opponents and
+their bound, units of every kind and when each counts, and sight blocked by
+the planet and by a rock but not by a shell.
 
 ### Two-player expedition
 

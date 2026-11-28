@@ -2546,6 +2546,18 @@ impl PhysicsWorld {
         direction: Vec2,
         options: RayCastOptions,
     ) -> Option<RayHit> {
+        self.cast_ray_keeping(origin, direction, options, |_| true)
+    }
+
+    /// Casts as [`Self::cast_ray`] does, and passes also through each
+    /// collider that `keep` turns away.
+    pub fn cast_ray_keeping(
+        &self,
+        origin: Vec2,
+        direction: Vec2,
+        options: RayCastOptions,
+        keep: impl Fn(ColliderId) -> bool,
+    ) -> Option<RayHit> {
         if !finite_vec2(origin)
             || !finite_vec2(direction)
             || direction.length_squared() <= f32::EPSILON
@@ -2558,7 +2570,8 @@ impl PhysicsWorld {
         let direction = direction.normalized();
         let excluded = options.exclude_entity;
         let predicate = |_: ColliderHandle, collider: &Collider| {
-            decode_collider(collider.user_data).is_none_or(|id| Some(id.entity) != excluded)
+            decode_collider(collider.user_data)
+                .is_none_or(|id| Some(id.entity) != excluded && keep(id))
         };
         let mut flags = QueryFilterFlags::empty();
         if !options.include_sensors {

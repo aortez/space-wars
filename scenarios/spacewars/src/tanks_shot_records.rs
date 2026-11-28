@@ -192,7 +192,7 @@ pub enum ShotStop {
 }
 
 impl ShotStop {
-    fn of(entity: PhysicsId) -> Self {
+    pub(super) fn of(entity: PhysicsId) -> Self {
         physics::classify_entity(entity).map_or(Self::Other, Self::on)
     }
 
@@ -331,7 +331,7 @@ impl SpacewarsState {
 
     /// Where `body`'s center of mass is and how it moves, if the world holds
     /// its body.
-    fn shot_target_motion(&self, body: ShotBody) -> Option<TargetMotion> {
+    pub(super) fn shot_target_motion(&self, body: ShotBody) -> Option<TargetMotion> {
         let (position, velocity) = self.physics.carried_motion(body.entity())?;
         Some(TargetMotion { position, velocity })
     }

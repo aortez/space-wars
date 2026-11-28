@@ -11,6 +11,9 @@
 //! [`cannon`], as Scorched Earth's tanks do. A round is a shell in the host's
 //! debris, a body in the world from the step it is fired in. Each shot has a
 //! record of how it left, flew and ended: its [`TankShot`].
+//!
+//! A tank can tell which units near it oppose it, and whether it sees each
+//! one: its [`Opponent`]s and its [`Sight`] of them.
 
 use std::collections::BTreeMap;
 
@@ -31,6 +34,10 @@ pub use shot_records::{
     ENDED_SHOTS, SHOT_HARMS, ShotApproach, ShotBody, ShotEnd, ShotFlight, ShotHarm, ShotLaunch,
     ShotOutcome, ShotStop, TankShot, TankShotId, TargetMotion,
 };
+
+#[path = "tanks_sensing.rs"]
+mod sensing;
+pub use sensing::{MAX_OPPONENTS, Opponent, Sight};
 
 pub const MAX_TANKS: usize = 16;
 /// A tank's health when placed, with its armor whole.
@@ -206,12 +213,18 @@ pub struct TankSnapshot {
     pub mount_angular_velocity: f32,
     pub drive_blocked: bool,
     pub local_gravity: Vec2,
+    /// Which way is up where the tank stands, which the barrel's elevation is
+    /// measured from: against the gravity its chassis felt in the last step,
+    /// or the hull's up if it felt none.
+    pub up: Vec2,
     pub body_gravity: [Vec2; 3],
     pub support: Option<SurfaceContact>,
 }
 
-/// Counts of explicit tank control work in the most recent host physics step.
-/// Snapshot/presentation queries are outside this control budget.
+/// Counts of explicit tank control work, of every tank together, in the most
+/// recent host step. Sight lines told after that step, before the next one
+/// begins, count with it. Snapshot/presentation queries are outside this
+/// control budget.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TankWork {
     pub queries: usize,
@@ -222,6 +235,9 @@ pub struct TankWork {
     pub contact_traversal: usize,
     /// Casts along a barrel as a tank fires: one for each shot fired.
     pub barrel_casts: usize,
+    /// Casts along the sight lines that tanks looked along: one for each
+    /// [`Sight`] told.
+    pub sight_casts: usize,
 }
 
 /// Most recent placement attempt, including rejected admission.
@@ -261,6 +277,11 @@ pub struct Tanks {
 }
 
 impl Tanks {
+    /// Starts counting the sight lines that tanks look along in a step.
+    pub(crate) fn begin_sight_step(&mut self) {
+        self.work.sight_casts = 0;
+    }
+
     pub(crate) fn begin_gravity_step(&mut self) {
         self.gravity_counts.clear();
         self.audit.gravity_applications = 0;
@@ -459,6 +480,7 @@ impl Tanks {
             command: tank.command,
             drive_blocked: tank.blocked,
             local_gravity: tank.gravity[0],
+            up: tank.up(assembly.chassis.angle),
             body_gravity: tank.gravity,
             support: tank
                 .assembly
@@ -482,9 +504,11 @@ impl Tanks {
     /// Bounded lookahead in the current contact frame. Refusal only changes motor
     /// intent: no pose correction, teleport, or artificial ground is introduced.
     pub(crate) fn prepare_controls(&mut self, physics: &mut PhysicsWorld, dirty: bool) {
-        // The step's firing came first, and its casts stay counted.
+        // The step's sighting and firing came first, and their casts stay
+        // counted.
         self.work = TankWork {
             barrel_casts: self.work.barrel_casts,
+            sight_casts: self.work.sight_casts,
             ..TankWork::default()
         };
         for tank in self.actors.values_mut() {
