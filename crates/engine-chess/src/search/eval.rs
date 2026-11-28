@@ -2,7 +2,8 @@
 //!
 //! The piece values, the tables and the terms for pawns and rooks are those
 //! of `aortez/cuda-chess`, with the differences that `REFERENCE.md`
-//! describes.
+//! describes. The term for a lone king is the mop-up evaluation of Chess 4.5,
+//! weighted more heavily, as `REFERENCE.md` explains.
 
 use crate::bitboard::{FILE_A, FILE_H, RANK_7, RANK_8, Squares};
 use crate::board::{Color, Piece, PieceKind, Square};
@@ -120,6 +121,19 @@ const ROOK_ON_OPEN_FILE: i32 = 9;
 /// while there is a pawn or a king for it to hem in.
 const ROOK_ON_SEVENTH: i32 = 17;
 
+/// Against a lone king, what each step it stands from the centre is worth to
+/// the player with a queen or a rook, counted along files and ranks.
+///
+/// A step is worth more than the margin of Easy or Normal, so that neither
+/// chooses a move that lets the lone king back towards the centre. Worth a
+/// tenth as much, it was lost in Normal's margin and most of the endings
+/// were drawn. Worth a fifth, nearly half of those with a rook still were.
+/// See `REFERENCE.md`.
+const LONE_KING_FROM_CENTRE: i32 = 100;
+/// And what each step closer the other king stands to it is worth, counted
+/// the same way.
+const KING_NEARER_LONE_KING: i32 = 40;
+
 /// The board counts as full with this many pieces on it and as empty of
 /// everything but an endgame with [`ENDGAME_PIECES`]. In between, the two
 /// king tables are blended.
@@ -191,7 +205,9 @@ pub(super) fn evaluate_placed(position: &Position, placement: i32) -> i32 {
         (early * opening + late * (span - opening)) / span
     };
 
-    let for_white = placement + king(Color::White) - king(Color::Black) + structure(position);
+    let for_white = placement + king(Color::White) - king(Color::Black)
+        + structure(position)
+        + lone_king(position);
     // No game reaches material worth half of this bound, but a position set
     // up by hand may hold sixty queens. However it looks, it looks like less
     // than a forced mate.
@@ -279,4 +295,40 @@ fn structure(position: &Position) -> i32 {
     let white = Side::of(position, Color::White);
     let black = Side::of(position, Color::Black);
     standing(&white, &black) - standing(&black.turned(), &white.turned())
+}
+
+/// How far `square` stands from the four squares in the middle of the
+/// board, counted along files and ranks: none on them, six in a corner.
+fn from_centre(square: Square) -> i32 {
+    let off = |line: u8| i32::from(line.max(7 - line)) - 4;
+    off(square.file()) + off(square.rank())
+}
+
+/// How far apart two squares are, counted along files and ranks.
+fn apart(one: Square, other: Square) -> i32 {
+    i32::from(one.file().abs_diff(other.file()) + one.rank().abs_diff(other.rank()))
+}
+
+/// Where one player has only the king and the other a queen or a rook, what
+/// the other player gains, White's less Black's, for driving the lone king
+/// away from the centre and bringing their own king up to it.
+///
+/// The mate is won at the edge, and can be ten moves or more away, beyond
+/// what a search can see. Without this a search finds nothing to choose
+/// between the moves that lead there and those that do not.
+pub(super) fn lone_king(position: &Position) -> i32 {
+    for (strong, sign) in [(Color::White, 1), (Color::Black, -1)] {
+        let weak = strong.opposite();
+        if position.by_color[weak.index()] != position.set(weak, PieceKind::King) {
+            continue;
+        }
+        if position.set(strong, PieceKind::Queen) | position.set(strong, PieceKind::Rook) == 0 {
+            return 0;
+        }
+        let lone = position.king(weak);
+        // The kings never stand side by side, so they are 2 to 14 apart.
+        let nearer = 14 - apart(lone, position.king(strong));
+        return sign * (LONE_KING_FROM_CENTRE * from_centre(lone) + KING_NEARER_LONE_KING * nearer);
+    }
+    0
 }

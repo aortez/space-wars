@@ -210,6 +210,18 @@ terms of the evaluation](#the-terms-of-the-evaluation).
 - **Not tried:** the pawns beside the king, castling, the squares round the
   other king, and checks. Most take every attack on the board.
 
+One more term is not that engine's. Where one player has only the king and
+the other has a queen or a rook, the other player gains 100 for each step
+the lone king stands from the four squares in the middle and 40 for each
+step their own king stands nearer to it, counted along files and ranks.
+Without it the search finds nothing to choose between moves that lead
+towards the mate and moves that do not, since the mate can be ten moves or
+more away. It is the mop-up evaluation of Chess 4.5 (Slate and Atkin, 1977),
+which the [Chess Programming Wiki](https://www.chessprogramming.org/Mop-up_Evaluation)
+gives as `4.7 * CMD + 1.6 * (14 - MD)`. The weights here are 21 and 25 times
+those. Smaller ones were lost in the margin of the levels: see [a lone
+king](#a-lone-king).
+
 ### What the search is compared with
 
 `src/search/tests.rs` holds a second search that tries every move to the
@@ -275,7 +287,12 @@ Three more things are held to, each with tests of its own.
   pawn, against a bare king, begun 11 to 40 half-moves from the hundredth
   at 20,000 positions a move, the engine won 86 this way. It won 84 with a
   table that took no notice of the count, and 82 with one that kept
-  nothing the rule could reach.
+  nothing the rule could reach. That was before the term for [a lone
+  king](#a-lone-king). With it the engine wins 160 of the 200, and 144
+  with a table that takes no notice of the count. Of the other 40, 32 run
+  out of quiet half-moves before the mate, seven end in a dead position,
+  and one in stalemate on the ninety-ninth, when no mate was left in time.
+  `strength conversion` in the tooling plays them.
 - **The margin beside a mate:** however wide the margin, a move that gets
   its player mated is not good enough beside one that does not. A position
   where several moves do is compared with the plain search under the widest
@@ -321,7 +338,7 @@ for a legal action after every step of three searches.
 
 ### Checking the tests
 
-On 2026-11-25 the search was broken in 133 ways, one at a time, in a copy
+On 2026-11-27 the search was broken in 143 ways, one at a time, in a copy
 of the crate, and its tests were rerun. Every break failed at least one
 test.
 
@@ -340,11 +357,18 @@ the table beside the fifty-move rule. The last three were wrong as well. Ten
 breaks went in with the fixes and their tests, and one more with the limit
 on the positions a player may give a search.
 
+The term for [a lone king](#a-lone-king) added ten, and all were noticed.
+It also hid a break that had been noticed: a return to the position a
+search began from counted as a repetition at once. The rook against a lone king had shown it, since
+returning there had been the best line, and with the lone king driven to
+the edge it no longer was. A case with locked pawns, where little else
+separates the moves, now shows it.
+
 | What was broken | Breaks | Tests that noticed |
 | --- | --- | --- |
 | Checkmate without its distance, stalemate as mate, a mate missed at the last position searched | 3 | Comparison with the plain search, mate distance |
 | The fifty-move rule at 50 half-moves, never, or ahead of checkmate | 3 | Comparison with the plain search |
-| Repetition never, at the first return to the root, only after three earlier occurrences, without the game's own positions | 4 | Positions already repeated in the game |
+| Repetition never, at the first return to the root, only after three earlier occurrences, without the game's own positions | 4 | Positions already repeated in the game, comparison with the plain search |
 | Dead material ignored, illegal moves searched | 2 | Comparison with the plain search |
 | A narrow window not followed by a wider search, or turned the wrong way, at the root or below it | 3 | Comparison with the plain search |
 | Captures past the full search: standing pat in check, at the wrong bound or not at all; one half-move too deep; lesser promotions or quiet moves followed; promotions or en passant left out | 8 | Comparison with the plain search |
@@ -374,6 +398,7 @@ on the positions a player may give a search.
 | A mated move good enough under the widest margin | 1 | The margin beside a mate |
 | The table beside the fifty-move rule: the count left out of what it knows a position by, a mate believed though it would come too late, by one half-move, or at the hundredth | 4 | The table and the count |
 | Pawns and rooks: a pawn beside a passed pawn taken to stop it, or only a pawn on its file; both pawns on a file passed; doubled pawns rewarded; a file with the other player's pawn counted open; the seventh rank counted whatever stands there; Black's board not turned | 7 | Evaluation |
+| A lone king: not counted, or counted as nothing; a king with pieces of its own taken for one; driven without a queen or a rook, or only by White; counted for its own player; drawn to the centre; worth a quarter as much; the kings kept apart, or counted apart by king moves | 10 | Evaluation, a lone king driven to the edge, a mate announced close to the hundredth half-move |
 
 A break that changes only the order in which moves are tried changes no
 answer. The sweep includes those that reverse an order the tests state, and
@@ -393,7 +418,11 @@ on the Pi 4 and 3.0 to 4.6 on the Pi 5, and 18.5 and 8.0 in the slowest
 position measured.
 
 On 2026-11-25 the levels were these, with the search as it is after every
-change listed under [the benchmark](#the-benchmark).
+change listed under [the benchmark](#the-benchmark). On 2026-11-27, with
+the term for [a lone king](#a-lone-king), the test positions and the games
+were counted again and the endings for the first time. The ratings on
+Stockfish's scale were not measured again, since that measurement cannot be
+repeated: see [the benchmark](#the-benchmark).
 
 | | Easy | Normal | Hard |
 | --- | --- | --- | --- |
@@ -403,7 +432,8 @@ change listed under [the benchmark](#the-benchmark).
 | Table | none | 1 MiB | 16 MiB |
 | Margin, in centipawns | 60 | 30 | 8 |
 | Plays about as well as Stockfish held to | far below 1320, its lowest | 1405 ± 58 | 2160 ± 53 |
-| Test positions found, of 300 | 34 | 166 | 272 |
+| Test positions found, of 300 | 34 | 167 | 272 |
+| Endings of a queen or a rook against a lone king mated, of 600 | 587 | 600 | 600 |
 | A move on the Pi 4 | under 1 ms | 8 to 12 ms | 0.7 to 1.1 s |
 | A move on the Pi 5 | under 1 ms | 3 to 5 ms | 0.3 to 0.45 s |
 | What a search holds | 105 KiB | 1.1 MiB | 16.1 MiB |
@@ -470,25 +500,130 @@ person.
 
 - **Test positions:** the earlier engine's repository holds `WAC.EPD`, 300
   positions from *Win at Chess* with the move to find in each. Searching
-  without the margin, Easy found 34 (11%), Normal 166 (55%) and Hard 272
-  (91%). With 100,000 positions the search found 228 (76%). Hard found 286
-  (95%) with four times its budget and 288 (96%) with sixteen times. The
-  search as first built had found 36 at Easy, 182 at 100,000 positions and
-  222 at Hard, and 250 and 258 with Hard's larger budgets.
+  without the margin, Easy found 34 (11%), Normal 167 (56%) and Hard 272
+  (91%). With 100,000 positions the search found 229 (76%). Hard found 287
+  (96%) with four times its budget and 288 (96%) with sixteen times. Before
+  the term for [a lone king](#a-lone-king), Normal had found 166, 100,000
+  positions 228 and four times Hard's budget 286. The term changed the
+  answer in four endgames, WAC.002, .041, .100 and .146, whose searches
+  reach a lone king after captures and promotions. The search as first
+  built had found 36 at Easy, 182 at 100,000 positions and 222 at Hard, and
+  250 and 258 with Hard's larger budgets.
 - **Games:** each pair of levels played 50 openings of four random half-moves,
   each opening twice with the colours exchanged. Normal beat Easy in all 100
   games, and so did Hard. Hard against Normal won 99 and drew one by
-  repetition.
+  repetition. The term for a lone king left these results as they were.
 - **A level against itself:** over the same 100 games, 94 ended in checkmate
-  at Easy, 78 at Normal and 90 at Hard. Two games at Normal were stopped
-  undecided after 400 half-moves, and the rest ended in a claimed draw,
-  stalemate or a dead position. The median game lasted 103 half-moves at
-  Easy, 159 at Normal and 164 at Hard.
+  at Easy, 84 at Normal and 82 at Hard, and the rest in a claimed draw or a
+  dead position. The median game lasted 103 half-moves at Easy and 163 at
+  Normal and at Hard. Before the term for a lone king there were 94, 78 and
+  90 checkmates, and the medians were 103, 159 and 164. The term changed
+  the moves in 11 of the 50 openings at Easy, 27 at Normal and 44 at Hard,
+  and the result in none, five and seven: see [a lone king](#a-lone-king).
 
 Easy searches two half-moves deep, too shallow for a pass or a reduction, so
 of the changes to the search only those to its evaluation and the order of
 its moves reach it. A search now uses all of its positions, where at first
 it used a little over half: see [How the budget is spent](#how-the-budget-is-spent).
+
+### A lone king
+
+Until 2026-11-27 a level that had taken everything but the other king often
+failed to mate it with a queen or a rook (#739). The mate can be ten moves
+or more away, beyond what Normal sees, and nothing in the evaluation told
+the moves that led towards it from those that did not. Normal played
+whichever of the moves within its margin the seed chose, and the lone king
+lasted until it could claim the fifty-move draw. The term for a lone king,
+described under [where the evaluation comes
+from](#where-the-evaluation-comes-from), gives the search something to aim
+at.
+
+`strength endings`, in the tooling outside the repository, plays such
+endings to their end with both players at one level, each action searched
+with a seed of its own. The lone king claims the fifty-move draw as soon as
+it may. With the seed 7 it chose 300 endings with a queen and 300 with a
+rook: either player the stronger, either to move, and the piece out of the
+lone king's reach.
+
+| Endings mated, of 300 | Easy | Normal | Hard |
+| --- | --- | --- | --- |
+| A queen, before | 18 | 41 | 292 |
+| A queen, now | 297 | 300 | 300 |
+| A rook, before | 21 | 39 | 142 |
+| A rook, now | 290 | 300 | 300 |
+
+- **How quickly:** with a queen, Normal now mates in a median of 14
+  half-moves and at most 41, and Hard in 13 and at most 36. With a rook
+  Normal takes 28 and at most 78, and Hard 29 and at most 75. Easy takes up
+  to 96 with a queen and 99 with a rook, and 13 of its 600 endings still
+  end in a claimed draw.
+- **The four positions of #739:** played with a queen and again with a
+  rook, every level now mates in all eight. Before, with the same seeds,
+  Easy mated in one of them, Normal in three and Hard in four. In the
+  issue's own games Normal had mated in none of the four with a queen.
+- **The Clock's birds:** the Clock's test that plays their game of queen
+  against king to its end,
+  `a_game_played_to_its_end_stops_play_and_the_next_visit_starts_a_new_match`,
+  now ends in checkmate after 17 actions. Before, the lone king claimed the
+  draw after 100.
+
+The term counts for both players, so a level left with the lone king now
+keeps it in the middle and away from the other king. Before, the king's
+squares differed by two centipawns at most, and it moved almost at random.
+`strength defence` plays the same 600 endings with the lone king at a level
+and the queen or the rook played by Stockfish, held to a number of positions
+a move:
+
+| Mated, of 300 | Easy, before | Easy, now | Normal, before | Normal, now |
+| --- | --- | --- | --- | --- |
+| A queen, Stockfish at 1,000 positions | 281 | 138 | 238 | 132 |
+| A queen, at 2,000 | 300 | 201 | 281 | 205 |
+| A queen, at 5,000 | 300 | 300 | 300 | 299 |
+| A rook, at 1,000 | 113 | 25 | 67 | 16 |
+| A rook, at 2,000 | 180 | 61 | 137 | 33 |
+| A rook, at 5,000 | 296 | 202 | 288 | 176 |
+
+A player who takes everything but a level's king now has to drive it to an
+edge to mate it, as the levels themselves do.
+
+The term changes the value only of a position with a lone king, but a
+search reaches such positions from many others, through captures and
+promotions. Searching a position that still held both queens, both rooks, a
+knight and eight pawns, Hard came upon 80 of them among its million.
+Changing the values of a few of a million positions can change how the
+search cuts its tree and where its budget runs out, and so which move it
+plays. That is why the term changed the moves in so many games, Hard's
+against itself above all, and their results far less: see [the
+levels](#the-levels-and-a-players-settings) and [the
+benchmark](#the-benchmark).
+
+A step of the lone king has to be worth more than the margin. Normal plays
+any of the moves within 30 of the best, and Easy within 60. Over the same
+600 endings at Normal, with the two weights in the same proportion:
+
+| A step from the centre, a step nearer | Queen | Rook | Longest mate with a rook |
+| --- | --- | --- | --- |
+| None | 41 | 39 | 99 |
+| 10 and 4 | 78 | 49 | 100 |
+| 20 and 8 | 250 | 161 | 100 |
+| 30 and 12 | 299 | 274 | 99 |
+| 40 and 16 | 300 | 298 | 99 |
+| 50 and 20 | 300 | 300 | 97 |
+| 60 and 24 | 300 | 300 | 90 |
+| 80 and 32 | 300 | 300 | 87 |
+| 100 and 40 | 300 | 300 | 78 |
+| 120 and 48 | 300 | 300 | 83 |
+| 160 and 64 | 300 | 300 | 76 |
+
+The weights kept are 100 and 40: a pawn for each step from the centre.
+Heavier ones mated no quicker, in a median of 14 half-moves with a queen and
+28 with a rook. In other proportions fewer rook endings were won: 291 with
+40 and 8, 295 with 40 and 24, and 294 with 60 and 12.
+
+The term counts only a queen or a rook. A king and pawns must promote
+first, after which the term applies. It leaves out two bishops, and a bishop
+and a knight: those mates take longer, the second needs a corner of the
+bishop's colour, and nothing here teaches the search them.
 
 ### The benchmark
 
@@ -533,8 +668,9 @@ crate's rules refused.
 
 #### What each change was worth
 
-Each was measured on 2026-11-24 at 100,000 positions a move, and the last
-on 2026-11-25.
+Each was measured on 2026-11-24 at 100,000 positions a move, the table
+told apart by the count on 2026-11-25, and the term for a lone king on
+2026-11-27.
 
 | The search | Rating | Against the baseline, in 200 games |
 | --- | --- | --- |
@@ -545,25 +681,30 @@ on 2026-11-25.
 | And every position of the budget used, with the answer taken from an unfinished depth | 1914 ± 23 | +319 (+262 to +394) |
 | And passed and doubled pawns counted, and rooks on open files and on the seventh rank | 1957 ± 23 | +531 (+445 to +691) |
 | And the table told apart by the count near the fifty-move rule | 1959 ± 23 | +531 (+445 to +691) |
+| And a lone king driven to the edge by a queen or a rook | 1954 ± 23 | +531 (+445 to +691) |
 
-With all of them the engine rated 1734 at 10,000 positions a move and 2124
-at 1,000,000, each give or take about 30. That is 140 to 207 above the
+With all of them the engine rated 1732 at 10,000 positions a move and 2117
+at 1,000,000, each give or take about 30. That is 140 to 202 above the
 baseline at every budget. At 100,000 it plays level with Stockfish at about
 400 positions a move.
 
-| Positions a move | Baseline | With the pass and the reductions | With its whole budget used | With the terms for pawns and rooks | As it is |
-| --- | --- | --- | --- | --- | --- |
-| 10,000 | 1592 | 1672 | 1688 | 1735 | 1734 |
-| 100,000 | 1752 | 1863 | 1914 | 1957 | 1959 |
-| 1,000,000 | 1924 | 2036 | 2045 | 2124 | 2124 |
+| Positions a move | Baseline | With the pass and the reductions | With its whole budget used | With the terms for pawns and rooks | After a review | With the term for a lone king |
+| --- | --- | --- | --- | --- | --- | --- |
+| 10,000 | 1592 | 1672 | 1688 | 1735 | 1734 | 1732 |
+| 100,000 | 1752 | 1863 | 1914 | 1957 | 1959 | 1954 |
+| 1,000,000 | 1924 | 2036 | 2045 | 2124 | 2124 | 2117 |
 
-The last column is the engine after a review of the whole change, which
-altered its play only close to the fifty-move rule: at least a dozen of
-the 3,500 games came out differently.
+A review of the whole change altered the engine's play only close to the
+fifty-move rule: at least a dozen of the 3,500 games came out differently.
+The term for [a lone king](#a-lone-king) changed the moves in 358 of the
+1,400 games at 10,000 positions a move and 519 at 100,000, and the result
+in 76 and 105. Nearly every game whose result changed ended with one
+player's king alone. Each rating moved by less than its error, and against
+the baseline no result moved by more than two games.
 
 Two builds of one engine beat each other by more than either gains against
 other programs: the 531 points won from the baseline at 100,000 positions a
-move are 207 on the field's scale.
+move are 202 on the field's scale.
 
 The settings were chosen by matches of 600 games between builds, at 100,000
 positions a move.
@@ -703,7 +844,9 @@ kiosks](#on-the-kiosks).
   1,000,000 positions each, the search went from 3.9 to 7.7 million
   positions a second. Every decision stayed the same, and so did the number
   of positions needed to search each to a fixed depth. The terms for pawns
-  and rooks then took it to 7.0 million.
+  and rooks then took it to 7.0 million. The term for a lone king cost
+  nothing that showed: timed in turn on 2026-11-27, the search looked at
+  6.92 million positions a second without it and 6.90 million with it.
 - A profile said where the time went: finding the next move to try took a
   fifth of it, the paths of sliding pieces an eighth, exchanges on a square
   an eighth and the evaluation a tenth. The moves and their scores are now
@@ -812,8 +955,9 @@ running them.
 - The comparison of the model with shakmaty on random games described above.
 - The script that breaks the search one way at a time, described above.
 - A program that scores the levels of the search on a file of test positions,
-  plays seeded pairs of games between them, and plays matches between any
-  engines that speak UCI.
+  plays seeded pairs of games between them, plays endings of a queen or a
+  rook against a lone king, and plays matches between any engines that
+  speak UCI.
 - The benchmark described above: its script, its field of opponents with
   their ratings, the baseline engine with its sources, every build rated
   since, a copy of Stockfish 19, and the log of ratings measured so far.
