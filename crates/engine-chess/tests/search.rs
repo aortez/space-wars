@@ -2,7 +2,9 @@
 //! a search may rely on.
 
 use engine_chess::search::{Level, MATE, MAX_DEPTH, MAX_PLAY_NODES, SearchJob, Settings};
-use engine_chess::{Action, ActionError, DrawClaim, DrawReason, Game, Move, Outcome, Position};
+use engine_chess::{
+    Action, ActionError, Color, DrawClaim, DrawReason, Game, Move, Outcome, Position,
+};
 
 const START: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const KIWIPETE: &str = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
@@ -33,6 +35,24 @@ const QUEENS_WITH_A_MATE: &str = "6nk/6pp/8/Q7/QQQQQQQQ/QQQQQQQQ/QQQQQQQQ/QQQQKQ
 /// A knight out and back for each player: four half-moves that restore the
 /// position.
 const SHUFFLE: &str = "g1f3 g8f6 f3g1 f6g8";
+/// A king and a queen or a rook against a lone king, and the player who
+/// should win. Normal mated none of the first four, which issue #739 found,
+/// until it was taught to drive the lone king to the edge.
+const LONE_KING_ENDINGS: [(&str, Color); 12] = [
+    ("8/8/8/4k3/8/8/8/KQ6 w - - 0 1", Color::White),
+    ("8/8/3k4/8/8/8/8/4K2Q w - - 0 1", Color::White),
+    ("4k3/8/8/8/8/8/8/Q3K3 w - - 0 1", Color::White),
+    ("8/8/8/8/3k4/8/8/K6Q w - - 0 1", Color::White),
+    ("8/8/8/4k3/8/8/8/KR6 w - - 0 1", Color::White),
+    ("8/8/3k4/8/8/8/8/4K2R w - - 0 1", Color::White),
+    ("4k3/8/8/8/8/8/8/R3K3 w - - 0 1", Color::White),
+    ("8/8/8/8/3k4/8/8/K6R w - - 0 1", Color::White),
+    // The lone king to move, and Black with the queen or the rook.
+    ("8/8/8/4k3/8/8/8/KQ6 b - - 0 1", Color::White),
+    ("8/8/8/8/3k4/8/8/K6R b - - 0 1", Color::White),
+    ("kq6/8/8/8/4K3/8/8/8 w - - 0 1", Color::Black),
+    ("r6k/8/8/8/8/3K4/8/8 w - - 0 1", Color::Black),
+];
 
 fn mv(text: &str) -> Move {
     Move::parse(text).unwrap_or_else(|| panic!("`{text}` is not a move"))
@@ -308,6 +328,28 @@ fn a_mate_in_two_is_found_and_scored_by_its_distance() {
         // Three half-moves: the king steps up, the other king steps aside,
         // and the rook mates.
         assert_eq!(decision.score, Some(MATE - 3), "{level:?}");
+    }
+}
+
+#[test]
+fn normal_mates_a_lone_king_with_a_queen_or_a_rook_within_the_fifty_move_rule() {
+    for (fen, winner) in LONE_KING_ENDINGS {
+        let mut game = game(fen, "");
+        // The lone king claims the draw once the rule allows, so the game
+        // ends by the hundredth quiet half-move at the latest.
+        for seed in 0..120 {
+            if game.outcome().is_some() {
+                break;
+            }
+            (_, game) = decide(&game, Level::Normal.settings(), seed);
+        }
+        assert_eq!(
+            game.outcome(),
+            Some(Outcome::Checkmate { winner }),
+            "{fen}: after {} half-moves",
+            game.moves().len()
+        );
+        assert!(game.position().halfmove_clock() <= 100, "{fen}");
     }
 }
 

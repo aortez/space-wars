@@ -16,7 +16,7 @@
 
 use std::collections::HashMap;
 
-use super::eval::evaluate;
+use super::eval::{evaluate, lone_king};
 use super::exchange::tests::plain_exchange;
 use super::*;
 use crate::{Color, Game, Position};
@@ -41,6 +41,12 @@ const MATE_ON_THE_HUNDREDTH: &str = "6k1/5ppp/8/8/8/8/8/R3K3 w Q - 99 60";
 const KNIGHT_PROMOTION: &str = "8/q1P5/4k3/8/8/8/8/4K3 b - - 0 1";
 const QUEEN_ENDGAME: &str = "8/8/8/3k4/8/8/8/KQ6 w - - 0 1";
 const ROOK_AGAINST_KING: &str = "8/8/8/4k3/8/8/8/R3K3 w - - 0 1";
+/// A rook and two pawns that block each other. Black's pawn keeps its king
+/// from being alone, so little separates most moves, and the best line can
+/// return to the position the search began from, which is not yet a draw.
+/// Against a lone king the rook no longer shows that, since the king is
+/// driven to the edge.
+const LOCKED_PAWNS: &str = "8/p7/P7/4k3/8/8/8/4K2R w - - 0 1";
 /// A rook checks on d8, is taken, and the other rook takes back with mate.
 /// Captures after the check show the mate two half-moves before the full
 /// search reaches it.
@@ -335,7 +341,7 @@ fn good_enough_beside(best: i32, margin: u16) -> i32 {
 
 /// Positions with the depth and the half-moves of captures to search them
 /// at. The plain search tries everything, so the busy ones stay shallow.
-const CASES: [(&str, &str, &str, u8, u8); 17] = [
+const CASES: [(&str, &str, &str, u8, u8); 18] = [
     ("start", START, "", 3, 2),
     ("kiwipete", KIWIPETE, "", 2, 2),
     ("rook-endgame", ROOK_ENDGAME, "", 4, 3),
@@ -352,6 +358,7 @@ const CASES: [(&str, &str, &str, u8, u8); 17] = [
     ("knight-promotion", KNIGHT_PROMOTION, "", 2, 3),
     ("queen-endgame", QUEEN_ENDGAME, "", 5, 1),
     ("rook-against-king", ROOK_AGAINST_KING, "", 5, 1),
+    ("locked-pawns", LOCKED_PAWNS, "", 5, 1),
     ("after-a-shuffle", START, SHUFFLE, 3, 1),
 ];
 
@@ -704,18 +711,21 @@ fn the_evaluation_counts_material_and_placement() {
     // One piece besides the kings, which stand alike and cancel out: its
     // value and the bonus for its square, read from its owner's side.
     // A lone pawn is passed, which on its fourth rank is worth 20, and a
-    // lone rook stands on an open file, which is worth 9.
+    // lone rook stands on an open file, which is worth 9. A rook or a queen
+    // also drives the other king, alone on its back rank, from the centre:
+    // three steps from it and seven from the king with the piece.
+    let lone_king = 3 * 100 + (14 - 7) * 40;
     for (board, worth) in [
         ("4k3/8/8/8/4P3/8/8/4K3", 100 + 10 + 20),
         ("4k3/8/8/8/3N4/8/8/4K3", 330 + 8),
         ("4k3/8/8/8/8/8/8/2B1K3", 350 - 12),
-        ("4k3/8/8/8/8/8/8/3RK3", 520 + 2 + 9),
-        ("4k3/8/8/8/8/8/8/3QK3", 980 - 5),
+        ("4k3/8/8/8/8/8/8/3RK3", 520 + 2 + 9 + lone_king),
+        ("4k3/8/8/8/8/8/8/3QK3", 980 - 5 + lone_king),
         ("4k3/8/8/4p3/8/8/8/4K3", -(100 + 10 + 20)),
         ("4k3/8/8/3n4/8/8/8/4K3", -(330 + 8)),
         ("2b1k3/8/8/8/8/8/8/4K3", -(350 - 12)),
-        ("3rk3/8/8/8/8/8/8/4K3", -(520 + 2 + 9)),
-        ("3qk3/8/8/8/8/8/8/4K3", -(980 - 5)),
+        ("3rk3/8/8/8/8/8/8/4K3", -(520 + 2 + 9 + lone_king)),
+        ("3qk3/8/8/8/8/8/8/4K3", -(980 - 5 + lone_king)),
     ] {
         assert_eq!(value(&format!("{board} w - - 0 1")), worth, "{board}");
         assert_eq!(value(&format!("{board} b - - 0 1")), -worth, "{board}");
@@ -758,9 +768,9 @@ fn the_evaluation_counts_what_pawns_and_rooks_are_worth_beyond_their_placement()
             (100 + 5 - 11) + (100 + 10 + 20),
         ),
         (
-            "a rook behind its own pawn is on no open file",
+            "a rook behind its own pawn is on no open file, and Black's king is alone, three steps from the centre and seven from White's",
             "4k3/8/8/8/8/8/3P4/3RK3",
-            (100 - 24) + (520 + 2),
+            (100 - 24) + (520 + 2) + 3 * 100 + (14 - 7) * 40,
         ),
         (
             "nor is one that faces a pawn of the other player",
@@ -768,9 +778,9 @@ fn the_evaluation_counts_what_pawns_and_rooks_are_worth_beyond_their_placement()
             (520 + 2) - (100 - 24),
         ),
         (
-            "a rook on the seventh rank with the king on the eighth",
+            "a rook on the seventh rank with the king on the eighth, which is alone, three steps from the centre and seven from White's king",
             "4k3/R7/8/8/8/8/8/4K3",
-            520 - 5 + 9 + 17,
+            520 - 5 + 9 + 17 + 3 * 100 + (14 - 7) * 40,
         ),
         (
             "or with a pawn beside it, which also closes no file to it",
@@ -778,12 +788,63 @@ fn the_evaluation_counts_what_pawns_and_rooks_are_worth_beyond_their_placement()
             (520 - 5 + 9 + 17) - (100 - 6) - 1,
         ),
         (
-            "with neither, the seventh rank is worth nothing, and the king stands a point better",
+            "with neither, the seventh rank is worth nothing, and the king stands a point better, a step from the centre and five from White's king",
             "8/R7/4k3/8/8/8/8/4K3",
-            (520 - 5 + 9) - 1,
+            (520 - 5 + 9) - 1 + 100 + (14 - 5) * 40,
         ),
     ] {
         assert_eq!(value(board), worth, "{what}: {board}");
+    }
+}
+
+#[test]
+fn a_queen_or_a_rook_drives_a_lone_king_to_the_edge_and_brings_its_own_king_up() {
+    let value = |fen: &str| lone_king(&Position::from_fen(fen).unwrap());
+    // Each step the lone king stands from the centre is worth 100, and each
+    // step nearer the other king stands to it 40, counted along files and
+    // ranks: 14 - 2 for kings two steps apart.
+    for (what, fen, worth) in [
+        (
+            "the most: in a corner, the other king two steps off",
+            "k7/8/K7/8/8/8/7Q/8 w - - 0 1",
+            6 * 100 + (14 - 2) * 40,
+        ),
+        (
+            "a rook as much as a queen",
+            "k7/8/K7/8/8/8/7R/8 w - - 0 1",
+            6 * 100 + (14 - 2) * 40,
+        ),
+        (
+            "with other pieces beside it",
+            "k7/8/K7/8/8/8/7R/5BN1 w - - 0 1",
+            6 * 100 + (14 - 2) * 40,
+        ),
+        (
+            "for Black as for White",
+            "K7/8/k7/8/8/8/7q/8 b - - 0 1",
+            -(6 * 100 + (14 - 2) * 40),
+        ),
+        (
+            "in the centre, the other king seven steps off",
+            "8/8/8/8/3k4/8/8/1Q5K w - - 0 1",
+            (14 - 7) * 40,
+        ),
+        (
+            "a step from the centre, eight from the other king",
+            "8/8/8/8/2k5/8/8/1Q5K w - - 0 1",
+            100 + (14 - 8) * 40,
+        ),
+        (
+            "nothing while the king is not alone",
+            "k7/p7/K7/8/8/8/7Q/8 w - - 0 1",
+            0,
+        ),
+        ("nor against bishops", "k7/8/K7/8/8/8/8/5BB1 w - - 0 1", 0),
+        ("a bishop and a knight", "k7/8/K7/8/8/8/8/5BN1 w - - 0 1", 0),
+        ("a pawn", "k7/8/K7/8/8/8/P7/8 w - - 0 1", 0),
+        ("or a king alone", "k7/8/K7/8/8/8/8/8 w - - 0 1", 0),
+    ] {
+        assert_eq!(value(fen), worth, "{what}: {fen}");
     }
 }
 
@@ -864,8 +925,10 @@ fn score_with_the_table_told(count: u32, told_at: u32, score: i32) -> i32 {
 
 #[test]
 fn what_the_table_holds_at_one_count_is_not_used_at_another_near_the_hundredth() {
-    // Black is said to be ten pawns behind after White's first move.
-    let behind = -1_000;
+    // Black is said to be twenty pawns behind after White's first move:
+    // more than a rook together with the most that driving Black's lone king
+    // can be worth, which is 1,080.
+    let behind = -2_000;
     // Far from the hundredth the count makes no difference.
     assert_eq!(score_with_the_table_told(10, 11, behind), -behind);
     assert_eq!(score_with_the_table_told(10, 30, behind), -behind);
