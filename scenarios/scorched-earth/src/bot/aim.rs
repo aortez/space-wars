@@ -1,4 +1,5 @@
 use super::*;
+use engine_rapier::cannon::bracket::{Bracket, Outcome};
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub(super) struct Geometry {
@@ -33,32 +34,22 @@ impl Geometry {
 #[derive(Clone, Serialize)]
 pub(super) struct Aim {
     geometry: Option<Geometry>,
-    pub elevation: f32,
-    pub power: f32,
-    pub confident: bool,
-    lower_power: Option<f32>,
-    upper_power: Option<f32>,
-    /// Power/range relationship learned from real ranging shots, retained when
-    /// positions change; local bracketing and confidence are cleared instead.
-    range_scale: f32,
+    /// The elevation and power, bracketed from real ranging shots. What those
+    /// shots showed of the flat-ground estimate outlasts a move; the local
+    /// bracket and confidence don't.
+    #[serde(flatten)]
+    pub bracket: Bracket,
     pub correction: &'static str,
     pub observations: u64,
-    blocked_arcs: u8,
 }
 
 impl Default for Aim {
     fn default() -> Self {
         Self {
             geometry: None,
-            elevation: 50.0_f32.to_radians(),
-            power: 32.0,
-            confident: false,
-            lower_power: None,
-            upper_power: None,
-            range_scale: 1.0,
+            bracket: Bracket::new(50.0_f32.to_radians(), 32.0),
             correction: "initial estimate",
             observations: 0,
-            blocked_arcs: 0,
         }
     }
 }
@@ -73,19 +64,16 @@ fn rough_power(geometry: Geometry, elevation: f32) -> f32 {
 
 impl Aim {
     pub(super) fn has_power_correction(&self) -> bool {
-        !self.confident
+        !self.bracket.confident
             && matches!(self.correction, "short" | "long")
-            && (self.lower_power.is_some() || self.upper_power.is_some())
+            && self.bracket.bounded()
     }
 
     pub fn refresh(&mut self, geometry: Geometry) {
         if self.geometry.is_none_or(|old| !old.matches(geometry)) {
             self.geometry = Some(geometry);
-            self.lower_power = None;
-            self.upper_power = None;
-            self.confident = false;
-            self.power = (rough_power(geometry, self.elevation) * self.range_scale)
-                .clamp(cannon::MIN_POWER, geometry.max_power);
+            let rough = |elevation| rough_power(geometry, elevation);
+            self.bracket.restart(rough, geometry.max_power);
             self.correction = "new firing geometry";
         }
     }
@@ -94,66 +82,29 @@ impl Aim {
         self.observations += 1;
         // A shot from a different pose remains useful evidence, but must not
         // install its old local bracket as the solution at the new location.
-        let current = self.geometry;
-        let applies = current.is_some_and(|g| {
-            g.shooter.distance_to(shot.launch.shooter) <= 1.0
+        let current = self.geometry.filter(|g| {
+            shot.assessment != "target moved"
+                && g.shooter.distance_to(shot.launch.shooter) <= 1.0
                 && g.target.distance_to(shot.launch.target) <= 1.0
                 && (g.pitch - shot.launch.pitch).abs() <= 8.0_f32.to_radians()
-                && (self.elevation - shot.launch.elevation).abs() < 0.01
+                && self.bracket.fired_at(shot.launch.elevation)
         });
-        if shot.assessment == "target moved" || !applies {
-            self.confident = false;
+        let Some(current) = current else {
+            self.bracket.confident = false;
             self.correction = "observation geometry changed";
             return;
-        }
-        self.confident = shot.assessment == "useful hit";
+        };
         self.correction = shot.assessment;
-        match shot.assessment {
-            "useful hit" => {
-                self.power = shot.launch.power;
-                self.lower_power = None;
-                self.upper_power = None;
-            }
-            "short" => self.lower_power = Some(shot.launch.power),
-            "long" => self.upper_power = Some(shot.launch.power),
-            "blocked arc" | "blocked barrel" | "self hit" => {
-                self.lower_power = None;
-                self.upper_power = None;
-                self.blocked_arcs = self.blocked_arcs.saturating_add(1);
-                self.elevation =
-                    (self.elevation + 10.0_f32.to_radians()).min(80.0_f32.to_radians());
-                self.power = (rough_power(current.unwrap(), self.elevation) * self.range_scale)
-                    .clamp(cannon::MIN_POWER, current.unwrap().max_power);
-                return;
-            }
-            _ => return,
-        }
-        if !self.confident {
-            self.power = match (self.lower_power, self.upper_power) {
-                (Some(low), Some(high)) if low < high => (low + high) * 0.5,
-                _ => {
-                    // Clear an inconsistent bracket after terrain changed the
-                    // result; never assume global monotonicity across impacts.
-                    if self
-                        .lower_power
-                        .zip(self.upper_power)
-                        .is_some_and(|(l, h)| l >= h)
-                    {
-                        self.lower_power = None;
-                        self.upper_power = None;
-                    }
-                    shot.launch.power
-                        + if shot.assessment == "short" {
-                            2.5
-                        } else {
-                            -2.5
-                        }
-                }
-            }
-            .clamp(cannon::MIN_POWER, current.unwrap().max_power);
-        }
-        self.range_scale =
-            (self.power / rough_power(current.unwrap(), self.elevation)).clamp(0.65, 1.4);
+        let outcome = match shot.assessment {
+            "useful hit" => Outcome::Hit,
+            "short" => Outcome::Short,
+            "long" => Outcome::Long,
+            "blocked arc" | "blocked barrel" | "self hit" => Outcome::Blocked,
+            _ => Outcome::Unclear,
+        };
+        let rough = |elevation| rough_power(current, elevation);
+        self.bracket
+            .learn(outcome, shot.launch.power, rough, current.max_power);
     }
 }
 

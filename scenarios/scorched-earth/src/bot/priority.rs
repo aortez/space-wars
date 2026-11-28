@@ -33,10 +33,10 @@ impl Bot {
             || !observation.launch.calibrated
             || self.aim.correction != observation.assessment
             || state.tick.saturating_sub(observation.tick) > 180
-            || (self.aim.power - observation.launch.power).abs() < 0.01
+            || (self.aim.bracket.power - observation.launch.power).abs() < 0.01
             || state.tanks[player].next_shot > state.tick + FIRE_WAIT
             || !state.has_track_support(physics, player)
-            || !state.correction_barrel_clear(physics, player, self.aim.elevation)
+            || !state.correction_barrel_clear(physics, player, self.aim.bracket.elevation)
             || self.shot_priority.as_ref().is_some_and(|previous| {
                 previous.ended.is_none()
                     || previous.evidence == observation.launch.id
@@ -81,7 +81,7 @@ impl Bot {
             Some("geometry changed")
         } else if !state.has_track_support(physics, player) {
             Some("no support")
-        } else if !state.correction_barrel_clear(physics, player, self.aim.elevation) {
+        } else if !state.correction_barrel_clear(physics, player, self.aim.bracket.elevation) {
             Some("blocked barrel")
         } else if priority.shot.is_none() && !self.aim.has_power_correction() {
             Some("correction changed")

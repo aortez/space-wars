@@ -37,8 +37,8 @@ fn flat_ranging_learns_from_real_shots_and_retains_a_useful_solution() {
             shots.last().unwrap().closest < shots[0].closest,
             "{shots:?}"
         );
-        assert!(state.bots[0].aim.confident);
-        let power = state.bots[0].aim.power;
+        assert!(state.bots[0].aim.bracket.confident);
+        let power = state.bots[0].aim.bracket.power;
         state.aim_bot(0);
         assert_eq!(state.tanks[0].speed, power);
         state.audit().unwrap();
@@ -103,11 +103,11 @@ fn confident_or_cooldown_bots_do_not_restart_relocation_on_a_hit() {
     state.config.cpu_driving = true;
     let geometry = Geometry::read(&state, &state.physics, 0);
     state.bots[0].aim.refresh(geometry);
-    state.bots[0].aim.confident = true;
+    state.bots[0].aim.bracket.confident = true;
     state.duel.bots[0].hit(state.duel.tick, 10.0);
     assert_eq!(state.bot_drive(0), None);
     assert!(state.bot_allows_fire(0));
-    state.bots[0].aim.confident = false;
+    state.bots[0].aim.bracket.confident = false;
     state.bots[0].relocate_after = state.tick + 100;
     assert_eq!(state.bot_drive(0), None);
     assert_eq!(state.bots[0].relocations, 0);
@@ -150,7 +150,7 @@ fn firing_destination_prefers_level_ground_over_a_drivable_slope() {
     let x = Geometry::read(&state, &state.physics, 0).shooter.x;
     assert!(state.safe_drive_direction(0, 1.0));
     assert!(state.safe_drive_direction(0, -1.0));
-    let sites = state.relocation_sites(0, state.bots[0].aim.elevation);
+    let sites = state.relocation_sites(0, state.bots[0].aim.bracket.elevation);
     assert!(
         sites
             .iter()
@@ -158,7 +158,7 @@ fn firing_destination_prefers_level_ground_over_a_drivable_slope() {
     );
     assert!(
         state
-            .escape_destination(0, state.bots[0].aim.elevation)
+            .escape_destination(0, state.bots[0].aim.bracket.elevation)
             .unwrap()
             < x
     );
@@ -168,7 +168,7 @@ fn firing_destination_prefers_level_ground_over_a_drivable_slope() {
 fn changing_pose_invalidates_local_confidence_but_keeps_learned_calibration() {
     let mut state = flat(GrainShape::Hexagon, CpuPolicy::Calibrated);
     state.aim_calibrated(0);
-    state.bots[0].aim.confident = true;
+    state.bots[0].aim.bracket.confident = true;
     state.bots[0].aim.observations = 3;
     let body = state.tanks[0].body;
     let motion = state.physics.motion(body).unwrap();
@@ -176,7 +176,7 @@ fn changing_pose_invalidates_local_confidence_but_keeps_learned_calibration() {
         .physics
         .set_pose(body, motion.position + Vec2::X * 3.0, motion.angle, true);
     state.aim_calibrated(0);
-    assert!(!state.bots[0].aim.confident);
+    assert!(!state.bots[0].aim.bracket.confident);
     assert_eq!(state.bots[0].aim.observations, 3);
 }
 
@@ -200,13 +200,13 @@ fn target_motion_and_obstructions_are_not_power_brackets() {
     shot.assessment = aim::assess(&shot, Vec2::new(12.0, 8.0));
     assert_eq!(shot.assessment, "blocked arc");
     state.bots[0].aim.learn(&shot);
-    assert!(state.bots[0].aim.elevation > launch.elevation);
+    assert!(state.bots[0].aim.bracket.elevation > launch.elevation);
     shot.target_moved = true;
     shot.assessment = aim::assess(&shot, Vec2::new(12.0, -8.0));
     assert_eq!(shot.assessment, "target moved");
-    let power = state.bots[0].aim.power;
+    let power = state.bots[0].aim.bracket.power;
     state.bots[0].aim.learn(&shot);
-    assert_eq!(state.bots[0].aim.power, power);
+    assert_eq!(state.bots[0].aim.bracket.power, power);
 }
 
 #[test]
@@ -296,12 +296,12 @@ fn height_and_ridge_cases_acquire_aim_instead_of_accepting_weak_splash() {
             let mut state = bot_lab::stationary_case(shape, case, CpuPolicy::Calibrated);
             for _ in 0..2100 {
                 step(&mut state);
-                if state.bots[0].aim.confident {
+                if state.bots[0].aim.bracket.confident {
                     break;
                 }
             }
             assert!(
-                state.bots[0].aim.confident,
+                state.bots[0].aim.bracket.confident,
                 "{shape:?} {case:?}: {:?}",
                 state.shot_observations()
             );
@@ -312,7 +312,10 @@ fn height_and_ridge_cases_acquire_aim_instead_of_accepting_weak_splash() {
             );
             if matches!(case, bot_lab::AimCase::Ridge) {
                 assert_eq!(state.shot_observations[0].assessment, "blocked arc");
-                assert!(state.bots[0].aim.elevation > state.shot_observations[0].launch.elevation);
+                assert!(
+                    state.bots[0].aim.bracket.elevation
+                        > state.shot_observations[0].launch.elevation
+                );
             }
             state.audit().unwrap();
         }
@@ -343,10 +346,10 @@ fn disabling_driving_during_relocation_does_not_block_stationary_firing() {
 fn unrelated_dirt_edits_do_not_erase_aim_and_lethal_hits_remain_hits() {
     let mut state = flat(GrainShape::Round, CpuPolicy::Calibrated);
     state.aim_calibrated(0);
-    state.bots[0].aim.confident = true;
+    state.bots[0].aim.bracket.confident = true;
     state.explode(Vec2::new(40.0, -5.0));
     state.aim_calibrated(0);
-    assert!(state.bots[0].aim.confident);
+    assert!(state.bots[0].aim.bracket.confident);
     state.fire(0);
     let launch = state.shells[0].flight.unwrap().launch;
     let shot = ShotObservation {

@@ -77,7 +77,7 @@ fn fork(checkpoint: &ScorchedState, player: usize, choice: Choice) -> ScorchedSt
         Choice::Reference | Choice::Destination => {
             let destination = match choice {
                 Choice::Reference => reference_destination(&state, player),
-                _ => state.escape_destination(player, bot.aim.elevation),
+                _ => state.escape_destination(player, bot.aim.bracket.elevation),
             };
             bot.consider_relocation(&state, &state.physics, player, destination);
         }
@@ -186,7 +186,7 @@ pub fn compare_relocation(
             if found != opportunity {
                 continue;
             }
-            let elevation = ready_bot(&state, player).unwrap().aim.elevation;
+            let elevation = ready_bot(&state, player).unwrap().aim.bracket.elevation;
             return json!({
                 "found": true, "seed": seed, "opportunity": opportunity,
                 "shape": format!("{:?}", state.config.shape), "player": player,
