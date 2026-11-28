@@ -27,7 +27,10 @@ fn trace(
     dir: &Path,
     tx: &SyncSender<Result<Option<Decision>, String>>,
 ) -> Result<(), String> {
-    let model = Trainer::read_genome(dir, &source.genome_id)?;
+    let model = match source.live_genome() {
+        Some(genome) => genome,
+        None => Arc::new(Trainer::read_genome(dir, &source.genome_id)?),
+    };
     let mut episode = DuckEpisode::new(case, DuckDriver::External)?;
     let sensor = episode.sensor()?;
     let mut held = DuckControls::default();
@@ -113,9 +116,13 @@ impl Playback {
     pub fn reset(&mut self) {
         self.episode =
             DuckEpisode::new(self.case, DuckDriver::External).expect("validated replay case");
+        self.invalidate_display();
+        self.terminal_time = Duration::ZERO;
+    }
+
+    pub fn invalidate_display(&mut self) {
         self.last_frame = None;
         self.shown_inspection = None;
-        self.terminal_time = Duration::ZERO;
     }
 
     pub fn ready(&mut self) -> bool {
@@ -181,8 +188,15 @@ impl Playback {
             .collect()
     }
 
-    pub fn frame(&mut self, width: u32) -> (String, String, Option<slint::Image>) {
+    pub fn frame(
+        &mut self,
+        max_width: u32,
+        max_height: u32,
+    ) -> (String, String, Option<slint::Image>) {
         let case = self.case;
+        let width = max_width
+            .min(max_height.saturating_mul(u32::from(case.width)) / u32::from(case.height))
+            .max(1);
         let height = (width * u32::from(case.height) / u32::from(case.width)).max(1);
         let progress = self.episode.progress();
         let key = (progress.tick, width, height);

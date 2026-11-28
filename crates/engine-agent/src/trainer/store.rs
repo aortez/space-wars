@@ -13,6 +13,7 @@ use std::{
     fs::{self, File, OpenOptions},
     io::{BufRead, BufReader, Read, Seek, SeekFrom, Write},
     path::Path,
+    sync::Arc,
 };
 
 pub(super) const MANIFEST: &str = "checkpoint.json";
@@ -131,14 +132,14 @@ pub(super) fn save_genome(dir: &Path, genome: &C3Genome) -> Result<(), String> {
     }
     Ok(())
 }
-pub(super) fn save_population(dir: &Path, population: &[C3Genome]) -> Result<(), String> {
+pub(super) fn save_population(dir: &Path, population: &[Arc<C3Genome>]) -> Result<(), String> {
     population
         .iter()
         .try_for_each(|genome| save_genome(dir, genome))
 }
 
 impl Checkpoint {
-    pub fn new(config: TrainerConfig, genomes: &[C3Genome]) -> Result<Self, String> {
+    pub fn new(config: TrainerConfig, genomes: &[Arc<C3Genome>]) -> Result<Self, String> {
         let population: Vec<_> = genomes.iter().map(|g| g.id().to_owned()).collect();
         let contract = Contract::default();
         let runtime = runtime_id().map_err(reason)?;
@@ -212,13 +213,18 @@ impl Checkpoint {
             || record.generation != generation
             || record.best.genome_id != record.best_genome
             || record.best.case != record.best_case
-            || record.best.generation != generation
-            || record.current.generation != generation
         {
             return Err("Saved replay does not match its generation".into());
         }
-        record.current.validate_replay().map_err(reason)?;
-        record.best.validate_replay().map_err(reason)?;
+        for replay in [&record.current, &record.best]
+            .into_iter()
+            .chain(&record.last_finished)
+        {
+            if replay.generation != generation || !valid_id(&replay.genome_id) {
+                return Err("Saved replay does not match its generation".into());
+            }
+            replay.validate_replay().map_err(reason)?;
+        }
         Ok(record)
     }
     pub fn history(&self, dir: &Path) -> Result<Vec<GenerationSummary>, String> {
@@ -241,7 +247,7 @@ impl Checkpoint {
         &self,
         dir: &Path,
         record: &Generation,
-        pop: &[C3Genome],
+        pop: &[Arc<C3Genome>],
         edit: Option<&Edit>,
     ) -> Result<Self, String> {
         let mut next = self.clone();

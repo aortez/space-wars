@@ -1,6 +1,6 @@
 //! Serializes the view's lifecycle and edit commands against the headless trainer.
 use engine_agent::{
-    trainer::{Generation, GenerationSummary, Replay, Trainer, TrainerConfig},
+    trainer::{Generation, GenerationSummary, LatestVisit, Trainer, TrainerConfig},
     training_workers::WorkerControl,
 };
 use std::{
@@ -27,8 +27,7 @@ pub(super) enum Event {
         completed: u32,
         history: Vec<GenerationSummary>,
     },
-    Scoring(u32, TrainerConfig, WorkerControl),
-    Sample(Box<Replay>),
+    Scoring(u32, TrainerConfig, WorkerControl, LatestVisit),
     Finished(Box<Generation>),
     RecoveryFailed(String, String),
     Paused,
@@ -175,14 +174,14 @@ pub(super) fn serve(
             continue;
         }
         let workers = trainer.worker_control();
-        match trainer.run_generation_observed(
-            |generation, settings| {
-                let _ = events.send(Event::Scoring(generation, settings.clone(), workers));
-            },
-            |sample| {
-                let _ = events.send(Event::Sample(Box::new(sample.clone())));
-            },
-        ) {
+        match trainer.run_generation_live(|generation, settings, latest| {
+            let _ = events.send(Event::Scoring(
+                generation,
+                settings.clone(),
+                workers,
+                latest,
+            ));
+        }) {
             Ok(generation) => {
                 let _ = events.send(Event::Finished(Box::new(generation)));
             }

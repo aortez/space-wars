@@ -1,6 +1,6 @@
-use super::{Playback, View};
+use super::{DoorComparison, Playback, State, View};
 use crate::{DuckOutput, MainWindow};
-use slint::{ComponentHandle, ModelRc, VecModel};
+use slint::{ModelRc, VecModel};
 use std::{
     sync::Arc,
     time::{Duration, Instant},
@@ -12,16 +12,25 @@ fn set_speed(w: &MainWindow, index: i32) {
 }
 
 impl View {
+    fn restore_comparison(&mut self, w: &MainWindow, compare: DoorComparison) {
+        w.set_training_preview_mode(compare.return_mode);
+        w.set_duck_inspect(compare.return_mode - 1);
+        self.playing = compare.original;
+        for player in self.playing.iter_mut().flatten() {
+            player.invalidate_display();
+        }
+    }
+
     pub(super) fn close_inspector(&mut self, w: &MainWindow) {
         if w.get_duck_inspect() >= 0 {
             w.set_training_preview_follow(self.follow_after_inspection);
         }
-        if self.compare.take().is_some() {
-            self.playing = Default::default();
+        if let Some(compare) = self.compare.take() {
+            self.restore_comparison(w, compare);
         }
         self.pinned = Default::default();
         self.pending_step = false;
-        let index = w.get_duck_inspect().max(0);
+        let index = i32::from(w.get_training_preview_mode() == 2);
         w.set_duck_compare(false);
         w.set_duck_inspect(-1);
         w.set_training_focus(10 + index);
@@ -37,9 +46,11 @@ impl View {
             | "training.duck.brain.best"
             | "training.preview.best" => {
                 if w.get_duck_inspect() < 0 {
+                    let selected = usize::from(w.get_training_preview_mode() == 2);
                     self.pinned = std::array::from_fn(|i| {
                         self.playing[i]
                             .as_ref()
+                            .filter(|_| i == selected || !w.get_training_preview_follow())
                             .map(|p| p.source.clone())
                             .or_else(|| self.latest[i].clone())
                     });
@@ -53,15 +64,20 @@ impl View {
             }
             "training.duck.brain.close" => self.close_inspector(w),
             "training.duck.brain.compare" => {
-                if self.compare.take().is_none() {
+                if let Some(compare) = self.compare.take() {
+                    self.restore_comparison(w, compare);
+                } else {
                     let source = self.pinned[1]
                         .as_ref()
                         .or(self.latest[1].as_ref())
                         .cloned()
                         .ok_or("Waiting for a scored champion")?;
-                    self.compare = Some(source);
+                    self.compare = Some(DoorComparison {
+                        champion: source,
+                        return_mode: w.get_training_preview_mode(),
+                        original: std::mem::take(&mut self.playing),
+                    });
                 }
-                self.playing = Default::default();
                 self.fraction = 0.;
                 self.previous = Instant::now();
                 w.set_duck_compare(self.compare.is_some());
@@ -72,8 +88,14 @@ impl View {
                 if w.get_duck_result() {
                     let play = w.get_duck_replay_paused();
                     if play && self.visible_replays_finished(w) {
-                        for p in self.playing.iter_mut().flatten() {
-                            p.reset();
+                        let selected = usize::from(w.get_training_preview_mode() == 2);
+                        for (i, slot) in self.playing.iter_mut().enumerate() {
+                            let Some(player) = slot else { continue };
+                            let newer = w.get_training_preview_follow()
+                                && self.latest[i].as_ref().is_some_and(|r| !player.matches(r));
+                            if self.compare.is_some() || (i == selected && !newer) {
+                                player.reset();
+                            }
                         }
                     }
                     if play && speed == 3 {
@@ -116,7 +138,7 @@ impl View {
         self.playing
             .iter()
             .enumerate()
-            .filter(|(i, _)| self.compare.is_some() || w.get_duck_wide() || *i == selected)
+            .filter(|(i, _)| self.compare.is_some() || *i == selected)
             .all(|(_, p)| p.as_ref().is_some_and(Playback::terminal))
     }
 
@@ -139,15 +161,13 @@ impl View {
         let wide = w.get_duck_wide();
         let selected = usize::from(w.get_training_preview_mode() == 2);
         let focused = usize::try_from(w.get_duck_inspect()).ok();
-        let width = w.window().size().width;
-        let target = if wide {
-            width.saturating_sub(56) / 2
-        } else {
-            width * 56 / 100
-        }
-        .clamp(160, 800);
+        let width = w.get_duck_replay_width().clamp(1, 1200) as u32;
+        let height = w.get_duck_replay_height().max(1) as u32;
         let paired = self.compare.is_some();
-        let visible = [wide || selected == 0, wide || selected == 1];
+        let visible = [
+            wide && paired || selected == 0,
+            wide && paired || selected == 1,
+        ];
         for (i, slot) in self.playing.iter_mut().enumerate() {
             if !visible[i] && !paired {
                 continue;
@@ -158,15 +178,19 @@ impl View {
             let Some(source) = self
                 .compare
                 .as_ref()
+                .map(|c| &c.champion)
                 .or(self.pinned[i].as_ref())
                 .or(self.latest[i].as_ref())
             else {
                 continue;
             };
-            if slot.is_none()
-                || (w.get_training_preview_follow()
-                    && slot.as_ref().is_some_and(|p| !p.matches(source)))
-            {
+            // Let a Latest visit finish even when workers score faster than playback.
+            let replace = slot.as_ref().is_none_or(|p| {
+                let can_follow = w.get_training_preview_follow()
+                    && (i == 1 || (p.terminal() && !w.get_duck_replay_paused()));
+                !p.matches(source) && (self.pinned[i].is_some() || can_follow)
+            });
+            if replace {
                 let side = if paired {
                     i == 1
                 } else {
@@ -179,6 +203,14 @@ impl View {
                         continue;
                     }
                 }
+            }
+            if i == 0
+                && !paired
+                && let Some(p) = slot
+            {
+                w.set_duck_archived_sample(
+                    self.saved_sample_generation == Some(p.source.generation),
+                );
             }
         }
 
@@ -203,8 +235,12 @@ impl View {
             let Some(player) = player else {
                 continue;
             };
+            let waiting_for_visit = !paired
+                && i == 0
+                && w.get_training_preview_follow()
+                && self.state != State::Watching;
             if (paired && pair_done || !paired && visible[i] && player.terminal())
-                && (manual || (speed > 0. && !w.get_duck_result()))
+                && (manual || (speed > 0. && !w.get_duck_result() && !waiting_for_visit))
             {
                 player.terminal_time += elapsed;
                 if manual || player.terminal_time >= Duration::from_secs(2) {
@@ -267,7 +303,7 @@ impl View {
             let Some(player) = slot else {
                 continue;
             };
-            let (id, details, image) = player.frame(target);
+            let (id, details, image) = player.frame(width, height);
             let decision = player.decision();
             let outputs = decision
                 .map(|d| {

@@ -41,11 +41,23 @@ fn steering_a_clock_run_updates_the_next_scored_generation_and_preserves_the_rep
         serde_json::from_str(&window.get_training_snapshot()).unwrap();
     let expected_scale = proposed["pending"][0]["mutation_scale"].as_f64().unwrap() as f32;
     activate("training.duck.steer");
+    wait(&|| window.get_duck_current_frame().size().width > 0);
+    assert_eq!(window.get_training_preview_mode(), 1);
+    assert_eq!(window.get_duck_best_frame().size().width, 0);
+    // Pinning holds the visit's identity while scoring and playback continue.
+    activate("training.preview.follow");
+    assert!(!window.get_training_preview_follow());
+    let pinned_id = window.get_duck_current_id();
+    let case = |details: SharedString| details.split(" · Tick ").next().unwrap().to_string();
+    let pinned_case = case(window.get_duck_current_details());
     wait(&|| window.get_training_status_code() == "completed");
+    assert_eq!(window.get_duck_current_id(), pinned_id);
+    assert_eq!(case(window.get_duck_current_details()), pinned_case);
     let snapshot: serde_json::Value =
         serde_json::from_str(&window.get_training_snapshot()).unwrap();
     let path = std::path::PathBuf::from(snapshot["run_dir"].as_str().unwrap());
     activate("training.preview.best");
+    assert_eq!(window.get_training_focus(), 5);
     wait(&|| window.get_duck_best_frame().size().width > 0);
     assert!(window.get_duck_best_details().contains("Tick "));
     assert!(
@@ -79,7 +91,7 @@ fn steering_a_clock_run_updates_the_next_scored_generation_and_preserves_the_rep
     if let Some(path) = &output {
         std::fs::create_dir_all(path).unwrap();
     }
-    for (width, height, chart_x, chart_y) in [(800, 480, 739., 84.), (1024, 768, 457., 482.)] {
+    for (width, height, chart_x, chart_y) in [(800, 480, 742., 78.), (1024, 768, 532., 540.)] {
         window
             .window()
             .set_size(slint::LogicalSize::new(width as f32, height as f32));
@@ -112,10 +124,7 @@ fn steering_a_clock_run_updates_the_next_scored_generation_and_preserves_the_rep
                         / 2)
                     .clamp(1, 150)
             };
-            wait(&|| {
-                in_play(window.get_duck_best_details())
-                    && (width < 920 || in_play(window.get_duck_current_details()))
-            });
+            wait(&|| in_play(window.get_duck_best_details()));
             let pixels = window.window().take_snapshot().unwrap();
             let file = std::fs::File::create(
                 path.join(format!("clock-duck-training-{width}x{height}.png")),
@@ -161,6 +170,8 @@ fn steering_a_clock_run_updates_the_next_scored_generation_and_preserves_the_rep
     .unwrap();
     viewer.show().unwrap();
     wait(&|| viewer.get_duck_best_id().contains(&winner));
+    assert_eq!(viewer.get_duck_current_frame().size().width, 0);
+    assert_eq!(viewer.get_training_preview_mode(), 2);
     assert_eq!(viewer.get_training_status_code(), "watching");
     assert_eq!(viewer.get_training_points().row_count(), 1);
     assert!(!viewer.get_training_can_resume());
@@ -173,6 +184,7 @@ fn steering_a_clock_run_updates_the_next_scored_generation_and_preserves_the_rep
     let command = |id| assert!(ui_activation::activate(&viewer, id), "{id}");
     command("training.duck.brain.best");
     command("training.duck.brain.pause");
+    let inspected_visit = viewer.get_duck_best_details();
     command("training.duck.brain.compare");
     command("training.duck.brain.step");
     wait(&|| viewer.get_duck_units().row_count() == 64);
@@ -212,4 +224,6 @@ fn steering_a_clock_run_updates_the_next_scored_generation_and_preserves_the_rep
     command("training.duck.brain.close");
     assert!(!viewer.get_duck_compare());
     assert_eq!(viewer.get_duck_inspect(), -1);
+    assert_eq!(viewer.get_training_preview_mode(), 2);
+    assert_eq!(viewer.get_duck_best_details(), inspected_visit);
 }

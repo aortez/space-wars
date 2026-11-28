@@ -8,7 +8,7 @@ mod playback;
 use crate::{DuckScoreTerm, MainWindow, TrainingPoint};
 use engine_agent::{
     duck_recipe::PATTERNS,
-    trainer::{Replay, Trainer, TrainerConfig},
+    trainer::{LatestVisit, Replay, Trainer, TrainerConfig},
     training_workers::WorkerControl,
 };
 use engine_common::ClockDuckCoursePattern as Pattern;
@@ -119,6 +119,12 @@ struct Trend {
     mix: Vec<Pattern>,
 }
 
+struct DoorComparison {
+    champion: Arc<Replay>,
+    return_mode: i32,
+    original: [Option<Playback>; 2],
+}
+
 struct View {
     events: Receiver<Event>,
     selected: bool,
@@ -133,9 +139,11 @@ struct View {
     best_terms: Option<[f64; 5]>,
     rate: f64,
     latest: [Option<Arc<Replay>>; 2],
+    live_visits: Option<LatestVisit>,
+    saved_sample_generation: Option<u32>,
     playing: [Option<Playback>; 2],
     pinned: [Option<Arc<Replay>>; 2],
-    compare: Option<Arc<Replay>>,
+    compare: Option<DoorComparison>,
     fraction: f64,
     pending_step: bool,
     resume_speed: i32,
@@ -175,9 +183,10 @@ impl Client {
         view.set_history(history);
         view.event(w, Event::Finished(Box::new(record)));
         view.state = State::Watching;
+        w.set_training_preview_mode(2);
         w.set_training_visible(true);
         w.set_training_setup(false);
-        w.set_training_focus(3);
+        w.set_training_focus(5);
         view.publish(w);
     }
     pub(super) fn poll(&self, w: &MainWindow) -> bool {
@@ -189,6 +198,9 @@ impl Client {
             }
         }
         if view.selected {
+            if let Some(replay) = view.live_visits.as_ref().and_then(LatestVisit::take) {
+                view.latest[0] = Some(replay);
+            }
             if let Some(rx) = &view.archive_doors
                 && let Ok(result) = rx.try_recv()
             {
@@ -226,7 +238,7 @@ impl Client {
         let mut view = self.view.borrow_mut();
         view.reset(w, config);
         w.set_training_setup(false);
-        w.set_training_focus(3);
+        w.set_training_focus(4);
         view.publish(w);
         Ok(())
     }
@@ -241,6 +253,22 @@ impl Client {
 
     pub(super) fn command(&self, w: &MainWindow, id: &str) -> Result<(), String> {
         let mut view = self.view.borrow_mut();
+        if matches!(id, "training.preview.current" | "training.preview.best")
+            && w.get_duck_inspect() < 0
+        {
+            let index = usize::from(id.ends_with(".best"));
+            if w.get_training_preview_mode() != index as i32 + 1
+                && w.get_training_preview_follow()
+                && let (Some(shown), Some(newest)) = (&view.playing[index], &view.latest[index])
+                && !shown.matches(newest)
+            {
+                view.playing[index] = None;
+            }
+            w.set_training_preview_mode(index as i32 + 1);
+            w.set_training_focus(4 + index as i32);
+            view.play(w);
+            return Ok(());
+        }
         if id.starts_with("training.duck.brain.")
             || id == "training.duck.replay.toggle"
             || matches!(id, "training.preview.current" | "training.preview.best")
@@ -254,7 +282,11 @@ impl Client {
             "training.duck.steer" => {
                 view.close_inspector(w);
                 w.set_duck_steering(!w.get_duck_steering());
-                w.set_training_focus(if w.get_duck_steering() { 0 } else { 7 });
+                w.set_training_focus(match (w.get_duck_steering(), w.get_duck_can_edit()) {
+                    (true, true) => 0,
+                    (true, false) => 9,
+                    (false, _) => 7,
+                });
             }
             "training.pause" => {
                 self.sender
@@ -315,6 +347,8 @@ impl View {
             best_terms: None,
             rate: 0.0,
             latest: Default::default(),
+            live_visits: None,
+            saved_sample_generation: None,
             playing: Default::default(),
             pinned: Default::default(),
             compare: None,
@@ -343,6 +377,8 @@ impl View {
         self.best_terms = None;
         self.error.clear();
         self.latest = Default::default();
+        self.live_visits = None;
+        self.saved_sample_generation = None;
         self.playing = Default::default();
         self.pinned = Default::default();
         self.compare = None;
@@ -352,6 +388,7 @@ impl View {
         self.archive_doors = None;
         self.last_progress.clear();
         w.set_duck_review_playing(false);
+        w.set_duck_archived_sample(false);
         w.set_duck_compare(false);
         w.set_duck_inspect(-1);
         w.set_duck_action(1);
@@ -364,7 +401,7 @@ impl View {
         w.set_training_preview_follow(true);
         w.set_duck_current_frame(Default::default());
         w.set_duck_best_frame(Default::default());
-        w.set_duck_current_id("Sampling candidate".into());
+        w.set_duck_current_id("Awaiting first visit".into());
         w.set_duck_best_id("Awaiting champion".into());
         w.set_duck_current_details("First scored case pending".into());
         w.set_duck_best_details("First completed generation pending".into());
@@ -402,7 +439,8 @@ impl View {
                 self.pending = pending;
                 self.set_history(history);
             }
-            Event::Scoring(generation, config, workers) => {
+            Event::Scoring(generation, config, workers, visits) => {
+                self.live_visits = Some(visits);
                 self.workers = Some(workers);
                 self.last_progress.clear();
                 if !matches!(self.state, State::Pausing | State::Stopping) {
@@ -414,10 +452,10 @@ impl View {
                 }
                 self.config = config;
             }
-            Event::Sample(replay) => self.latest[0] = Some(Arc::new(*replay)),
             Event::Finished(generation) => {
                 let record = generation.summary();
                 self.workers = None;
+                self.live_visits = None;
                 w.set_duck_door_exits(
                     record
                         .door_exits
@@ -450,8 +488,14 @@ impl View {
                 }
                 self.config = record.config.clone();
                 self.best_terms = Some(record.best_terms);
+                if generation.last_finished.is_none() {
+                    self.saved_sample_generation = Some(record.generation);
+                    w.set_duck_archived_sample(true);
+                }
                 self.latest = [
-                    Some(Arc::new(generation.current)),
+                    Some(Arc::new(
+                        generation.last_finished.unwrap_or(generation.current),
+                    )),
                     Some(Arc::new(generation.best)),
                 ];
             }

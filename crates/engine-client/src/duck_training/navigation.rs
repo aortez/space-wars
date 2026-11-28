@@ -32,18 +32,49 @@ const BRAIN_ACTIONS: [(&str, &str); 8] = [
     ("training.duck.brain.close", "Close brain inspector"),
 ];
 
+fn enabled(w: &MainWindow, id: &str) -> bool {
+    let scores = !w.get_duck_steering() && w.get_duck_inspect() < 0;
+    match id {
+        "training.pause" => w.get_training_can_pause(),
+        "training.resume" => w.get_training_can_resume(),
+        "training.stop" => w.get_training_can_stop(),
+        "training.new" => w.get_training_can_start(),
+        "training.preview.follow" => w.get_duck_can_follow(),
+        "training.preview.speed" | "training.duck.term" => scores,
+        "training.preview.current"
+        | "training.preview.best"
+        | "training.duck.brain.current"
+        | "training.duck.brain.best" => !w.get_duck_steering(),
+        "training.duck.replay.toggle" => scores && w.get_training_points().row_count() > 0,
+        "training.duck.brain.compare" => {
+            w.get_duck_compare() || w.get_training_points().row_count() > 0
+        }
+        _ => true,
+    }
+}
+
 pub(crate) fn inventory(w: &MainWindow) -> Vec<UiControl> {
+    let latest = if w.get_duck_archived_sample() {
+        "Saved sample"
+    } else {
+        "Latest replay"
+    };
+    let (first, second) = if w.get_duck_compare() {
+        ("Left door", "Right door")
+    } else {
+        (latest, "Best replay")
+    };
     let mut controls = vec![
         UiControl::new("training.snapshot", "Training job", false)
             .with_value(w.get_training_snapshot().to_string()),
         UiControl::new("training.status", "Run state", false)
             .with_value(w.get_training_status_code().to_string()),
-        UiControl::new("training.duck.current", "Sample replay", false).with_value(format!(
+        UiControl::new("training.duck.current", first, false).with_value(format!(
             "{} · {}",
             w.get_duck_current_id(),
             w.get_duck_current_details()
         )),
-        UiControl::new("training.duck.best", "Best replay", false).with_value(format!(
+        UiControl::new("training.duck.best", second, false).with_value(format!(
             "{} · {}",
             w.get_duck_best_id(),
             w.get_duck_best_details()
@@ -51,30 +82,34 @@ pub(crate) fn inventory(w: &MainWindow) -> Vec<UiControl> {
         UiControl::new("training.duck.pending", "Generation settings", false)
             .with_value(w.get_duck_edit_status().to_string()),
     ];
-    for (id, label, enabled) in [
-        ("training.pause", "Pause", w.get_training_can_pause()),
-        ("training.resume", "Resume", w.get_training_can_resume()),
-        ("training.stop", "Save and stop", w.get_training_can_stop()),
-        ("training.new", "New run", w.get_training_can_start()),
-        ("training.back", "Back", true),
-        ("training.preview.current", "Sample replay", true),
-        ("training.preview.best", "Best replay", true),
-        ("training.duck.term", "Chart term", true),
-        ("training.duck.steer", "Generation settings", true),
-        ("training.preview.speed", "Replay speed", true),
+    for (id, label) in [
+        ("training.pause", "Pause"),
+        ("training.resume", "Resume"),
+        ("training.stop", "Save and stop"),
+        ("training.new", "New run"),
+        ("training.back", "Back"),
+        ("training.preview.current", first),
+        ("training.preview.best", second),
+        ("training.duck.term", "Chart term"),
+        ("training.duck.steer", "Generation settings"),
+        ("training.preview.speed", "Replay speed"),
         (
             "training.preview.follow",
-            "Follow or pin replay",
-            !w.get_duck_compare(),
+            if w.get_training_preview_follow() {
+                "Pin replay"
+            } else {
+                "Follow new"
+            },
         ),
         (
             "training.duck.brain.current",
             if w.get_duck_compare() {
                 "Inspect left-door replay"
+            } else if w.get_duck_archived_sample() {
+                "Inspect saved sample brain"
             } else {
-                "Inspect sample brain"
+                "Inspect latest brain"
             },
-            !w.get_duck_steering(),
         ),
         (
             "training.duck.brain.best",
@@ -83,10 +118,9 @@ pub(crate) fn inventory(w: &MainWindow) -> Vec<UiControl> {
             } else {
                 "Inspect best brain"
             },
-            !w.get_duck_steering(),
         ),
     ] {
-        controls.push(UiControl::new(id, label, enabled));
+        controls.push(UiControl::new(id, label, enabled(w, id)));
     }
     if w.get_duck_result() && !w.get_duck_steering() {
         controls.push(UiControl::new(
@@ -101,10 +135,7 @@ pub(crate) fn inventory(w: &MainWindow) -> Vec<UiControl> {
     }
     if !w.get_duck_steering() && w.get_duck_inspect() >= 0 {
         for (id, label) in BRAIN_ACTIONS {
-            let enabled = id != "training.duck.brain.compare"
-                || w.get_duck_compare()
-                || w.get_training_points().row_count() > 0;
-            controls.push(UiControl::new(id, label, enabled));
+            controls.push(UiControl::new(id, label, enabled(w, id)));
         }
         controls.push(
             UiControl::new("training.duck.brain.status", "Brain inspection", false)
@@ -126,7 +157,11 @@ pub(crate) fn inventory(w: &MainWindow) -> Vec<UiControl> {
 }
 
 pub(crate) fn selected_id(w: &MainWindow) -> &'static str {
-    let focus = w.get_training_focus() as usize;
+    focus_id(w, w.get_training_focus())
+}
+
+fn focus_id(w: &MainWindow, focus: i32) -> &'static str {
+    let focus = focus as usize;
     if !w.get_duck_steering() && w.get_duck_inspect() >= 0 && focus >= ACTIONS.len() {
         return BRAIN_ACTIONS
             .get(focus - ACTIONS.len())
@@ -178,28 +213,48 @@ pub(crate) fn handle_action(w: &MainWindow, action: UiAction) {
             } else {
                 1
             };
-            let next = if steer {
-                crate::ui_navigation::moved_selection(focus, 12, delta)
+            let selected_best = w.get_training_preview_mode() == 2;
+            let (rail, content): (&[i32], &[i32]) = if steer {
+                (
+                    &[9, 5, 6, 7, 8],
+                    if w.get_duck_can_edit() {
+                        &[0, 1, 2, 3, 4]
+                    } else {
+                        &[]
+                    },
+                )
             } else if w.get_duck_inspect() >= 0 {
-                // The two pane selectors precede the eight inspector actions.
-                10 + crate::ui_navigation::moved_selection((focus - 10).max(0), 10, delta)
+                (&[10, 11, 12, 13, 14, 15, 16, 17, 18, 19], &[])
             } else {
-                let count = ACTIONS.len() as i32;
-                let mut next = crate::ui_navigation::moved_selection(focus, count, delta);
-                if w.get_duck_wide() && matches!(next, 4 | 5) {
-                    next = if delta > 0 { 6 } else { 3 };
+                (
+                    &[4, 5, 8, 9, 7, 0, 1, 2, 3],
+                    if selected_best { &[11, 6] } else { &[10, 6] },
+                )
+            };
+            let next = if action == UiAction::Right && rail.contains(&focus) && !content.is_empty()
+            {
+                content[0]
+            } else if action == UiAction::Left && content.contains(&focus) {
+                if focus == 6 {
+                    8
+                } else if selected_best {
+                    5
+                } else {
+                    4
                 }
-                if !w.get_duck_wide()
-                    && next
-                        == (if w.get_training_preview_mode() == 2 {
-                            10
-                        } else {
-                            11
-                        })
-                {
-                    next = crate::ui_navigation::moved_selection(next, count, delta);
-                }
-                next
+            } else {
+                let available: Vec<_> = rail
+                    .iter()
+                    .chain(content)
+                    .copied()
+                    .filter(|&index| enabled(w, focus_id(w, index)))
+                    .collect();
+                let index = available.iter().position(|&index| index == focus);
+                let next = index.map_or(0, |i| {
+                    crate::ui_navigation::moved_selection(i as i32, available.len() as i32, delta)
+                        as usize
+                });
+                available[next]
             };
             w.set_training_focus(next);
         }
