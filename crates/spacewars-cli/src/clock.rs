@@ -455,6 +455,11 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 spider.failed_exit
             );
         }
+        if let Some(chess) = &state.chess {
+            for line in chess_lines(chess) {
+                println!("{line}");
+            }
+        }
         let world_vector =
             |value: Option<[i32; 2]>| value.map(|[x, y]| [x as f64 / 1000.0, y as f64 / 1000.0]);
         if let Some(rain) = state.rain {
@@ -700,6 +705,33 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         }
     }
     Ok(())
+}
+
+/// The visit to the chess board, and each of its birds that is in the
+/// scene. The birds are the visit's own, so they are listed under it.
+fn chess_lines(chess: &engine_common::ClockChessState) -> Vec<String> {
+    let mut lines = vec![format!(
+        "Chess visit #{}: match {}, {}, phase tick={}, actions={}, board={:?}",
+        chess.visit_id,
+        chess.match_number,
+        chess.phase.as_str(),
+        chess.phase_tick,
+        chess.actions,
+        chess.board_milli
+    )];
+    for actor in &chess.actors {
+        lines.push(format!(
+            "Chess visit #{} {}: plays {}, {}, position={:?}, facing right={}, carrying={}",
+            chess.visit_id,
+            actor.bird.as_str(),
+            if actor.white { "White" } else { "Black" },
+            actor.pose.as_str(),
+            actor.position_milli,
+            actor.facing_right,
+            actor.carrying
+        ));
+    }
+    lines
 }
 
 fn print_arena(arena: &ClockArenaState) {
@@ -1024,6 +1056,57 @@ mod tests {
         assert_eq!(
             theme_line(&theme, ClockThemeChoice::Normal),
             "Theme: Normal; wears=Normal auto=Christmas fade=400"
+        );
+    }
+
+    #[test]
+    fn the_chess_lines_show_the_visit_and_each_of_its_birds_under_it() {
+        use engine_common::{
+            ClockChessActor, ClockChessBird, ClockChessPhase, ClockChessPose, ClockChessState,
+        };
+        let mut chess = ClockChessState {
+            visit_id: 3,
+            match_number: 2,
+            phase: ClockChessPhase::Arriving,
+            phase_tick: 120,
+            actions: 17,
+            board_milli: [-45_067, -201_600, 45_067, -111_467],
+            actors: vec![
+                ClockChessActor {
+                    bird: ClockChessBird::Crow,
+                    white: true,
+                    pose: ClockChessPose::Arriving,
+                    position_milli: [78_402, -187_310],
+                    facing_right: false,
+                    carrying: false,
+                },
+                ClockChessActor {
+                    bird: ClockChessBird::Duck,
+                    white: false,
+                    pose: ClockChessPose::Arriving,
+                    position_milli: [-250_683, -194_660],
+                    facing_right: true,
+                    carrying: true,
+                },
+            ],
+        };
+        assert_eq!(
+            chess_lines(&chess),
+            [
+                "Chess visit #3: match 2, arriving, phase tick=120, actions=17, board=[-45067, -201600, 45067, -111467]",
+                "Chess visit #3 crow: plays White, arriving, position=[78402, -187310], facing right=false, carrying=false",
+                "Chess visit #3 duck: plays Black, arriving, position=[-250683, -194660], facing right=true, carrying=true",
+            ]
+        );
+        // A visit whose birds have gone is still a visit until its door has
+        // closed.
+        chess.phase = ClockChessPhase::Leaving;
+        chess.actors.clear();
+        assert_eq!(
+            chess_lines(&chess),
+            [
+                "Chess visit #3: match 2, leaving, phase tick=120, actions=17, board=[-45067, -201600, 45067, -111467]"
+            ]
         );
     }
 

@@ -1,5 +1,5 @@
 use super::*;
-use crate::events::duck::{ArenaTerrain, DuckEvent, DuckView};
+use crate::events::duck::{ArenaTerrain, DuckView};
 
 pub(super) fn render(frame: &mut RenderFrame, event: &DuckView<'_>, debug: bool) {
     render_with_course(frame, event, debug, true);
@@ -67,7 +67,6 @@ pub(super) fn render_arena(frame: &mut RenderFrame, terrain: &ArenaTerrain, opac
 
 fn render_actor(frame: &mut RenderFrame, event: &DuckView<'_>, debug: bool, opacity: f32) {
     let radius = event.radius;
-    let orange = RenderColor::rgb(1.0, 0.48, 0.08);
     if debug && let Some(arc) = event.debug_arc() {
         for (index, point) in arc.into_iter().enumerate() {
             let size = radius * if index == 0 || index == 24 { 0.5 } else { 0.15 };
@@ -80,7 +79,7 @@ fn render_actor(frame: &mut RenderFrame, event: &DuckView<'_>, debug: bool, opac
             };
             rect(
                 frame,
-                event,
+                &|point| event.render_position(point),
                 point - Vec2::splat(size),
                 point + Vec2::splat(size),
                 color,
@@ -93,13 +92,14 @@ fn render_actor(frame: &mut RenderFrame, event: &DuckView<'_>, debug: bool, opac
     let Some(position) = event.position() else {
         return;
     };
-    let pixel = radius * 0.33;
+    let place = |point: Vec2| event.render_position(point);
+    let pixel = radius * PIXEL;
     if let Some((remaining, recovering)) = event.dive_meter() {
         let min = position + Vec2::new(-radius * 1.5, radius * 2.5);
         let size = Vec2::new(radius * 3.0, pixel);
         rect(
             frame,
-            event,
+            &place,
             min - Vec2::splat(pixel * 0.3),
             min + size + Vec2::splat(pixel * 0.3),
             RenderColor::rgb(0.05, 0.12, 0.18),
@@ -108,11 +108,11 @@ fn render_actor(frame: &mut RenderFrame, event: &DuckView<'_>, debug: bool, opac
         );
         rect(
             frame,
-            event,
+            &place,
             min,
             min + Vec2::new(size.x * remaining, size.y),
             if recovering {
-                orange
+                ORANGE
             } else {
                 RenderColor::rgb(0.25, 0.85, 1.0)
             },
@@ -120,75 +120,25 @@ fn render_actor(frame: &mut RenderFrame, event: &DuckView<'_>, debug: bool, opac
             opacity,
         );
     }
-    let yellow = RenderColor::rgb(1.0, 0.88, 0.12);
     let ledge = event.ledge_state();
     let attached = event.ledge_anchor().is_some();
-    // Code-native pixel art renders identically through both presentation paths.
-    let rows = [
-        "       YYYY  ",
-        "      YYYYY  ",
-        "      YYKYYOO",
-        "     YYYYYOO ",
-        " YY YYYYYY   ",
-        "YYYYYYYYYY   ",
-        " YYYYYYYY    ",
-        "  YYYYYY     ",
-    ];
-    for (row, cells) in rows.into_iter().enumerate() {
-        for (column, cell) in cells.bytes().enumerate() {
-            let color = match cell {
-                b'Y' => yellow,
-                b'O' => orange,
-                b'K' => BACKGROUND_COLOR,
-                _ => continue,
-            };
-            let offset_x = (column as f32 - 6.0) * pixel;
-            let min = position
-                + Vec2::new(
-                    if event.facing() > 0.0 {
-                        offset_x
-                    } else {
-                        -offset_x - pixel
-                    },
-                    -radius + (8 - row) as f32 * pixel,
-                );
-            rect(
-                frame,
-                event,
-                min,
-                min + Vec2::new(pixel, pixel),
-                color,
-                ACTIVE_CELL_LAYER,
-                1.0,
-            );
-        }
-    }
-    let stride = if !attached && event.feet_moving() {
-        ((event.tick / 6) % 2) as f32 * pixel
-    } else {
-        0.0
-    };
-    for (x, offset) in [(-2.0, stride), (1.0, -stride)] {
-        let offset_x = x * pixel + offset;
-        let min = position
-            + Vec2::new(
-                if event.facing() > 0.0 {
-                    offset_x
-                } else {
-                    -offset_x - pixel * 2.0
-                },
-                if attached { -radius * 0.45 } else { -radius },
-            );
-        rect(
-            frame,
-            event,
-            min,
-            min + Vec2::new(pixel * 2.0, pixel),
-            orange,
-            ACTIVE_CELL_LAYER,
-            1.0,
-        );
-    }
+    silhouette(
+        frame,
+        &Pose {
+            position,
+            radius,
+            facing: event.facing(),
+            stride: if !attached && event.feet_moving() {
+                ((event.tick / 6) % 2) as f32
+            } else {
+                0.0
+            },
+            hanging: attached,
+            lean: 0.0,
+            hop: 0.0,
+        },
+        &place,
+    );
     // Pose-only wings meet the authoritative anchor; they add no collision hull
     // or animation-driven movement. Both adapters consume these same primitives.
     if ledge.phase != engine_common::ClockDuckLedgePhase::Free {
@@ -216,16 +166,129 @@ fn render_actor(frame: &mut RenderFrame, event: &DuckView<'_>, debug: bool, opac
                 RenderPrimitive::Line(engine_common::RenderLine::new(
                     RenderPoint::new(from.x, from.y),
                     RenderPoint::new(to.x, to.y),
-                    Stroke::new(yellow, pixel),
+                    Stroke::new(YELLOW, pixel),
                 )),
             );
         }
         rect(
             frame,
-            event,
+            &place,
             hand - Vec2::splat(pixel * 0.5),
             hand + Vec2::splat(pixel * 0.5),
-            orange,
+            ORANGE,
+            ACTIVE_CELL_LAYER,
+            1.0,
+        );
+    }
+}
+
+/// The side of a pixel of the duck's art, in radii of its body.
+pub(super) const PIXEL: f32 = 0.33;
+const YELLOW: RenderColor = RenderColor::rgb(1.0, 0.88, 0.12);
+const ORANGE: RenderColor = RenderColor::rgb(1.0, 0.48, 0.08);
+/// The duck's art, a row of pixels to a line from its head down: yellow,
+/// its orange bill, and its eye. Its body's middle is at the left of the
+/// seventh column, a radius above the foot of the last row.
+pub(super) const ART: [&str; 8] = [
+    "       YYYY  ",
+    "      YYYYY  ",
+    "      YYKYYOO",
+    "     YYYYYOO ",
+    " YY YYYYYY   ",
+    "YYYYYYYYYY   ",
+    " YYYYYYYY    ",
+    "  YYYYYY     ",
+];
+/// The column the middle of the duck's body is at the left of.
+const MIDDLE: f32 = 6.0;
+/// How far each row of the art goes the way the duck faces when it leans
+/// all the way, in pixels, from its head down: its head and neck go, and its
+/// body stays.
+const LEAN: [f32; 8] = [2.0, 2.0, 2.0, 2.0, 1.0, 0.0, 0.0, 0.0];
+/// How far the rows of the duck's head come down when it leans all the way,
+/// in pixels.
+const DIP: [f32; 8] = [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0];
+
+/// How a duck stands, for its silhouette: the visiting duck on its course,
+/// or the duck at the chess board.
+pub(super) struct Pose {
+    /// The middle of the duck's round body.
+    pub position: Vec2,
+    pub radius: f32,
+    /// Which way the duck faces along x, as a sign.
+    pub facing: f32,
+    /// How far each foot is from where it rests, in pixels of the art: none
+    /// standing, and none or one by turns walking.
+    pub stride: f32,
+    /// Its feet are drawn up, as when it hangs from a ledge.
+    pub hanging: bool,
+    /// How far its head leans the way it faces, from 0, upright, to 1.
+    pub lean: f32,
+    /// How far off the ground it is drawn, in pixels of the art.
+    pub hop: f32,
+}
+
+/// Draws a duck as `pose` has it. The pose is in whatever frame `place`
+/// takes to the world: a visiting duck's is its course's, which may be
+/// mirrored. Code-native pixel art renders identically through both
+/// presentation paths.
+pub(super) fn silhouette(frame: &mut RenderFrame, pose: &Pose, place: &impl Fn(Vec2) -> Vec2) {
+    let (position, radius) = (pose.position, pose.radius);
+    let pixel = radius * PIXEL;
+    let rise = pose.hop * pixel;
+    for (row, cells) in ART.into_iter().enumerate() {
+        let lean = pose.lean * LEAN[row] * pixel;
+        let dip = pose.lean * DIP[row] * pixel;
+        for (column, cell) in cells.bytes().enumerate() {
+            let color = match cell {
+                b'Y' => YELLOW,
+                b'O' => ORANGE,
+                b'K' => BACKGROUND_COLOR,
+                _ => continue,
+            };
+            let offset_x = (column as f32 - MIDDLE) * pixel + lean;
+            let min = position
+                + Vec2::new(
+                    if pose.facing > 0.0 {
+                        offset_x
+                    } else {
+                        -offset_x - pixel
+                    },
+                    -radius + (8 - row) as f32 * pixel + rise - dip,
+                );
+            rect(
+                frame,
+                place,
+                min,
+                min + Vec2::new(pixel, pixel),
+                color,
+                ACTIVE_CELL_LAYER,
+                1.0,
+            );
+        }
+    }
+    let stride = pose.stride * pixel;
+    for (x, offset) in [(-2.0, stride), (1.0, -stride)] {
+        let offset_x = x * pixel + offset;
+        let min = position
+            + Vec2::new(
+                if pose.facing > 0.0 {
+                    offset_x
+                } else {
+                    -offset_x - pixel * 2.0
+                },
+                if pose.hanging {
+                    -radius * 0.45
+                } else {
+                    -radius + rise
+                },
+            );
+        rect(
+            frame,
+            place,
+            min,
+            min + Vec2::new(pixel * 2.0, pixel),
+            ORANGE,
             ACTIVE_CELL_LAYER,
             1.0,
         );
@@ -280,17 +343,18 @@ fn slab(frame: &mut RenderFrame, terrain: &ArenaTerrain, min: Vec2, max: Vec2, o
     );
 }
 
+/// A rectangle between `min` and `max`, which `place` takes to the world.
 fn rect(
     frame: &mut RenderFrame,
-    event: &DuckEvent,
+    place: &impl Fn(Vec2) -> Vec2,
     min: Vec2,
     max: Vec2,
     color: RenderColor,
     layer: i32,
     opacity: f32,
 ) {
-    let a = event.render_position(min);
-    let b = event.render_position(max);
+    let a = place(min);
+    let b = place(max);
     frame.push_primitive(
         layer,
         rectangle(

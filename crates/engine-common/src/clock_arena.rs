@@ -72,8 +72,9 @@ pub enum ClockArenaOwner {
     /// A spaceling the hills of a Tanks fight left behind, a temporary actor
     /// that stands on the floor and the digits.
     Stranded,
-    /// The chess board the crow and the duck play on, a temporary prop that
-    /// stands on the floor below the digits.
+    /// A visit to the chess board: the board the crow and the duck play
+    /// on, a temporary prop that stands on the floor below the digits, and
+    /// the duck that carries it in and out.
     Chess,
 }
 

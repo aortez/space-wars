@@ -31,11 +31,16 @@ use engine_common::background::{Background, Steps};
 
 use crate::events::FIXED_HZ;
 
+pub mod crow;
+pub mod duck;
 pub mod stage;
 #[cfg(test)]
 mod tests;
 mod visit;
 
+/// What a bird of a visit to the board is doing, for whatever draws it or
+/// reports it.
+pub use engine_common::ClockChessPose as Pose;
 pub use visit::{MOVE_TICKS, Phase, Show, Visit};
 
 /// The players.
@@ -60,6 +65,8 @@ pub struct Exhibition {
     seed: u64,
     /// How many matches the run has started.
     started: u64,
+    /// How many visits to the board the run has admitted.
+    visits: u64,
     current: Option<Match>,
 }
 
@@ -81,8 +88,15 @@ impl Exhibition {
         Self {
             seed,
             started: 0,
+            visits: 0,
             current: None,
         }
+    }
+
+    /// How many visits to the board the run has admitted. The last of them
+    /// goes by this number.
+    pub fn visits(&self) -> u64 {
+        self.visits
     }
 
     /// The match in hand: the one being played, or the last to have ended.
@@ -96,6 +110,7 @@ impl Exhibition {
     /// an admitted visit calls this, so one turned away takes nothing from the
     /// run.
     pub fn admit(&mut self) -> &Match {
+        self.visits += 1;
         let ended = self
             .current
             .as_ref()

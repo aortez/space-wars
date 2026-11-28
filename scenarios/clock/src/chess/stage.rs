@@ -4,10 +4,10 @@
 //! square to the view on the floor's actual support, below the face and
 //! clear of its AM/PM letters, with a room for a bird at each side of it and
 //! a way in for each from the edge of the view on its side: the duck's along
-//! the ground, which carries it, and the crow's through the air just above
-//! the rooms, over whatever stands on the floor. Nothing is moved, cleared or
-//! propped up to make room. Where no stage stands clear, supported and dry,
-//! the visit is turned away.
+//! the ground, which carries it, and the crow's through the air, over
+//! whatever stands low on the floor, to where it comes down into its room.
+//! Nothing is moved, cleared or propped up to make room. Where no stage
+//! stands clear, supported and dry, the visit is turned away.
 //!
 //! The board is as tall as the room below the face allows, but no wider than
 //! a third of the floor, so that it stays small beside the digits and leaves
@@ -44,13 +44,21 @@ const LEAST_BELOW_FACE: f32 = 0.1;
 const LEAST_MARGIN: f32 = 1.001;
 /// The most of the floor between the rails that the board's side may take.
 const FLOOR_SHARE: f32 = 1.0 / 3.0;
-/// A bird's room beside the board, and its way in, as shares of the board's
-/// side: how wide the room is and how high both are.
+/// A bird's room beside the board, and the duck's way in, as shares of the
+/// board's side: how wide the room is and how high both are.
 const ROOM_WIDTH: f32 = 0.36;
 const ROOM_HEIGHT: f32 = 0.45;
-/// How tall the crow's way is, in pitches of the face: as tall as the
-/// crow's body.
-const LANE: f32 = 2.0 * crate::crow::body::RADIUS_PITCH;
+/// How high above the ground the crow's way in begins, as a share of the
+/// board's side: over what stands low on the floor, and low enough for the
+/// way to pass below the gap kept round the AM/PM letters in the cabinets'
+/// views and the portrait one.
+const WAY_FOOT: f32 = 0.28;
+/// How tall the crow's way is, as a share of the board's side: as tall as
+/// the crow needs to fly along it.
+const WAY_HEIGHT: f32 = super::crow::PITCH * super::crow::WAY;
+// The crow comes down out of its way into its room, so the one begins below
+// the top of the other.
+const _: () = assert!(WAY_FOOT < ROOM_HEIGHT);
 /// The packed case's width and height, as shares of the board's side.
 const CASE_WIDTH: f32 = 0.5;
 const CASE_HEIGHT: f32 = 0.16;
@@ -187,8 +195,8 @@ impl Stage {
 
     /// The way in and out of the bird on `side`, from the edge of the view
     /// on that side: along the ground to its room for the duck, which walks,
-    /// and for the crow, which flies, through the air just above the rooms
-    /// to above its own, where it comes down.
+    /// and for the crow, which flies, through the air as far as the board,
+    /// over its own room, where it comes down.
     pub fn way(&self, side: Side) -> Area {
         self.ways[side as usize]
     }
@@ -302,10 +310,10 @@ impl Stage {
                     Side::Left => (rails[0], board.min.x),
                     Side::Right => (board.max.x, rails[1]),
                 };
-                let lane = ground + height;
+                let lane = ground + side * WAY_FOOT;
                 let flight = Area::new(
                     Vec2::new(left, lane),
-                    Vec2::new(right, lane + layout.pitch * LANE),
+                    Vec2::new(right, lane + side * WAY_HEIGHT),
                 );
                 let open = |way: Area| {
                     way.width() <= 0.0 || !(way.overlaps(letters) || way.overlaps(above))

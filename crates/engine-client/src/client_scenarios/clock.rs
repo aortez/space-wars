@@ -360,6 +360,7 @@ impl ClientScenario for ClockClientScenario {
             crows: self.state.crow_states(),
             stranded: self.state.stranded_state(),
             spider: self.state.spider_state(),
+            chess: self.state.chess_state(),
             explosion: self.state.explosion_state(),
             coins: self.state.coins_state(),
             lamps: Some(self.state.lamps_state()),

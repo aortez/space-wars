@@ -574,6 +574,9 @@ pub(crate) fn plant_actor_polygons(state: &ClockState) -> Vec<Vec<Vec2>> {
             crow::render(&mut frame, crow, layout);
         }
     }
+    if let Some(visit) = &state.chess_visit {
+        chess::render_crow(&mut frame, visit);
+    }
     if let Some(crate::events::ActiveEvent::Coins(event)) = &state.active_event
         && let Some(magpie) = event.magpie().filter(|magpie| magpie.in_view())
     {
@@ -679,6 +682,9 @@ fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout:
     stranded::render(frame, &state.stranded, state.simulation_tick(), layout);
     if let Some(fixture) = &state.spider {
         spider::render(frame, &fixture.state(&state.arena, &state.published));
+    }
+    if let Some(visit) = &state.chess_visit {
+        chess::render_birds(frame, visit);
     }
     // Kept outside the marquee's face fade and early return. The duck/course
     // retain their own opacity and geometry while clock content transforms.
