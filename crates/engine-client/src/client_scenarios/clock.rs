@@ -20,6 +20,8 @@ pub(super) mod benchmark;
 #[cfg(test)]
 mod capture;
 #[cfg(test)]
+mod chess_tests;
+#[cfg(test)]
 mod digit_surface_tests;
 #[cfg(test)]
 mod floor_tests;
@@ -153,6 +155,11 @@ fn live(
             ),
             arena_fixture: scenario_clock::arena_fixture::FixtureStart::from_override(
                 std::env::var("SPACEWARS_CLOCK_ARENA_FIXTURE")
+                    .ok()
+                    .as_deref(),
+            ),
+            chess_fixture: scenario_clock::chess::FixtureStart::from_override(
+                std::env::var("SPACEWARS_CLOCK_CHESS_FIXTURE")
                     .ok()
                     .as_deref(),
             ),

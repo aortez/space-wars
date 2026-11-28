@@ -730,6 +730,7 @@ fn print_arena(arena: &ClockArenaState) {
                 ClockArenaOwner::Spider => "spider".into(),
                 ClockArenaOwner::Crow => "crow".into(),
                 ClockArenaOwner::Stranded => "stranded".into(),
+                ClockArenaOwner::Chess => "chess".into(),
             };
             format!(
                 "{owner} {}/{} bodies, {}/{} colliders",

@@ -91,6 +91,10 @@ pub(crate) enum Owner {
     /// with its body, and a perch for the digit block it stands on and for
     /// the one it is going to. It stays a while, and a resize ends its stay.
     Stranded,
+    /// The chess board the crow and the duck play on: a temporary prop that
+    /// stands on the floor below the digits, packed or set up. It comes and
+    /// goes with their visit, and a resize ends it.
+    Chess,
 }
 
 impl Owner {
@@ -102,7 +106,8 @@ impl Owner {
 
     /// An owner that rests on the floor, so the arena keeps a floor under it
     /// while no visit's terrain is one. Soil is fixed in place and needs none.
-    /// Falling's batch lands on the floor beside the residents.
+    /// Falling's batch lands on the floor beside the residents, and the chess
+    /// board stands on it.
     fn rests(self) -> bool {
         matches!(
             self,
@@ -110,6 +115,7 @@ impl Owner {
                 | Self::Spider
                 | Self::Crow
                 | Self::Stranded
+                | Self::Chess
                 | Self::Event(ClockEventKind::Falling)
         )
     }
@@ -125,7 +131,11 @@ impl Owner {
     /// An owner that brings no world of its own, so the world keeps the
     /// settings it would be built with while only such owners hold it.
     fn worldless(self) -> bool {
-        self.resident() || matches!(self, Self::Spider | Self::Crow | Self::Stranded)
+        self.resident()
+            || matches!(
+                self,
+                Self::Spider | Self::Crow | Self::Stranded | Self::Chess
+            )
     }
 
     /// Whether the entity `id` is one of this owner's.
@@ -198,6 +208,11 @@ impl Owner {
                     count(&ids::canonical::STRANDED) + count(&ids::canonical::STRANDED_PERCHES);
                 Population::new(bodies, bodies)
             }
+            // The board, packed or set up, with one collider.
+            Self::Chess => Population::new(
+                count(&ids::canonical::CHESS_BOARD),
+                count(&ids::canonical::CHESS_BOARD),
+            ),
         }
     }
 
@@ -245,6 +260,7 @@ impl Owner {
             Self::Spider => &[SPIDER, SPIDER_FRAME, SPIDER_SURFACES],
             Self::Crow => &[CROW, CROW_PERCHES],
             Self::Stranded => &[STRANDED, STRANDED_PERCHES],
+            Self::Chess => &[CHESS_BOARD],
         }
     }
 }
@@ -259,6 +275,7 @@ impl From<Owner> for ClockArenaOwner {
             Owner::Spider => Self::Spider,
             Owner::Crow => Self::Crow,
             Owner::Stranded => Self::Stranded,
+            Owner::Chess => Self::Chess,
         }
     }
 }
@@ -296,19 +313,21 @@ const LARGEST_EVENT: Population = {
 
 /// The most bodies, colliders and joints the arena holds at once: a visit
 /// and the largest event sharing its arena, with the crow, a stranded
-/// spaceling, soil and one arena fixture, and the spider's line. The spider
-/// takes no more room than the largest event, so beside a visit and the
-/// residents it fits where an event would, and it never shares the arena with
-/// an event that has bodies, because the two together do not. The crow can
-/// still be in the air when an event that takes its perches starts, and a
-/// stranded spaceling in its beam, so their room is kept for them, as
-/// [`admits`] says. Everything Clock ships fits, so only residents beyond
-/// those make the arena refuse a claim.
+/// spaceling, the chess board, soil and one arena fixture, and the spider's
+/// line. The spider takes no more room than the largest event, so beside a
+/// visit and the residents it fits where an event would, and it never shares
+/// the arena with an event that has bodies, because the two together do not.
+/// The crow can still be in the air when an event that takes its perches
+/// starts, and a stranded spaceling in its beam, so their room is kept for
+/// them, as [`admits`] says. The chess board's room is its own. Everything
+/// Clock ships fits, so only residents beyond those make the arena refuse a
+/// claim.
 pub const ARENA_CAPACITY: Population = Owner::Visit
     .budget()
     .plus(LARGEST_EVENT)
     .plus(Owner::Crow.budget())
     .plus(Owner::Stranded.budget())
+    .plus(Owner::Chess.budget())
     .plus(Owner::Soil.budget())
     .plus(Owner::Fixture(0).budget())
     .plus(Population {
@@ -318,10 +337,11 @@ pub const ARENA_CAPACITY: Population = Owner::Visit
     });
 
 // Tanks has a separate reservation for chunked terrain and cannot share a
-// visit, the spider or the crow. Its larger collider allowance must not relax
-// admissions for the existing visitor/event combinations. A spaceling its
-// hills leave behind takes its place in the arena as they withdraw, and one
-// stranded earlier is still in its beam as the next fight's hills rise.
+// visit, the spider, the crow or the chess board. Its larger collider
+// allowance must not relax admissions for the existing visitor/event
+// combinations. A spaceling its hills leave behind takes its place in the
+// arena as they withdraw, and one stranded earlier is still in its beam as
+// the next fight's hills rise.
 const TANKS_CAPACITY: Population = crate::events::tanks::POPULATION
     .plus(FLOOR_BUDGET)
     .plus(Owner::Stranded.budget())
@@ -346,9 +366,9 @@ const _: () = assert!(
 pub const MAX_RESIDENT_CLAIMS: usize = 4;
 
 /// The most owners that hold the arena at once: a visit, one event sharing
-/// its arena or the spider, the crow, a stranded spaceling, and the
-/// residents.
-pub const MAX_ARENA_CLAIMS: usize = 4 + MAX_RESIDENT_CLAIMS;
+/// its arena or the spider, the crow, a stranded spaceling, the chess board,
+/// and the residents.
+pub const MAX_ARENA_CLAIMS: usize = 5 + MAX_RESIDENT_CLAIMS;
 
 const _: () = assert!(
     FLOOR_BUDGET
@@ -384,7 +404,8 @@ pub(crate) fn admits(owners: &[Owner]) -> Result<(), Unavailable> {
     if tanks
         && (held.contains(&Owner::Visit)
             || held.contains(&Owner::Spider)
-            || held.contains(&Owner::Crow))
+            || held.contains(&Owner::Crow)
+            || held.contains(&Owner::Chess))
     {
         return Err(Unavailable::Capacity);
     }
@@ -1186,15 +1207,28 @@ mod tests {
                     admits(&[Owner::Event(kind), Owner::Soil, Owner::Fixture(0)]),
                     Ok(())
                 );
-                assert_eq!(
-                    admits(&[Owner::Event(kind), Owner::Visit]),
-                    Err(Unavailable::Capacity)
-                );
+                for other in [Owner::Visit, Owner::Spider, Owner::Crow, Owner::Chess] {
+                    assert_eq!(
+                        admits(&[Owner::Event(kind), other]),
+                        Err(Unavailable::Capacity),
+                        "{other:?}"
+                    );
+                }
                 continue;
             }
             let owners = [
                 Owner::Visit,
                 Owner::Event(kind),
+                Owner::Soil,
+                Owner::Fixture(0),
+            ];
+            assert_eq!(admits(&owners), Ok(()), "{kind:?}");
+            let owners = [
+                Owner::Visit,
+                Owner::Event(kind),
+                Owner::Crow,
+                Owner::Stranded,
+                Owner::Chess,
                 Owner::Soil,
                 Owner::Fixture(0),
             ];
@@ -1477,6 +1511,8 @@ pub(crate) mod ids {
         /// the one it is going to.
         pub(crate) const STRANDED_PERCHES: Range<u64> =
             8710..8710 + crate::stranded::PERCHES as u64;
+        /// The chess board, packed or set up.
+        pub(crate) const CHESS_BOARD: Range<u64> = 8801..8802;
         /// The duel, its monotonic material allocator and reserved conversion tail.
         pub(crate) const TANKS: Range<u64> = 20_000..60_000;
         /// Retained soil, the one resident today that outlives its admitting
@@ -1561,6 +1597,7 @@ pub(crate) mod ids {
             ("MAGPIE", MAGPIE),
             ("STRANDED", STRANDED),
             ("STRANDED_PERCHES", STRANDED_PERCHES),
+            ("CHESS_BOARD", CHESS_BOARD),
             ("SOIL", SOIL),
             ("TEST_OBSTACLES", TEST_OBSTACLES),
         ];

@@ -447,6 +447,8 @@ pub struct ClockConfig {
     pub water_lab: ClockWaterLab,
     /// Development-only arena fixtures, residents from the run's start.
     pub arena_fixture: arena_fixture::FixtureStart,
+    /// Development-only visits to the chess board, staged by the run itself.
+    pub chess_fixture: chess::FixtureStart,
     /// Explicit reproducible full-sun fixture; ordinary Clock remains dim.
     pub favorable_grass_fixture: bool,
     /// Isolate the pre-existing zero-input physiology fixture from sunlight.
@@ -491,6 +493,7 @@ impl Default for ClockConfig {
             duck_direct_flap_landing: false,
             water_lab: ClockWaterLab::Off,
             arena_fixture: arena_fixture::FixtureStart::None,
+            chess_fixture: chess::FixtureStart::None,
             favorable_grass_fixture: false,
             ceiling_sunlight: true,
             lamp_plant_light: true,
@@ -522,6 +525,7 @@ impl ClockConfig {
             duck_direct_flap_landing: self.duck_direct_flap_landing,
             water_lab: self.water_lab,
             arena_fixture: self.arena_fixture,
+            chess_fixture: self.chess_fixture,
             favorable_grass_fixture: self.favorable_grass_fixture,
             ceiling_sunlight: self.ceiling_sunlight,
             lamp_plant_light: self.lamp_plant_light,
@@ -599,8 +603,11 @@ pub struct ClockState {
     // The match the crow and the duck play over their visits, kept for the
     // run.
     chess: chess::Exhibition,
-    // Play at the board, begun only on request until the birds can stage it.
-    chess_play: Option<chess::Play>,
+    // The visit to the board, admitted only on request or by the chess
+    // fixture until the birds can come for it.
+    chess_visit: Option<chess::Visit>,
+    // Ticks the chess fixture has waited without a visit.
+    chess_fixture_wait: u64,
     // The spaceling a Tanks fight's hills left behind, the flag one planted,
     // and what became of those the run has had.
     stranded: stranded::Scene,
@@ -1132,7 +1139,7 @@ impl ClockState {
         // new view if they can come in as they are.
         self.finish_duck_visit();
         self.finish_crow_visit();
-        self.end_chess_play();
+        self.finish_chess_visit();
         self.clear_stranded();
         if self.active_event.is_some() {
             self.finish_event();
@@ -1367,28 +1374,141 @@ impl ClockState {
         &self.chess
     }
 
-    /// Play at the board, while a visit is there.
+    /// The visit to the board, from the packed case's arrival to its
+    /// departure.
+    pub fn chess_visit(&self) -> Option<&chess::Visit> {
+        self.chess_visit.as_ref()
+    }
+
+    /// Play at the board, while the birds play there.
     pub fn chess_play(&self) -> Option<&chess::Play> {
-        self.chess_play.as_ref()
+        self.chess_visit.as_ref().and_then(chess::Visit::play)
     }
 
-    /// Admits a visit to the board and begins play there at once, as though
-    /// the birds had set it up. The visit plays the run's unfinished match,
-    /// or a new one. Refused, changing nothing, while play is under way.
-    pub fn admit_chess_play(&mut self) -> bool {
-        if self.chess_play.is_some() {
-            return false;
+    /// Admits a visit to the board where a stage stands clear below the
+    /// digits, and puts the board there packed, to be set up. The visit
+    /// plays the run's unfinished match, or a new one, with the duck at the
+    /// left where it can be. Refused, changing nothing, while a visit is at
+    /// the board, while an event or a duck's visit has the floor to itself,
+    /// where no stage stands clear, supported and dry, as over an open drain,
+    /// and when the arena cannot take the board.
+    pub fn admit_chess_visit(&mut self) -> Result<(), chess::Refusal> {
+        use chess::stage::{Scene, Side, Stage};
+        if self.chess_visit.is_some() {
+            return Err(chess::Refusal::Busy);
         }
+        if self.duck_visit.is_some()
+            || self.floor.mode() == engine_common::ClockFloorMode::EventOwned
+        {
+            return Err(chess::Refusal::Floor);
+        }
+        let layout = Layout::new(self.aspect_ratio());
+        let support: Vec<_> = self.floor.geometry(layout).support().collect();
+        let plants = self.plant_areas();
+        // The residents stay in the arena's world while an event simulates
+        // apart from it in its own, so the stage keeps clear of both.
+        let worlds: Vec<_> = Self::scene_worlds(&self.arena, self.active_event.as_ref())
+            .into_iter()
+            .flatten()
+            .collect();
+        let scene = Scene {
+            layout,
+            support: &support,
+            worlds: &worlds,
+            plants: &plants,
+            water: self.scene_water(),
+        };
+        let stage = Stage::find(&scene, Side::Left).map_err(chess::Refusal::Stage)?;
+        let mut owners = self.arena_owners();
+        owners.push(arena::Owner::Chess);
+        self.arena.admit(&owners).map_err(chess::Refusal::Arena)?;
         let current = self.chess.admit();
-        self.chess_play = Some(chess::Play::begin(current, chess::Pace::CLOCK));
-        true
+        let world = self.arena.claim_resident(arena::Owner::Chess, layout);
+        self.chess_visit = Some(chess::Visit::new(stage, current, world));
+        Ok(())
     }
 
-    /// Ends play at the board, as packing up or a cancellation does. The
-    /// match keeps every action its game accepted. False when there is no
-    /// play.
-    pub fn end_chess_play(&mut self) -> bool {
-        self.chess_play.take().is_some()
+    /// Asks the visit at the board to pack up and go, as the end of its time
+    /// or a cancellation does. No action is searched for or taken after
+    /// this, and the match keeps every action its game accepted. False when
+    /// there is no visit, or it is packing up already.
+    pub fn pack_chess_visit(&mut self) -> bool {
+        self.chess_visit.as_mut().is_some_and(chess::Visit::pack)
+    }
+
+    /// Stages the chess fixture's visits, one after another: admits the next
+    /// once the board has been away for the fixture's pause, and asks each to
+    /// pack up once it has played for the fixture's time. A visit turned
+    /// away is tried again after another pause.
+    fn drive_chess_fixture(&mut self) {
+        use chess::FixtureStart;
+        if self.config.chess_fixture != FixtureStart::Visits || !self.heard_the_time() {
+            return;
+        }
+        match &self.chess_visit {
+            Some(visit) => {
+                self.chess_fixture_wait = 0;
+                if visit.phase() == chess::Phase::Playing && visit.ticks() >= FixtureStart::PLAY {
+                    self.pack_chess_visit();
+                }
+            }
+            None => {
+                self.chess_fixture_wait += 1;
+                if self.chess_fixture_wait >= FixtureStart::PAUSE {
+                    self.chess_fixture_wait = 0;
+                    let _ = self.admit_chess_visit();
+                }
+            }
+        }
+    }
+
+    /// Takes the board and its visit away at once, with whatever of it is in
+    /// the arena, as when it has gone or a resize ends it.
+    fn finish_chess_visit(&mut self) {
+        if self.chess_visit.take().is_some() {
+            self.arena.release(arena::Owner::Chess);
+        }
+    }
+
+    /// Where the plants' tissue rises above the ground, for a stage to keep
+    /// clear of. Roots stay in the soil.
+    fn plant_areas(&self) -> Vec<chess::stage::Area> {
+        use engine_core::plants::Role;
+        let Some(soil) = &self.soil else {
+            return Vec::new();
+        };
+        let observation = self.plants.plants.observe();
+        observation
+            .tissues
+            .iter()
+            .filter(|tissue| tissue.role != Role::Root)
+            .filter_map(|tissue| {
+                let drawn = match tissue.role {
+                    Role::Shoot => grass::residents::shoot_polygon(tissue, &observation, soil),
+                    Role::Moss => grass::residents::moss_polygon(tissue, soil),
+                    _ => None,
+                };
+                let points = match drawn {
+                    Some(points) => points,
+                    None => {
+                        let center = soil.world_point(tissue.cell)?;
+                        let half = engine_core::Vec2::splat(grass::SOIL_CELL_SIZE * 0.5);
+                        vec![center - half, center + half]
+                    }
+                };
+                chess::stage::Area::around(&points)
+            })
+            .collect()
+    }
+
+    /// The water the active event holds, if it holds any.
+    fn scene_water(&self) -> Option<&engine_water::WaterWorld> {
+        match &self.active_event {
+            Some(ActiveEvent::Aquarium(event)) => Some(&event.water),
+            Some(ActiveEvent::Rain(rain)) => Some(&rain.water),
+            Some(ActiveEvent::Meltdown(melt)) => Some(&melt.water),
+            _ => None,
+        }
     }
 
     pub fn spider_accounting(&self) -> spider::SpiderAccounting {
@@ -2370,6 +2490,14 @@ impl ClockState {
                 .expect("the stranded spaceling's claim keeps a world");
             spaceling.drive(world);
         }
+        // The chess board takes the shape it has now: its case or its square.
+        if let Some(visit) = &mut self.chess_visit {
+            let world = self
+                .arena
+                .held_mut(arena::Owner::Chess)
+                .expect("the chess board's claim keeps a world");
+            visit.drive(world);
+        }
         // The arena's one rigid step this tick, whoever holds it.
         self.arena.step(events::duck::DT);
         if let Some(spider) = &mut self.spider {
@@ -2405,10 +2533,15 @@ impl ClockState {
         }
         self.update_crow(true);
         self.update_stranded(true);
-        // Play at the board takes its tick of the visit.
-        if let Some(play) = &mut self.chess_play {
-            play.tick(&mut self.chess);
+        // The visit to the board takes its tick, and play there with it. A
+        // board that has gone leaves the arena.
+        if let Some(visit) = &mut self.chess_visit {
+            visit.tick(&mut self.chess);
+            if visit.done() {
+                self.finish_chess_visit();
+            }
         }
+        self.drive_chess_fixture();
         let (view, facts) = self.lamp_sight(&layout);
         self.lamps.perceive(
             &Self::scene_worlds(&self.arena, self.active_event.as_ref()),
@@ -2800,7 +2933,8 @@ impl Scenario for ClockScenario {
             crow_visit: None,
             crow_visit_size: None,
             chess: chess::Exhibition::new(seed ^ 0x4348_4553_5300_0000),
-            chess_play: None,
+            chess_visit: None,
+            chess_fixture_wait: 0,
             stranded: stranded::Scene::default(),
             lamps: lamps::Lamps::new(seed),
             floor_light: Vec::new(),

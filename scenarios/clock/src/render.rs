@@ -12,6 +12,7 @@ use engine_core::Vec2;
 mod aquarium;
 pub(crate) mod ceiling;
 mod cell_swap;
+mod chess;
 mod coins;
 mod crow;
 mod digit_slide;
@@ -321,6 +322,9 @@ fn compose(state: &ClockState) -> RenderFrame {
                 );
             }
         }
+    }
+    if let Some(visit) = &state.chess_visit {
+        chess::render(&mut frame, visit, &state.chess);
     }
     for fixture in state.arena_fixtures() {
         for ball in &fixture.balls {

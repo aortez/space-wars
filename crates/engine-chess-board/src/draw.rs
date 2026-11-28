@@ -7,11 +7,13 @@ use engine_common::{
 
 use crate::mask::Corner;
 use crate::pieces;
-use crate::{Board, Detail, FRAME, Orientation, Presentation, Transition};
+use crate::{Board, Detail, Edge, FRAME, Presentation, Transition};
 
-const FRAME_COLOR: RenderColor = RenderColor::rgb(0.30, 0.21, 0.14);
-const LIGHT: RenderColor = RenderColor::rgb(0.87, 0.80, 0.66);
-const DARK: RenderColor = RenderColor::rgb(0.55, 0.42, 0.30);
+/// The frame's colour, and the light and the dark squares', for a host that
+/// draws the board as it comes and goes in its own way.
+pub const FRAME_COLOR: RenderColor = RenderColor::rgb(0.30, 0.21, 0.14);
+pub const LIGHT: RenderColor = RenderColor::rgb(0.87, 0.80, 0.66);
+pub const DARK: RenderColor = RenderColor::rgb(0.55, 0.42, 0.30);
 const OUTLINE: RenderColor = RenderColor::rgb(0.05, 0.04, 0.04);
 const TURN: RenderColor = RenderColor::rgb(0.96, 0.72, 0.22);
 
@@ -138,6 +140,7 @@ pub(crate) fn placements(
     });
     let standing = squares()
         .filter(|&square| carried.iter().all(|&(_, from, _)| from != square))
+        .filter(|&square| !presentation.hidden.contains(square))
         .filter_map(|square| {
             let piece = shown.piece_at(square)?;
             Some(Placed {
@@ -150,6 +153,7 @@ pub(crate) fn placements(
     let progress = motion.map_or(0.0, |transition| transition.progress.clamp(0.0, 1.0));
     let moving = carried
         .into_iter()
+        .filter(|&(_, from, _)| !presentation.hidden.contains(from))
         .map(|(piece, from, to)| {
             let (from, to) = (board.square_rect(from).min, board.square_rect(to).min);
             Placed {
@@ -266,20 +270,29 @@ impl Painter<'_> {
     /// Lights the frame along the side of the player to move.
     fn turn(&mut self, side: Color) {
         let board = self.board;
-        let bounds = board.bounds();
+        let RenderRect { min, max } = board.bounds();
         let frame = board.square * FRAME;
-        let near = (side == Color::White) == (board.orientation == Orientation::WhiteAtBottom);
-        let (bottom, top) = if near {
-            (bounds.min.y, bounds.min.y + frame)
-        } else {
-            (bounds.max.y - frame, bounds.max.y)
+        let corner = board.corner();
+        let squares = 8.0 * board.square;
+        let (min, max) = match board.orientation.edge(side) {
+            Edge::Bottom => (
+                RenderPoint::new(corner.x, min.y),
+                RenderPoint::new(corner.x + squares, min.y + frame),
+            ),
+            Edge::Top => (
+                RenderPoint::new(corner.x, max.y - frame),
+                RenderPoint::new(corner.x + squares, max.y),
+            ),
+            Edge::Left => (
+                RenderPoint::new(min.x, corner.y),
+                RenderPoint::new(min.x + frame, corner.y + squares),
+            ),
+            Edge::Right => (
+                RenderPoint::new(max.x - frame, corner.y),
+                RenderPoint::new(max.x, corner.y + squares),
+            ),
         };
-        let left = board.corner().x;
-        let rect = RenderRect {
-            min: RenderPoint::new(left, bottom),
-            max: RenderPoint::new(left + 8.0 * board.square, top),
-        };
-        self.rect(rect, TURN);
+        self.rect(RenderRect { min, max }, TURN);
     }
 
     /// The light squares as one area, then each square of another colour,
