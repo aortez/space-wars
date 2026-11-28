@@ -216,7 +216,7 @@ impl Bot {
         let confident = if policy == CpuPolicy::Plotted {
             self.plotted_hit()
         } else {
-            self.aim.confident
+            self.aim.bracket.confident
         };
         policy.moves()
             && self.relocation.is_none()
@@ -251,7 +251,7 @@ impl Bot {
             });
             self.relocations += 1;
             self.require_shot = true;
-            self.aim.confident = false;
+            self.aim.bracket.confident = false;
             self.plot = None;
             // Gate firing before the drive ramp changes measured velocity.
             self.mode = "relocating after hit";
@@ -262,7 +262,7 @@ impl Bot {
     }
 
     fn react_to_hit(&mut self, state: &Duel, physics: &PhysicsWorld, player: usize) {
-        let destination = state.escape_destination(physics, player, self.aim.elevation);
+        let destination = state.escape_destination(physics, player, self.aim.bracket.elevation);
         if destination.is_some() && self.try_shot_priority(state, physics, player) {
             self.considered_hit = self.hit_serial;
         } else {
@@ -320,7 +320,7 @@ impl Bot {
         }
         self.mode = if state.config.cpu_policy[player] == CpuPolicy::Plotted {
             self.plot.as_ref().map_or("waiting to plot", Plot::mode)
-        } else if self.aim.confident {
+        } else if self.aim.bracket.confident {
             "aim acquired"
         } else {
             "ranging"
@@ -392,8 +392,8 @@ impl Duel {
         let aim = &mut self.bots[player].aim;
         aim.refresh(geometry);
         self.tanks[player].facing = (geometry.target.x - geometry.shooter.x).signum();
-        self.tanks[player].elevation = aim.elevation;
-        self.tanks[player].speed = aim.power;
+        self.tanks[player].elevation = aim.bracket.elevation;
+        self.tanks[player].speed = aim.bracket.power;
     }
 
     pub(super) fn record_launch(
@@ -474,7 +474,7 @@ impl Duel {
                 bot.mode = "waiting to plot";
             } else {
                 bot.aim.learn(&result);
-                bot.mode = if bot.aim.confident {
+                bot.mode = if bot.aim.bracket.confident {
                     "aim acquired"
                 } else {
                     "ranging"

@@ -18,6 +18,8 @@ use crate::world::weapon::{Blast, BlastPush};
 use engine_core::Vec2;
 use engine_material::{Region, SHELL, Section, point_velocity};
 
+pub mod bracket;
+
 /// The lowest a barrel aims above the horizontal, in radians.
 pub const MIN_ELEVATION: f32 = 5.0_f32.to_radians();
 /// The highest a barrel aims above the horizontal, in radians.

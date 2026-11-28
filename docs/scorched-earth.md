@@ -340,6 +340,9 @@ by bisection. A hill or blocked barrel raises the arc by 10°, up to 80°. An ac
 damaging shot passing within 2.5 units of the target establishes a useful
 solution. Weak splash damage alone does not stop calibration. These are initial
 playtesting thresholds, not a guarantee of a hit within a fixed number of shots.
+The bracket, its steps and its cap are the cannon's own
+(`engine_rapier::cannon::bracket`), so that tanks elsewhere range by the same
+rules. Scorched supplies the flat-ground estimate and says how each shell fell.
 
 Each launch retains its owner, actual muzzle/velocity, angle/power, tank poses
 and shot ID. A bounded flight observation records closest approach and crossing
