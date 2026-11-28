@@ -597,7 +597,11 @@ In the plant runtime, wood stays lightweight tissue on cells, with no bodies,
 colliders or loads. Garden Lab's tree bed can hang its trees' wood on hinges as
 bodies while they grow, their cells the shape the wood rests in
 ([Physical wood](garden-lab.md#physical-wood-224)), held in the dirt by their
-roots ([Roots that hold](garden-lab.md#roots-that-hold-225)).
+roots ([Roots that hold](garden-lab.md#roots-that-hold-225)). A trench there
+can lay roots bare or cut their dirt loose
+([Trenches and loose dirt](garden-lab.md#trenches-and-loose-dirt-225)): a root
+holds loose dirt but takes nothing from it, since it is no longer the support
+the root grew on.
 `engine-material`'s `TissueTable` gains a wood entry in the same role order.
 The grass and moss policies act only on their own tissue, so wood in a shared
 runtime counts only toward the runtime's ceilings.

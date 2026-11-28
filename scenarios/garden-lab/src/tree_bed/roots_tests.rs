@@ -9,7 +9,7 @@
 use super::*;
 
 /// The grown conifer, at rest.
-fn grown() -> TreeBed {
+pub(super) fn grown() -> TreeBed {
     let mut bed = TreeBed::new(42);
     while bed.plants.observe().tick < 600 {
         bed.tick();
@@ -18,7 +18,7 @@ fn grown() -> TreeBed {
 }
 
 /// The grown conifer with its wood physical, hanging as it stood.
-fn standing() -> TreeBed {
+pub(super) fn standing() -> TreeBed {
     let mut bed = grown();
     bed.command(Command::PhysicalWood);
     hold(&mut bed, 8.0);
@@ -26,7 +26,7 @@ fn standing() -> TreeBed {
 }
 
 /// Move the bodies alone for `seconds`, the trees' clock held.
-fn hold(bed: &mut TreeBed, seconds: f32) {
+pub(super) fn hold(bed: &mut TreeBed, seconds: f32) {
     for _ in 0..(seconds / WOOD_DT).round() as u32 {
         bed.step_wood(WOOD_DT);
     }
@@ -44,7 +44,7 @@ fn cut(bed: &mut TreeBed, cell: [i32; 2]) {
 }
 
 /// Turn the wind up to the gale.
-fn gale(bed: &mut TreeBed) {
+pub(super) fn gale(bed: &mut TreeBed) {
     while WINDS[bed.wood.wind.level].0 != "gale" {
         bed.command(Command::Wind);
     }
@@ -115,7 +115,7 @@ fn fastest(bed: &TreeBed) -> f32 {
 }
 
 /// The bed's longest line of text, in characters.
-fn longest_line(bed: &TreeBed) -> usize {
+pub(super) fn longest_line(bed: &TreeBed) -> usize {
     bed.render_frame()
         .layers
         .into_iter()
@@ -390,7 +390,7 @@ fn a_root_that_pulled_out_grips_nothing_again() {
     // The dirt lets go of the seed's root, as a load would make it.
     let o = bed.plants.observe();
     let seed = o.tissues.iter().find(|t| t.cell == TREE_ORIGIN).unwrap();
-    let joint = bed.wood.plates[&1].anchors[&seed.id];
+    let joint = bed.wood.plates[&1].anchors[&seed.id].joint;
     assert!(bed.pull(joint));
     assert!(!bed.pull(joint));
     assert_eq!(bed.anchors().len(), 31);
@@ -469,7 +469,7 @@ fn a_dead_tree_stands_on_the_roots_it_died_with_and_leans_in_the_wind() {
     assert!(
         dead.anchors
             .values()
-            .all(|j| bed.world.connection(*j).is_some())
+            .all(|hold| bed.world.connection(hold.joint).is_some())
     );
     hold(&mut bed, 5.0);
     let upright = bed.plate_moved(&dead).unwrap().turn();

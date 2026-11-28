@@ -221,7 +221,8 @@ impl ClientScenario for GardenLabClientScenario {
                 .iter()
                 .map(|a| {
                     serde_json::json!({
-                        "tissue":a.tissue,"cell":a.cell,"utilization":a.utilization,"pull":a.pull,
+                        "tissue":a.tissue,"cell":a.cell,"dirt":a.dirt.value(),
+                        "utilization":a.utilization,"pull":a.pull,
                     })
                 })
                 .collect();
@@ -253,6 +254,26 @@ impl ClientScenario for GardenLabClientScenario {
                 "work":work,"bodies":bed.world().body_count(),"colliders":bed.world().collider_count(),
                 "summary":bed.wood_summary(),"roots":roots,"wind":wind,
             });
+            // The dirt as trenches have left it: the trenches dug, the cells
+            // they hold open, the cells filled back in and the anchors they
+            // laid bare, then each loose block of dirt with its entity, its
+            // cells, where it lies and its turn in radians, and the anchors
+            // that grip it.
+            let blocks: Vec<_> = bed
+                .blocks()
+                .iter()
+                .map(|b| {
+                    serde_json::json!({
+                        "entity":b.entity.value(),"cells":b.cells,
+                        "position":[b.position.x, b.position.y],"angle":b.angle,
+                        "anchors":b.anchors,
+                    })
+                })
+                .collect();
+            let dirt = serde_json::json!({
+                "trenches":bed.dirt.trenches,"open":bed.dirt.dug.len(),"filled":bed.dirt.filled,
+                "bared":bed.dirt.bared,"blocks":blocks,"summary":bed.dirt_summary(),
+            });
             serde_json::json!({
                 "tick":bo.tick,"seed":bo.seed,
                 "run_state":if bo.tick >= scenario_garden_lab::TREE_MAX_TICKS { "complete" } else if bed.paused { "lab_paused" } else { "running" },
@@ -267,7 +288,7 @@ impl ClientScenario for GardenLabClientScenario {
                 "intake":bo.ledger.intake,"maintenance":bo.ledger.maintenance,
                 "growth":bo.ledger.growth,"loss":bo.ledger.loss,"unmet":bo.ledger.unmet,
                 "probes":bed.probes,"work":[bed.work.rays,bed.work.footprint_tests,bed.work.collider_records],
-                "wood":wood,
+                "wood":wood,"dirt":dirt,
             })
         });
         // Selection walks bed tissue, then standing rock tissue.
@@ -1084,6 +1105,96 @@ mod tests {
         let down = capture("roots-uprooted", &s);
         for (held, down) in held.into_iter().zip(down) {
             assert!(down > held + 1000, "the fallen tree invisible: {down}");
+        }
+    }
+    #[test]
+    fn garden_render_contract_tree_bed_a_root_ball_cut_loose_tips_into_its_trench_in_a_gale() {
+        let output =
+            std::env::var_os("SPACEWARS_GARDEN_RENDER_ARTIFACTS").map(std::path::PathBuf::from);
+        if let Some(dir) = &output {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        let near = |p: &slint::Rgb8Pixel, c: [u8; 3]| {
+            (i16::from(p.r) - i16::from(c[0])).abs() < 12
+                && (i16::from(p.g) - i16::from(c[1])).abs() < 12
+                && (i16::from(p.b) - i16::from(c[2])).abs() < 12
+        };
+        // The dirt's brown and grey dead wood, at both viewports.
+        let capture = |name: &str, s: &GardenLabState| -> Vec<[usize; 2]> {
+            let frame = GardenLabScenario::render_frame(s);
+            let mut found = Vec::new();
+            for (w, h) in [(1280u32, 720u32), (800, 480)] {
+                let viewport = Viewport::new(w as f32, h as f32);
+                let pixels = raster(&frame, viewport);
+                let count = |c: [u8; 3]| pixels.as_slice().iter().filter(|p| near(p, c)).count();
+                found.push([count([71, 48, 26]), count([128, 102, 102])]);
+                let export = svg(&frame, viewport);
+                assert!(!export.contains("NaN"));
+                if let Some(dir) = &output {
+                    let stem = format!("tree-{name}-{w}x{h}");
+                    write_png(&dir.join(format!("{stem}-raster.png")), &pixels);
+                    std::fs::write(dir.join(format!("{stem}-vector.svg")), &export).unwrap();
+                }
+            }
+            if let Some(dir) = &output {
+                let bed = s.shown_tree_bed().unwrap();
+                let state = serde_json::json!({"simulation_seconds":bed.plants.observe().tick,
+                    "tree":bed.tree_summary(),"wood":bed.wood_summary(),
+                    "roots":bed.roots_summary(),"dirt":bed.dirt_summary(),"preview_only":true});
+                std::fs::write(
+                    dir.join(format!("tree-{name}-state.json")),
+                    serde_json::to_vec_pretty(&state).unwrap(),
+                )
+                .unwrap();
+            }
+            found
+        };
+        let mut s = GardenLabScenario::init((), 42);
+        s.command(Command::TreeBed);
+        let bed = s.tree_bed.as_mut().unwrap();
+        while bed.plants.observe().tick < 600 {
+            bed.tick();
+        }
+        // With the bed paused, each step moves the bodies and holds the
+        // trees' clock.
+        s.command(Command::PhysicalWood);
+        s.command(Command::Pause);
+        let step = |s: &mut GardenLabState, seconds: f32| {
+            for _ in 0..(seconds * 60.0).round() as u32 {
+                s.command(Command::Step);
+            }
+        };
+        step(&mut s, 8.0);
+        let whole = capture("dirt-whole", &s);
+        // Trenches beside the conifer's roots, to windward and then to lee,
+        // cut its root ball loose, with the anchors of all its roots.
+        s.command(Command::Dig);
+        s.command(Command::Dig);
+        step(&mut s, 4.0);
+        let bed = s.shown_tree_bed().unwrap();
+        let blocks: Vec<_> = bed.blocks().iter().map(|b| (b.cells, b.anchors)).collect();
+        assert_eq!(blocks, [(72, 0), (48, 32)]);
+        let loose = capture("dirt-loose", &s);
+        // The gale tips it into the trench to lee until it meets the far
+        // wall, which stops it so short that the conifer's top snaps.
+        s.command(Command::Wind);
+        s.command(Command::Wind);
+        step(&mut s, 12.0);
+        let bed = s.shown_tree_bed().unwrap();
+        let ball = bed.blocks()[1];
+        assert!(
+            (ball.angle + (1.0f32 / 8.0).asin()).abs() < 0.002,
+            "{ball:?}"
+        );
+        assert_eq!((bed.wood.breaks, bed.wood.pulls), (1, 0));
+        assert_eq!(bed.plants.observe().tick, 600);
+        let tipped = capture("dirt-tipped", &s);
+        for ((whole, loose), tipped) in whole.into_iter().zip(loose).zip(tipped) {
+            // The trenches show sixteen cells less dirt.
+            assert!(loose[0] < whole[0] * 96 / 100, "{loose:?} after {whole:?}");
+            assert!(loose[0] > whole[0] * 90 / 100, "{loose:?} after {whole:?}");
+            // The snapped top lies grey.
+            assert!(tipped[1] > loose[1] + 500, "{tipped:?} after {loose:?}");
         }
     }
 }

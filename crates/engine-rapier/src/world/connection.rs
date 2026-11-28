@@ -7,7 +7,9 @@
 //! the beam's own bending stiffness holds the held body's turn about the root.
 //! An anchor holds a body in its support as the ground holds a root: springs
 //! with the beam's own stiffness hold it along the beam, across it and in its
-//! turn, so that several anchors share a load by where they hold.
+//! turn, so that several anchors share a load by where they hold. A
+//! connection's root end can pass to another body where it lies, as when the
+//! dirt that holds a root breaks away with it.
 //! Callers name a connection by a stable joint identity and never see the
 //! backend's joint types. See `docs/design/material-connection-loads.md`.
 
@@ -491,6 +493,71 @@ impl PhysicsWorld {
         }
         self.remove_joint(id);
         true
+    }
+
+    /// Hand a live connection's root end to another body, where its root
+    /// section now lies, as when the dirt that holds a root breaks away from
+    /// the ground with it. The connection holds on as it held: both its
+    /// frames stay where they now lie, so it keeps the give it has, and it
+    /// keeps its springs, its beam, the work it has absorbed and its last
+    /// load. From the next step the new root body takes what the old one
+    /// took, and contacts between the new pair stay off while it holds.
+    ///
+    /// Refused, with nothing changed, when `id` names no connection, the
+    /// connection has severed, or `root_body` is missing or is the body the
+    /// connection holds.
+    pub fn rebind_connection(
+        &mut self,
+        id: JointId,
+        root_body: BodyId,
+    ) -> Result<(), ConnectionRejection> {
+        use ConnectionRejection as R;
+        let record = self.connections.get(&id).ok_or(R::Missing)?;
+        if record.failure.is_some() {
+            return Err(R::Exhausted);
+        }
+        let Some(new_root) = self.body_handle(root_body) else {
+            return Err(R::Bodies);
+        };
+        if root_body == record.body {
+            return Err(R::Bodies);
+        }
+        let index = *self
+            .joint_indices
+            .get(&id)
+            .expect("a live connection has its joint");
+        let entry = self.joints[index];
+        let joint = self
+            .raw
+            .impulse_joints
+            .get(entry.handle)
+            .expect("a live connection has its joint");
+        let (old_root, held) = (joint.body1(), joint.body2());
+        let mut data = joint.data;
+        let lying = *self.raw.bodies[old_root].position() * data.local_frame1;
+        data.local_frame1 = self.raw.bodies[new_root].position().inverse() * lying;
+        self.invalidate_gravity(super::GravityInvalidation::ExternalEdit);
+        self.raw.remove_impulse_joint(entry.handle);
+        let handle = self.raw.insert_impulse_joint(new_root, held, data);
+        self.joints[index] = JointEntry {
+            body_a: root_body,
+            handle,
+            ..entry
+        };
+        if entry.body_a.entity != entry.body_b.entity
+            && let Some(record) = self.entities.get_mut(&entry.body_a.entity)
+        {
+            record.joints.retain(|joint| *joint != id);
+        }
+        let joints = &mut self.entities.entry(root_body.entity).or_default().joints;
+        if !joints.contains(&id) {
+            joints.push(id);
+        }
+        self.connections
+            .get_mut(&id)
+            .expect("checked above")
+            .root_body = root_body;
+        Ok(())
     }
 
     /// Give a live connection a new beam where it is joined, as wood does

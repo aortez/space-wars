@@ -94,6 +94,8 @@ pub enum Command {
     LightSnow,
     HeavySnow,
     Wind,
+    Dig,
+    Fill,
 }
 impl Command {
     pub fn action(self) -> Action {
@@ -147,6 +149,8 @@ impl Command {
             Self::LightSnow,
             Self::HeavySnow,
             Self::Wind,
+            Self::Dig,
+            Self::Fill,
         ]
         .get(*v as usize)
         .copied()
@@ -806,7 +810,9 @@ impl GardenLabState {
             | Command::PhysicalWood
             | Command::LightSnow
             | Command::HeavySnow
-            | Command::Wind => {}
+            | Command::Wind
+            | Command::Dig
+            | Command::Fill => {}
         }
     }
     /// Time passes only for the bed that is shown.

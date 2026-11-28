@@ -62,9 +62,9 @@ pub struct Plate {
     /// The tree's seed, the root its trunk stands on.
     pub seed: u64,
     /// The anchor of each root that grips, by its tissue.
-    pub anchors: BTreeMap<u64, JointId>,
+    pub anchors: BTreeMap<u64, Hold>,
     /// Where it lay when it was built, at the seed's cell.
-    rest: Vec2,
+    pub(super) rest: Vec2,
     /// Its roots' mass in its body's frame, when it was last shaped.
     mass: ColliderMassProperties,
     /// Its anchors' identities count up from one, and are never reused.
@@ -91,6 +91,16 @@ impl Plate {
     }
 }
 
+/// Where a root's anchor holds: its joint, the body of the dirt it grips,
+/// the bed's or a loose block's, and the cell of that dirt it grips, in the
+/// dirt's own frame.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Hold {
+    pub joint: JointId,
+    pub dirt: BodyId,
+    pub cell: [i32; 2],
+}
+
 /// A dead tree's root plate, with the drawing its roots had, in grey. It
 /// holds the dead tree by the anchors it had left.
 #[derive(Clone, Debug)]
@@ -106,6 +116,8 @@ pub struct DeadPlate {
 pub struct Anchor {
     pub tissue: u64,
     pub cell: [i32; 2],
+    /// The entity of the dirt it grips: the bed's, or a loose block's.
+    pub dirt: PhysicsId,
     /// Its last load over its safe limit.
     pub utilization: f32,
     /// The force it carried along its root, positive where the root is
@@ -172,8 +184,10 @@ impl TreeBed {
         }
     }
 
-    /// Whether a root at `cell` lies in dirt, and so grips it.
-    fn grips(&self, cell: [i32; 2]) -> bool {
+    /// The dirt a root at `cell` grips, which its plate has carried to `at`:
+    /// the bed's where the bed has dirt at its cell, else a loose block's
+    /// where it now lies. Its body and its cell there.
+    fn grips(&self, cell: [i32; 2], at: Vec2) -> Option<(BodyId, [i32; 2])> {
         uptake(
             &self.world,
             &self.assembly,
@@ -182,7 +196,8 @@ impl TreeBed {
             self.availability,
         )
         .soil(cell)
-        .is_some()
+        .map(|_| (self.assembly.body(), cell))
+        .or_else(|| self.loose_dirt(at))
     }
 
     /// Bring the root plates in step with the trees' roots, before the next
@@ -257,27 +272,34 @@ impl TreeBed {
                 .collect();
             for id in shed {
                 let plate = self.wood.plates.get_mut(&organism).unwrap();
-                if let Some(joint) = plate.anchors.remove(&id) {
-                    self.world.remove_connection(joint);
+                if let Some(hold) = plate.anchors.remove(&id) {
+                    self.world.remove_connection(hold.joint);
                 }
             }
             for &(t, parent) in &tree.roots {
                 let plate = &self.wood.plates[&organism];
-                if plate.anchors.contains_key(&t.id)
-                    || self.wood.pulled.contains(&t.id)
-                    || !self.grips(t.cell)
-                {
+                if plate.anchors.contains_key(&t.id) || self.wood.pulled.contains(&t.id) {
                     continue;
                 }
-                self.anchor(organism, t, parent);
+                let moved = self.plate_moved(plate);
+                let at = moved.map_or(self.at(t.cell), |m| m.apply(self.at(t.cell)));
+                if let Some(dirt) = self.grips(t.cell, at) {
+                    self.anchor(organism, t, parent, dirt);
+                }
             }
         }
     }
 
-    /// Anchor root `t` of the tree `organism` in the dirt where its plate
-    /// has carried its cell, along the way it grew: from the root it grew
-    /// from, or for the seed downward.
-    fn anchor(&mut self, organism: u64, t: &Tissue, parent: Option<&Tissue>) {
+    /// Anchor root `t` of the tree `organism` in `dirt`, the body and cell
+    /// of the dirt it grips, where its plate has carried its cell, along the
+    /// way it grew: from the root it grew from, or for the seed downward.
+    fn anchor(
+        &mut self,
+        organism: u64,
+        t: &Tissue,
+        parent: Option<&Tissue>,
+        (dirt, cell): (BodyId, [i32; 2]),
+    ) {
         let plate = &self.wood.plates[&organism];
         let moved = self.plate_moved(plate);
         let at = moved.map_or(self.at(t.cell), |m| m.apply(self.at(t.cell)));
@@ -289,7 +311,7 @@ impl TreeBed {
             .insert_anchor(
                 joint,
                 AnchorSpec {
-                    support: self.assembly.body(),
+                    support: dirt,
                     body,
                     at,
                     axis: along.rotate_radians(moved.map_or(0.0, |m| m.turn())),
@@ -300,7 +322,7 @@ impl TreeBed {
             .expect("a fresh anchor between the dirt and a root plate");
         let plate = self.wood.plates.get_mut(&organism).unwrap();
         plate.joints += 1;
-        plate.anchors.insert(t.id, joint);
+        plate.anchors.insert(t.id, Hold { joint, dirt, cell });
     }
 
     /// How a plate's body has moved from where it was built.
@@ -452,7 +474,7 @@ impl TreeBed {
             let Some(tissue) = plate
                 .anchors
                 .iter()
-                .find(|(_, anchor)| **anchor == joint)
+                .find(|(_, hold)| hold.joint == joint)
                 .map(|(&tissue, _)| tissue)
             else {
                 continue;
@@ -494,10 +516,11 @@ impl TreeBed {
         }
     }
 
-    /// Dead wood and dead roots that have fallen out of the bed are cleared
-    /// away.
+    /// Dead wood, dead roots and loose dirt that have fallen out of the bed
+    /// are cleared away.
     pub(super) fn sweep(&mut self) {
         let floor = self.at([0, 0]).y - 0.5 - LOST_BELOW;
+        self.sweep_dirt(floor);
         let lost = |world: &PhysicsWorld, body: BodyId| {
             world.motion(body).is_none_or(|m| m.position.y < floor)
         };
@@ -530,11 +553,12 @@ impl TreeBed {
             .plates
             .values()
             .flat_map(|plate| &plate.anchors)
-            .filter_map(|(&tissue, &joint)| {
-                let state = self.world.connection(joint)?;
+            .filter_map(|(&tissue, hold)| {
+                let state = self.world.connection(hold.joint)?;
                 Some(Anchor {
                     tissue,
                     cell: *cells.get(&tissue)?,
+                    dirt: hold.dirt.entity,
                     utilization: state.load.utilization,
                     pull: [state.load.axial, state.load.shear],
                 })
