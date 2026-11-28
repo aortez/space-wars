@@ -237,7 +237,7 @@ fn a_round_leaves_at_the_muzzle_at_the_launch_velocity_or_where_a_blocked_barrel
     let s = state.tank_snapshot(tank).unwrap();
     // The hull carries the pivot along at more than a unit a second.
     assert!(s.mount_velocity.length() > 1.0, "{:?}", s.mount_velocity);
-    state.fire_tanks();
+    state.fire_and_record_tanks();
     let [round] = rounds(&state, tank)[..] else {
         panic!("{:?}", state.debris);
     };
@@ -253,7 +253,8 @@ fn a_round_leaves_at_the_muzzle_at_the_launch_velocity_or_where_a_blocked_barrel
         round.tank_round,
         Some(TankRound {
             tank,
-            allegiance: FIRST
+            allegiance: FIRST,
+            shot: state.tank_shots(tank).next().unwrap().id
         })
     );
     // It is the shared cannon's round, in the shared cannon's casing, which
@@ -295,7 +296,7 @@ fn a_round_leaves_at_the_muzzle_at_the_launch_velocity_or_where_a_blocked_barrel
         let rock = state.debris[0].position;
         aim(&mut state, tank, 30.0, 1.0, 30.0, true);
         let s = state.tank_snapshot(tank).unwrap();
-        state.fire_tanks();
+        state.fire_and_record_tanks();
         let [round] = rounds(&state, tank)[..] else {
             panic!("{:?}", state.debris);
         };
@@ -335,7 +336,7 @@ fn a_round_leaves_at_the_muzzle_at_the_launch_velocity_or_where_a_blocked_barrel
     let hull = world.cast_ray(s.mount_position, along, options).unwrap();
     let entity = state.physics.tanks.actors[&tank].assembly.entity();
     assert_eq!(hull.collider.entity, entity);
-    state.fire_tanks();
+    state.fire_and_record_tanks();
     let [round] = rounds(&state, tank)[..] else {
         panic!("{:?}", state.debris);
     };
@@ -354,7 +355,7 @@ fn a_round_passes_through_its_own_tank_for_exactly_eight_steps_and_meets_another
     // hull until the step it meets something.
     for (tank, steps) in [(own, cannon::CLEARANCE_TICKS + 1), (other, 1)] {
         aim(&mut state, own, 85.0, 1.0, 30.0, true);
-        state.fire_tanks();
+        state.fire_and_record_tanks();
         aim(&mut state, own, 85.0, 1.0, 30.0, false);
         for step in 1..=steps {
             let hull = state.physics.world.motion(chassis(&state, tank)).unwrap();
@@ -390,7 +391,7 @@ fn a_round_falls_by_the_planets_gravity_every_tick() {
     let tank = place(&mut state, Vec2::Y, 0.0, GOVERNMENT);
     idle(&mut state, 30);
     aim(&mut state, tank, 85.0, 1.0, cannon::MAX_POWER, true);
-    state.fire_tanks();
+    state.fire_and_record_tanks();
     aim(&mut state, tank, 85.0, 1.0, cannon::MAX_POWER, false);
     let planet = state.planets[0];
     let [mut before] = rounds(&state, tank)[..] else {
@@ -557,6 +558,7 @@ fn a_direct_hit_and_a_blast_name_the_side_of_the_tank_that_fired() {
         let round = TankRound {
             tank: TankId(1),
             allegiance,
+            shot: TankShotId::NONE,
         };
         DebrisState::new_tank_round(round, 0, Vec2::ZERO, Vec2::ZERO)
     };

@@ -1049,6 +1049,31 @@ impl SpacewarsPhysics {
         self.pre_step_motions.get(&entity).copied()
     }
 
+    /// Where the center of mass of the body that carries `entity` is, and
+    /// how it moves: a rover's or a tank's chassis, or the one body of a
+    /// ship, a pilot on foot or a piece of debris. None for anything else,
+    /// and while the world holds no such body.
+    pub(super) fn carried_motion(&self, entity: MechanicalEntity) -> Option<(Vec2, Vec2)> {
+        let body = match entity {
+            MechanicalEntity::Ship(index) if index < SPACEWARS_PLAYER_COUNT => {
+                primary_body(ship_entity(index))
+            }
+            MechanicalEntity::Spaceling(index) => primary_body(
+                super::surface_sortie::pilot_physics_id(PlayerId::from_index(index)?),
+            ),
+            MechanicalEntity::Rover(id) => self.rovers.get(&id)?.assembly.bodies()[0],
+            MechanicalEntity::Tank(entity) => self
+                .tanks
+                .chassis_body(super::tanks::TankId::of_entity(entity)?)?,
+            MechanicalEntity::Debris(id) if self.debris_keys.contains_key(&id) => {
+                primary_body(PhysicsId::new(id))
+            }
+            _ => return None,
+        };
+        let motion = self.world.motion(body)?;
+        Some((self.world.center_of_mass(body)?, motion.linear_velocity))
+    }
+
     fn contact_closing_speed(
         &self,
         a: MechanicalEntity,

@@ -72,6 +72,8 @@ pub(super) struct TerrainState {
     previous_controls: [bool; 2],
     pub removed_cells: u64,
     pub cannon_hits: u64,
+    /// The shells that terrain stopped in this step, by physics id.
+    pub cannon_struck: Vec<u64>,
     pub budget_skips: u64,
     motion_trace: Option<motion_trace::MotionTrace>,
 }
@@ -96,6 +98,7 @@ impl Default for TerrainState {
             previous_controls: [false; 2],
             removed_cells: 0,
             cannon_hits: 0,
+            cannon_struck: Vec::new(),
             budget_skips: 0,
             motion_trace: None,
         }
@@ -507,6 +510,7 @@ fn reconcile_support(state: &mut SpacewarsState) {
 }
 
 pub(super) fn queue_cannon_hits(state: &mut SpacewarsState) {
+    state.terrain.cannon_struck.clear();
     if state.terrain.planets.is_empty() {
         return;
     }
@@ -546,10 +550,11 @@ pub(super) fn queue_cannon_hits(state: &mut SpacewarsState) {
         }
     }
     state.terrain.budget_skips += hits.len().saturating_sub(MAX_CANNON_HITS) as u64;
-    for (ordinal, (_, (shell, edit))) in hits.into_iter().enumerate() {
+    for (ordinal, (id, (shell, edit))) in hits.into_iter().enumerate() {
         // A projectile is consumed by its first solid hit, including when this
         // tick's work budget is full. It cannot drill by resting on the ground.
         state.debris[shell].dead = true;
+        state.terrain.cannon_struck.push(id);
         if ordinal < MAX_CANNON_HITS {
             loose::queue_hit(&mut state.terrain, edit);
             state.terrain.cannon_hits += 1;

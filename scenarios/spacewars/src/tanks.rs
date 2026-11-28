@@ -9,7 +9,8 @@
 //!
 //! Each tank's cannon fires the shared cannon's rounds by its rules, in
 //! [`cannon`], as Scorched Earth's tanks do. A round is a shell in the host's
-//! debris, a body in the world from the step it is fired in.
+//! debris, a body in the world from the step it is fired in. Each shot has a
+//! record of how it left, flew and ended: its [`TankShot`].
 
 use std::collections::BTreeMap;
 
@@ -23,6 +24,13 @@ use engine_rapier::{
 };
 
 use crate::{Allegiance, DebrisState};
+
+#[path = "tanks_shot_records.rs"]
+mod shot_records;
+pub use shot_records::{
+    ENDED_SHOTS, SHOT_HARMS, ShotApproach, ShotBody, ShotEnd, ShotFlight, ShotHarm, ShotLaunch,
+    ShotOutcome, ShotStop, TankShot, TankShotId, TargetMotion,
+};
 
 pub const MAX_TANKS: usize = 16;
 /// A tank's health when placed, with its armor whole.
@@ -109,11 +117,17 @@ pub struct TankCommand {
     /// Whether the trigger is held. A held trigger fires each time the cannon
     /// may.
     pub fire: bool,
+    /// The body the shots fired under this command are meant for, if any. It
+    /// labels their records, so that they tell how the target moved and how
+    /// close each round came. It changes nothing about a round or what the
+    /// round can hit.
+    pub target: Option<ShotBody>,
 }
 
 impl Default for TankCommand {
     /// No drive and no brake, the barrel 45° up toward the side clockwise of
-    /// up at the power halfway between the limits, and the trigger released.
+    /// up at the power halfway between the limits, the trigger released, and
+    /// no target.
     fn default() -> Self {
         Self {
             drive: 0.0,
@@ -122,16 +136,18 @@ impl Default for TankCommand {
             facing: 1.0,
             power: (cannon::MIN_POWER + cannon::MAX_POWER) * 0.5,
             fire: false,
+            target: None,
         }
     }
 }
 
-/// The tank whose cannon fired a round, and the side that tank fights for,
-/// which the round's hits name.
+/// The tank whose cannon fired a round, the side that tank fights for, which
+/// the round's hits name, and the shot whose record the round's flight fills.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TankRound {
     pub tank: TankId,
     pub allegiance: Allegiance,
+    pub shot: TankShotId,
 }
 
 #[derive(Debug, Clone)]
@@ -230,6 +246,12 @@ pub struct TankStepAudit {
 pub struct Tanks {
     actors: BTreeMap<TankId, Tank>,
     next_id: u64,
+    /// How many shots the tanks have fired, which names the next. Removal and
+    /// clearing never rewind it either.
+    shots_fired: u64,
+    /// The records of the tanks' shots, by shot: each round in flight, and
+    /// the last [`ENDED_SHOTS`] of each live tank's shots to end.
+    shots: BTreeMap<TankShotId, TankShot>,
     work: TankWork,
     admission: TankAdmissionWork,
     audit: TankStepAudit,
@@ -281,6 +303,11 @@ impl Tanks {
     /// The live tank whose physics entity has the value `entity`.
     pub(crate) fn by_entity(&self, entity: u64) -> Option<TankId> {
         TankId::of_entity(entity).filter(|id| self.actors.contains_key(id))
+    }
+
+    /// Tank `id`'s chassis, which carries its motion.
+    pub(crate) fn chassis_body(&self, id: TankId) -> Option<BodyId> {
+        Some(self.actors.get(&id)?.assembly.bodies()[0])
     }
 
     /// Where tank `id`'s chassis is, and the side it fights for: what its hits
@@ -579,15 +606,20 @@ impl Tanks {
         }
     }
 
+    /// Takes tank `id` out of the world. Its ended shots' records go with
+    /// it, and its rounds in flight keep theirs until they end.
     pub fn remove(&mut self, physics: &mut PhysicsWorld, id: TankId) -> bool {
         let Some(tank) = self.actors.remove(&id) else {
             return false;
         };
+        self.forget_ended_shots(id);
         tank.assembly.remove(physics)
     }
 
     /// Takes each tank whose armor has failed out of the world and returns its
-    /// wreck. A tank leaves once, and nothing replaces it.
+    /// wreck. A tank leaves once, and nothing replaces it. Its ended shots'
+    /// records go with it, and its rounds in flight keep theirs until they
+    /// end.
     pub(crate) fn remove_failed(&mut self, physics: &mut PhysicsWorld) -> Vec<Wreck> {
         let failed: Vec<_> = self
             .actors
@@ -598,6 +630,7 @@ impl Tanks {
         let mut wrecks = Vec::with_capacity(failed.len());
         for id in failed {
             let tank = self.actors.remove(&id).expect("each failed tank is live");
+            self.forget_ended_shots(id);
             let bodies = tank
                 .assembly
                 .bodies()
@@ -621,10 +654,13 @@ impl Tanks {
         wrecks
     }
 
+    /// Takes every tank out of the world, and drops every shot's record. A
+    /// round still in flight flies on without one.
     pub fn clear(&mut self, physics: &mut PhysicsWorld) {
         for (_, tank) in std::mem::take(&mut self.actors) {
             tank.assembly.remove(physics);
         }
+        self.shots.clear();
     }
 }
 
@@ -1115,6 +1151,7 @@ mod tests {
                 facing: 1.0,
                 power: 30.0,
                 fire: false,
+                target: None,
             }
         );
         // Each value is held to its range, and any input below zero faces the
@@ -1129,6 +1166,7 @@ mod tests {
                 facing: -0.25,
                 power: 100.0,
                 fire: true,
+                target: Some(ShotBody::Ship(1)),
             }
         ));
         assert_eq!(tanks.snapshot(&physics, b).unwrap(), before);
@@ -1139,6 +1177,7 @@ mod tests {
             facing: -1.0,
             power: cannon::MAX_POWER,
             fire: true,
+            target: Some(ShotBody::Ship(1)),
         };
         assert_eq!(tanks.snapshot(&physics, a).unwrap().command, held);
         let low = TankCommand {
@@ -1328,6 +1367,7 @@ impl super::SpacewarsState {
 
     pub fn clear_tanks(&mut self) {
         self.physics.tanks.clear(&mut self.physics.world);
+        self.tank_shots_ended.clear();
     }
 
     /// Fires each tank that holds its trigger, in id order, where the shared
@@ -1335,17 +1375,25 @@ impl super::SpacewarsState {
     /// [`cannon::MAX_ROUNDS_PER_CANNON`] of its rounds and [`cannon::MAX_ROUNDS`]
     /// tanks' rounds in all are in flight. A round leaves where the barrel's
     /// cast stops, or else at the muzzle, at the velocity the cannon gives it.
-    /// Runs before the step's debris takes its bodies.
-    pub(super) fn fire_tanks(&mut self) {
+    /// Runs before the step's debris takes its bodies. Returns the record
+    /// that each shot fired starts, for [`Self::record_tank_shots`] to keep
+    /// once the world holds the step's bodies. A refused shot starts none.
+    #[must_use = "each round fired names a record that the step must keep"]
+    pub(super) fn fire_tanks(&mut self) -> Vec<TankShot> {
         let mut flying: Vec<TankId> = self
             .debris
             .iter()
             .filter(|item| !item.dead)
             .filter_map(|item| item.tank_round.map(|round| round.tank))
             .collect();
-        let tanks = &mut self.physics.tanks;
+        let mut fired = Vec::new();
+        let Tanks {
+            actors,
+            shots_fired,
+            ..
+        } = &mut self.physics.tanks;
         let world = &self.physics.world;
-        for (&id, tank) in &mut tanks.actors {
+        for (&id, tank) in actors {
             let own = flying.iter().filter(|&&tank| tank == id).count();
             if !tank.command.fire
                 || cannon::may_fire(self.tick, tank.reloaded, own, flying.len()).is_err()
@@ -1359,6 +1407,7 @@ impl super::SpacewarsState {
                 continue;
             };
             let (direction, barrel) = tank.barrel(motion.position, motion.angle);
+            let mut blocked = false;
             let position = barrel.exit(|from, along| {
                 let options = RayCastOptions {
                     max_distance: along.length(),
@@ -1366,7 +1415,9 @@ impl super::SpacewarsState {
                     exclude_entity: Some(tank.assembly.entity()),
                     ..Default::default()
                 };
-                world.cast_ray(from, along, options).map(|hit| hit.point)
+                let met = world.cast_ray(from, along, options).map(|hit| hit.point);
+                blocked = met.is_some();
+                met
             });
             let carriage = Carriage::new(motion, center);
             let velocity =
@@ -1374,13 +1425,38 @@ impl super::SpacewarsState {
             let round = TankRound {
                 tank: id,
                 allegiance: tank.allegiance,
+                shot: TankShotId::next(shots_fired),
             };
+            let launch = ShotLaunch {
+                tick: self.tick,
+                elevation: tank.command.elevation,
+                facing: tank.command.facing,
+                power: tank.command.power,
+                up: tank.up(motion.angle),
+                hull: motion,
+                pivot: barrel.pivot,
+                direction,
+                position,
+                velocity,
+                blocked,
+                target: None,
+            };
+            fired.push(TankShot::fired(round, tank.command.target, launch));
             tank.reloaded = self.tick + cannon::RELOAD_TICKS;
             self.debris.push(DebrisState::new_tank_round(
                 round, self.tick, position, velocity,
             ));
             flying.push(id);
         }
+        fired
+    }
+
+    /// Fires the tanks and keeps their shots' records at once, for a test
+    /// that reads a round before a step moves it.
+    #[cfg(test)]
+    pub(crate) fn fire_and_record_tanks(&mut self) {
+        let fired = self.fire_tanks();
+        self.record_tank_shots(fired);
     }
 
     /// Lets each round pass through the tank that fired it on its first
