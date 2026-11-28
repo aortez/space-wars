@@ -183,6 +183,51 @@ requires the same build. A new run can start from compatible saved genomes.
 Measure time per generation on the Pi with the same command as on desktop.
 [#755](https://github.com/aortez/space-wars/issues/755)
 
+### Running the Clock trainer
+
+Build the runner with `cargo build --locked --profile ci -p engine-agent`.
+Choose a new directory on the workstation or Pi for each run. These commands
+start a population, change settings during a run, explicitly resume a stopped
+run, and compare its champion against scripted and random play.
+
+```sh
+target/ci/engine-agent train duck-clock --population 50 --generations 100 --seed 1 --out "$run_dir"
+target/ci/engine-agent edit "$run_dir" --case-mix platforms --cases-per-generation 4
+target/ci/engine-agent resume "$run_dir"
+target/ci/engine-agent evaluate "$run_dir" --partition qualification --pattern platforms --cases 10 --seed 112702
+```
+
+Use `--stop-after N` on train or resume to return at a generation boundary.
+An edit reports the first generation that will use it. The job stores each
+scored candidate population by genome hash, the winning case and controls by
+generation, and the generation summaries in `generations.jsonl`.
+`--start-from FILE` on train starts a new population with a saved genome.
+
+### First learning run
+
+Fifty randomly initialized C3 policies trained for 70 generations at seed 1.
+Each candidate initially saw two mixed cases. An edit switched to four
+Platforms cases per candidate at generation 16. Mutation probability and
+scale changed from 0.16 and 0.25 to 0.10 and 0.09 at generation 27.
+The selection compared saved winners on mirrored validation cases before
+running generation 56 on two fresh suites. Each suite contained ten pairs.
+
+| Fresh cases | Learned exits | Random exits | Scripted exits | Learned pairs with exits from both doors |
+| --- | ---: | ---: | ---: | ---: |
+| Platforms, seed 112702 | 6/20 | 0/20 | 20/20 | 0/10 |
+| Mixed courses, seed 112701 | 9/20 | 0/20 | 20/20 | 0/10 |
+
+All learned exits came from the right entrance. The scripted controller
+exited from both doors in every pair. The generation 56 scored replay clears
+four obstacles and exits at tick 1,401. Its genome ID is
+`d674d885595f8bdce20c3b06ea92ebda0e40f855d1337f6f2331186ba4be223e`.
+
+For a smaller repeatable timing run, use `--population 4 --cases-per-generation
+2 --generations 2 --workers 2 --seed 1` with the optimized CI profile. The
+two generations took 1.22 s and 0.91 s on the Ryzen desktop and 6.41 s and
+5.46 s on sw-picade-2 (Pi 4). Both runs produced the same champion ID and
+ordered score terms in both generations.
+
 ## Watching and steering
 
 Put the duck alongside ship arrivals in Training. **Current** follows a
