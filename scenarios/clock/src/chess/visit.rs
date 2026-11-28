@@ -1,38 +1,43 @@
-//! One visit to the board, from the duck's arrival with the packed case to
-//! its departure with it.
+//! One visit to the board, from the birds' arrival to their departure.
 //!
 //! A [`Visit`] is admitted with its [`Stage`] found and the arena's claim
 //! granted. The duck walks in with the board packed in its case, sets the
-//! case down where the board is to stand, and steps back to its seat. As
-//! soon as it is clear of the board's place the case opens out, and the
-//! pieces of the match in hand come out onto their squares, each player's
-//! from its own back rank outward. Then the birds
-//! play, as [`Play`] paces them, until the host asks the visit to pack up.
-//! No action is searched for or taken after that: the pieces go back, the
-//! board folds into its case, and the duck picks the case up and walks out
-//! with it. The match keeps every action its game accepted.
+//! case down where the board is to stand, and steps back to its seat.
+//! Meanwhile the crow flies in on the other side and comes down at its own
+//! seat. As soon as the duck is clear of the board's place the case opens
+//! out, and the pieces of the match in hand come out onto their squares,
+//! each player's from its own back rank outward. Then the birds play, as
+//! [`Play`] paces them, until the host asks the visit to pack up. No action
+//! is searched for or taken after that: the pieces go back, the board folds
+//! into its case, the crow flies out, and the duck picks the case up and
+//! walks out with it. The match keeps every action its game accepted.
 //!
 //! What the board shows always comes from the match's game as it stands, so
 //! the pieces set out, those in play and a move in motion are of one
 //! revision. Packed, it shows none.
 //!
-//! In the arena the visit has two bodies. The [`Duck`]'s is there from the
-//! visit's admission until the duck has walked out. The board's is fixed, in
-//! the chess board's identity, and shaped as the board is drawn: the case
-//! while it stands on the ground, and the board's square from the moment the
-//! case opens until the board has folded up again. The case the duck holds
-//! is no body.
+//! In the arena the visit has three bodies. The [`Duck`]'s is there from the
+//! visit's admission until the duck has walked out, and the [`Crow`]'s until
+//! the crow has flown out. The board's is fixed, in the chess board's
+//! identity, and shaped as the board is drawn: the case while it stands on
+//! the ground, and the board's square from the moment the case opens until
+//! the board has folded up again. The case the duck holds is no body.
 //!
 //! The duck sets the case down, and the case opens, only while the board's
-//! place is clear of every other body. Where something has come to stand
-//! there since the stage was found, the duck takes the case away as it
-//! brought it.
+//! place is clear of every other body, the crow's among them. Where
+//! something has come to stand there since the stage was found, the duck
+//! takes the case away as it brought it.
 //!
 //! A duck that is late on its way in turns back, and one late to its seat
 //! takes the board away again. A duck that is late to the case or on its way
 //! out, or whose body has left the scene, cannot take the board away. The
 //! visit is then over where it stands, and the host takes what is left of
 //! it out of the arena.
+//!
+//! A crow that is late to its seat flies out again, and the visit packs up.
+//! So it does when the crow's body has left the scene some other way than
+//! the crow flies out. A crow that is late on its way out leaves the arena
+//! where it is. The duck takes the board away in each case.
 
 use engine_chess::{Action, Color, Outcome, PieceKind, Position, Square};
 use engine_chess_board::{Board, Presentation, Squares, Transition};
@@ -42,6 +47,7 @@ use engine_rapier::world::{
     PhysicsWorld,
 };
 
+use super::crow::{self, Crow};
 use super::duck::{self, Duck, Task};
 use super::stage::{Area, Side, Stage};
 use super::{Bird, Event, Exhibition, Pace, Play, Pose};
@@ -139,6 +145,7 @@ pub struct Visit {
     /// The board's shape in the arena, as last driven. It has none while the
     /// duck has the case.
     shape: Option<Shape>,
+    crow: Crow,
     duck: Duck,
     /// The visit ended where it stood, with no duck to take the board away.
     abandoned: bool,
@@ -147,7 +154,8 @@ pub struct Visit {
 impl Visit {
     /// The visit `exhibition` has just admitted to its match in hand, on
     /// `stage` in the view `layout` lays out. The arena's claim was granted,
-    /// and the duck goes into `world`, out of the view with the case.
+    /// and the birds go into `world`, out of the view: the duck with the
+    /// case on its side, and the crow on the other.
     pub(crate) fn new(
         stage: Stage,
         layout: Layout,
@@ -172,6 +180,7 @@ impl Visit {
             packing: false,
             down: false,
             shape: None,
+            crow: Crow::new(&stage, layout, world),
             duck: Duck::new(&stage, layout, world),
             abandoned: false,
         }
@@ -200,6 +209,11 @@ impl Visit {
         self.play.as_ref()
     }
 
+    /// The visit's crow.
+    pub fn crow(&self) -> &Crow {
+        &self.crow
+    }
+
     /// The visit's duck.
     pub fn duck(&self) -> &Duck {
         &self.duck
@@ -213,11 +227,13 @@ impl Visit {
         }
     }
 
-    /// Whether the visit is over: the duck has gone with the case and its
-    /// door has closed behind it, or the visit ended where it stood.
+    /// Whether the visit is over: the crow has gone, and the duck with the
+    /// case, and its door has closed behind it. Or the visit ended where it
+    /// stood.
     pub fn done(&self) -> bool {
         self.abandoned
             || (self.phase == Phase::Leaving
+                && self.crow.task() == crow::Task::Gone
                 && self.duck.task() == Task::Gone
                 && self.duck.door_closed())
     }
@@ -231,7 +247,8 @@ impl Visit {
     /// Asks the visit to pack up: no action is searched for or taken from
     /// now on. A move on its way still arrives, a board still being set up
     /// is put away from where it got to, and a duck still bringing the case
-    /// takes it away again. False if the visit is packing up already.
+    /// takes it away again, as the crow flies out again. False if the visit
+    /// is packing up already.
     pub fn pack(&mut self) -> bool {
         if self.packing {
             return false;
@@ -264,9 +281,11 @@ impl Visit {
         })
     }
 
-    /// The duck takes the case away, from whatever it is doing with it.
+    /// The birds go: the crow flies out from wherever it is, and the duck
+    /// takes the case away, from whatever it is doing with it.
     fn leave(&mut self) {
         self.enter(Phase::Leaving);
+        self.crow.leave();
         match self.duck.task() {
             Task::Bringing => self.duck.begin(Task::Turning),
             Task::Lowering => self.duck.lift_again(),
@@ -276,40 +295,66 @@ impl Visit {
     }
 
     /// The visit gives up on its board before it has opened: the duck takes
-    /// the case away, and nothing is played.
+    /// the case away, the crow flies out, and nothing is played.
     fn give_up(&mut self) {
         self.packing = true;
         self.play = None;
         self.leave();
     }
 
-    /// The visit is over where it stands. Its duck leaves `world` at once,
+    /// The visit is over where it stands. Its birds leave `world` at once,
     /// and its board with the next shape it is given.
     fn abandon(&mut self, world: &mut PhysicsWorld) {
         self.abandoned = true;
         self.packing = true;
         self.play = None;
         self.down = false;
+        self.crow.remove(world);
         self.duck.remove(world);
         self.enter(Phase::Leaving);
     }
 
     /// Whether the board's place in `world` is clear of every body but the
-    /// visit's own.
+    /// board's own and the duck's, which sets the board down there. The
+    /// crow's is not excepted: it has no business there.
     fn clear(&self, world: &PhysicsWorld) -> bool {
         let own = [PhysicsId::new(canonical::CHESS_BOARD.start), duck::ENTITY];
         self.stage.board.is_clear_in(world, &own)
     }
 
     /// Has the duck go on with the case as far as it has got, gives the
-    /// board in `world` the shape it has now, and steers the duck for the
+    /// board in `world` the shape it has now, and steers the birds for the
     /// step to come. The host calls this before the arena's step.
     pub fn drive(&mut self, world: &mut PhysicsWorld) {
         if !self.abandoned {
+            self.direct_crow(world);
             self.direct(world);
         }
         self.shape_board(world);
+        self.crow.drive(world);
         self.duck.drive(world);
+    }
+
+    /// What a crow that cannot do what it is doing does instead, and the end
+    /// of its flight out.
+    fn direct_crow(&mut self, world: &mut PhysicsWorld) {
+        let task = self.crow.task();
+        if task == crow::Task::Gone {
+            return;
+        }
+        if self.crow.lost() {
+            // Its body left the scene some other way than the crow flies
+            // out. What is left of it goes, and the visit packs up.
+            self.crow.remove(world);
+            self.pack();
+        } else if task == crow::Task::Coming && self.crow.late() {
+            // Late to its seat, it flies out again, and the visit packs up.
+            self.crow.leave();
+            self.pack();
+        } else if task == crow::Task::Going && (self.crow.away() || self.crow.late()) {
+            // Out of the view, or late on its way out, it leaves the arena.
+            self.crow.remove(world);
+        }
     }
 
     /// The duck's next task with the case, once it has done its last, and
@@ -415,13 +460,15 @@ impl Visit {
         self.shape = shape;
     }
 
-    /// Takes one tick of the visit: reads the duck back from `world` after
+    /// Takes one tick of the visit: reads the birds back from `world` after
     /// the arena's step, plays a tick at the board while the birds play
     /// there, and returns what they did in it. The host calls this for each
     /// tick that moves time.
     pub fn tick(&mut self, exhibition: &mut Exhibition, world: &PhysicsWorld) -> Option<Event> {
+        self.crow.observe(world);
         self.duck.observe(world);
         let event = self.advance(exhibition);
+        self.crow.set_pose(self.pose(Bird::Crow, exhibition));
         self.duck.set_pose(self.pose(Bird::Duck, exhibition));
         event
     }
@@ -593,6 +640,17 @@ impl Visit {
             .filter(|current| current.seed == self.session);
         let board = self.stage.board;
         let mut actors = Vec::new();
+        if self.crow.present() {
+            let at = self.crow.position();
+            actors.push(ClockChessActor {
+                bird: ClockChessBird::Crow,
+                white: current.is_some_and(|current| current.bird(Color::White) == Bird::Crow),
+                pose: self.pose(Bird::Crow, exhibition),
+                position_milli: [milli(at.x), milli(at.y)],
+                facing_right: self.crow.facing_right(),
+                carrying: false,
+            });
+        }
         if self.duck.present() {
             let at = self.duck.position();
             actors.push(ClockChessActor {

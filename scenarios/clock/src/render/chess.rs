@@ -1,17 +1,20 @@
 //! The chess board below the digits: packed in its case, opening out of it
 //! into a board, set up with the match's pieces, and folding away again. And
-//! the duck that brings it, plays at it and takes it away.
+//! the birds at it: the duck that brings it, plays at it and takes it away,
+//! and the crow that flies in to play.
 //!
 //! The board stands on the floor in front of the plants, so it is drawn on
 //! the floor's layer after them. The spotlights do not warm that layer, and
-//! the board keeps the colours its pieces were qualified in. The duck is
-//! drawn as a visiting duck is, by the same silhouette on the same layer, in
-//! front of the board and of the case it holds.
+//! the board keeps the colours its pieces were qualified in. Each bird is
+//! drawn as the Clock's other birds of its kind are, by the same silhouette
+//! on the same layer: the duck in front of the board and of the case it
+//! holds, and the crow in front of the board and behind the frame it flies
+//! in over.
 
 use engine_chess_board::{DARK_SQUARE, FRAME_COLOR, FRAME_SHARE, LIGHT_SQUARE};
 
 use super::*;
-use crate::chess::{Exhibition, Show, Visit, duck::Duck, stage::Area};
+use crate::chess::{Exhibition, Show, Visit, crow::Crow, duck::Duck, stage::Area};
 
 #[cfg(test)]
 mod tests;
@@ -19,6 +22,9 @@ mod tests;
 // The duck is drawn in front of its board and of the case it holds, and
 // behind the door it comes through.
 const _: () = assert!(ARENA_LAYER < ACTIVE_CELL_LAYER && ACTIVE_CELL_LAYER < frame::DOOR_LAYER);
+// The crow is drawn in front of the board, and behind the frame it flies in
+// over.
+const _: () = assert!(ARENA_LAYER < CREATURE_LAYER && CREATURE_LAYER < frame::FRAME_LAYER);
 
 /// The case's lid line, as a share of its height from its foot, and its
 /// width as a share of the case's height.
@@ -48,9 +54,31 @@ pub(super) fn render(frame: &mut RenderFrame, visit: &Visit, exhibition: &Exhibi
 
 /// The visit's birds, drawn with the Clock's other visitors.
 pub(super) fn render_birds(frame: &mut RenderFrame, visit: &Visit) {
+    render_crow(frame, visit);
     let duck = visit.duck();
     if duck.present() {
         super::duck::silhouette(frame, &pose(duck), &|point| point);
+    }
+}
+
+/// The visit's crow, while it is in the scene.
+pub(super) fn render_crow(frame: &mut RenderFrame, visit: &Visit) {
+    let crow = visit.crow();
+    if crow.present() {
+        super::crow::silhouette(frame, &crow_pose(crow));
+    }
+}
+
+/// The chess crow as its silhouette is drawn.
+fn crow_pose(crow: &Crow) -> super::crow::Pose {
+    super::crow::Pose {
+        position: crow.position(),
+        pitch: crow.pitch(),
+        facing_right: crow.facing_right(),
+        pecking: crow.bowed(),
+        wing: crow.wing(),
+        lean: crow.lean(),
+        hop: crow.hop(),
     }
 }
 

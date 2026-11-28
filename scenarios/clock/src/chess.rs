@@ -31,6 +31,7 @@ use engine_common::background::{Background, Steps};
 
 use crate::events::FIXED_HZ;
 
+pub mod crow;
 pub mod duck;
 pub mod stage;
 #[cfg(test)]

@@ -10,8 +10,8 @@
 //!
 //! A bird flies in and out of the view over its frame, so the frame's walls
 //! do not stop it: it is in one of the arena's bird groups, each crow of a
-//! visit in its own and the magpie in the first crow's, which they filter
-//! out.
+//! visit in its own and the magpie and the chess board's crow in the first
+//! crow's, which they filter out.
 //!
 //! The digit cells are bodies only during the events that make them so, so
 //! a visit of crows brings a perch for each column they may land on: a fixed
@@ -75,6 +75,9 @@ pub(crate) const fn crow(member: usize) -> Bird {
         crate::arena::crow(member),
     )
 }
+
+/// The body of the crow at the chess board, in the arena.
+pub(crate) const CHESS_CROW: Bird = Bird::new(canonical::CHESS_CROW.start, crate::arena::BIRD);
 
 /// The magpie's body, in whichever world the coins lie in.
 pub(crate) const MAGPIE: Bird = Bird::new(canonical::MAGPIE.start, crate::arena::BIRD);

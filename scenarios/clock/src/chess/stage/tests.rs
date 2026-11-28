@@ -124,7 +124,7 @@ fn assert_staged(stage: &Stage, scene: &Scene<'_>, name: &str) {
     }
     // The rooms stand at the board's sides. The duck's way runs along the
     // ground from its rail to its room, and the crow's from its rail through
-    // the air just above the rooms to above its own.
+    // the air to the board, over its own room.
     assert_eq!(stage.room(Side::Left).max.x, board.min.x, "{name}");
     assert_eq!(stage.room(Side::Right).min.x, board.max.x, "{name}");
     let left = stage.way(Side::Left);
@@ -145,10 +145,19 @@ fn assert_staged(stage: &Stage, scene: &Scene<'_>, name: &str) {
     assert_eq!(crow.0, crow.1, "{name}: the crow flies to above its room");
     assert_eq!(walk.min.y, layout.floor_y, "{name}: the duck walks in");
     assert_eq!(walk.max.y, room(duck).max.y, "{name}");
-    assert_eq!(
-        flight.min.y,
-        room(duck.other()).max.y,
-        "{name}: the crow flies in"
+    // The crow's way is as tall as the crow needs. It begins above the
+    // ground and below the top of the crow's room, so the crow comes down
+    // out of the one into the other, and it ends below the top of the board.
+    let side = board.width();
+    assert_eq!(flight.min.y, layout.floor_y + side * WAY_FOOT, "{name}");
+    assert!(
+        (flight.height() - side * crate::chess::crow::PITCH * crate::chess::crow::WAY).abs() < 1e-3,
+        "{name}: {}",
+        flight.height()
+    );
+    assert!(
+        flight.min.y < room(duck.other()).max.y,
+        "{name}: the crow comes down into its room"
     );
     assert!(flight.max.y <= board.max.y, "{name}");
     assert!(stage.board.contains(stage.case()), "{name}");
@@ -444,9 +453,24 @@ fn a_view_a_little_short_of_room_gives_up_part_of_the_gap_for_the_least_board() 
     // There the crow's way on the right would pass within the gap kept round
     // the letters, so the duck takes the right and the crow flies in on the
     // left.
-    let lane = stage.room(Side::Right).max.y + LANE * layout.pitch;
+    let lane = stage.ground() + stage.side() * (WAY_FOOT + WAY_HEIGHT);
     assert!(lane > letters(layout).grown(BELOW_FACE * layout.pitch).min.y);
     assert_eq!(stage.duck, Side::Right);
+    // At the sizes the board is qualified at it passes below that gap, and
+    // the duck takes the left.
+    for (name, aspect) in SIZES {
+        let layout = Layout::new(aspect);
+        let support = closed(layout);
+        let stage = Stage::find(&self::scene(layout, &support, &[]), Side::Left).unwrap();
+        let lane = stage.ground() + stage.side() * (WAY_FOOT + WAY_HEIGHT);
+        let kept = letters(layout).grown(BELOW_FACE * layout.pitch).min.y;
+        assert!(lane <= kept, "{name}: {lane} and {kept}");
+        eprintln!(
+            "{name}: the crow's way ends {:.1} below the gap round the letters",
+            kept - lane
+        );
+        assert_eq!(stage.duck, Side::Left, "{name}");
+    }
 
     // A view with room for the whole gap keeps it.
     for (name, aspect) in SIZES {

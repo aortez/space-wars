@@ -151,6 +151,10 @@ const FLAG_OFFSET: f32 = 0.22;
 /// and how long it waits before it looks for a clearer place again.
 const BIRD_CLEAR: f32 = 3.0;
 const WARY_TICKS: u64 = SECOND;
+/// How many places it may have to keep clear of crows at: where each crow of
+/// a visit to the face is and where it is going, and the same for the crow
+/// at the chess board.
+pub(crate) const BIRDS: usize = 2 * (crate::crow::MAX_CROWS + 1);
 /// How far from the middle of its block, and how far below its top, its feet
 /// may be, in pitches, before it has been knocked off it.
 const OFF_BLOCK: f32 = CELL_HALF;
@@ -419,8 +423,8 @@ pub(crate) struct Surroundings<'a> {
     /// Whether Falling's bars fall in the world it stands in, where they can
     /// meet it.
     pub falling: bool,
-    /// Where each crow of a visit is, and where it is going.
-    pub birds: [Option<Vec2>; 2 * crate::crow::MAX_CROWS],
+    /// Where each crow in the scene is, and where it is going.
+    pub birds: [Option<Vec2>; BIRDS],
     /// The digits the face shows.
     pub digits: [Option<u8>; DIGIT_SLOT_COUNT],
     /// The run's tick.

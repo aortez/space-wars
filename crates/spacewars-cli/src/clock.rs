@@ -1071,19 +1071,30 @@ mod tests {
             phase_tick: 120,
             actions: 17,
             board_milli: [-45_067, -201_600, 45_067, -111_467],
-            actors: vec![ClockChessActor {
-                bird: ClockChessBird::Duck,
-                white: false,
-                pose: ClockChessPose::Arriving,
-                position_milli: [-250_683, -194_660],
-                facing_right: true,
-                carrying: true,
-            }],
+            actors: vec![
+                ClockChessActor {
+                    bird: ClockChessBird::Crow,
+                    white: true,
+                    pose: ClockChessPose::Arriving,
+                    position_milli: [78_402, -187_310],
+                    facing_right: false,
+                    carrying: false,
+                },
+                ClockChessActor {
+                    bird: ClockChessBird::Duck,
+                    white: false,
+                    pose: ClockChessPose::Arriving,
+                    position_milli: [-250_683, -194_660],
+                    facing_right: true,
+                    carrying: true,
+                },
+            ],
         };
         assert_eq!(
             chess_lines(&chess),
             [
                 "Chess visit #3: match 2, arriving, phase tick=120, actions=17, board=[-45067, -201600, 45067, -111467]",
+                "Chess visit #3 crow: plays White, arriving, position=[78402, -187310], facing right=false, carrying=false",
                 "Chess visit #3 duck: plays Black, arriving, position=[-250683, -194660], facing right=true, carrying=true",
             ]
         );
