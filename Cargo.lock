@@ -1574,6 +1574,7 @@ dependencies = [
  "engine-common",
  "engine-core",
  "rayon",
+ "scenario-clock",
  "scenario-line-mover",
  "scenario-spacewars",
  "serde",

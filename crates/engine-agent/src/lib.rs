@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 
 pub mod brain_assembly;
+pub mod duck_recipe;
 pub mod evolution;
 pub mod genome_library;
 pub mod line_diagnostic;
